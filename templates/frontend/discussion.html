@@ -1,0 +1,229 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}{{ post.title }} - Discussion Hub{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-8">
+    <!-- Post Content -->
+    <div class="bg-card border border-border rounded-lg p-6">
+        <div class="flex items-start justify-between mb-4">
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-medium">
+                    {{ post.user.username|first|upper }}
+                </div>
+                <div>
+                    <p class="font-medium text-foreground">{{ post.user.username }}</p>
+                    <p class="text-sm text-muted-foreground">{{ post.created_at|date:"M j, Y g:i A" }}</p>
+                </div>
+            </div>
+            <span class="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-sm">
+                {{ post.category }}
+            </span>
+        </div>
+
+        <h1 class="text-2xl font-bold text-foreground mb-4">{{ post.title }}</h1>
+
+        {% if post.content %}
+        <div class="text-foreground mb-6 whitespace-pre-wrap">{{ post.content }}</div>
+        {% endif %}
+
+        <div class="flex items-center space-x-4 text-sm text-muted-foreground">
+            <span>{{ yes_comments.count }} Yes votes</span>
+            <span>{{ no_comments.count }} No votes</span>
+        </div>
+    </div>
+
+    <!-- Comments Section -->
+    <div class="space-y-6">
+        <h2 class="text-xl font-bold text-foreground">Discussion</h2>
+
+        {% if user.is_authenticated %}
+        <!-- Add Comment Form -->
+        <div class="bg-card border border-border rounded-lg p-6">
+            <h3 class="text-lg font-semibold mb-4">Share your thoughts</h3>
+            <form method="post" action="{% url 'create_comment' post.id %}">
+                {% csrf_token %}
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Your stance</label>
+                        <div class="flex space-x-4">
+                            <label class="flex items-center">
+                                <input type="radio" name="vote_type" value="yes" required
+                                       class="mr-2 text-primary focus:ring-primary">
+                                <span class="text-green-600 font-medium">Agree</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="vote_type" value="no" required
+                                       class="mr-2 text-primary focus:ring-primary">
+                                <span class="text-red-600 font-medium">Disagree</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Your comment (optional)</label>
+                        <textarea name="content" rows="3"
+                                  class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                  placeholder="Explain your position..."></textarea>
+                    </div>
+                    <button type="submit"
+                            class="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90">
+                        Post Comment
+                    </button>
+                </div>
+            </form>
+        </div>
+        {% else %}
+        <div class="bg-secondary border border-border rounded-lg p-6 text-center">
+            <p class="text-muted-foreground mb-4">Join the discussion by signing in</p>
+            <a href="{% url 'login' %}" class="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90">
+                Sign In
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- Comments List -->
+        <div class="space-y-4">
+            <!-- Yes Comments -->
+            {% if yes_comments %}
+            <div>
+                <h3 class="text-lg font-semibold text-green-600 mb-4 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                    Agreeing Comments ({{ yes_comments.count }})
+                </h3>
+                <div class="space-y-3">
+                    {% for comment in yes_comments %}
+                    <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-medium">
+                                    {{ comment.user.username|first|upper }}
+                                </div>
+                                <span class="font-medium text-green-800 dark:text-green-200">{{ comment.user.username }}</span>
+                                <span class="text-xs text-green-600 dark:text-green-400">{{ comment.created_at|date:"M j, Y g:i A" }}</span>
+                            </div>
+                            {% if user.is_authenticated %}
+                            <div class="flex space-x-2">
+                                <button onclick="likeComment({{ comment.id }}, 'like')"
+                                        class="text-green-600 hover:text-green-800 text-sm">
+                                    👍 {{ comment.likes }}
+                                </button>
+                                <button onclick="likeComment({{ comment.id }}, 'dislike')"
+                                        class="text-red-600 hover:text-red-800 text-sm">
+                                    👎 {{ comment.dislikes }}
+                                </button>
+                                {% if user != comment.user %}
+                                <button onclick="startDebate({{ comment.id }})"
+                                        class="text-blue-600 hover:text-blue-800 text-sm">
+                                    Debate
+                                </button>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% if comment.content %}
+                        <p class="text-green-800 dark:text-green-200">{{ comment.content }}</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- No Comments -->
+            {% if no_comments %}
+            <div>
+                <h3 class="text-lg font-semibold text-red-600 mb-4 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                    </svg>
+                    Disagreeing Comments ({{ no_comments.count }})
+                </h3>
+                <div class="space-y-3">
+                    {% for comment in no_comments %}
+                    <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-medium">
+                                    {{ comment.user.username|first|upper }}
+                                </div>
+                                <span class="font-medium text-red-800 dark:text-red-200">{{ comment.user.username }}</span>
+                                <span class="text-xs text-red-600 dark:text-red-400">{{ comment.created_at|date:"M j, Y g:i A" }}</span>
+                            </div>
+                            {% if user.is_authenticated %}
+                            <div class="flex space-x-2">
+                                <button onclick="likeComment({{ comment.id }}, 'like')"
+                                        class="text-green-600 hover:text-green-800 text-sm">
+                                    👍 {{ comment.likes }}
+                                </button>
+                                <button onclick="likeComment({{ comment.id }}, 'dislike')"
+                                        class="text-red-600 hover:text-red-800 text-sm">
+                                    👎 {{ comment.dislikes }}
+                                </button>
+                                {% if user != comment.user %}
+                                <button onclick="startDebate({{ comment.id }})"
+                                        class="text-blue-600 hover:text-blue-800 text-sm">
+                                    Debate
+                                </button>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% if comment.content %}
+                        <p class="text-red-800 dark:text-red-200">{{ comment.content }}</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if not yes_comments and not no_comments %}
+            <div class="text-center py-12">
+                <p class="text-muted-foreground">No comments yet. Be the first to share your thoughts!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function likeComment(commentId, action) {
+    fetch('{% url "like_comment" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `comment_id=${commentId}&action=${action}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        }
+    });
+}
+
+function startDebate(commentId) {
+    fetch('{% url "start_debate" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: `comment_id=${commentId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert(data.error);
+        }
+    });
+}
+</script>
+{% endblock %}

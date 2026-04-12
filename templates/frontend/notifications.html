@@ -1,0 +1,80 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Notifications - Discussion Hub{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-8">
+    <!-- Header -->
+    <div>
+        <h1 class="text-3xl font-bold text-foreground mb-2">Notifications</h1>
+        <p class="text-muted-foreground">Your debate requests and discussions</p>
+    </div>
+
+    <!-- Debates List -->
+    {% if debates %}
+    <div class="space-y-4">
+        {% for debate in debates %}
+        <div class="bg-card border border-border rounded-lg p-6">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center space-x-2 mb-2">
+                        {% if debate.initiator == user %}
+                        <span class="text-sm text-muted-foreground">You challenged</span>
+                        <span class="font-medium text-foreground">{{ debate.target.username }}</span>
+                        {% else %}
+                        <span class="font-medium text-foreground">{{ debate.initiator.username }}</span>
+                        <span class="text-sm text-muted-foreground">challenged you</span>
+                        {% endif %}
+                        <span class="text-sm text-muted-foreground">in</span>
+                        <a href="{% url 'discussion' debate.post.id %}" class="text-primary hover:text-primary/80 font-medium">
+                            "{{ debate.post.title|truncatechars:50 }}"
+                        </a>
+                    </div>
+
+                    <p class="text-muted-foreground mb-3">
+                        "{{ debate.comment.content|truncatechars:100 }}" - {{ debate.comment.user.username }}
+                    </p>
+
+                    <div class="flex items-center space-x-4 text-sm text-muted-foreground">
+                        <span>{{ debate.created_at|date:"M j, Y g:i A" }}</span>
+                        <span class="px-2 py-1 rounded-full text-xs
+                            {% if debate.status == 'pending' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200{% endif %}
+                            {% if debate.status == 'accepted' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}
+                            {% if debate.status == 'rejected' %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% endif %}">
+                            {{ debate.status|title }}
+                        </span>
+                    </div>
+                </div>
+
+                {% if debate.status == 'pending' and debate.target == user %}
+                <div class="flex space-x-2 ml-4">
+                    <form method="post" action="{% url 'accept_debate' debate.id %}" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 text-sm">
+                            Accept
+                        </button>
+                    </form>
+                    <form method="post" action="{% url 'reject_debate' debate.id %}" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 text-sm">
+                            Reject
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12">
+        <div class="text-6xl mb-4">🔔</div>
+        <h3 class="text-xl font-semibold text-foreground mb-2">No notifications yet</h3>
+        <p class="text-muted-foreground mb-6">When someone challenges your comments or you challenge others, you'll see them here.</p>
+        <a href="{% url 'index' %}" class="bg-primary text-primary-foreground px-6 py-2 rounded-lg hover:bg-primary/90">
+            Browse Discussions
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

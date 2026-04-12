@@ -1,0 +1,73 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Search - Discussion Hub{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-8">
+    <!-- Search Header -->
+    <div>
+        <h1 class="text-3xl font-bold text-foreground mb-4">Search Discussions</h1>
+
+        <!-- Search Form -->
+        <form method="get" class="mb-8">
+            <div class="flex space-x-4">
+                <input type="text" name="q" value="{{ query }}"
+                       placeholder="Search for discussions..."
+                       class="flex-1 px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                <button type="submit"
+                        class="bg-primary text-primary-foreground px-6 py-2 rounded-lg hover:bg-primary/90">
+                    Search
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Search Results -->
+    {% if query %}
+    <div>
+        {% if results %}
+        <h2 class="text-xl font-semibold text-foreground mb-4">
+            Found {{ results.count }} result{{ results.count|pluralize }} for "{{ query }}"
+        </h2>
+        <div class="space-y-4">
+            {% for post in results %}
+            <div class="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-foreground mb-2">
+                            <a href="{% url 'discussion' post.id %}" class="hover:text-primary">
+                                {{ post.title }}
+                            </a>
+                        </h3>
+                        <p class="text-muted-foreground mb-3 line-clamp-2">
+                            {{ post.content|truncatechars:200 }}
+                        </p>
+                        <div class="flex items-center space-x-4 text-sm text-muted-foreground">
+                            <span>{{ post.created_at|date:"M j, Y" }}</span>
+                            <span>{{ post.user.username }}</span>
+                            <span class="px-2 py-1 bg-secondary rounded-full text-xs">
+                                {{ post.category }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <div class="text-6xl mb-4">🔍</div>
+            <h3 class="text-xl font-semibold text-foreground mb-2">No results found</h3>
+            <p class="text-muted-foreground">Try different keywords or check your spelling.</p>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="text-center py-12">
+        <div class="text-6xl mb-4">💡</div>
+        <h3 class="text-xl font-semibold text-foreground mb-2">Search for discussions</h3>
+        <p class="text-muted-foreground">Enter keywords to find relevant discussions and topics.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

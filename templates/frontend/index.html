@@ -1,0 +1,130 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Home - Discussion Hub{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Hero Section -->
+    <div class="text-center py-12">
+        <h1 class="text-4xl font-bold text-foreground mb-4">
+            Welcome to Discussion Hub
+        </h1>
+        <p class="text-xl text-muted-foreground mb-8">
+            Engage in meaningful discussions, share your thoughts, and connect with like-minded people.
+        </p>
+        {% if not user.is_authenticated %}
+        <div class="space-x-4">
+            <a href="{% url 'register' %}" class="bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90">
+                Get Started
+            </a>
+            <a href="{% url 'login' %}" class="border border-border text-foreground px-6 py-3 rounded-lg font-medium hover:bg-accent">
+                Sign In
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Categories -->
+    <div>
+        <h2 class="text-2xl font-bold text-foreground mb-6">Explore Categories</h2>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {% for category in categories %}
+            <a href="{% url 'category' category.name %}"
+               class="p-4 rounded-lg border border-border hover:border-primary/50 transition-colors {{ category.color }}">
+                <div class="text-2xl mb-2">{{ category.icon }}</div>
+                <div class="font-medium">{{ category.name }}</div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Trending Posts -->
+    <div>
+        <h2 class="text-2xl font-bold text-foreground mb-6">Trending Discussions</h2>
+        <div class="space-y-4">
+            {% for post in trending_posts %}
+            <div class="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-foreground mb-2">
+                            <a href="{% url 'discussion' post.id %}" class="hover:text-primary">
+                                {{ post.title }}
+                            </a>
+                        </h3>
+                        <p class="text-muted-foreground mb-3 line-clamp-2">
+                            {{ post.content|truncatechars:150 }}
+                        </p>
+                        <div class="flex items-center space-x-4 text-sm text-muted-foreground">
+                            <span class="px-2 py-1 bg-secondary rounded-full text-xs">
+                                {{ post.category }}
+                            </span>
+                            <span>{{ post.created_at|date:"M j, Y" }}</span>
+                            <span>{{ post.user.username }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center py-12">
+                <p class="text-muted-foreground">No discussions yet. Be the first to start one!</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Create Post CTA -->
+    {% if user.is_authenticated %}
+    <div class="bg-primary/5 border border-primary/20 rounded-lg p-6 text-center">
+        <h3 class="text-lg font-semibold text-foreground mb-2">Ready to share your thoughts?</h3>
+        <p class="text-muted-foreground mb-4">Start a new discussion and engage with the community.</p>
+        <button onclick="document.getElementById('create-post-modal').classList.remove('hidden')"
+                class="bg-primary text-primary-foreground px-6 py-2 rounded-lg hover:bg-primary/90">
+            Create Discussion
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Create Post Modal -->
+{% if user.is_authenticated %}
+<div id="create-post-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-card p-6 rounded-lg w-full max-w-md mx-4">
+        <h3 class="text-lg font-semibold mb-4">Create New Discussion</h3>
+        <form method="post" action="{% url 'create_post' %}">
+            {% csrf_token %}
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Title</label>
+                    <input type="text" name="title" required
+                           class="w-full px-3 py-2 border border-border rounded-md bg-background">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Category</label>
+                    <select name="category" required
+                            class="w-full px-3 py-2 border border-border rounded-md bg-background">
+                        <option value="">Select a category</option>
+                        {% for category in categories %}
+                        <option value="{{ category.name }}">{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Content (Optional)</label>
+                    <textarea name="content" rows="4"
+                              class="w-full px-3 py-2 border border-border rounded-md bg-background"></textarea>
+                </div>
+            </div>
+            <div class="flex space-x-3 mt-6">
+                <button type="submit" class="flex-1 bg-primary text-primary-foreground py-2 rounded-md hover:bg-primary/90">
+                    Create
+                </button>
+                <button type="button" onclick="document.getElementById('create-post-modal').classList.add('hidden')"
+                        class="flex-1 border border-border py-2 rounded-md hover:bg-accent">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

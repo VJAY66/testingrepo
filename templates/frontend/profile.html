@@ -1,0 +1,64 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Profile - Discussion Hub{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-8">
+    <!-- Profile Header -->
+    <div class="bg-card border border-border rounded-lg p-6">
+        <div class="flex items-center space-x-4">
+            <div class="w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-2xl font-bold">
+                {{ user.username|first|upper }}
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-foreground">{{ user.username }}</h1>
+                <p class="text-muted-foreground">Member since {{ user.date_joined|date:"M Y" }}</p>
+                <p class="text-muted-foreground">{{ user_posts.count }} discussions created</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- User's Posts -->
+    <div>
+        <h2 class="text-xl font-bold text-foreground mb-6">Your Discussions</h2>
+
+        {% if user_posts %}
+        <div class="space-y-4">
+            {% for post in user_posts %}
+            <div class="bg-card border border-border rounded-lg p-6">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-foreground mb-2">
+                            <a href="{% url 'discussion' post.id %}" class="hover:text-primary">
+                                {{ post.title }}
+                            </a>
+                        </h3>
+                        {% if post.content %}
+                        <p class="text-muted-foreground mb-3 line-clamp-2">
+                            {{ post.content|truncatechars:150 }}
+                        </p>
+                        {% endif %}
+                        <div class="flex items-center space-x-4 text-sm text-muted-foreground">
+                            <span>{{ post.created_at|date:"M j, Y g:i A" }}</span>
+                            <span class="px-2 py-1 bg-secondary rounded-full text-xs">
+                                {{ post.category }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <div class="text-6xl mb-4">💭</div>
+            <h3 class="text-xl font-semibold text-foreground mb-2">No discussions yet</h3>
+            <p class="text-muted-foreground mb-6">Start your first discussion to see it here!</p>
+            <a href="{% url 'index' %}" class="bg-primary text-primary-foreground px-6 py-2 rounded-lg hover:bg-primary/90">
+                Create Discussion
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

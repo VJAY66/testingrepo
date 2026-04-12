@@ -1,0 +1,48 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Login - Discussion Hub{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto">
+    <div class="bg-card border border-border rounded-lg p-8">
+        <div class="text-center mb-8">
+            <h1 class="text-2xl font-bold text-foreground">Welcome Back</h1>
+            <p class="text-muted-foreground mt-2">Sign in to your account</p>
+        </div>
+
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+
+            <div>
+                <label for="username" class="block text-sm font-medium text-foreground mb-2">
+                    Username
+                </label>
+                <input type="text" id="username" name="username" required
+                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+
+            <div>
+                <label for="password" class="block text-sm font-medium text-foreground mb-2">
+                    Password
+                </label>
+                <input type="password" id="password" name="password" required
+                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            </div>
+
+            <button type="submit"
+                    class="w-full bg-primary text-primary-foreground py-2 px-4 rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+                Sign In
+            </button>
+        </form>
+
+        <div class="mt-6 text-center">
+            <p class="text-muted-foreground">
+                Don't have an account?
+                <a href="{% url 'register' %}" class="text-primary hover:text-primary/80 font-medium">
+                    Sign up
+                </a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
