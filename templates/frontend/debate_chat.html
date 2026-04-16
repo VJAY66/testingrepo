@@ -1,0 +1,1214 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Debate Chat - Discussion Hub{% endblock %}
+
+{% block content %}
+{{ active_participants|json_script:"dh-debate-active-participants" }}
+{# ── Desktop: open floating panel and redirect away ───────── #}
+<script>
+(function() {
+    if (window.innerWidth >= 768) {
+    const activeParticipantsNode = document.getElementById('dh-debate-active-participants');
+    let activeParticipants = [];
+    if (activeParticipantsNode) {
+      try {
+        activeParticipants = JSON.parse(activeParticipantsNode.textContent || '[]');
+      } catch {}
+    }
+        const debateData = {
+            id: '{{ debate.id }}',
+            title: '{{ debate.post.title|escapejs }}',
+            opponent: '{% if user == debate.initiator %}{{ debate.target.username|escapejs }}{% else %}{{ debate.initiator.username|escapejs }}{% endif %}',
+          opponent_avatar: '{{ opponent_avatar|escapejs }}',
+      active_participants: activeParticipants,
+            yes_supporters: {{ debate.yes_supporters }},
+            no_supporters: {{ debate.no_supporters }},
+            user_is_active: {% if is_active_participant %}true{% else %}false{% endif %},
+            can_post: {% if can_post %}true{% else %}false{% endif %},
+            can_rejoin: {% if can_rejoin %}true{% else %}false{% endif %},
+            is_view_only: {% if is_view_only %}true{% else %}false{% endif %},
+            can_end_chat: {% if can_end_chat %}true{% else %}false{% endif %},
+            debate_status: '{{ debate.status }}',
+            current_controller_name: '{{ current_controller_name|escapejs }}',
+            current_controller_side: '{{ current_controller_side }}',
+            can_moderate_chat: {% if can_moderate_chat %}true{% else %}false{% endif %}
+        };
+        window.addEventListener('DOMContentLoaded', function() {
+            ChatManager.openWithData(debateData);
+            window.location.replace('{% url "discussion" debate.post.id %}');
+        });
+    }
+})();
+</script>
+
+{# ── Mobile: full-screen Messenger-style chat ─────────────── #}
+<style>
+  @media (min-width: 768px) { #mc-shell, #mc-chathead { display: none !important; } }
+  @media (max-width: 767px) {
+    /* hide default page chrome (nav, footer, main padding) when chat is open */
+    body.mc-open > nav,
+    body.mc-open > footer,
+    body.mc-open > main > .mc-hide-when-open { display: none; }
+    body.mc-open > main { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+
+    #mc-shell {
+      position: fixed; inset: 0; z-index: 8000;
+      display: flex; flex-direction: column;
+      background: hsl(var(--background));
+      transition: transform 0.32s cubic-bezier(.4,0,.2,1), opacity 0.28s ease;
+    }
+    #mc-shell.mc-hidden {
+      transform: translateY(100%); opacity: 0; pointer-events: none;
+    }
+
+    /* ─── Header ─── */
+    #mc-header {
+      display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+      padding-top: max(10px, env(safe-area-inset-top, 10px));
+      background-image: var(--float-gradient);
+      color: hsl(var(--primary-foreground));
+      box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+      flex-shrink: 0;
+    }
+    #mc-back {
+      background: rgba(255,255,255,0.15); border: none; color: inherit;
+      width: 36px; height: 36px; border-radius: 50%; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; transition: background 0.15s;
+    }
+    #mc-back:hover { background: rgba(255,255,255,0.28); }
+    #mc-avatar-wrap { position: relative; flex-shrink: 0; }
+    #mc-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background-image: var(--float-gradient);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; font-weight: 700;
+      border: 2px solid rgba(255,255,255,0.36);
+    }
+    #mc-avatar-img {
+      width: 40px; height: 40px; border-radius: 50%;
+      object-fit: cover; border: 2px solid rgba(255,255,255,0.36);
+    }
+    #mc-online-dot {
+      position: absolute; bottom: 1px; right: 1px;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #4ade80; border: 2px solid hsl(var(--primary));
+    }
+    #mc-header-info { flex: 1; min-width: 0; }
+    #mc-opp-name {
+      font-size: 15px; font-weight: 600; letter-spacing: 0.01em;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #mc-sub {
+      font-size: 11px; opacity: 0.75; margin-top: 1px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #mc-hacts { display: flex; gap: 6px; }
+    #mc-hacts button {
+      background: rgba(255,255,255,0.15); border: none; color: inherit;
+      width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s; flex-shrink: 0;
+    }
+    #mc-hacts button:hover { background: rgba(255,255,255,0.30); }
+
+    /* ── Supporters strip ── */
+    #mc-sup-strip {
+      display: flex; align-items: center; gap: 8px; padding: 6px 16px;
+      background: hsl(var(--card)); border-bottom: 1px solid hsl(var(--border));
+      flex-shrink: 0;
+    }
+    #mc-caution {
+      padding: 8px 16px;
+      font-size: 11px;
+      line-height: 1.45;
+      color: hsl(var(--foreground));
+      background: rgba(251, 191, 36, 0.14);
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .mc-badge {
+      font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+    }
+    .mc-badge-y { background: rgba(16,207,145,0.14); color: #0d9970; }
+    .mc-badge-n { background: rgba(239,68,68,0.13); color: #dc2626; }
+    html[data-theme="dark"] .mc-badge-y { background: rgba(16,207,145,0.24); color:#34d399; }
+    html[data-theme="dark"] .mc-badge-n { background: rgba(239,68,68,0.22); color:#f87171; }
+    #mc-topic {
+      flex: 1; font-size: 11px; color: hsl(var(--muted-foreground));
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right;
+    }
+
+    /* ── Messages ── */
+    #mc-msgs {
+      flex: 1; overflow-y: auto; padding: 8px 6px 4px;
+      display: flex; flex-direction: column; gap: 8px;
+      -webkit-overflow-scrolling: touch;
+    }
+    #mc-msgs::-webkit-scrollbar { display: none; }
+
+    .mc-date-divider {
+      display: flex;
+      justify-content: center;
+      margin: 4px 0 2px;
+    }
+    .mc-date-divider span {
+      font-size: 10px;
+      color: hsl(var(--muted-foreground));
+      background: hsl(var(--background) / 0.72);
+      border: 1px solid hsl(var(--border));
+      border-radius: 999px;
+      padding: 2px 8px;
+      opacity: 0.78;
+    }
+    .mc-sticky-date {
+      position: sticky;
+      top: 6px;
+      align-self: center;
+      z-index: 3;
+      font-size: 10px;
+      color: hsl(var(--muted-foreground));
+      background: hsl(var(--background) / 0.82);
+      border: 1px solid hsl(var(--border));
+      border-radius: 999px;
+      padding: 2px 8px;
+      opacity: 0;
+      transform: translateY(-2px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      pointer-events: none;
+    }
+    .mc-sticky-date.show {
+      opacity: 0.9;
+      transform: translateY(0);
+    }
+
+    #mc-empty {
+      text-align: center; color: hsl(var(--muted-foreground));
+      font-size: 13px; padding: 40px 20px; line-height: 1.7;
+    }
+    #mc-empty span { display: block; font-size: 32px; margin-bottom: 10px; }
+
+    .mc-msg { display: flex; flex-direction: column; max-width: 96%; width: 100%; }
+    .mc-msg.own { align-self: flex-end; align-items: flex-end; }
+    .mc-msg.other { align-self: flex-start; align-items: flex-start; }
+    .mc-row { display: flex; align-items: flex-end; gap: 6px; width: 100%; }
+    .mc-msg.own .mc-row { flex-direction: row-reverse; }
+    .mc-msg.own .mc-row { justify-content: flex-start; }
+    .mc-msg.other .mc-row { justify-content: flex-start; }
+    .mc-msg-avatar {
+      width: 22px; height: 22px; border-radius: 999px; object-fit: cover;
+      border: 1px solid hsl(var(--border)); flex-shrink: 0;
+    }
+    .mc-msg-avatar-fallback {
+      width: 22px; height: 22px; border-radius: 999px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      background-image: var(--float-gradient); color: hsl(var(--primary-foreground));
+      border: 1px solid hsl(var(--border)); font-size: 10px; font-weight: 700;
+    }
+
+    .mc-msg.own .mc-msg-avatar,
+    .mc-msg.own .mc-msg-avatar-fallback { display: none; }
+
+    .mc-msg-main { max-width: 96%; }
+
+    .mc-bubble {
+      padding: 9px 13px; font-size: 14px; line-height: 1.5;
+      word-break: break-word; position: relative;
+    }
+    .mc-msg.own .mc-bubble {
+      background-image: var(--float-gradient); color: hsl(var(--primary-foreground));
+      border-radius: 18px 18px 4px 18px;
+    }
+    .mc-msg.other .mc-bubble {
+      background: #ffffff; color: #111827;
+      border-radius: 18px 18px 18px 4px;
+      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.42);
+    }
+    .mc-msg.other.sender-v1 .mc-bubble { background: #f8fafc; }
+    .mc-msg.other.sender-v2 .mc-bubble { background: #eefaf8; }
+    .mc-msg.other.sender-v3 .mc-bubble { background: #fff7ed; }
+    .mc-msg.other.sender-v4 .mc-bubble { background: #f0fdf4; }
+    html[data-theme="dark"] .mc-msg.other .mc-bubble { background: #1f2937; color: #e5e7eb; box-shadow: inset 0 0 0 1px rgba(100,116,139,0.5); }
+    html[data-theme="dark"] .mc-msg.other.sender-v1 .mc-bubble { background: #1f2937; }
+    html[data-theme="dark"] .mc-msg.other.sender-v2 .mc-bubble { background: #1c3135; }
+    html[data-theme="dark"] .mc-msg.other.sender-v3 .mc-bubble { background: #3a2d1f; }
+    html[data-theme="dark"] .mc-msg.other.sender-v4 .mc-bubble { background: #20322b; }
+    .mc-sender {
+      font-size: 10.5px; font-weight: 600; opacity: 0.68; margin-bottom: 3px;
+      padding: 0 2px;
+    }
+    .mc-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 3px;
+      padding: 0 2px;
+    }
+    .mc-time-inline {
+      font-size: 10px;
+      opacity: 0.55;
+      white-space: nowrap;
+    }
+    .mc-time {
+      font-size: 10px; opacity: 0.55; margin-top: 4px; padding: 0 3px;
+    }
+    .mc-msg-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 4px;
+    }
+    .mc-remove-btn {
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      background: rgba(239, 68, 68, 0.12);
+      color: #dc2626;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    #mc-members {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 8px 12px;
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      -webkit-overflow-scrolling: touch;
+    }
+    #mc-members::-webkit-scrollbar { display: none; }
+    .mc-member {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--background));
+      border-radius: 999px;
+      padding: 4px 6px 4px 4px;
+      max-width: 78vw;
+    }
+    .mc-member-avatar,
+    .mc-member-avatar-fallback {
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+    .mc-member-avatar {
+      object-fit: cover;
+      border: 1px solid hsl(var(--border));
+    }
+    .mc-member-avatar-fallback {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background-image: var(--float-gradient);
+      color: hsl(var(--primary-foreground));
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .mc-member-side {
+      display: inline-flex;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      border-radius: 999px;
+      padding: 2px 6px;
+      border: 1px solid transparent;
+      line-height: 1;
+      margin-left: 5px;
+      vertical-align: middle;
+    }
+    .mc-member-side.yes {
+      color: #0d9970;
+      background: rgba(16, 207, 145, 0.14);
+      border-color: rgba(16, 207, 145, 0.3);
+    }
+    .mc-member-side.no {
+      color: #dc2626;
+      background: rgba(239, 68, 68, 0.13);
+      border-color: rgba(239, 68, 68, 0.28);
+    }
+    .mc-member-presence {
+      display: inline-flex;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      border-radius: 999px;
+      padding: 2px 6px;
+      border: 1px solid transparent;
+      line-height: 1;
+      margin-left: 5px;
+      vertical-align: middle;
+    }
+    .mc-member-presence.online {
+      color: #0d9970;
+      background: rgba(16, 207, 145, 0.14);
+      border-color: rgba(16, 207, 145, 0.3);
+    }
+    .mc-member-presence.offline {
+      color: hsl(var(--muted-foreground));
+      background: hsl(var(--secondary));
+      border-color: hsl(var(--border));
+    }
+    html[data-theme="dark"] .mc-member-side.yes { color:#34d399; background: rgba(16,207,145,0.24); }
+    html[data-theme="dark"] .mc-member-side.no { color:#f87171; background: rgba(239,68,68,0.22); }
+    html[data-theme="dark"] .mc-member-presence.online { color:#34d399; background: rgba(16,207,145,0.24); }
+    .mc-member-text { min-width: 0; display: inline-flex; align-items: center; }
+    .mc-member-name {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mc-msg.own .mc-time { text-align: right; }
+    .mc-reply-quote {
+      margin-bottom: 5px; border-left: 2px solid hsl(var(--primary));
+      background: hsl(var(--background) / 0.45); border-radius: 8px; padding: 4px 7px;
+    }
+    .mc-reply-quote-name { display: block; font-size: 10px; font-weight: 700; opacity: 0.82; }
+    .mc-reply-quote-text {
+      display: block; font-size: 11px; opacity: 0.72;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* ── Input bar ── */
+    #mc-inputbar {
+      display: flex; align-items: center; gap: 9px;
+      padding: 10px 12px;
+      padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+      background: hsl(var(--card)); border-top: 1px solid hsl(var(--border));
+      flex-shrink: 0;
+    }
+    #mc-replying {
+      display: none; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 7px 12px; border-top: 1px solid hsl(var(--border));
+      background: hsl(var(--secondary) / 0.55);
+    }
+    #mc-replying.show { display: flex; }
+    #mc-reply-meta { min-width: 0; }
+    #mc-reply-to { font-size: 11px; font-weight: 700; color: hsl(var(--foreground)); }
+    #mc-reply-text {
+      font-size: 11px; color: hsl(var(--muted-foreground));
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #mc-reply-close {
+      width: 22px; height: 22px; border-radius: 999px; border: none;
+      background: transparent; color: hsl(var(--muted-foreground));
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    #mc-reply-close:active { transform: scale(0.92); }
+    #mc-inp {
+      flex: 1; border: 1.5px solid hsl(var(--input));
+      background: hsl(var(--background)); color: hsl(var(--foreground));
+      border-radius: 999px; padding: 10px 18px; font-size: 14px;
+      font-family: 'Manrope', sans-serif; font-weight: 300; outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      -webkit-appearance: none;
+    }
+    #mc-inp:focus {
+      border-color: hsl(var(--primary));
+      box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+    }
+    #mc-inp::placeholder { color: hsl(var(--muted-foreground)); }
+    #mc-send {
+      width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+      background-image: var(--float-gradient); color: hsl(var(--primary-foreground));
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.12s, background 0.15s;
+      box-shadow: 0 3px 10px hsl(var(--primary) / 0.35);
+    }
+    #mc-send:active { transform: scale(0.90); }
+
+    /* ── Minimized chat-head bubble ── */
+    #mc-chathead {
+      position: fixed; bottom: 22px; right: 18px; z-index: 8001;
+      width: 58px; height: 58px; border-radius: 50%;
+      background-image: var(--float-gradient);
+      color: hsl(var(--primary-foreground));
+      display: none; align-items: center; justify-content: center;
+      font-size: 21px; font-weight: 700;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.28), 0 2px 8px hsl(var(--primary)/0.45);
+      cursor: pointer; border: 3px solid rgba(255,255,255,0.28);
+      animation: mc-pop 0.26s cubic-bezier(.4,0,.2,1) both;
+      user-select: none;
+    }
+    @keyframes mc-pop {
+      from { transform: scale(0.5); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+    #mc-chathead .mc-unread-dot {
+      position: absolute; top: 2px; right: 2px;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #ef4444; border: 2px solid hsl(var(--background));
+      display: none;
+    }
+  }
+</style>
+
+{# ── Chat shell (mobile) ── #}
+<div id="mc-shell">
+  <div id="mc-header">
+    <button id="mc-back" aria-label="Back" onclick="mcBack()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div id="mc-avatar-wrap">
+      {% if opponent_avatar %}
+      <img id="mc-avatar-img" src="{{ opponent_avatar }}" alt="Profile picture" loading="lazy">
+      {% else %}
+      <div id="mc-avatar">{% if user == debate.initiator %}{{ debate.target.username|slice:":1"|upper }}{% else %}{{ debate.initiator.username|slice:":1"|upper }}{% endif %}</div>
+      {% endif %}
+      <div id="mc-online-dot"></div>
+    </div>
+    <div id="mc-header-info">
+      <p id="mc-opp-name">{% if user == debate.initiator %}{{ debate.target.username }}{% else %}{{ debate.initiator.username }}{% endif %}</p>
+      <p id="mc-sub">Controller: {% if current_controller_name %}{{ current_controller_name }}{% if current_controller_side %} ({{ current_controller_side|upper }}){% endif %}{% else %}None{% endif %}</p>
+    </div>
+    <div id="mc-hacts">
+      {% if is_active_participant %}
+      <button id="mc-leave-btn" onclick="mcLeaveConversation()" aria-label="Leave conversation" title="Leave conversation">Leave</button>
+      {% endif %}
+      {% if can_rejoin %}
+      <button id="mc-rejoin-btn" onclick="mcRejoinConversation()" aria-label="Rejoin conversation" title="Rejoin conversation">Rejoin</button>
+      {% endif %}
+      {% if can_end_chat %}
+      <button id="mc-end-btn" onclick="mcEndConversation()" aria-label="End conversation" title="End conversation">End</button>
+      {% endif %}
+      <button onclick="mcMinimize()" aria-label="Minimize" title="Minimize">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="mc-sup-strip">
+    <span id="mc-yes-limit" class="mc-badge mc-badge-y">✓ Yes {{ debate.yes_supporters }}</span>
+    <span id="mc-no-limit" class="mc-badge mc-badge-n">✗ No {{ debate.no_supporters }}</span>
+    <span id="mc-topic">{{ debate.post.title|truncatechars:36 }}</span>
+  </div>
+
+  <div id="mc-caution">Please do not insult others, maintain respect and collaborate effectively.</div>
+
+  <div id="mc-msgs">
+    <div id="mc-sticky-date" class="mc-sticky-date"></div>
+    {% if not messages_list %}
+    <div id="mc-empty"><span>💬</span>No messages yet.<br>Start the conversation!</div>
+    {% else %}
+      {% for message in messages_list %}
+      {% ifchanged message.created_date_label %}
+      <div class="mc-date-divider"><span>{{ message.created_date_label }}</span></div>
+      {% endifchanged %}
+      <div class="mc-msg {% if message.is_own %}own{% else %}other{% endif %}" id="mc-m-{{ message.id }}">
+        <div class="mc-row">
+          {% if message.sender_avatar %}
+          <img src="{{ message.sender_avatar }}" alt="{{ message.sender }}" class="mc-msg-avatar" loading="lazy">
+          {% else %}
+          <div class="mc-msg-avatar-fallback">{{ message.sender_initial }}</div>
+          {% endif %}
+          <div>
+            <div class="mc-meta">
+              <p class="mc-sender">{{ message.sender }}</p>
+              <p class="mc-time-inline">{{ message.created_time }}</p>
+            </div>
+            {% if message.reply_to %}
+            <div class="mc-reply-quote">
+              <span class="mc-reply-quote-name">{{ message.reply_to.sender }}</span>
+              <span class="mc-reply-quote-text">{{ message.reply_to.content }}</span>
+            </div>
+            {% endif %}
+            <div class="mc-bubble">{{ message.content }}</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <div id="mc-replying">
+    <div id="mc-reply-meta">
+      <p id="mc-reply-to"></p>
+      <p id="mc-reply-text"></p>
+    </div>
+    <button type="button" id="mc-reply-close" aria-label="Cancel reply" onclick="mcClearReply()">✕</button>
+  </div>
+
+  <div id="mc-inputbar">
+    <form id="mc-form" style="display:contents">
+      {% csrf_token %}
+      <input id="mc-inp" type="text" placeholder="{% if is_active_participant %}Message…{% elif is_view_only %}View only mode. You cannot send messages.{% else %}You left this conversation. Rejoin to send.{% endif %}" autocomplete="off" inputmode="text" {% if not is_active_participant %}disabled{% endif %}>
+      <button type="submit" id="mc-send" form="mc-form" aria-label="Send" {% if not is_active_participant %}disabled{% endif %}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+      </button>
+    </form>
+  </div>
+</div>
+
+{# ── Chat-head (minimized bubble) ── #}
+<div id="mc-chathead" onclick="mcRestore()" aria-label="Open chat">
+  {% if user == debate.initiator %}{{ debate.target.username|slice:":1"|upper }}{% else %}{{ debate.initiator.username|slice:":1"|upper }}{% endif %}
+  <span class="mc-unread-dot" id="mc-unread-dot"></span>
+</div>
+
+{# ── Mobile chat JS ── #}
+<script>
+(function() {
+  if (window.innerWidth >= 768) return;   // desktop uses ChatManager
+
+  const mobileDebateId = '{{ debate.id }}';
+  const mobilePostId = '{{ debate.post.id }}';
+  const mobilePostUrl = '{% url "discussion" debate.post.id %}';
+
+  // Open full-screen
+  document.body.classList.add('mc-open');
+  const shell     = document.getElementById('mc-shell');
+  const chathead  = document.getElementById('mc-chathead');
+  const msgs      = document.getElementById('mc-msgs');
+  const inp       = document.getElementById('mc-inp');
+  const form      = document.getElementById('mc-form');
+  const unreadDot = document.getElementById('mc-unread-dot');
+  const stickyDateChip = document.getElementById('mc-sticky-date');
+  const replyWrap = document.getElementById('mc-replying');
+  const replyToEl = document.getElementById('mc-reply-to');
+  const replyTxtEl = document.getElementById('mc-reply-text');
+  const leaveBtn = document.getElementById('mc-leave-btn');
+  const rejoinBtn = document.getElementById('mc-rejoin-btn');
+  const endBtn = document.getElementById('mc-end-btn');
+  const yesLimitBadge = document.getElementById('mc-yes-limit');
+  const noLimitBadge = document.getElementById('mc-no-limit');
+
+  let minimized  = false;
+  let lastMsgId  = 0;
+  let unread     = 0;
+  let replyTarget = null;
+  let canSend = {% if is_active_participant %}true{% else %}false{% endif %};
+  let canEnd = {% if can_end_chat %}true{% else %}false{% endif %};
+  let debateStatus = 'accepted';
+  let currentControllerName = '{{ current_controller_name|escapejs }}';
+  let currentControllerSide = '{{ current_controller_side }}';
+  let canModerate = {% if can_moderate_chat %}true{% else %}false{% endif %};
+  let yesSupporters = {{ debate.yes_supporters }};
+  let noSupporters = {{ debate.no_supporters }};
+  let lastDateLabel = '';
+  let activeParticipants = (() => {
+    const node = document.getElementById('dh-debate-active-participants');
+    if (!node) return [];
+    try {
+      const parsed = JSON.parse(node.textContent || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  })();
+  const msgIndex = new Map();
+  let pollTimer = null;
+
+  function updateControllerLabel() {
+    const sub = document.getElementById('mc-sub');
+    if (!sub) return;
+    if (!currentControllerName) {
+      sub.textContent = 'Controller: None';
+      return;
+    }
+    const sideText = currentControllerSide ? ` (${String(currentControllerSide).toUpperCase()})` : '';
+    sub.textContent = `Controller: ${currentControllerName}${sideText}`;
+  }
+
+  function updateComposerState() {
+    if (!inp || !document.getElementById('mc-send')) return;
+    const sendBtn = document.getElementById('mc-send');
+    const disabled = !canSend || debateStatus !== 'accepted';
+    inp.disabled = disabled;
+    sendBtn.disabled = disabled;
+    inp.placeholder = disabled ? 'You left this conversation. Rejoin to send.' : 'Message…';
+  }
+
+  function ensureActionButton(id, label, onClick) {
+    const acts = document.getElementById('mc-hacts');
+    if (!acts) return null;
+    let btn = document.getElementById(id);
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = id;
+      acts.insertBefore(btn, acts.firstChild);
+    }
+    btn.textContent = label;
+    btn.onclick = onClick;
+    return btn;
+  }
+
+  function refreshActionButtons() {
+    if (canModerate && debateStatus === 'accepted') {
+      ensureActionButton('mc-limits-btn', 'Limits', function() { mcIncreaseLimits(); });
+    } else {
+      const xb = document.getElementById('mc-limits-btn');
+      if (xb) xb.remove();
+    }
+
+    if (canSend) {
+      ensureActionButton('mc-leave-btn', 'Leave', function() { mcLeaveConversation(); });
+      const rb = document.getElementById('mc-rejoin-btn');
+      if (rb) rb.remove();
+    } else {
+      ensureActionButton('mc-rejoin-btn', 'Rejoin', function() { mcRejoinConversation(); });
+      const lb = document.getElementById('mc-leave-btn');
+      if (lb) lb.remove();
+    }
+
+    if (canEnd && canSend && debateStatus === 'accepted') {
+      ensureActionButton('mc-end-btn', 'End', function() { mcEndConversation(); });
+    } else {
+      const eb = document.getElementById('mc-end-btn');
+      if (eb) eb.remove();
+    }
+  }
+
+  function updateSupporterBadges() {
+    if (yesLimitBadge) {
+      yesLimitBadge.textContent = `✓ Yes ${Number(yesSupporters || 0)}`;
+    }
+    if (noLimitBadge) {
+      noLimitBadge.textContent = `✗ No ${Number(noSupporters || 0)}`;
+    }
+  }
+
+  function renderMembers() {
+    if (!membersBox) return;
+    membersBox.innerHTML = activeParticipants.map(member => {
+      const side = String(member.side || '').toLowerCase();
+      const sideClass = side === 'yes' ? 'yes' : (side === 'no' ? 'no' : '');
+      const onlineClass = member.is_online ? 'online' : 'offline';
+      const onlineLabel = member.is_online ? 'ONLINE' : 'OFFLINE';
+      const presenceTitle = esc(member.presence_label || (member.is_online ? 'Active now' : 'Last seen unavailable'));
+      const avatar = member.avatar_url
+        ? `<img src="${esc(member.avatar_url)}" alt="${esc(member.username)}" class="mc-member-avatar" loading="lazy">`
+        : `<span class="mc-member-avatar-fallback">${esc((member.username || '?').charAt(0).toUpperCase())}</span>`;
+      const removeAction = member.can_remove
+        ? `<button type="button" class="mc-remove-btn" onclick="mcRemoveParticipant('${esc(member.id)}', '${esc(member.username)}')">Remove</button>`
+        : '';
+      return `<div class="mc-member">${avatar}<span class="mc-member-text"><span class="mc-member-name">${esc(member.username)}</span><span class="mc-member-side ${sideClass}">${esc(String(member.side || '').toUpperCase())}</span><span title="${presenceTitle}" class="mc-member-presence ${onlineClass}">${onlineLabel}</span></span>${removeAction}</div>`;
+    }).join('');
+  }
+
+  function updateStickyDate() {
+    if (!stickyDateChip) return;
+    const dividers = Array.from(msgs.querySelectorAll('.mc-date-divider'));
+    if (!dividers.length) {
+      stickyDateChip.classList.remove('show');
+      stickyDateChip.textContent = '';
+      return;
+    }
+
+    const markerY = msgs.scrollTop + 10;
+    let current = dividers[0];
+    for (const divider of dividers) {
+      if (divider.offsetTop <= markerY) {
+        current = divider;
+      } else {
+        break;
+      }
+    }
+
+    const label = (current.querySelector('span')?.textContent || '').trim();
+    if (!label) {
+      stickyDateChip.classList.remove('show');
+      return;
+    }
+    stickyDateChip.textContent = label;
+    stickyDateChip.classList.add('show');
+  }
+
+  function postAction(url) {
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrf() },
+      body: ''
+    }).then(r => r.json());
+  }
+
+  function removeParticipant(userId, username) {
+    return fetch('{% url "remove_debate_participant" debate.id %}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrf() },
+      body: 'user_id=' + encodeURIComponent(String(userId))
+    }).then(r => r.json()).then(d => {
+      if (!d.success) {
+        window.showToast(d.error || 'Unable to remove participant.', 'error');
+        return;
+      }
+      window.showToast(d.message || `${username} was removed.`, 'success', 4200);
+      poll();
+    }).catch(() => window.showToast('Unable to remove participant.', 'error'));
+  }
+
+  window.mcRemoveParticipant = function(userId, username) {
+    if (!canModerate) return;
+    if (!window.confirm(`Remove ${username} from this conversation? They will not be able to rejoin or send requests to you again.`)) {
+      return;
+    }
+    removeParticipant(userId, username);
+  };
+
+  window.mcLeaveConversation = function() {
+    postAction('{% url "leave_debate" debate.id %}')
+      .then(d => {
+        if (!d.success) {
+          window.showToast(d.error || 'Unable to leave conversation.', 'error');
+          return;
+        }
+        canSend = false;
+        canEnd = false;
+        updateComposerState();
+        refreshActionButtons();
+        window.showToast(d.message || 'You left the conversation.', 'info');
+      })
+      .catch(() => window.showToast('Unable to leave conversation.', 'error'));
+  };
+
+  window.mcRejoinConversation = function() {
+    postAction('{% url "rejoin_debate" debate.id %}')
+      .then(d => {
+        if (!d.success) {
+          window.showToast(d.error || 'Unable to rejoin conversation.', 'error');
+          return;
+        }
+        canSend = true;
+        updateComposerState();
+        refreshActionButtons();
+        window.showToast(d.message || 'You rejoined the conversation.', 'success');
+      })
+      .catch(() => window.showToast('Unable to rejoin conversation.', 'error'));
+  };
+
+  window.mcEndConversation = function() {
+    postAction('{% url "end_debate" debate.id %}')
+      .then(d => {
+        if (!d.success) {
+          window.showToast(d.error || 'Unable to end conversation.', 'error');
+          return;
+        }
+        window.showToast(d.message || 'Conversation ended.', 'success');
+        setTimeout(() => {
+          document.body.classList.remove('mc-open');
+          window.location.href = '{% url "notifications" %}';
+        }, 500);
+      })
+      .catch(() => window.showToast('Unable to end conversation.', 'error'));
+  };
+
+  function mcAskLimitUpdate(currentYes, currentNo) {
+    return new Promise((resolve) => {
+      const existing = document.getElementById('mc-limit-modal-backdrop');
+      if (existing) existing.remove();
+
+      const backdrop = document.createElement('div');
+      backdrop.id = 'mc-limit-modal-backdrop';
+      backdrop.style.position = 'fixed';
+      backdrop.style.inset = '0';
+      backdrop.style.zIndex = '9200';
+      backdrop.style.display = 'flex';
+      backdrop.style.alignItems = 'center';
+      backdrop.style.justifyContent = 'center';
+      backdrop.style.padding = '1rem';
+      backdrop.style.background = 'rgba(2, 6, 23, 0.45)';
+      backdrop.style.backdropFilter = 'blur(2px)';
+
+      const modal = document.createElement('div');
+      modal.style.width = 'min(380px, 100%)';
+      modal.style.borderRadius = '14px';
+      modal.style.border = '1px solid hsl(var(--border))';
+      modal.style.background = 'hsl(var(--card))';
+      modal.style.padding = '14px';
+      modal.style.boxShadow = '0 20px 60px rgba(0,0,0,0.25)';
+
+      modal.innerHTML = `
+        <h3 style="margin:0 0 6px;font-size:15px;font-weight:800;color:hsl(var(--foreground));">Update Participant Limits</h3>
+        <p style="margin:0 0 12px;font-size:12px;color:hsl(var(--muted-foreground));">You can only increase limits during an active conversation.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:700;color:hsl(var(--muted-foreground));">
+            YES limit
+            <input id="mc-limit-yes" type="number" min="0" step="1" value="${Number(currentYes || 0)}" style="border:1px solid hsl(var(--border));border-radius:10px;padding:8px 10px;background:hsl(var(--background));color:hsl(var(--foreground));font-size:13px;" />
+          </label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:700;color:hsl(var(--muted-foreground));">
+            NO limit
+            <input id="mc-limit-no" type="number" min="0" step="1" value="${Number(currentNo || 0)}" style="border:1px solid hsl(var(--border));border-radius:10px;padding:8px 10px;background:hsl(var(--background));color:hsl(var(--foreground));font-size:13px;" />
+          </label>
+        </div>
+        <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;">
+          <button id="mc-limit-cancel" type="button" style="border:1px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground));border-radius:999px;padding:7px 12px;font-size:12px;font-weight:700;">Cancel</button>
+          <button id="mc-limit-save" type="button" style="border:none;background-image:var(--float-gradient);color:hsl(var(--primary-foreground));border-radius:999px;padding:7px 14px;font-size:12px;font-weight:800;">Save</button>
+        </div>
+      `;
+
+      backdrop.appendChild(modal);
+      document.body.appendChild(backdrop);
+
+      const yesInput = modal.querySelector('#mc-limit-yes');
+      const noInput = modal.querySelector('#mc-limit-no');
+      const cancelBtn = modal.querySelector('#mc-limit-cancel');
+      const saveBtn = modal.querySelector('#mc-limit-save');
+
+      function close(result) {
+        backdrop.remove();
+        resolve(result);
+      }
+
+      backdrop.addEventListener('click', (event) => {
+        if (event.target === backdrop) close(null);
+      });
+
+      cancelBtn?.addEventListener('click', () => close(null));
+      saveBtn?.addEventListener('click', () => {
+        close({
+          yes: Number(yesInput?.value),
+          no: Number(noInput?.value),
+        });
+      });
+
+      yesInput?.focus();
+    });
+  }
+
+  window.mcIncreaseLimits = function() {
+    if (!canModerate) {
+      window.showToast('Only the host can update participant limits.', 'error');
+      return;
+    }
+
+    mcAskLimitUpdate(yesSupporters, noSupporters).then(values => {
+      if (!values) {
+        return;
+      }
+
+      const nextYes = values.yes;
+      const nextNo = values.no;
+
+      if (!Number.isInteger(nextYes) || !Number.isInteger(nextNo) || nextYes < 0 || nextNo < 0) {
+        window.showToast('Limits must be non-negative whole numbers.', 'error');
+        return;
+      }
+
+      if (nextYes < yesSupporters || nextNo < noSupporters) {
+        window.showToast('You can only increase limits during conversation.', 'error');
+        return;
+      }
+
+      fetch('{% url "increase_debate_limits" debate.id %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrf() },
+        body: 'yes_supporters=' + encodeURIComponent(String(nextYes)) + '&no_supporters=' + encodeURIComponent(String(nextNo))
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (!d.success) {
+            window.showToast(d.error || 'Unable to update limits.', 'error');
+            return;
+          }
+
+          if (typeof d.yes_supporters === 'number') {
+            yesSupporters = d.yes_supporters;
+          }
+          if (typeof d.no_supporters === 'number') {
+            noSupporters = d.no_supporters;
+          }
+          updateSupporterBadges();
+          poll();
+          window.showToast(d.message || 'Participant limits updated.', 'success');
+        })
+        .catch(() => window.showToast('Unable to update limits.', 'error'));
+    });
+  };
+
+  function scrollBottom() {
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function csrf() {
+    const n = 'csrftoken=';
+    for (const c of decodeURIComponent(document.cookie).split(';')) {
+      const t = c.trim();
+      if (t.startsWith(n)) return t.slice(n.length);
+    }
+    return '';
+  }
+
+  function esc(s) {
+    const d = document.createElement('div'); d.textContent = String(s||''); return d.innerHTML;
+  }
+
+  function senderVariant(sender) {
+    const value = String(sender || 'x');
+    let hash = 0;
+    for (let i = 0; i < value.length; i++) hash = ((hash << 5) - hash) + value.charCodeAt(i);
+    const idx = (Math.abs(hash) % 4) + 1;
+    return 'sender-v' + idx;
+  }
+
+  function setReply(msg) {
+    replyTarget = msg || null;
+    if (!replyTarget) {
+      replyWrap.classList.remove('show');
+      return;
+    }
+    replyToEl.textContent = 'Replying to ' + replyTarget.sender;
+    replyTxtEl.textContent = replyTarget.content;
+    replyWrap.classList.add('show');
+    inp.focus();
+  }
+
+  window.mcClearReply = function() {
+    setReply(null);
+  };
+
+  function wireSwipe(el, messageId) {
+    let startX = 0;
+    let startY = 0;
+    let triggered = false;
+    el.addEventListener('touchstart', function(e) {
+      if (!e.touches || e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      triggered = false;
+    }, { passive: true });
+
+    el.addEventListener('touchmove', function(e) {
+      if (triggered || !e.touches || e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (Math.abs(dy) > 36) return;
+      if (Math.abs(dx) > 58) {
+        const msg = msgIndex.get(Number(messageId));
+        if (msg) setReply(msg);
+        triggered = true;
+      }
+    }, { passive: true });
+  }
+
+  function registerMsg(msg) {
+    msgIndex.set(Number(msg.id), msg);
+    const el = document.getElementById('mc-m-' + msg.id);
+    if (el && !el.dataset.swipeBound) {
+      wireSwipe(el, msg.id);
+      el.dataset.swipeBound = '1';
+    }
+  }
+
+  function addMsg(m) {
+    registerMsg(m);
+    if (document.getElementById('mc-m-' + m.id)) return;
+    const empty = document.getElementById('mc-empty');
+    if (empty) empty.remove();
+
+    const dateLabel = m.created_date_label || '';
+    if (dateLabel && dateLabel !== lastDateLabel) {
+      const divider = document.createElement('div');
+      divider.className = 'mc-date-divider';
+      divider.innerHTML = `<span>${esc(dateLabel)}</span>`;
+      msgs.appendChild(divider);
+      lastDateLabel = dateLabel;
+    }
+
+    const div = document.createElement('div');
+    div.className = 'mc-msg ' + (m.is_own ? 'own' : 'other');
+    if (!m.is_own) {
+      div.classList.add(senderVariant(m.sender));
+    }
+    div.id = 'mc-m-' + m.id;
+    const avatar = m.sender_avatar
+      ? `<img src="${esc(m.sender_avatar)}" alt="${esc(m.sender)}" class="mc-msg-avatar" loading="lazy">`
+      : `<div class="mc-msg-avatar-fallback">${esc(m.sender_initial || (m.sender || '?').charAt(0).toUpperCase())}</div>`;
+    const replyQuote = m.reply_to
+      ? `<div class="mc-reply-quote"><span class="mc-reply-quote-name">${esc(m.reply_to.sender)}</span><span class="mc-reply-quote-text">${esc(m.reply_to.content)}</span></div>`
+      : '';
+    div.innerHTML = `<div class="mc-row">`
+      + `${avatar}`
+      + `<div class="mc-msg-main"><div class="mc-meta"><p class="mc-sender">${esc(m.sender)}</p><p class="mc-time-inline">${esc(m.created_time || m.created_at || '')}</p></div>`
+      + `${replyQuote}`
+      + `<div class="mc-bubble">${esc(m.content)}</div>`
+      + `</div></div>`;
+    msgs.appendChild(div);
+    wireSwipe(div, m.id);
+    div.dataset.swipeBound = '1';
+    if (!minimized) scrollBottom();
+    else {
+      unread++;
+      unreadDot.style.display = 'block';
+    }
+    if (m.id > lastMsgId) lastMsgId = m.id;
+    updateStickyDate();
+  }
+
+  function poll() {
+    fetch('{% url "debate_messages" debate.id %}')
+      .then(r => {
+        if (r.status === 403) {
+          if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+          }
+          document.body.classList.remove('mc-open');
+          window.location.href = '{% url "notifications" %}';
+          return null;
+        }
+        return r.json();
+      })
+      .then(d => {
+        if (!d) return;
+        if (d.success) {
+          if (typeof d.user_is_active === 'boolean') {
+            canSend = d.user_is_active;
+          }
+          if (typeof d.can_end_chat === 'boolean') {
+            canEnd = d.can_end_chat;
+          }
+          if (d.debate_status) {
+            debateStatus = d.debate_status;
+          }
+          if (typeof d.current_controller_name === 'string') {
+            currentControllerName = d.current_controller_name;
+          }
+          if (typeof d.current_controller_side === 'string') {
+            currentControllerSide = d.current_controller_side;
+          }
+          if (typeof d.can_moderate_chat === 'boolean') {
+            canModerate = d.can_moderate_chat;
+          }
+          if (Array.isArray(d.active_participants)) {
+            activeParticipants = d.active_participants;
+          }
+          if (typeof d.yes_supporters === 'number') {
+            yesSupporters = d.yes_supporters;
+          }
+          if (typeof d.no_supporters === 'number') {
+            noSupporters = d.no_supporters;
+          }
+          updateComposerState();
+          refreshActionButtons();
+          updateSupporterBadges();
+          updateControllerLabel();
+
+          if (debateStatus !== 'accepted') {
+            if (pollTimer) {
+              clearInterval(pollTimer);
+              pollTimer = null;
+            }
+            window.showToast('This conversation has ended.', 'info');
+            setTimeout(() => {
+              document.body.classList.remove('mc-open');
+              window.location.href = '{% url "notifications" %}';
+            }, 600);
+            return;
+          }
+
+          d.messages.forEach(addMsg);
+          updateStickyDate();
+          return;
+        }
+        if (d.error === 'Access denied') {
+          if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+          }
+          document.body.classList.remove('mc-open');
+          window.location.href = '{% url "notifications" %}';
+        }
+      })
+      .catch(() => {});
+  }
+
+  window.mcMinimize = function() {
+    try {
+      sessionStorage.setItem('dhMobileMinimizedDebateId', mobileDebateId);
+      sessionStorage.setItem('dhMobileMinimizedPostId', mobilePostId);
+      sessionStorage.setItem('dhMobileMinimizedAt', String(Date.now()));
+    } catch {}
+    document.body.classList.remove('mc-open');
+    window.location.href = mobilePostUrl;
+  };
+
+  window.mcRestore = function() {
+    minimized = true; // will be set false below after render
+    shell.classList.remove('mc-hidden');
+    chathead.style.display = 'none';
+    minimized = false;
+    unread = 0;
+    unreadDot.style.display = 'none';
+    scrollBottom();
+  };
+
+  window.mcBack = function() {
+    document.body.classList.remove('mc-open');
+    window.location.href = mobilePostUrl;
+  };
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const content = inp.value.trim();
+    if (!content) return;
+    inp.value = '';
+    const reply = replyTarget;
+    fetch('{% url "send_debate_message" debate.id %}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrf() },
+      body: 'content=' + encodeURIComponent(content)
+        + (reply ? '&reply_to_id=' + encodeURIComponent(String(reply.id)) : '')
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) {
+        addMsg(d.message);
+        setReply(null);
+      }
+    })
+    .catch(() => {});
+  });
+
+  // Keep input bar above keyboard on iOS
+  inp.addEventListener('focus', () => setTimeout(scrollBottom, 350));
+
+  document.querySelectorAll('.mc-msg[id^="mc-m-"]').forEach(function(el) {
+    const id = Number((el.id || '').replace('mc-m-', ''));
+    if (id) {
+      msgIndex.set(id, {
+        id,
+        sender: (el.querySelector('.mc-sender')?.textContent || '').trim(),
+        content: (el.querySelector('.mc-bubble')?.textContent || '').trim()
+      });
+      if (!el.dataset.swipeBound) {
+        wireSwipe(el, id);
+        el.dataset.swipeBound = '1';
+      }
+
+      const sender = (el.querySelector('.mc-sender')?.textContent || '').trim();
+      if (sender && !el.classList.contains('own')) {
+        el.classList.add(senderVariant(sender));
+      }
+
+      const main = el.querySelector('.mc-row > div:last-child');
+      if (main && !main.classList.contains('mc-msg-main')) {
+        main.classList.add('mc-msg-main');
+      }
+    }
+  });
+
+  const lastDividerLabel = document.querySelector('#mc-msgs .mc-date-divider:last-child span');
+  if (lastDividerLabel) {
+    lastDateLabel = (lastDividerLabel.textContent || '').trim();
+  }
+
+  scrollBottom();
+  updateComposerState();
+  refreshActionButtons();
+  updateSupporterBadges();
+  updateControllerLabel();
+  renderMembers();
+  updateStickyDate();
+  msgs.addEventListener('scroll', updateStickyDate, { passive: true });
+  poll();
+  pollTimer = setInterval(poll, 3000);
+})();
+</script>
+{% endblock %}

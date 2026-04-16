@@ -43,5 +43,5 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             email=validated_data['email'],
             password=validated_data['password']
         )
-        Profile.objects.create(user=user, username=username)
+        # Profile is created automatically by the post_save signal
         return user

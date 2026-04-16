@@ -3,15 +3,18 @@
 {% block title %}Register - Discussion Hub{% endblock %}
 
 {% block content %}
-<div class="max-w-md mx-auto">
-    <div class="bg-card border border-border rounded-lg p-8">
-        <div class="text-center mb-8">
+<div class="max-w-2xl mx-auto min-h-[calc(100vh-11rem)] flex items-center">
+    <div class="w-full bg-card border border-border rounded-xl p-5 sm:p-6">
+        <div class="text-center mb-5">
             <h1 class="text-2xl font-bold text-foreground">Create Account</h1>
-            <p class="text-muted-foreground mt-2">Join the discussion community</p>
+            <p class="text-muted-foreground mt-1">Join the discussion community</p>
         </div>
 
-        <form method="post" class="space-y-6">
+        <form id="register-form" method="post" class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {% csrf_token %}
+            {% if next %}
+            <input type="hidden" name="next" value="{{ next }}">
+            {% endif %}
 
             <div>
                 <label for="username" class="block text-sm font-medium text-foreground mb-2">
@@ -36,28 +39,31 @@
                 <input type="password" id="password" name="password" required
                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                 <div class="mt-1 text-xs text-muted-foreground">
-                    Password must contain at least 8 characters, including uppercase, lowercase, number, and special character.
+                    At least 8 chars with uppercase, lowercase, number, and special character.
                 </div>
+                <p id="password-error" class="mt-1 text-xs text-red-600 hidden">Password does not meet criteria.</p>
             </div>
 
             <div>
                 <label for="confirm_password" class="block text-sm font-medium text-foreground mb-2">
-                    Confirm Password
+                    Re-enter Password
                 </label>
                 <input type="password" id="confirm_password" name="confirm_password" required
                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                <p id="confirm-password-error" class="mt-1 text-xs text-red-600 hidden">Passwords do not match.</p>
             </div>
 
-            <button type="submit"
-                    class="w-full bg-primary text-primary-foreground py-2 px-4 rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+            <button id="signup-btn" type="submit"
+                    class="md:col-span-2 w-full bg-primary text-primary-foreground py-2 px-4 rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled>
                 Create Account
             </button>
         </form>
 
-        <div class="mt-6 text-center">
+        <div class="mt-4 text-center">
             <p class="text-muted-foreground">
                 Already have an account?
-                <a href="{% url 'login' %}" class="text-primary hover:text-primary/80 font-medium">
+                <a href="{% url 'login' %}{% if next %}?next={{ next|urlencode }}{% endif %}" class="text-primary hover:text-primary/80 font-medium">
                     Sign in
                 </a>
             </p>
@@ -66,15 +72,55 @@
 </div>
 
 <script>
-// Password confirmation validation
-document.getElementById('confirm_password').addEventListener('input', function() {
-    const password = document.getElementById('password').value;
-    const confirmPassword = this.value;
+const passwordInput = document.getElementById('password');
+const confirmPasswordInput = document.getElementById('confirm_password');
+const passwordError = document.getElementById('password-error');
+const confirmPasswordError = document.getElementById('confirm-password-error');
+const signupButton = document.getElementById('signup-btn');
+const registerForm = document.getElementById('register-form');
 
-    if (password !== confirmPassword) {
-        this.setCustomValidity('Passwords do not match');
+function isPasswordCriteriaMet(value) {
+    return value.length >= 8
+        && /[A-Z]/.test(value)
+        && /[a-z]/.test(value)
+        && /[0-9]/.test(value)
+        && /[!@#$%^&*(),.?":{}|<>]/.test(value);
+}
+
+function validateRegistrationPasswords() {
+    const password = passwordInput.value;
+    const confirmPassword = confirmPasswordInput.value;
+
+    const passwordValid = isPasswordCriteriaMet(password);
+    const passwordsMatch = password.length > 0 && confirmPassword.length > 0 && password === confirmPassword;
+
+    if (password.length > 0 && !passwordValid) {
+        passwordError.classList.remove('hidden');
+        passwordInput.setCustomValidity('Password does not meet criteria.');
     } else {
-        this.setCustomValidity('');
+        passwordError.classList.add('hidden');
+        passwordInput.setCustomValidity('');
+    }
+
+    if (confirmPassword.length > 0 && !passwordsMatch) {
+        confirmPasswordError.classList.remove('hidden');
+        confirmPasswordInput.setCustomValidity('Passwords do not match.');
+    } else {
+        confirmPasswordError.classList.add('hidden');
+        confirmPasswordInput.setCustomValidity('');
+    }
+
+    const canSubmit = passwordValid && passwordsMatch;
+    signupButton.disabled = !canSubmit;
+    return canSubmit;
+}
+
+passwordInput.addEventListener('input', validateRegistrationPasswords);
+confirmPasswordInput.addEventListener('input', validateRegistrationPasswords);
+
+registerForm.addEventListener('submit', function(event) {
+    if (!validateRegistrationPasswords()) {
+        event.preventDefault();
     }
 });
 </script>

@@ -14,7 +14,7 @@
     {% if debates %}
     <div class="space-y-4">
         {% for debate in debates %}
-        <div class="bg-card border border-border rounded-lg p-6">
+        <div class="bg-card border border-border rounded-2xl p-6" data-debate-id="{{ debate.id }}">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
                     <div class="flex items-center space-x-2 mb-2">
@@ -37,7 +37,11 @@
 
                     <div class="flex items-center space-x-4 text-sm text-muted-foreground">
                         <span>{{ debate.created_at|date:"M j, Y g:i A" }}</span>
-                        <span class="px-2 py-1 rounded-full text-xs
+                        {% if debate.status == 'accepted' %}
+                        <span>Yes {{ debate.yes_supporters }}</span>
+                        <span>No {{ debate.no_supporters }}</span>
+                        {% endif %}
+                        <span id="debate-status-{{ debate.id }}" class="px-2 py-1 rounded-full text-xs
                             {% if debate.status == 'pending' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200{% endif %}
                             {% if debate.status == 'accepted' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}
                             {% if debate.status == 'rejected' %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% endif %}">
@@ -47,19 +51,67 @@
                 </div>
 
                 {% if debate.status == 'pending' and debate.target == user %}
-                <div class="flex space-x-2 ml-4">
-                    <form method="post" action="{% url 'accept_debate' debate.id %}" class="inline">
-                        {% csrf_token %}
-                        <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 text-sm">
-                            Accept
-                        </button>
-                    </form>
+                <div id="debate-actions-{{ debate.id }}" class="flex space-x-2 ml-4">
+                    <button type="button" onclick="acceptDebate('{{ debate.id }}')" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 text-sm">
+                        Accept
+                    </button>
                     <form method="post" action="{% url 'reject_debate' debate.id %}" class="inline">
                         {% csrf_token %}
                         <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 text-sm">
                             Reject
                         </button>
                     </form>
+                </div>
+                {% elif debate.status == 'accepted' %}
+                <div class="ml-4">
+                    <!-- Desktop: opens floating panel. Mobile: navigate to full page -->
+                    {% if debate.user_can_post or debate.user_is_view_only %}
+                    <button
+                        onclick="openDebateChat('{{ debate.id }}', '{{ debate.post.title|escapejs }}', '{% if user == debate.initiator %}{{ debate.target.username|escapejs }}{% else %}{{ debate.initiator.username|escapejs }}{% endif %}', {{ debate.yes_supporters }}, {{ debate.no_supporters }}, {% if debate.user_is_active_participant %}true{% else %}false{% endif %}, {% if debate.user_can_end %}true{% else %}false{% endif %}, '{{ debate.status }}', {% if debate.user_can_post %}true{% else %}false{% endif %}, {% if debate.user_can_rejoin %}true{% else %}false{% endif %}, {% if debate.user_is_view_only %}true{% else %}false{% endif %}, {% if debate.user_can_moderate %}true{% else %}false{% endif %})"
+                        class="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition shadow-sm">
+                        <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                        {% if debate.user_is_view_only %}View Conversation{% else %}Open Chat{% endif %}
+                    </button>
+                    {% endif %}
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        {% if debate.user_can_leave %}
+                        <button type="button" onclick="leaveDebate('{{ debate.id }}')" class="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary transition">
+                            Leave
+                        </button>
+                        {% endif %}
+                        {% if debate.user_can_rejoin %}
+                        <button type="button" onclick="rejoinDebate('{{ debate.id }}')" class="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary transition">
+                            Rejoin
+                        </button>
+                        {% endif %}
+                        {% if debate.user_can_end %}
+                        <button type="button" onclick="endDebate('{{ debate.id }}')" class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition">
+                            End Chat
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% if debate.user_can_moderate %}
+                    <div class="mt-3 rounded-xl border border-border bg-background/60 p-3">
+                        <p class="text-xs font-semibold text-foreground mb-2">Participant Controls</p>
+                        {% if debate.moderatable_participants %}
+                        <div class="space-y-2">
+                            {% for participant in debate.moderatable_participants %}
+                            <div class="flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-card px-2.5 py-2">
+                                <div class="min-w-0">
+                                    <p class="text-xs font-semibold text-foreground truncate">{{ participant.user.username }}</p>
+                                    <p class="text-[11px] text-muted-foreground">{{ participant.side|upper }} side</p>
+                                </div>
+                                <button type="button" onclick="removeParticipantFromDebate('{{ debate.id }}', '{{ participant.user.id }}', '{{ participant.user.username|escapejs }}')" class="inline-flex items-center rounded-lg border border-red-400/50 bg-red-500/10 px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-500/15">
+                                    Remove
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-[11px] text-muted-foreground">No other active participants right now.</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
                 {% endif %}
             </div>
@@ -77,4 +129,275 @@
     </div>
     {% endif %}
 </div>
+
+<div id="debate-counts-modal" class="hidden fixed inset-0 z-[7200] items-center justify-center bg-black/35 backdrop-blur-[2px] px-4">
+    <div class="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-[0_24px_60px_rgba(15,23,42,0.35)]">
+        <h3 class="text-base font-semibold text-foreground">Set Conversation Limits</h3>
+        <p class="mt-1 text-xs text-muted-foreground">Choose how many YES and NO voters can join this conversation.</p>
+
+        <div class="mt-4 space-y-3">
+            <div>
+                <label for="modal-yes-supporters" class="block text-xs font-semibold text-foreground mb-1">YES side participants</label>
+                <input id="modal-yes-supporters" type="number" min="1" max="50" step="1"
+                    class="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    value="5">
+            </div>
+            <div>
+                <label for="modal-no-supporters" class="block text-xs font-semibold text-foreground mb-1">NO side participants</label>
+                <input id="modal-no-supporters" type="number" min="1" max="50" step="1"
+                    class="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    value="5">
+            </div>
+        </div>
+
+        <div class="mt-4 flex items-center justify-end gap-2">
+            <button type="button" id="modal-cancel-btn" class="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary">Cancel</button>
+            <button type="button" id="modal-submit-btn" class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90">Continue</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function getCSRFToken() {
+    const name = 'csrftoken=';
+    const decodedCookie = decodeURIComponent(document.cookie || '');
+    const cookies = decodedCookie.split(';');
+
+    for (let cookie of cookies) {
+        cookie = cookie.trim();
+        if (cookie.indexOf(name) === 0) {
+            return cookie.substring(name.length, cookie.length);
+        }
+    }
+
+    return '';
+}
+
+function openDebateChat(debateId, title, opponent, yesSupp, noSupp, userIsActive = true, canEndChat = false, debateStatus = 'accepted', canPost = true, canRejoin = false, isViewOnly = false, canModerate = false) {
+    if (window.innerWidth >= 768) {
+        // Desktop: open floating panel
+        ChatManager.openWithData({
+            id: String(debateId),
+            title: title,
+            opponent: opponent,
+            yes_supporters: yesSupp,
+            no_supporters: noSupp,
+            user_is_active: !!userIsActive,
+            can_post: !!canPost,
+            can_rejoin: !!canRejoin,
+            is_view_only: !!isViewOnly,
+            can_moderate_chat: !!canModerate,
+            can_end_chat: !!canEndChat,
+            debate_status: debateStatus || 'accepted'
+        });
+    } else {
+        // Mobile: navigate to full-page chat
+        window.location.href = '/debates/' + debateId + '/chat/';
+    }
+}
+
+function openDebateCountsModal() {
+    const modal = document.getElementById('debate-counts-modal');
+    const yesInput = document.getElementById('modal-yes-supporters');
+    const noInput = document.getElementById('modal-no-supporters');
+    const submitBtn = document.getElementById('modal-submit-btn');
+    const cancelBtn = document.getElementById('modal-cancel-btn');
+
+    if (!modal || !yesInput || !noInput || !submitBtn || !cancelBtn) {
+        return Promise.resolve(null);
+    }
+
+    yesInput.value = '5';
+    noInput.value = '5';
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    yesInput.focus();
+
+    return new Promise((resolve) => {
+        const close = (result = null) => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            submitBtn.removeEventListener('click', onSubmit);
+            cancelBtn.removeEventListener('click', onCancel);
+            modal.removeEventListener('click', onBackdropClick);
+            document.removeEventListener('keydown', onEscape);
+            resolve(result);
+        };
+
+        const onSubmit = () => {
+            const yes = Number.parseInt(yesInput.value, 10);
+            const no = Number.parseInt(noInput.value, 10);
+
+            if (!Number.isInteger(yes) || !Number.isInteger(no) || yes < 1 || no < 1) {
+                window.showToast('Please enter valid participant counts (minimum 1).', 'error');
+                return;
+            }
+
+            close({ yes, no });
+        };
+
+        const onCancel = () => close(null);
+        const onBackdropClick = (event) => {
+            if (event.target === modal) {
+                close(null);
+            }
+        };
+        const onEscape = (event) => {
+            if (event.key === 'Escape') {
+                close(null);
+            }
+        };
+
+        submitBtn.addEventListener('click', onSubmit);
+        cancelBtn.addEventListener('click', onCancel);
+        modal.addEventListener('click', onBackdropClick);
+        document.addEventListener('keydown', onEscape);
+    });
+}
+
+function _openAcceptedDebateChat(debateId) {
+    if (window.innerWidth >= 768 && window.ChatManager) {
+        window.ChatManager.open(String(debateId));
+    } else if (window.innerWidth < 768) {
+        window.location.href = '/debates/' + debateId + '/chat/';
+    }
+}
+
+function _markDebateRowAccepted(debateId) {
+    const actionsEl = document.getElementById('debate-actions-' + debateId);
+    if (actionsEl) {
+        actionsEl.outerHTML = '<div class="ml-4"><button type="button" onclick="window.ChatManager && window.ChatManager.open(\'' + debateId + '\')" class="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition shadow-sm"><svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>Open Chat</button></div>';
+    }
+    const statusEl = document.getElementById('debate-status-' + debateId);
+    if (statusEl) {
+        statusEl.textContent = 'Accepted';
+        statusEl.className = 'px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+    }
+}
+
+function acceptDebate(debateId) {
+    const sendAccept = (yesSupporters = null, noSupporters = null) => fetch(`/accept-debate/${debateId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: yesSupporters !== null && noSupporters !== null
+            ? `yes_supporters=${encodeURIComponent(yesSupporters)}&no_supporters=${encodeURIComponent(noSupporters)}`
+            : ''
+    });
+
+    sendAccept()
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            _markDebateRowAccepted(debateId);
+            _openAcceptedDebateChat(debateId);
+            window.showToast('Debate accepted! Chat is now open.', 'success', 3000);
+            return;
+        }
+
+        if (data.requires_counts) {
+            openDebateCountsModal()
+                .then(counts => {
+                    if (!counts) {
+                        return;
+                    }
+
+                    return sendAccept(counts.yes, counts.no)
+                        .then(response => response.json())
+                        .then(retryData => {
+                            if (retryData.success) {
+                                _markDebateRowAccepted(debateId);
+                                _openAcceptedDebateChat(debateId);
+                                window.showToast('Debate accepted! Chat is now open.', 'success', 3000);
+                            } else {
+                                window.showToast(retryData.error || 'Failed to accept debate.', 'error', 4200);
+                            }
+                        });
+                })
+                .catch(() => window.showToast('Failed to accept debate.', 'error'));
+            return;
+        }
+
+        window.showToast(data.error || 'Failed to accept debate.', 'error', 4200);
+    })
+    .catch(() => window.showToast('Failed to accept debate.', 'error'));
+}
+
+function postDebateAction(url) {
+    return fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: ''
+    }).then(response => response.json());
+}
+
+function leaveDebate(debateId) {
+    postDebateAction(`/debates/${debateId}/leave/`)
+        .then(data => {
+            if (data.success) {
+                window.showToast(data.message || 'You left the conversation.', 'info');
+                window.setTimeout(() => window.location.reload(), 450);
+            } else {
+                window.showToast(data.error || 'Failed to leave conversation.', 'error');
+            }
+        })
+        .catch(() => window.showToast('Failed to leave conversation.', 'error'));
+}
+
+function rejoinDebate(debateId) {
+    postDebateAction(`/debates/${debateId}/rejoin/`)
+        .then(data => {
+            if (data.success) {
+                window.showToast(data.message || 'You rejoined the conversation.', 'success');
+                window.setTimeout(() => window.location.reload(), 450);
+            } else {
+                window.showToast(data.error || 'Failed to rejoin conversation.', 'error');
+            }
+        })
+        .catch(() => window.showToast('Failed to rejoin conversation.', 'error'));
+}
+
+function endDebate(debateId) {
+    postDebateAction(`/debates/${debateId}/end/`)
+        .then(data => {
+            if (data.success) {
+                window.showToast(data.message || 'Conversation ended.', 'success');
+                window.setTimeout(() => window.location.reload(), 450);
+            } else {
+                window.showToast(data.error || 'Failed to end conversation.', 'error');
+            }
+        })
+        .catch(() => window.showToast('Failed to end conversation.', 'error'));
+}
+
+function removeParticipantFromDebate(debateId, userId, username) {
+    if (!window.confirm(`Remove ${username} from this conversation? They will not be able to rejoin or send requests to you again.`)) {
+        return;
+    }
+
+    fetch(`/debates/${debateId}/remove-participant/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: `user_id=${encodeURIComponent(userId)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.showToast(data.message || `${username} removed successfully.`, 'success', 4200);
+            window.setTimeout(() => window.location.reload(), 450);
+        } else {
+            window.showToast(data.error || 'Failed to remove participant.', 'error');
+        }
+    })
+    .catch(() => window.showToast('Failed to remove participant.', 'error'));
+}
+</script>
 {% endblock %}

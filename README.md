@@ -184,6 +184,7 @@ Login with your superuser credentials to manage:
 - Technology
 - Sports
 - Science
+- History
 - Politics
 - Entertainment
 - Health

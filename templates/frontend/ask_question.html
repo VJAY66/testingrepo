@@ -1,0 +1,94 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Ask Question - Discussion Hub{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto py-8">
+    <div class="bg-card border border-border rounded-3xl p-6 shadow-lg">
+        <h1 class="text-2xl font-bold text-foreground mb-2">Ask the Community</h1>
+        <p class="text-muted-foreground mb-4 text-sm">
+            Post a
+            <span class="inline-flex items-center rounded-md border border-primary/25 bg-primary/10 px-1.5 py-0.5 font-medium text-foreground">yes/no question</span>
+            and get opinions from the community.
+        </p>
+
+        <!-- Examples banner -->
+        <div class="mb-6 rounded-2xl border border-primary/30 bg-secondary p-4">
+            <div class="mb-3 flex items-center gap-2">
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary">💡</span>
+                <h3 class="text-sm font-semibold text-foreground">Good question examples</h3>
+            </div>
+            <ul class="space-y-2 text-sm text-foreground">
+                <li class="rounded-xl border border-border bg-background/80 px-3 py-2">Is it worth buying Honda City in a village?</li>
+                <li class="rounded-xl border border-border bg-background/80 px-3 py-2">If we do SIP consistently, does SIP have the ability to beat lumpsum in the long term?</li>
+                <li class="rounded-xl border border-border bg-background/80 px-3 py-2">If there is a conflict between two countries, will it affect the world in any way?</li>
+            </ul>
+        </div>
+
+        {% if not user.is_authenticated %}
+        <div class="mb-4 rounded-2xl border border-yellow-300 bg-yellow-50 p-3 text-xs text-yellow-900">
+            <strong>Note:</strong> You need to log in before posting a question.
+        </div>
+        {% endif %}
+
+        <form method="post" action="{% url 'create_post' %}" class="space-y-4" id="ask-form">
+            {% csrf_token %}
+            <div>
+                <label for="title" class="block text-sm font-medium text-foreground mb-2">Your Question (Yes/No)</label>
+                <textarea id="title" name="title" rows="2" required maxlength="200"
+                          class="w-full rounded-2xl border border-border bg-background px-4 py-3 text-foreground text-sm shadow-sm placeholder-muted-foreground/50 focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none"
+                          placeholder="Should I... ? Is it worth... ? Will... ?"></textarea>
+                <div class="text-xs text-muted-foreground mt-1">
+                    <span id="char-count">0</span>/200 characters
+                </div>
+            </div>
+            <input type="hidden" name="content" value="">
+
+            <div>
+                <label for="category" class="block text-sm font-medium text-foreground mb-2">Category</label>
+                <select id="category" name="category" required
+                        class="w-full rounded-2xl border border-border bg-background px-4 py-2 text-sm text-foreground shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
+                    <option value="">Select a category</option>
+                    {% for category in categories %}
+                    <option value="{{ category.name }}">{{ category.icon }} {{ category.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" id="submit-btn"
+                    class="w-full rounded-full bg-primary text-primary-foreground px-6 py-3 text-sm font-semibold hover:bg-primary/90 transition">
+                Post Question
+            </button>
+        </form>
+
+        <div class="mt-4 text-center text-xs text-muted-foreground border-t border-border pt-4">
+            💬 Keep it short, simple, and answerable with yes or no
+        </div>
+    </div>
+</div>
+
+<script>
+    const titleInput = document.getElementById('title');
+    const charCount = document.getElementById('char-count');
+    const submitBtn = document.getElementById('submit-btn');
+
+    titleInput.addEventListener('input', function() {
+        charCount.textContent = this.value.length;
+        
+        // Check if looks like a yes/no question
+        const hasQuestionMark = this.value.includes('?');
+        const startsWithKeyword = /^(should|is|will|can|would|do|does|did|may|might|must|was|were|am|are)\s/i.test(this.value);
+        
+        if (this.value.length > 0 && !hasQuestionMark) {
+            submitBtn.classList.add('opacity-70');
+            submitBtn.title = 'Try to form it as a question (end with ?)';
+        } else if (this.value.length > 0 && !startsWithKeyword) {
+            submitBtn.classList.add('opacity-70');
+            submitBtn.title = 'Good questions usually start with: Should, Is, Will, Can, etc.';
+        } else {
+            submitBtn.classList.remove('opacity-70');
+            submitBtn.title = '';
+        }
+    });
+</script>
+{% endblock %}

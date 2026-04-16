@@ -2,10 +2,12 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.exceptions import ValidationError
 from django.db.models import Q
 import uuid
 
-from discussions.models import Post, Comment, Debate
+from discussions.limits import has_reached_daily_post_limit
+from discussions.models import Post, Comment, Debate, CommentReaction
 from discussions.serializers import PostSerializer, CommentSerializer, DebateSerializer
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -19,6 +21,9 @@ class PostViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
 
     def perform_create(self, serializer):
+        limit_reached, _, limit = has_reached_daily_post_limit(self.request.user)
+        if limit_reached:
+            raise ValidationError({'detail': f'You can create up to {limit} posts per day.'})
         serializer.save(user=self.request.user, id=str(uuid.uuid4()))
 
     def perform_update(self, serializer):
@@ -69,6 +74,9 @@ class CommentViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
 
     def perform_create(self, serializer):
+        post = serializer.validated_data.get('post')
+        if post and Comment.objects.filter(post=post, user=self.request.user).exists():
+            raise ValidationError({'detail': 'You can comment only once on a post.'})
         serializer.save(user=self.request.user, id=str(uuid.uuid4()))
 
     @action(detail=False, methods=['get'])
@@ -83,22 +91,66 @@ class CommentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def like(self, request):
         comment_id = request.data.get('comment_id')
+
+        if not request.user.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+
         try:
             comment = Comment.objects.get(id=comment_id)
-            comment.likes += 1
-            comment.save()
-            return Response({'likes': comment.likes})
+
+            if comment.user_id == request.user.id:
+                return Response({'error': 'You cannot react to your own comment.'}, status=status.HTTP_403_FORBIDDEN)
+
+            reaction, created = CommentReaction.objects.get_or_create(
+                comment=comment,
+                user=request.user,
+                defaults={'reaction': 'like'}
+            )
+
+            if not created and reaction.reaction != 'like':
+                reaction.reaction = 'like'
+                reaction.save(update_fields=['reaction', 'updated_at'])
+
+            likes_count = CommentReaction.objects.filter(comment=comment, reaction='like').count()
+            dislikes_count = CommentReaction.objects.filter(comment=comment, reaction='dislike').count()
+            comment.likes = likes_count
+            comment.dislikes = dislikes_count
+            comment.save(update_fields=['likes', 'dislikes', 'updated_at'])
+
+            return Response({'likes': likes_count, 'dislikes': dislikes_count})
         except Comment.DoesNotExist:
             return Response({'error': 'Comment not found'}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=False, methods=['post'])
     def dislike(self, request):
         comment_id = request.data.get('comment_id')
+
+        if not request.user.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+
         try:
             comment = Comment.objects.get(id=comment_id)
-            comment.dislikes += 1
-            comment.save()
-            return Response({'dislikes': comment.dislikes})
+
+            if comment.user_id == request.user.id:
+                return Response({'error': 'You cannot react to your own comment.'}, status=status.HTTP_403_FORBIDDEN)
+
+            reaction, created = CommentReaction.objects.get_or_create(
+                comment=comment,
+                user=request.user,
+                defaults={'reaction': 'dislike'}
+            )
+
+            if not created and reaction.reaction != 'dislike':
+                reaction.reaction = 'dislike'
+                reaction.save(update_fields=['reaction', 'updated_at'])
+
+            likes_count = CommentReaction.objects.filter(comment=comment, reaction='like').count()
+            dislikes_count = CommentReaction.objects.filter(comment=comment, reaction='dislike').count()
+            comment.likes = likes_count
+            comment.dislikes = dislikes_count
+            comment.save(update_fields=['likes', 'dislikes', 'updated_at'])
+
+            return Response({'likes': likes_count, 'dislikes': dislikes_count})
         except Comment.DoesNotExist:
             return Response({'error': 'Comment not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -127,6 +179,38 @@ class DebateViewSet(viewsets.ModelViewSet):
             
             if request.user == target_user:
                 return Response({'error': 'Cannot start debate with yourself'}, status=status.HTTP_400_BAD_REQUEST)
+
+            existing_debate = Debate.objects.filter(
+                comment=comment,
+                initiator=request.user,
+                target=target_user
+            ).exists()
+
+            if existing_debate:
+                return Response({'error': 'Debate request already sent'}, status=status.HTTP_400_BAD_REQUEST)
+
+            pending_for_target = Debate.objects.filter(target=target_user, status='pending')
+            category_pending_count = pending_for_target.filter(comment__vote_type=comment.vote_type).count()
+            total_pending_count = pending_for_target.count()
+            side_label = 'YES' if comment.vote_type == 'yes' else 'NO'
+
+            if category_pending_count >= 5:
+                return Response(
+                    {
+                        'queued': True,
+                        'error': f'You are in queue. {side_label} queue is full (5/5), commentor still not responding to existing requests.'
+                    },
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+
+            if total_pending_count >= 10:
+                return Response(
+                    {
+                        'queued': True,
+                        'error': 'You are in queue. This user already has 10 pending requests, commentor still not responding to existing requests.'
+                    },
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
 
             debate = Debate.objects.create(
                 id=str(uuid.uuid4()),

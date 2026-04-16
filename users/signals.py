@@ -6,7 +6,8 @@ from users.models import Profile
 @receiver(post_save, sender=User)
 def create_profile(sender, instance, created, **kwargs):
     if created:
-        Profile.objects.get_or_create(user=instance, defaults={'username': instance.username})
+        if not Profile.objects.filter(user=instance).exists():
+            Profile.objects.create(user=instance, username=instance.username)
 
 @receiver(post_save, sender=User)
 def save_profile(sender, instance, **kwargs):

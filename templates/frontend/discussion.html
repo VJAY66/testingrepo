@@ -5,7 +5,7 @@
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-8">
     <!-- Post Content -->
-    <div class="bg-card border border-border rounded-lg p-6">
+    <div class="bg-card border border-border rounded-2xl p-6">
         <div class="flex items-start justify-between mb-4">
             <div class="flex items-center space-x-2">
                 <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-medium">
@@ -21,180 +21,446 @@
             </span>
         </div>
 
-        <h1 class="text-2xl font-bold text-foreground mb-4">{{ post.title }}</h1>
+        <h1 id="post-title-display" class="text-2xl font-bold text-foreground mb-4">{{ post.title }}</h1>
 
         {% if post.content %}
-        <div class="text-foreground mb-6 whitespace-pre-wrap">{{ post.content }}</div>
+        <div id="post-content-display" class="text-foreground mb-6 whitespace-pre-wrap">{{ post.content }}</div>
+        {% else %}
+        <div id="post-content-display" class="text-foreground mb-6 whitespace-pre-wrap"></div>
         {% endif %}
 
-        <div class="flex items-center space-x-4 text-sm text-muted-foreground">
-            <span>{{ yes_comments.count }} Yes votes</span>
-            <span>{{ no_comments.count }} No votes</span>
+        {% if is_post_creator %}
+        <div class="mb-5 flex flex-wrap items-center gap-2">
+            {% if can_edit_post %}
+            <button type="button" id="open-post-editor-btn" onclick="openPostEditor()" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border text-muted-foreground hover:border-primary hover:text-primary transition" aria-label="Edit post" title="Edit post">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 13l6.232-6.232a2.5 2.5 0 113.536 3.536L12.536 16.536a4 4 0 01-1.414.943L7 19l1.521-4.122A4 4 0 019.464 13.464z"></path>
+                </svg>
+            </button>
+            {% else %}
+            <button type="button" disabled class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border text-muted-foreground opacity-70 cursor-not-allowed" aria-label="Edit locked" title="Edit locked">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 13l6.232-6.232a2.5 2.5 0 113.536 3.536L12.536 16.536a4 4 0 01-1.414.943L7 19l1.521-4.122A4 4 0 019.464 13.464z"></path>
+                </svg>
+            </button>
+            {% endif %}
+            <button type="button" onclick="deletePost('{{ post.id }}')" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-foreground/70 hover:border-foreground/30 hover:bg-secondary/60 hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition" aria-label="Delete post" title="Delete post">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                    <rect x="9.25" y="3.5" width="5.5" height="2.2" rx="1.1" stroke-width="1.8"></rect>
+                    <rect x="6" y="6" width="12" height="2.4" rx="1.2" stroke-width="1.8"></rect>
+                    <rect x="7.25" y="8.75" width="9.5" height="10.25" rx="2.1" stroke-width="1.8"></rect>
+                    <path stroke-linecap="round" stroke-width="1.8" d="M10 11.5v5.5M12 11.5v5.5M14 11.5v5.5"></path>
+                </svg>
+            </button>
         </div>
+        {% if can_edit_post %}
+        <div id="post-editor-panel" class="hidden mb-5 rounded-2xl border border-border bg-background/70 p-4 space-y-3">
+            <div>
+                <label for="post-edit-title" class="block text-xs font-semibold text-muted-foreground mb-1">Title</label>
+                <input id="post-edit-title" type="text" value="{{ post.title|escape }}" class="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" id="save-post-editor-btn" onclick="savePostEdit('{{ post.id }}')" class="inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition">Save Changes</button>
+                <button type="button" onclick="closePostEditor()" class="inline-flex items-center justify-center rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground hover:border-primary hover:text-primary transition">Cancel</button>
+            </div>
+        </div>
+        {% endif %}
+        {% if post_has_comments %}
+        <p class="text-xs text-muted-foreground mb-4">This post already has comments, so editing is disabled. You can still delete it.</p>
+        {% endif %}
+        {% endif %}
+
+        <div class="flex items-center space-x-4 text-sm text-muted-foreground mb-4">
+            <div class="flex-1">
+                <div class="flex justify-between mb-1">
+                    <span>Yes: {{ yes_percentage|floatformat:1 }}%</span>
+                    <span>No: {{ no_percentage|floatformat:1 }}%</span>
+                </div>
+                <div class="w-full rounded-full h-2 overflow-hidden bg-secondary flex">
+                    <div class="bg-green-500 h-2" style="width: {{ yes_percentage }}%"></div>
+                    <div class="bg-red-500 h-2" style="width: {{ no_percentage }}%"></div>
+                </div>
+            </div>
+        </div>
+
+        {% if show_post_submitted %}
+        <div id="post-submitted-banner" class="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl transition-opacity duration-500">
+            <p class="text-green-800 dark:text-green-200 font-medium">✅ Post submitted successfully!</p>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Comments Section -->
-    <div class="space-y-6">
-        <h2 class="text-xl font-bold text-foreground">Discussion</h2>
+    <div id="discussion-comments-section" class="space-y-6">
+        <div class="grid gap-4 md:grid-cols-[1fr_auto] items-center">
+            <div>
+                <h2 class="text-xl font-bold text-foreground">Discussion</h2>
+                <p class="text-sm text-muted-foreground">Vote in one direction and watch the community split into Yes and No.</p>
+            </div>
+            <div class="flex flex-wrap gap-3 justify-start md:justify-end">
+                <span class="inline-flex items-center rounded-full border border-green-500/20 bg-slate-900/90 px-3 py-1 text-sm font-semibold text-green-300 shadow-sm">
+                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    Yes {{ yes_vote_count }}
+                </span>
+                <span class="inline-flex items-center rounded-full border border-red-500/20 bg-slate-900/90 px-3 py-1 text-sm font-semibold text-red-300 shadow-sm">
+                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                    No {{ no_vote_count }}
+                </span>
+            </div>
+        </div>
 
-        {% if user.is_authenticated %}
-        <!-- Add Comment Form -->
-        <div class="bg-card border border-border rounded-lg p-6">
-            <h3 class="text-lg font-semibold mb-4">Share your thoughts</h3>
-            <form method="post" action="{% url 'create_comment' post.id %}">
-                {% csrf_token %}
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium mb-2">Your stance</label>
-                        <div class="flex space-x-4">
-                            <label class="flex items-center">
-                                <input type="radio" name="vote_type" value="yes" required
-                                       class="mr-2 text-primary focus:ring-primary">
-                                <span class="text-green-600 font-medium">Agree</span>
-                            </label>
-                            <label class="flex items-center">
-                                <input type="radio" name="vote_type" value="no" required
-                                       class="mr-2 text-primary focus:ring-primary">
-                                <span class="text-red-600 font-medium">Disagree</span>
-                            </label>
+        {% if user.is_authenticated and not is_post_creator %}
+            {% if not user_has_voted or not user_has_commented %}
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <form method="post" action="{% url 'create_comment' post.id %}" class="group rounded-2xl border border-green-500/10 bg-slate-950/90 p-5 shadow-[0_24px_80px_-40px_rgba(16,185,129,0.6)] transition hover:border-green-400/40">
+                    {% csrf_token %}
+                    <input type="hidden" name="vote_type" value="yes">
+                    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-500 text-white shadow-sm">
+                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-green-100">Yes</p>
+                            <p class="text-2xl font-semibold text-white">Agree</p>
                         </div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2">Your comment (optional)</label>
-                        <textarea name="content" rows="3"
-                                  class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                  placeholder="Explain your position..."></textarea>
-                    </div>
-                    <button type="submit"
-                            class="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90">
-                        Post Comment
+                    <p class="text-sm text-muted-foreground mb-4">
+                        {% if user_has_voted and not user_has_commented and user_vote_type == 'yes' %}
+                        You voted Yes. Add your comment here if you want your opinion to appear.
+                        {% elif user_has_voted and not user_has_commented and user_vote_type == 'no' %}
+                        Switch to Yes, or add text here to switch and comment at the same time.
+                        {% else %}
+                        Vote yes if you believe the statement is true or should happen.
+                        {% endif %}
+                    </p>
+                    <textarea name="content" rows="2" placeholder="{% if user_has_voted and not user_has_commented and user_vote_type == 'yes' %}Add your Yes comment...{% elif user_has_voted and not user_has_commented and user_vote_type == 'no' %}Optional: add comment while switching to Yes...{% else %}Optional: explain your view...{% endif %}" class="w-full rounded-2xl border border-green-300/30 bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-green-400 focus:ring-2 focus:ring-green-500/20"></textarea>
+                    <button type="submit" class="mt-4 inline-flex w-full justify-center rounded-full bg-gradient-to-r from-emerald-500 to-green-500 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:from-emerald-400 hover:to-green-400">
+                        {% if user_has_voted and not user_has_commented and user_vote_type == 'yes' %}
+                        Add Yes Comment
+                        {% elif user_has_voted and not user_has_commented and user_vote_type == 'no' %}
+                        Switch to Yes
+                        {% else %}
+                        Yes ({{ yes_vote_count }})
+                        {% endif %}
                     </button>
-                </div>
-            </form>
-        </div>
-        {% else %}
-        <div class="bg-secondary border border-border rounded-lg p-6 text-center">
-            <p class="text-muted-foreground mb-4">Join the discussion by signing in</p>
-            <a href="{% url 'login' %}" class="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90">
-                Sign In
-            </a>
+                </form>
+
+                <form method="post" action="{% url 'create_comment' post.id %}" class="group rounded-2xl border border-red-500/10 bg-slate-950/90 p-5 shadow-[0_24px_80px_-40px_rgba(239,68,68,0.6)] transition hover:border-red-400/40">
+                    {% csrf_token %}
+                    <input type="hidden" name="vote_type" value="no">
+                    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500 text-white shadow-sm">
+                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-red-100">No</p>
+                            <p class="text-2xl font-semibold text-white">Disagree</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-muted-foreground mb-4">
+                        {% if user_has_voted and not user_has_commented and user_vote_type == 'no' %}
+                        You voted No. Add your comment here if you want your opinion to appear.
+                        {% elif user_has_voted and not user_has_commented and user_vote_type == 'yes' %}
+                        Switch to No, or add text here to switch and comment at the same time.
+                        {% else %}
+                        Vote no if you think the statement is wrong or should not happen.
+                        {% endif %}
+                    </p>
+                    <textarea name="content" rows="2" placeholder="{% if user_has_voted and not user_has_commented and user_vote_type == 'no' %}Add your No comment...{% elif user_has_voted and not user_has_commented and user_vote_type == 'yes' %}Optional: add comment while switching to No...{% else %}Optional: explain your view...{% endif %}" class="w-full rounded-2xl border border-red-300/30 bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-red-400 focus:ring-2 focus:ring-red-500/20"></textarea>
+                    <button type="submit" class="mt-4 inline-flex w-full justify-center rounded-full bg-gradient-to-r from-rose-500 to-red-500 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:from-rose-400 hover:to-red-400">
+                        {% if user_has_voted and not user_has_commented and user_vote_type == 'no' %}
+                        Add No Comment
+                        {% elif user_has_voted and not user_has_commented and user_vote_type == 'yes' %}
+                        Switch to No
+                        {% else %}
+                        No ({{ no_vote_count }})
+                        {% endif %}
+                    </button>
+                </form>
+            </div>
+            {% else %}
+            {% endif %}
+        {% elif not user.is_authenticated %}
+        <div class="rounded-2xl border border-border bg-card p-5 text-center">
+            <p class="text-sm text-muted-foreground mb-3">Sign in to cast your vote and join the debate.</p>
+            <a href="{% url 'login' %}" class="inline-flex items-center justify-center rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">Sign In</a>
         </div>
         {% endif %}
 
-        <!-- Comments List -->
-        <div class="space-y-4">
-            <!-- Yes Comments -->
-            {% if yes_comments %}
-            <div>
-                <h3 class="text-lg font-semibold text-green-600 mb-4 flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                    </svg>
-                    Agreeing Comments ({{ yes_comments.count }})
-                </h3>
-                <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-2 md:gap-3">
+            <div class="space-y-2">
+                <div class="mb-3 flex items-center justify-between rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900/40 px-3 py-2">
+                    <p class="text-base font-semibold text-green-700 dark:text-green-300">Yes</p>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ yes_vote_count }}</span>
+                        <span class="text-sm font-semibold text-green-600 dark:text-green-400">{{ yes_percentage|floatformat:0 }}%</span>
+                    </div>
+                </div>
+                {% if yes_comments %}
+                <div class="space-y-2">
                     {% for comment in yes_comments %}
-                    <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                        <div class="flex items-start justify-between mb-2">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-medium">
+                    <div class="border border-border rounded-2xl bg-card overflow-hidden shadow-sm">
+                        <div class="px-3 py-1.5">
+                            <p id="comment-content-{{ comment.id }}" class="text-[13px] leading-5 font-medium text-foreground break-words {% if not comment.content %}hidden{% endif %}">{{ comment.content }}</p>
+                            <div class="mt-2 flex items-center gap-2 text-muted-foreground">
+                                {% if comment.user.profile.avatar_url %}
+                                <img src="{{ comment.user.profile.avatar_url }}" alt="{{ comment.user.username }}" class="h-6 w-6 rounded-full object-cover border border-border" loading="lazy">
+                                {% else %}
+                                <div class="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-secondary text-secondary-foreground text-[10px] font-semibold">
                                     {{ comment.user.username|first|upper }}
                                 </div>
-                                <span class="font-medium text-green-800 dark:text-green-200">{{ comment.user.username }}</span>
-                                <span class="text-xs text-green-600 dark:text-green-400">{{ comment.created_at|date:"M j, Y g:i A" }}</span>
-                            </div>
-                            {% if user.is_authenticated %}
-                            <div class="flex space-x-2">
-                                <button onclick="likeComment({{ comment.id }}, 'like')"
-                                        class="text-green-600 hover:text-green-800 text-sm">
-                                    👍 {{ comment.likes }}
-                                </button>
-                                <button onclick="likeComment({{ comment.id }}, 'dislike')"
-                                        class="text-red-600 hover:text-red-800 text-sm">
-                                    👎 {{ comment.dislikes }}
-                                </button>
-                                {% if user != comment.user %}
-                                <button onclick="startDebate({{ comment.id }})"
-                                        class="text-blue-600 hover:text-blue-800 text-sm">
-                                    Debate
-                                </button>
+                                {% endif %}
+                                <p class="font-medium text-[12px] leading-5 truncate">{{ comment.user.username }}</p>
+                                <span title="{% if comment.is_online %}Active now{% else %}{{ comment.presence_label }}{% endif %}" class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold {% if comment.is_online %}bg-emerald-500/15 text-emerald-700 dark:text-emerald-300{% else %}bg-gray-500/15 text-gray-600 dark:text-gray-300{% endif %}">
+                                    <span class="h-1.5 w-1.5 rounded-full {% if comment.is_online %}bg-emerald-500{% else %}bg-gray-400{% endif %}"></span>
+                                    {% if comment.is_online %}Online{% else %}Offline{% endif %}
+                                </span>
+                                {% if top_yes_comment_id and comment.id == top_yes_comment_id %}
+                                <span class="rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-semibold">Top Debater</span>
                                 {% endif %}
                             </div>
+                            {% if user.is_authenticated %}
+                            <div class="flex flex-wrap items-center gap-1 mt-1.5 pt-1.5 border-t border-border/60">
+                                {% if user != comment.user %}
+                                <button onclick="likeComment('{{ comment.id }}', 'like')" class="rounded text-[9px] px-1.5 py-1 text-muted-foreground hover:bg-secondary whitespace-nowrap">👍 {{ comment.likes }}</button>
+                                <button onclick="likeComment('{{ comment.id }}', 'dislike')" class="rounded text-[9px] px-1.5 py-1 text-muted-foreground hover:bg-secondary whitespace-nowrap">👎 {{ comment.dislikes }}</button>
+                                {% if user_has_voted %}
+                                {% if comment.debate_action_mode == 'view' and comment.debate_chat_url %}
+                                <a href="{{ comment.debate_chat_url }}" class="inline-flex items-center rounded bg-blue-500 px-1.5 py-1 text-[9px] text-white hover:bg-blue-600 whitespace-nowrap">{{ comment.debate_action_label }}</a>
+                                {% else %}
+                                <button onclick="startDebate('{{ comment.id }}', this)" class="rounded bg-blue-500 px-1.5 py-1 text-[9px] text-white hover:bg-blue-600 whitespace-nowrap">{{ comment.debate_action_label }}</button>
+                                {% endif %}
+                                {% else %}
+                                <button onclick="showInlineActionPopup(this, 'Please vote yes or no first.', 'error')" class="rounded bg-blue-500/65 px-1.5 py-1 text-[9px] text-white/95 hover:bg-blue-500 whitespace-nowrap">Start Debate</button>
+                                {% endif %}
+                                {% endif %}
+                                {% if user == comment.user %}
+                                <button onclick="openCommentEditor('{{ comment.id }}')" class="rounded text-[9px] px-1.5 py-1 text-muted-foreground hover:bg-secondary whitespace-nowrap">Edit</button>
+                                {% endif %}
+                                <button onclick="reportComment('{{ comment.id }}')" class="rounded text-[9px] px-1.5 py-1 text-muted-foreground hover:bg-secondary whitespace-nowrap">Report</button>
+                            </div>
+                            {% if user == comment.user %}
+                            <div id="comment-editor-{{ comment.id }}" class="hidden mt-2 space-y-2 rounded-xl border border-border bg-background/70 p-2">
+                                <textarea id="comment-editor-input-{{ comment.id }}" rows="3" class="w-full rounded-lg border border-border bg-card px-2.5 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">{{ comment.content|default:'' }}</textarea>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" id="comment-save-btn-{{ comment.id }}" onclick="saveCommentEdit('{{ comment.id }}')" class="rounded-full bg-primary px-3 py-1.5 text-[10px] font-semibold text-primary-foreground hover:bg-primary/90">Save</button>
+                                    <button type="button" onclick="closeCommentEditor('{{ comment.id }}')" class="rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold text-foreground hover:border-primary hover:text-primary">Cancel</button>
+                                </div>
+                            </div>
+                            {% endif %}
                             {% endif %}
                         </div>
-                        {% if comment.content %}
-                        <p class="text-green-800 dark:text-green-200">{{ comment.content }}</p>
-                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
+                {% else %}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900/50 p-4 text-center text-sm text-gray-600 dark:text-gray-400">
+                    No arguments yet. Be the first!
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
 
-            <!-- No Comments -->
-            {% if no_comments %}
-            <div>
-                <h3 class="text-lg font-semibold text-red-600 mb-4 flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                    </svg>
-                    Disagreeing Comments ({{ no_comments.count }})
-                </h3>
-                <div class="space-y-3">
+            <div class="space-y-2">
+                <div class="mb-3 flex items-center justify-between rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900/40 px-3 py-2">
+                    <p class="text-base font-semibold text-red-700 dark:text-red-300">No</p>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ no_vote_count }}</span>
+                        <span class="text-sm font-semibold text-red-600 dark:text-red-400">{{ no_percentage|floatformat:0 }}%</span>
+                    </div>
+                </div>
+                {% if no_comments %}
+                <div class="space-y-2">
                     {% for comment in no_comments %}
-                    <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                        <div class="flex items-start justify-between mb-2">
-                            <div class="flex items-center space-x-2">
-                                <div class="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-medium">
+                    <div class="border border-border rounded-2xl bg-card overflow-hidden shadow-sm">
+                        <div class="px-3 py-1.5">
+                            <p id="comment-content-{{ comment.id }}" class="text-[13px] leading-5 font-medium text-foreground break-words {% if not comment.content %}hidden{% endif %}">{{ comment.content }}</p>
+                            <div class="mt-2 flex items-center gap-2 text-muted-foreground">
+                                {% if comment.user.profile.avatar_url %}
+                                <img src="{{ comment.user.profile.avatar_url }}" alt="{{ comment.user.username }}" class="h-6 w-6 rounded-full object-cover border border-border" loading="lazy">
+                                {% else %}
+                                <div class="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-secondary text-secondary-foreground text-[10px] font-semibold">
                                     {{ comment.user.username|first|upper }}
                                 </div>
-                                <span class="font-medium text-red-800 dark:text-red-200">{{ comment.user.username }}</span>
-                                <span class="text-xs text-red-600 dark:text-red-400">{{ comment.created_at|date:"M j, Y g:i A" }}</span>
-                            </div>
-                            {% if user.is_authenticated %}
-                            <div class="flex space-x-2">
-                                <button onclick="likeComment({{ comment.id }}, 'like')"
-                                        class="text-green-600 hover:text-green-800 text-sm">
-                                    👍 {{ comment.likes }}
-                                </button>
-                                <button onclick="likeComment({{ comment.id }}, 'dislike')"
-                                        class="text-red-600 hover:text-red-800 text-sm">
-                                    👎 {{ comment.dislikes }}
-                                </button>
-                                {% if user != comment.user %}
-                                <button onclick="startDebate({{ comment.id }})"
-                                        class="text-blue-600 hover:text-blue-800 text-sm">
-                                    Debate
-                                </button>
+                                {% endif %}
+                                <p class="font-medium text-[12px] leading-5 truncate">{{ comment.user.username }}</p>
+                                <span title="{% if comment.is_online %}Active now{% else %}{{ comment.presence_label }}{% endif %}" class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold {% if comment.is_online %}bg-emerald-500/15 text-emerald-700 dark:text-emerald-300{% else %}bg-gray-500/15 text-gray-600 dark:text-gray-300{% endif %}">
+                                    <span class="h-1.5 w-1.5 rounded-full {% if comment.is_online %}bg-emerald-500{% else %}bg-gray-400{% endif %}"></span>
+                                    {% if comment.is_online %}Online{% else %}Offline{% endif %}
+                                </span>
+                                {% if top_no_comment_id and comment.id == top_no_comment_id %}
+                                <span class="rounded-full bg-red-500/15 text-red-700 dark:text-red-300 px-2 py-0.5 text-[10px] font-semibold">Top Challenger</span>
                                 {% endif %}
                             </div>
+                            {% if user.is_authenticated %}
+                            <div class="flex flex-wrap items-center gap-1 mt-1.5 pt-1.5 border-t border-border/60">
+                                {% if user != comment.user %}
+                                <button onclick="likeComment('{{ comment.id }}', 'like')" class="rounded text-[9px] px-1.5 py-1 text-muted-foreground hover:bg-secondary whitespace-nowrap">👍 {{ comment.likes }}</button>
+                                <button onclick="likeComment('{{ comment.id }}', 'dislike')" class="rounded text-[9px] px-1.5 py-1 text-muted-foreground hover:bg-secondary whitespace-nowrap">👎 {{ comment.dislikes }}</button>
+                                {% if user_has_voted %}
+                                {% if comment.debate_action_mode == 'view' and comment.debate_chat_url %}
+                                <a href="{{ comment.debate_chat_url }}" class="inline-flex items-center rounded bg-blue-500 px-1.5 py-1 text-[9px] text-white hover:bg-blue-600 whitespace-nowrap">{{ comment.debate_action_label }}</a>
+                                {% else %}
+                                <button onclick="startDebate('{{ comment.id }}', this)" class="rounded bg-blue-500 px-1.5 py-1 text-[9px] text-white hover:bg-blue-600 whitespace-nowrap">{{ comment.debate_action_label }}</button>
+                                {% endif %}
+                                {% else %}
+                                <button onclick="showInlineActionPopup(this, 'Please vote yes or no first.', 'error')" class="rounded bg-blue-500/65 px-1.5 py-1 text-[9px] text-white/95 hover:bg-blue-500 whitespace-nowrap">Start Debate</button>
+                                {% endif %}
+                                {% endif %}
+                                {% if user == comment.user %}
+                                <button onclick="openCommentEditor('{{ comment.id }}')" class="rounded text-[9px] px-1.5 py-1 text-muted-foreground hover:bg-secondary whitespace-nowrap">Edit</button>
+                                {% endif %}
+                                <button onclick="reportComment('{{ comment.id }}')" class="rounded text-[9px] px-1.5 py-1 text-muted-foreground hover:bg-secondary whitespace-nowrap">Report</button>
+                            </div>
+                            {% if user == comment.user %}
+                            <div id="comment-editor-{{ comment.id }}" class="hidden mt-2 space-y-2 rounded-xl border border-border bg-background/70 p-2">
+                                <textarea id="comment-editor-input-{{ comment.id }}" rows="3" class="w-full rounded-lg border border-border bg-card px-2.5 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">{{ comment.content|default:'' }}</textarea>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" id="comment-save-btn-{{ comment.id }}" onclick="saveCommentEdit('{{ comment.id }}')" class="rounded-full bg-primary px-3 py-1.5 text-[10px] font-semibold text-primary-foreground hover:bg-primary/90">Save</button>
+                                    <button type="button" onclick="closeCommentEditor('{{ comment.id }}')" class="rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold text-foreground hover:border-primary hover:text-primary">Cancel</button>
+                                </div>
+                            </div>
+                            {% endif %}
                             {% endif %}
                         </div>
-                        {% if comment.content %}
-                        <p class="text-red-800 dark:text-red-200">{{ comment.content }}</p>
-                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
+                {% else %}
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900/50 p-4 text-center text-sm text-gray-600 dark:text-gray-400">
+                    No arguments yet. Be the first!
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
-
-            {% if not yes_comments and not no_comments %}
-            <div class="text-center py-12">
-                <p class="text-muted-foreground">No comments yet. Be the first to share your thoughts!</p>
-            </div>
-            {% endif %}
         </div>
     </div>
 </div>
 
 <script>
+function getCSRFToken() {
+    const name = 'csrftoken=';
+    const decodedCookie = decodeURIComponent(document.cookie || '');
+    const cookies = decodedCookie.split(';');
+
+    for (let cookie of cookies) {
+        cookie = cookie.trim();
+        if (cookie.indexOf(name) === 0) {
+            return cookie.substring(name.length, cookie.length);
+        }
+    }
+
+    return '';
+}
+
+function openPostEditor() {
+    const panel = document.getElementById('post-editor-panel');
+    const openBtn = document.getElementById('open-post-editor-btn');
+    if (!panel) {
+        return;
+    }
+    panel.classList.remove('hidden');
+    if (openBtn) {
+        openBtn.classList.add('hidden');
+    }
+}
+
+function closePostEditor() {
+    const panel = document.getElementById('post-editor-panel');
+    const openBtn = document.getElementById('open-post-editor-btn');
+    if (panel) {
+        panel.classList.add('hidden');
+    }
+    if (openBtn) {
+        openBtn.classList.remove('hidden');
+    }
+}
+
+function savePostEdit(postId) {
+    const titleInput = document.getElementById('post-edit-title');
+    const saveBtn = document.getElementById('save-post-editor-btn');
+
+    if (!titleInput) {
+        return;
+    }
+
+    const trimmedTitle = titleInput.value.trim();
+    if (!trimmedTitle) {
+        window.showToast('Title is required.', 'error');
+        return;
+    }
+
+    if (saveBtn) {
+        saveBtn.disabled = true;
+    }
+
+    fetch(`/posts/${encodeURIComponent(postId)}/update/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: `title=${encodeURIComponent(trimmedTitle)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.showToast(data.message || 'Post updated successfully.', 'success');
+            const titleDisplay = document.getElementById('post-title-display');
+            if (titleDisplay) {
+                titleDisplay.textContent = trimmedTitle;
+            }
+            closePostEditor();
+        } else {
+            window.showToast(data.error || 'Failed to update post.', 'error');
+        }
+    })
+    .catch(() => window.showToast('Failed to update post.', 'error'))
+    .finally(() => {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+        }
+    });
+}
+
+function deletePost(postId) {
+    if (!confirm('Delete this post? All comments and debates under this post will also be deleted permanently.')) {
+        return;
+    }
+
+    fetch(`/posts/${encodeURIComponent(postId)}/delete/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: ''
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.showToast(data.message || 'Post deleted successfully.', 'success');
+            const target = data.redirect_url || '/';
+            window.location.href = target;
+        } else {
+            window.showToast(data.error || 'Failed to delete post.', 'error');
+        }
+    })
+    .catch(() => window.showToast('Failed to delete post.', 'error'));
+}
+
 function likeComment(commentId, action) {
     fetch('{% url "like_comment" %}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            'X-CSRFToken': getCSRFToken()
         },
         body: `comment_id=${commentId}&action=${action}`
     })
@@ -203,27 +469,420 @@ function likeComment(commentId, action) {
         if (data.success) {
             location.reload();
         }
-    });
+    })
+    .catch(() => window.showToast('Failed to react to comment.', 'error'));
 }
 
-function startDebate(commentId) {
+function showInlineActionPopup(triggerEl, message, tone = 'success') {
+    const existing = document.getElementById('inline-action-popup-backdrop');
+    if (existing) {
+        existing.remove();
+    }
+
+    const backdrop = document.createElement('div');
+    backdrop.id = 'inline-action-popup-backdrop';
+    backdrop.style.position = 'fixed';
+    backdrop.style.inset = '0';
+    backdrop.style.zIndex = '7200';
+    backdrop.style.display = 'flex';
+    backdrop.style.alignItems = 'center';
+    backdrop.style.justifyContent = 'center';
+    backdrop.style.background = 'rgba(2, 6, 23, 0.32)';
+    backdrop.style.backdropFilter = 'blur(2px)';
+    backdrop.style.webkitBackdropFilter = 'blur(2px)';
+    backdrop.style.opacity = '0';
+    backdrop.style.transition = 'opacity 180ms ease';
+
+    const popup = document.createElement('div');
+    popup.id = 'inline-action-popup';
+    popup.textContent = message;
+    popup.style.maxWidth = '360px';
+    popup.style.width = 'calc(100vw - 2rem)';
+    popup.style.padding = '14px 16px';
+    popup.style.borderRadius = '16px';
+    popup.style.fontSize = '13px';
+    popup.style.fontWeight = '600';
+    popup.style.lineHeight = '1.45';
+    popup.style.textAlign = 'center';
+    popup.style.boxShadow = '0 22px 60px rgba(15, 23, 42, 0.28)';
+    popup.style.border = tone === 'error' ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(20, 184, 166, 0.35)';
+    popup.style.background = tone === 'error' ? 'rgba(255, 241, 242, 0.98)' : 'rgba(240, 253, 250, 0.98)';
+    popup.style.color = tone === 'error' ? '#991b1b' : '#0f766e';
+    popup.style.opacity = '0';
+    popup.style.transform = 'translateY(8px) scale(0.98)';
+    popup.style.transition = 'opacity 180ms ease, transform 180ms ease';
+
+    backdrop.appendChild(popup);
+    document.body.appendChild(backdrop);
+
+    window.requestAnimationFrame(() => {
+        backdrop.style.opacity = '1';
+        popup.style.opacity = '1';
+        popup.style.transform = 'translateY(0) scale(1)';
+    });
+
+    const closePopup = () => {
+        backdrop.style.opacity = '0';
+        popup.style.opacity = '0';
+        popup.style.transform = 'translateY(8px) scale(0.98)';
+        window.setTimeout(() => backdrop.remove(), 180);
+    };
+
+    backdrop.addEventListener('click', function(event) {
+        if (event.target === backdrop) {
+            closePopup();
+        }
+    });
+
+    window.setTimeout(() => {
+        closePopup();
+    }, 2200);
+}
+
+function startDebate(commentId, triggerEl) {
     fetch('{% url "start_debate" %}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            'X-CSRFToken': getCSRFToken()
         },
         body: `comment_id=${commentId}`
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
-            location.reload();
+            showInlineActionPopup(triggerEl, data.message || 'Debate request sent successfully!', 'success');
+            if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+                return;
+            }
         } else {
-            alert(data.error);
+            showInlineActionPopup(triggerEl, data.error || 'Failed to start debate.', 'error');
+        }
+    })
+    .catch(() => window.showToast('Failed to start debate.', 'error'));
+}
+
+function reportComment(commentId) {
+    if (confirm('Are you sure you want to report this comment?')) {
+        fetch('{% url "report_comment" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: `comment_id=${commentId}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.showToast(data.message, 'success');
+            } else {
+                window.showToast('Failed to report comment.', 'error');
+            }
+        })
+        .catch(() => window.showToast('Failed to report comment.', 'error'));
+    }
+}
+
+function openCommentEditor(commentId) {
+    const panel = document.getElementById(`comment-editor-${commentId}`);
+    if (!panel) {
+        return;
+    }
+    panel.classList.remove('hidden');
+}
+
+function closeCommentEditor(commentId) {
+    const panel = document.getElementById(`comment-editor-${commentId}`);
+    if (!panel) {
+        return;
+    }
+    panel.classList.add('hidden');
+}
+
+function saveCommentEdit(commentId) {
+    const input = document.getElementById(`comment-editor-input-${commentId}`);
+    const saveBtn = document.getElementById(`comment-save-btn-${commentId}`);
+    if (!input) {
+        return;
+    }
+
+    const trimmed = input.value.trim();
+    if (!trimmed) {
+        window.showToast('Comment cannot be empty.', 'error');
+        return;
+    }
+
+    if (saveBtn) {
+        saveBtn.disabled = true;
+    }
+
+    fetch('{% url "update_comment" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: `comment_id=${encodeURIComponent(commentId)}&content=${encodeURIComponent(trimmed)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.showToast(data.message, 'success');
+            const contentEl = document.getElementById(`comment-content-${commentId}`);
+            if (contentEl) {
+                contentEl.textContent = trimmed;
+                if (trimmed) {
+                    contentEl.classList.remove('hidden');
+                } else {
+                    contentEl.classList.add('hidden');
+                }
+            }
+            closeCommentEditor(commentId);
+        } else {
+            window.showToast(data.error || 'Failed to update comment.', 'error');
+        }
+    })
+    .catch(() => window.showToast('Failed to update comment.', 'error'))
+    .finally(() => {
+        if (saveBtn) {
+            saveBtn.disabled = false;
         }
     });
 }
+
+(function() {
+    const postId = '{{ post.id }}';
+    if (!postId) {
+        return;
+    }
+
+    let knownVisibleComments = new Map([
+        {% for comment in yes_comments %}
+        ['{{ comment.id }}', '{{ comment.content|default:""|escapejs }}'.trim()],
+        {% endfor %}
+        {% for comment in no_comments %}
+        ['{{ comment.id }}', '{{ comment.content|default:""|escapejs }}'.trim()],
+        {% endfor %}
+    ]);
+    let pollInFlight = false;
+
+    function userIsTypingComment() {
+        const active = document.activeElement;
+        if (!active) {
+            return false;
+        }
+
+        const tag = (active.tagName || '').toLowerCase();
+        if (tag !== 'textarea' && !(tag === 'input' && (active.type || '').toLowerCase() === 'text')) {
+            return false;
+        }
+
+        return Boolean(active.value && String(active.value).trim().length > 0);
+    }
+
+    function collectVisibleCommentMap() {
+        const nextMap = new Map();
+        document.querySelectorAll('[id^="comment-content-"]').forEach((el) => {
+            const id = (el.id || '').replace('comment-content-', '');
+            if (!id) {
+                return;
+            }
+            const content = String(el.textContent || '').trim();
+            if (content) {
+                nextMap.set(id, content);
+            }
+        });
+        return nextMap;
+    }
+
+    function refreshCommentsSection() {
+        return fetch(window.location.pathname, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+            .then(response => response.ok ? response.text() : null)
+            .then(html => {
+                if (!html) {
+                    return;
+                }
+
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const incomingSection = doc.getElementById('discussion-comments-section');
+                const currentSection = document.getElementById('discussion-comments-section');
+
+                if (!incomingSection || !currentSection) {
+                    return;
+                }
+
+                currentSection.replaceWith(incomingSection);
+                knownVisibleComments = collectVisibleCommentMap();
+            })
+            .catch(() => {});
+    }
+
+    function refreshCommentsIfNeeded() {
+        if (pollInFlight || document.hidden || userIsTypingComment()) {
+            return;
+        }
+
+        pollInFlight = true;
+        fetch(`/api/comments/by_post/?post_id=${encodeURIComponent(postId)}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+            .then(response => response.ok ? response.json() : null)
+            .then(data => {
+                if (!Array.isArray(data)) {
+                    return;
+                }
+
+                const latestVisibleComments = new Map();
+                data
+                    .filter(item => item && String(item.content || '').trim().length > 0)
+                    .forEach(item => {
+                        latestVisibleComments.set(String(item.id), String(item.content || '').trim());
+                    });
+
+                if (latestVisibleComments.size !== knownVisibleComments.size) {
+                    refreshCommentsSection();
+                    return;
+                }
+
+                for (const [id, content] of latestVisibleComments.entries()) {
+                    if (!knownVisibleComments.has(id)) {
+                        refreshCommentsSection();
+                        return;
+                    }
+
+                    if (knownVisibleComments.get(id) !== content) {
+                        refreshCommentsSection();
+                        return;
+                    }
+                }
+
+                knownVisibleComments = latestVisibleComments;
+            })
+            .catch(() => {})
+            .finally(() => {
+                pollInFlight = false;
+            });
+    }
+
+    window.setInterval(refreshCommentsIfNeeded, 5000);
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            refreshCommentsIfNeeded();
+        }
+    });
+})();
+
+// Mobile: if a debate chat was minimized from this post, show a small reopen button.
+(function() {
+        if (window.innerWidth >= 768) {
+                return;
+        }
+
+        let debateId = '';
+        let postId = '';
+        try {
+                debateId = sessionStorage.getItem('dhMobileMinimizedDebateId') || '';
+                postId = sessionStorage.getItem('dhMobileMinimizedPostId') || '';
+        } catch {}
+
+        if (!debateId || postId !== '{{ post.id }}') {
+                return;
+        }
+
+        const style = document.createElement('style');
+        style.textContent = `
+            .dh-mobile-chat-resume {
+                position: fixed;
+                right: 14px;
+                bottom: 18px;
+                z-index: 7000;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                border-radius: 999px;
+                background: linear-gradient(135deg, hsl(var(--primary)), hsl(186 84% 28%));
+                color: hsl(var(--primary-foreground));
+                padding: 10px 14px;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.24);
+                font-size: 13px;
+                font-weight: 600;
+                text-decoration: none;
+            }
+            .dh-mobile-chat-resume-icon {
+                width: 26px;
+                height: 26px;
+                border-radius: 999px;
+                background: rgba(255,255,255,0.16);
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .dh-mobile-chat-resume-close {
+                width: 20px;
+                height: 20px;
+                border: none;
+                border-radius: 999px;
+                background: rgba(255,255,255,0.14);
+                color: inherit;
+                font-size: 12px;
+                line-height: 1;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+            }
+        `;
+        document.head.appendChild(style);
+
+        const wrapper = document.createElement('a');
+        wrapper.className = 'dh-mobile-chat-resume';
+        wrapper.href = '/debates/' + encodeURIComponent(debateId) + '/chat/';
+        wrapper.innerHTML = `
+            <span class="dh-mobile-chat-resume-icon">💬</span>
+            <span>Resume chat</span>
+            <button type="button" class="dh-mobile-chat-resume-close" aria-label="Dismiss">✕</button>
+        `;
+
+        const closeBtn = wrapper.querySelector('.dh-mobile-chat-resume-close');
+        if (closeBtn) {
+                closeBtn.addEventListener('click', function(event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        try {
+                                sessionStorage.removeItem('dhMobileMinimizedDebateId');
+                                sessionStorage.removeItem('dhMobileMinimizedPostId');
+                                sessionStorage.removeItem('dhMobileMinimizedAt');
+                        } catch {}
+                        wrapper.remove();
+                });
+        }
+
+        document.body.appendChild(wrapper);
+})();
+
+(function() {
+    const banner = document.getElementById('post-submitted-banner');
+    if (!banner) {
+        return;
+    }
+    if (window.history && window.history.replaceState) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('created');
+        window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+    }
+    setTimeout(() => {
+        banner.classList.add('opacity-0');
+        setTimeout(() => banner.remove(), 550);
+    }, 5000);
+})();
 </script>
 {% endblock %}

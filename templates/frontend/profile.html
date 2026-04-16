@@ -3,62 +3,86 @@
 {% block title %}Profile - Discussion Hub{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto space-y-8">
-    <!-- Profile Header -->
-    <div class="bg-card border border-border rounded-lg p-6">
-        <div class="flex items-center space-x-4">
-            <div class="w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-2xl font-bold">
-                {{ user.username|first|upper }}
-            </div>
-            <div>
-                <h1 class="text-2xl font-bold text-foreground">{{ user.username }}</h1>
-                <p class="text-muted-foreground">Member since {{ user.date_joined|date:"M Y" }}</p>
-                <p class="text-muted-foreground">{{ user_posts.count }} discussions created</p>
-            </div>
-        </div>
-    </div>
+<div class="max-w-5xl mx-auto space-y-8">
+    <section class="relative overflow-hidden rounded-3xl border border-border/70 bg-card/95 shadow-[0_12px_45px_rgba(0,0,0,0.10)]">
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.15),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(244,114,182,0.12),transparent_45%)] pointer-events-none"></div>
+        <div class="relative p-6 sm:p-8">
+            <div class="grid gap-6 sm:grid-cols-[auto_1fr] sm:items-center">
+                <div class="mx-auto sm:mx-0">
+                    {% if avatar_url %}
+                    <img src="{{ avatar_url }}" alt="{{ user.username }}" class="h-24 w-24 sm:h-28 sm:w-28 rounded-full object-cover border-4 border-white/80 shadow-lg" loading="lazy">
+                    {% else %}
+                    <div class="h-24 w-24 sm:h-28 sm:w-28 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 text-white flex items-center justify-center text-3xl font-extrabold shadow-lg">
+                        {{ user.username|first|upper }}
+                    </div>
+                    {% endif %}
+                </div>
 
-    <!-- User's Posts -->
-    <div>
-        <h2 class="text-xl font-bold text-foreground mb-6">Your Discussions</h2>
+                <div class="text-center sm:text-left">
+                    <div class="inline-flex items-center gap-2">
+                        <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-foreground">{{ user.username }}</h1>
+                        <span title="{{ presence_label }}" class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold {% if is_online %}bg-emerald-500/15 text-emerald-700 dark:text-emerald-300{% else %}bg-gray-500/15 text-gray-600 dark:text-gray-300{% endif %}">
+                            <span class="h-1.5 w-1.5 rounded-full {% if is_online %}bg-emerald-500{% else %}bg-gray-400{% endif %}"></span>
+                            {% if is_online %}Online{% else %}Offline{% endif %}
+                        </span>
+                    </div>
+                    <p class="text-sm text-muted-foreground mt-1">{{ user.email }}</p>
 
-        {% if user_posts %}
-        <div class="space-y-4">
-            {% for post in user_posts %}
-            <div class="bg-card border border-border rounded-lg p-6">
-                <div class="flex items-start justify-between mb-4">
-                    <div class="flex-1">
-                        <h3 class="text-lg font-semibold text-foreground mb-2">
-                            <a href="{% url 'discussion' post.id %}" class="hover:text-primary">
-                                {{ post.title }}
-                            </a>
-                        </h3>
-                        {% if post.content %}
-                        <p class="text-muted-foreground mb-3 line-clamp-2">
-                            {{ post.content|truncatechars:150 }}
-                        </p>
-                        {% endif %}
-                        <div class="flex items-center space-x-4 text-sm text-muted-foreground">
-                            <span>{{ post.created_at|date:"M j, Y g:i A" }}</span>
-                            <span class="px-2 py-1 bg-secondary rounded-full text-xs">
-                                {{ post.category }}
-                            </span>
-                        </div>
+                    <div class="mt-5 inline-flex items-center gap-3 rounded-2xl border border-border/70 bg-background/80 px-5 py-3">
+                        <p class="text-2xl font-black leading-none text-foreground">{{ user_posts.count }}</p>
+                        <p class="text-xs uppercase tracking-[0.16em] text-muted-foreground">Posts Published</p>
                     </div>
                 </div>
             </div>
+        </div>
+    </section>
+
+    <section id="my-posts">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl sm:text-2xl font-black tracking-tight text-foreground">My Posts</h2>
+            <span class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Latest First</span>
+        </div>
+
+        {% if user_posts %}
+        <div class="grid gap-4 sm:gap-5">
+            {% for post in user_posts %}
+            <article class="group rounded-2xl border border-border/70 bg-card p-5 sm:p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
+                <div class="flex items-start justify-between gap-3 mb-2">
+                    <h3 class="text-lg font-bold tracking-tight text-foreground">
+                        {% if post.id %}
+                        <a href="{% url 'discussion' post.id %}" class="hover:text-primary transition-colors">{{ post.title }}</a>
+                        {% else %}
+                        <span>{{ post.title }}</span>
+                        {% endif %}
+                    </h3>
+                    <span class="shrink-0 px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-medium">{{ post.category }}</span>
+                </div>
+                {% if post.content %}
+                <p class="text-sm text-muted-foreground mb-4 leading-relaxed">{{ post.content|truncatechars:190 }}</p>
+                {% endif %}
+                <div class="text-xs text-muted-foreground">{{ post.created_at|date:"M j, Y g:i A" }}</div>
+            </article>
             {% endfor %}
         </div>
         {% else %}
-        <div class="text-center py-12">
-            <div class="text-6xl mb-4">💭</div>
-            <h3 class="text-xl font-semibold text-foreground mb-2">No discussions yet</h3>
-            <p class="text-muted-foreground mb-6">Start your first discussion to see it here!</p>
-            <a href="{% url 'index' %}" class="bg-primary text-primary-foreground px-6 py-2 rounded-lg hover:bg-primary/90">
-                Create Discussion
-            </a>
+        <div class="rounded-2xl border border-dashed border-border bg-card/70 p-10 text-center">
+            <p class="text-muted-foreground">No posts yet.</p>
         </div>
         {% endif %}
-    </div>
+    </section>
 </div>
+
+<script>
+(function() {
+    if (!window.history || !window.history.pushState) {
+        return;
+    }
+
+    // Keep profile "posts" view back navigation predictable: Back returns to home.
+    window.history.pushState({ profilePostsView: true }, '', window.location.href);
+    window.addEventListener('popstate', function() {
+        window.location.href = '{% url "index" %}';
+    });
+})();
+</script>
 {% endblock %}

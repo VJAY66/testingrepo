@@ -1,4 +1,5 @@
 import os
+import socket
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -10,7 +11,33 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-your-secret-key-change-in-
 
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+def _split_env_list(name, default=''):
+    return [
+        value.strip().strip('"').strip("'")
+        for value in os.getenv(name, default).split(',')
+        if value.strip().strip('"').strip("'")
+    ]
+
+
+ALLOWED_HOSTS = _split_env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1')
+
+if DEBUG:
+    local_hosts = {'localhost', '127.0.0.1', '0.0.0.0', '[::1]'}
+
+    try:
+        hostname = socket.gethostname()
+        if hostname:
+            local_hosts.add(hostname)
+            local_hosts.add(f'{hostname}.local')
+
+        for host_info in socket.getaddrinfo(hostname, None):
+            host = host_info[4][0]
+            if host:
+                local_hosts.add(host)
+    except socket.gaierror:
+        pass
+
+    ALLOWED_HOSTS = list(dict.fromkeys([*ALLOWED_HOSTS, *sorted(local_hosts)]))
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -34,6 +61,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'users.middleware.UpdateLastSeenMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -55,6 +83,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'frontend.context_processors.notification_counts',
             ],
         },
     },
@@ -115,7 +144,12 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
 }
 
+DAILY_POST_LIMIT = int(os.getenv('DAILY_POST_LIMIT', '50'))
+
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:3000').split(',')
 
 CORS_ALLOW_CREDENTIALS = True
+
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'

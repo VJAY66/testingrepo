@@ -3,34 +3,318 @@
 {% block title %}Login - Discussion Hub{% endblock %}
 
 {% block content %}
-<div class="max-w-md mx-auto">
-    <div class="bg-card border border-border rounded-lg p-8">
+<style>
+    .login-scene {
+        --mx: 50%;
+        --my: 40%;
+        --tilt-x: 0px;
+        --tilt-y: 0px;
+        position: relative;
+        width: 100vw;
+        margin-left: calc(50% - 50vw);
+        margin-right: calc(50% - 50vw);
+        min-height: calc(100vh - 10rem);
+        padding: clamp(1.25rem, 4vw, 3.5rem);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        isolation: isolate;
+    }
+
+    .login-scene::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(540px circle at var(--mx) var(--my), rgba(56, 189, 248, 0.22), transparent 52%),
+            radial-gradient(400px circle at calc(var(--mx) + 14%) calc(var(--my) - 8%), rgba(20, 184, 166, 0.16), transparent 48%),
+            radial-gradient(320px circle at calc(var(--mx) - 18%) calc(var(--my) + 12%), rgba(245, 158, 11, 0.11), transparent 44%),
+            linear-gradient(180deg, rgba(2, 6, 23, 0.06), rgba(2, 6, 23, 0.18));
+        transition: background 120ms linear;
+        z-index: -2;
+    }
+
+    .login-scene::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+            radial-gradient(circle at 16% 22%, rgba(255,255,255,0.24), transparent 26%),
+            radial-gradient(circle at 78% 18%, rgba(56,189,248,0.18), transparent 24%),
+            radial-gradient(circle at 74% 72%, rgba(245,158,11,0.15), transparent 26%),
+            radial-gradient(circle at 34% 76%, rgba(20,184,166,0.13), transparent 24%);
+        filter: blur(42px);
+        opacity: 1;
+        z-index: -3;
+        pointer-events: none;
+    }
+
+    .login-orb {
+        position: absolute;
+        border-radius: 999px;
+        pointer-events: none;
+        filter: blur(1px);
+        opacity: 0.92;
+        transition: transform 140ms linear;
+        z-index: -1;
+    }
+
+    .login-orb-a {
+        width: 17rem;
+        height: 17rem;
+        top: 8%;
+        left: 12%;
+        background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.36), rgba(34,211,238,0.18) 56%, transparent 76%);
+        transform: translate(calc(var(--tilt-x) * -0.45), calc(var(--tilt-y) * -0.45));
+    }
+
+    .login-orb-b {
+        width: 14rem;
+        height: 14rem;
+        right: 14%;
+        bottom: 10%;
+        background: radial-gradient(circle at 40% 35%, rgba(255,255,255,0.3), rgba(245,158,11,0.17) 58%, transparent 76%);
+        transform: translate(calc(var(--tilt-x) * 0.35), calc(var(--tilt-y) * 0.35));
+    }
+
+    .login-grid {
+        position: absolute;
+        inset: 0;
+        background-image:
+            radial-gradient(circle at 12% 22%, rgba(255,255,255,0.20) 1px, transparent 1.6px),
+            radial-gradient(circle at 78% 34%, rgba(255,255,255,0.16) 1px, transparent 1.6px),
+            radial-gradient(circle at 62% 78%, rgba(255,255,255,0.12) 1px, transparent 1.6px),
+            radial-gradient(circle at 34% 64%, rgba(255,255,255,0.10) 1px, transparent 1.6px);
+        background-size: 260px 220px, 240px 210px, 230px 220px, 210px 200px;
+        opacity: 0.55;
+        z-index: -2;
+        pointer-events: none;
+    }
+
+    .login-particles {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: -1;
+        overflow: hidden;
+    }
+
+    .login-particle {
+        position: absolute;
+        width: var(--size, 12px);
+        height: var(--size, 12px);
+        left: 0;
+        top: 0;
+        border-radius: 999px;
+        background: var(--particle-bg, rgba(255,255,255,0.3));
+        box-shadow: 0 8px 24px -16px rgba(15, 23, 42, 0.55);
+        opacity: 0.85;
+        transform: translate3d(var(--px, 0px), var(--py, 0px), 0);
+        will-change: transform;
+        animation: starTwinkle var(--twinkle, 4.8s) ease-in-out infinite;
+    }
+
+    .login-particle::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: radial-gradient(circle at 32% 30%, rgba(255,255,255,0.8), transparent 62%);
+        opacity: 0.9;
+    }
+
+    @keyframes starTwinkle {
+        0%, 100% { opacity: 0.48; transform: translate3d(var(--px, 0px), var(--py, 0px), 0) scale(1); }
+        50% { opacity: 0.95; transform: translate3d(var(--px, 0px), var(--py, 0px), 0) scale(1.08); }
+    }
+
+    .orbit-planet {
+        position: absolute;
+        border-radius: 999px;
+        pointer-events: none;
+        z-index: -1;
+        transition: transform 140ms linear;
+        box-shadow: inset -8px -10px 16px rgba(15,23,42,0.24), inset 5px 6px 8px rgba(255,255,255,0.2);
+    }
+
+    .orbit-planet-a {
+        width: 86px;
+        height: 86px;
+        top: 14%;
+        right: 18%;
+        background: radial-gradient(circle at 34% 32%, rgba(255,255,255,0.52), rgba(56,189,248,0.3) 56%, transparent 88%);
+        transform: translate(calc(var(--tilt-x) * 0.3), calc(var(--tilt-y) * 0.3));
+    }
+
+    .orbit-planet-b {
+        width: 62px;
+        height: 62px;
+        bottom: 16%;
+        left: 16%;
+        background: radial-gradient(circle at 34% 30%, rgba(255,255,255,0.48), rgba(245,158,11,0.3) 58%, transparent 90%);
+        transform: translate(calc(var(--tilt-x) * -0.26), calc(var(--tilt-y) * -0.26));
+    }
+
+    .orbit-ring {
+        position: absolute;
+        border-radius: 999px;
+        border: 1px solid rgba(148,163,184,0.35);
+        pointer-events: none;
+        z-index: -1;
+    }
+
+    .orbit-ring-a {
+        width: 120px;
+        height: 42px;
+        top: 17%;
+        right: 15.6%;
+        transform: rotate(14deg) translate(calc(var(--tilt-x) * 0.18), calc(var(--tilt-y) * 0.18));
+    }
+
+    .login-card {
+        width: min(100%, 31rem);
+        padding: 2rem;
+        border-radius: 1.6rem;
+        background:
+            linear-gradient(145deg, hsl(var(--card) / 0.88), hsl(var(--card) / 0.64)),
+            radial-gradient(circle at top left, rgba(255,255,255,0.24), transparent 34%);
+        box-shadow:
+            0 30px 80px -42px rgba(15,23,42,0.66),
+            inset 0 1px 0 rgba(255,255,255,0.24);
+        backdrop-filter: blur(18px) saturate(135%);
+        -webkit-backdrop-filter: blur(18px) saturate(135%);
+        transform: perspective(1100px) rotateX(calc(var(--tilt-y) * -0.012)) rotateY(calc(var(--tilt-x) * 0.012));
+        transition: transform 140ms linear, box-shadow 140ms linear;
+    }
+
+    .login-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0.42rem 0.75rem;
+        border-radius: 999px;
+        background: hsl(var(--background) / 0.58);
+        color: hsl(var(--muted-foreground));
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
+    }
+
+    .login-chip-dot {
+        width: 0.45rem;
+        height: 0.45rem;
+        border-radius: 999px;
+        background-image: var(--float-gradient);
+    }
+
+    .login-field {
+        width: 100%;
+        padding: 0.72rem 0.9rem;
+        border-radius: 0.95rem;
+        border: 1px solid hsl(var(--border));
+        background: hsl(var(--background) / 0.72);
+        color: hsl(var(--foreground));
+        transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+    }
+
+    .login-field:focus {
+        outline: none;
+        border-color: hsl(var(--primary));
+        box-shadow: 0 0 0 3px hsl(var(--primary) / 0.14);
+        background: hsl(var(--background) / 0.92);
+    }
+
+    .login-submit {
+        background-image: var(--float-gradient);
+        box-shadow: 0 16px 28px -18px hsl(var(--primary) / 0.82);
+    }
+
+    .login-submit:hover {
+        filter: brightness(1.03);
+    }
+
+    @media (max-width: 640px) {
+        .login-scene {
+            min-height: auto;
+            padding: 1rem;
+        }
+
+        .login-card {
+            padding: 1.4rem;
+            border-radius: 1.25rem;
+            transform: none !important;
+        }
+
+        .login-orb-a,
+        .login-orb-b {
+            opacity: 0.76;
+        }
+
+        .orbit-planet-a,
+        .orbit-planet-b,
+        .orbit-ring-a {
+            opacity: 0.8;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .login-card,
+        .login-orb,
+        .orbit-planet,
+        .orbit-ring,
+        .login-scene::before {
+            transition: none !important;
+        }
+
+        .login-particle {
+            animation: none !important;
+        }
+    }
+</style>
+
+<div id="login-scene" class="login-scene">
+    <div class="login-grid"></div>
+    <div id="login-particles" class="login-particles" aria-hidden="true"></div>
+    <div class="login-orb login-orb-a"></div>
+    <div class="login-orb login-orb-b"></div>
+    <div class="orbit-planet orbit-planet-a"></div>
+    <div class="orbit-ring orbit-ring-a"></div>
+    <div class="orbit-planet orbit-planet-b"></div>
+
+    <div class="login-card">
         <div class="text-center mb-8">
-            <h1 class="text-2xl font-bold text-foreground">Welcome Back</h1>
-            <p class="text-muted-foreground mt-2">Sign in to your account</p>
+            <div class="login-chip">
+                <span class="login-chip-dot"></span>
+                Secure Access
+            </div>
+            <h1 class="text-3xl font-bold text-foreground">Welcome Back</h1>
+            <p class="text-muted-foreground mt-2">Sign in to continue the conversation.</p>
         </div>
 
         <form method="post" class="space-y-6">
             {% csrf_token %}
+            {% if next %}
+            <input type="hidden" name="next" value="{{ next }}">
+            {% endif %}
 
             <div>
                 <label for="username" class="block text-sm font-medium text-foreground mb-2">
                     Username
                 </label>
-                <input type="text" id="username" name="username" required
-                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                <input type="text" id="username" name="username" required class="login-field">
             </div>
 
             <div>
                 <label for="password" class="block text-sm font-medium text-foreground mb-2">
                     Password
                 </label>
-                <input type="password" id="password" name="password" required
-                       class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                <input type="password" id="password" name="password" required class="login-field">
             </div>
 
-            <button type="submit"
-                    class="w-full bg-primary text-primary-foreground py-2 px-4 rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+            <button type="submit" class="login-submit w-full text-primary-foreground py-2.5 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
                 Sign In
             </button>
         </form>
@@ -38,11 +322,128 @@
         <div class="mt-6 text-center">
             <p class="text-muted-foreground">
                 Don't have an account?
-                <a href="{% url 'register' %}" class="text-primary hover:text-primary/80 font-medium">
+                <a href="{% url 'register' %}{% if next %}?next={{ next|urlencode }}{% endif %}" class="text-primary hover:text-primary/80 font-medium">
                     Sign up
                 </a>
             </p>
         </div>
     </div>
 </div>
+
+<script>
+    (function () {
+        const scene = document.getElementById('login-scene');
+        const particleLayer = document.getElementById('login-particles');
+        const lowPerfDevice = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            || (typeof navigator.hardwareConcurrency === 'number' && navigator.hardwareConcurrency <= 4)
+            || (typeof navigator.deviceMemory === 'number' && navigator.deviceMemory <= 4);
+
+        if (!scene || lowPerfDevice) {
+            return;
+        }
+
+        let rafId = null;
+        let targetX = window.innerWidth * 0.5;
+        let targetY = window.innerHeight * 0.4;
+        let currentX = targetX;
+        let currentY = targetY;
+        const particles = [];
+
+        function makeParticles() {
+            if (!particleLayer) return;
+
+            const specs = [
+                { x: 8, y: 16, size: 6, color: 'rgba(255,255,255,0.42)', depth: 0.018 },
+                { x: 14, y: 52, size: 5, color: 'rgba(56,189,248,0.34)', depth: 0.021 },
+                { x: 21, y: 78, size: 7, color: 'rgba(255,255,255,0.38)', depth: 0.024 },
+                { x: 30, y: 28, size: 5, color: 'rgba(20,184,166,0.34)', depth: 0.019 },
+                { x: 36, y: 66, size: 6, color: 'rgba(255,255,255,0.4)', depth: 0.027 },
+                { x: 44, y: 18, size: 7, color: 'rgba(245,158,11,0.34)', depth: 0.022 },
+                { x: 49, y: 82, size: 5, color: 'rgba(255,255,255,0.42)', depth: 0.026 },
+                { x: 58, y: 46, size: 6, color: 'rgba(56,189,248,0.3)', depth: 0.02 },
+                { x: 64, y: 12, size: 5, color: 'rgba(255,255,255,0.36)', depth: 0.021 },
+                { x: 71, y: 70, size: 7, color: 'rgba(20,184,166,0.32)', depth: 0.025 },
+                { x: 79, y: 30, size: 5, color: 'rgba(255,255,255,0.42)', depth: 0.024 },
+                { x: 86, y: 58, size: 6, color: 'rgba(245,158,11,0.3)', depth: 0.018 },
+                { x: 92, y: 84, size: 5, color: 'rgba(255,255,255,0.38)', depth: 0.022 },
+            ];
+
+            specs.forEach((spec) => {
+                const node = document.createElement('span');
+                node.className = 'login-particle';
+                node.style.setProperty('--size', `${spec.size}px`);
+                node.style.setProperty('--particle-bg', spec.color);
+                node.style.setProperty('--twinkle', `${3.8 + (spec.size * 0.25)}s`);
+                particleLayer.appendChild(node);
+                particles.push({
+                    node,
+                    baseX: spec.x,
+                    baseY: spec.y,
+                    depth: spec.depth,
+                    drift: (spec.size % 5) + 1,
+                    x: spec.x,
+                    y: spec.y,
+                });
+            });
+        }
+
+        function render() {
+            currentX += (targetX - currentX) * 0.12;
+            currentY += (targetY - currentY) * 0.12;
+            const t = performance.now();
+
+            const rect = scene.getBoundingClientRect();
+            const relX = ((currentX - rect.left) / Math.max(rect.width, 1)) * 100;
+            const relY = ((currentY - rect.top) / Math.max(rect.height, 1)) * 100;
+            const tiltX = ((currentX - (rect.left + rect.width / 2)) / Math.max(rect.width, 1)) * 24;
+            const tiltY = ((currentY - (rect.top + rect.height / 2)) / Math.max(rect.height, 1)) * 20;
+
+            scene.style.setProperty('--mx', `${relX}%`);
+            scene.style.setProperty('--my', `${relY}%`);
+            scene.style.setProperty('--tilt-x', `${tiltX}px`);
+            scene.style.setProperty('--tilt-y', `${tiltY}px`);
+
+            particles.forEach((particle, index) => {
+                const wave = Math.sin((t * 0.00045) + index) * particle.drift;
+                const px = particle.baseX + (tiltX * particle.depth * 3.2) + wave;
+                const py = particle.baseY + (tiltY * particle.depth * 3.2) + Math.cos((t * 0.00038) + index) * particle.drift;
+                particle.node.style.setProperty('--px', `${px}vw`);
+                particle.node.style.setProperty('--py', `${py}vh`);
+            });
+
+            rafId = window.requestAnimationFrame(render);
+        }
+
+        window.addEventListener('pointermove', function (event) {
+            targetX = event.clientX;
+            targetY = event.clientY;
+        });
+
+        window.addEventListener('pointerleave', function () {
+            targetX = window.innerWidth * 0.5;
+            targetY = window.innerHeight * 0.4;
+        });
+
+        makeParticles();
+        rafId = window.requestAnimationFrame(render);
+
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden && rafId) {
+                window.cancelAnimationFrame(rafId);
+                rafId = null;
+                return;
+            }
+
+            if (!document.hidden && !rafId) {
+                rafId = window.requestAnimationFrame(render);
+            }
+        });
+
+        window.addEventListener('beforeunload', function () {
+            if (rafId) {
+                window.cancelAnimationFrame(rafId);
+            }
+        });
+    })();
+</script>
 {% endblock %}
