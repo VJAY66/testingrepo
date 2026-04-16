@@ -29,6 +29,16 @@
         <div id="post-content-display" class="text-foreground mb-6 whitespace-pre-wrap"></div>
         {% endif %}
 
+        {% if user.is_authenticated and not is_post_creator %}
+        <div class="mb-4">
+            <button id="follow-post-btn" type="button" onclick="togglePostFollow('{{ post.id }}')"
+                    class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition
+                    {% if is_following_post %}bg-gray-500 text-white hover:bg-gray-600{% else %}bg-primary text-primary-foreground hover:bg-primary/90{% endif %}">
+                {% if is_following_post %}Unfollow Post{% else %}Follow Post{% endif %}
+            </button>
+        </div>
+        {% endif %}
+
         {% if is_post_creator %}
         <div class="mb-5 flex flex-wrap items-center gap-2">
             {% if can_edit_post %}
@@ -357,6 +367,38 @@ function getCSRFToken() {
     }
 
     return '';
+}
+
+function togglePostFollow(postId) {
+    const btn = document.getElementById('follow-post-btn');
+    const isFollowing = btn.textContent.trim() === 'Unfollow Post';
+
+    fetch('/api/follow-post/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({
+            post_id: postId,
+            action: isFollowing ? 'unfollow' : 'follow'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            btn.textContent = isFollowing ? 'Follow Post' : 'Unfollow Post';
+            btn.className = isFollowing ?
+                'inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition bg-primary text-primary-foreground hover:bg-primary/90' :
+                'inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition bg-gray-500 text-white hover:bg-gray-600';
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred. Please try again.');
+    });
 }
 
 function openPostEditor() {

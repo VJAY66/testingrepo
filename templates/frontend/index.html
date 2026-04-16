@@ -524,6 +524,30 @@
         border-radius: 1.2rem;
         padding: 1.35rem;
     }
+
+    .tab-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    .tab-button.active .section-title {
+        color: hsl(var(--primary));
+    }
+
+    .tab-button:not(.active) {
+        opacity: 0.6;
+    }
+
+    .posts-container {
+        display: block;
+    }
+
+    .posts-container.hidden {
+        display: none;
+    }
 </style>
 <div class="home-fullbleed ag-stage galaxy-stage space-y-8">
     <div class="galaxy-layer" aria-hidden="true">
@@ -591,48 +615,103 @@
         </div>
     </div>
 
-    <!-- Trending Posts -->
-    <div id="trending-discussions">
+    <!-- Posts Tabs -->
+    <div id="posts-section">
         <div class="section-head">
-            <h2 class="section-title text-foreground">Trending Discussions</h2>
+            <div class="flex items-center gap-4">
+                <button id="trending-tab" class="tab-button active" onclick="switchTab('trending')">
+                    <h2 class="section-title text-foreground">Trending Discussions</h2>
+                </button>
+                {% if user.is_authenticated %}
+                <button id="suggested-tab" class="tab-button" onclick="switchTab('suggested')">
+                    <h2 class="section-title text-foreground">Suggested for You</h2>
+                </button>
+                {% endif %}
+            </div>
             <span class="section-chip">Live Pulse</span>
         </div>
-        <div class="space-y-4">
-            {% for post in trending_posts %}
-            {% if post.id %}
-            <div class="glass-panel trend-card transition hover:shadow-lg hover:shadow-primary/10">
-                <div class="trend-side"></div>
-                <div class="flex items-start justify-between w-full">
-                    <div class="flex-1">
-                        <h3 class="trend-title text-foreground mb-2">
-                            <a href="{% url 'discussion' post.id %}" class="hover:text-primary">
-                                {{ post.title }}
+
+        <!-- Trending Posts -->
+        <div id="trending-posts" class="posts-container">
+            <div class="space-y-4">
+                {% for post in trending_posts %}
+                {% if post.id %}
+                <div class="glass-panel trend-card transition hover:shadow-lg hover:shadow-primary/10">
+                    <div class="trend-side"></div>
+                    <div class="flex items-start justify-between w-full">
+                        <div class="flex-1">
+                            <h3 class="trend-title text-foreground mb-2">
+                                <a href="{% url 'discussion' post.id %}" class="hover:text-primary">
+                                    {{ post.title }}
+                                </a>
+                            </h3>
+                            <p class="text-muted-foreground mb-3 line-clamp-2 text-sm leading-6">
+                                {{ post.content|truncatechars:150 }}
+                            </p>
+                            <div class="trend-meta">
+                                <span class="trend-pill">
+                                    {{ post.category }}
+                                </span>
+                                <span>{{ post.created_at|date:"M j, Y" }}</span>
+                                <span>{{ post.user.username }}</span>
+                            </div>
+                            <a href="{% url 'discussion' post.id %}" class="trend-open">
+                                Open discussion
+                                <span>→</span>
                             </a>
-                        </h3>
-                        <p class="text-muted-foreground mb-3 line-clamp-2 text-sm leading-6">
-                            {{ post.content|truncatechars:150 }}
-                        </p>
-                        <div class="trend-meta">
-                            <span class="trend-pill">
-                                {{ post.category }}
-                            </span>
-                            <span>{{ post.created_at|date:"M j, Y" }}</span>
-                            <span>{{ post.user.username }}</span>
                         </div>
-                        <a href="{% url 'discussion' post.id %}" class="trend-open">
-                            Open discussion
-                            <span>→</span>
-                        </a>
                     </div>
                 </div>
+                {% endif %}
+                {% empty %}
+                <div class="text-center py-12">
+                    <p class="text-muted-foreground">No discussions yet. Be the first to start one!</p>
+                </div>
+                {% endfor %}
             </div>
-            {% endif %}
-            {% empty %}
-            <div class="text-center py-12">
-                <p class="text-muted-foreground">No discussions yet. Be the first to start one!</p>
-            </div>
-            {% endfor %}
         </div>
+
+        <!-- Suggested Posts -->
+        {% if user.is_authenticated %}
+        <div id="suggested-posts" class="posts-container hidden">
+            <div class="space-y-4">
+                {% for post in suggested_posts %}
+                {% if post.id %}
+                <div class="glass-panel trend-card transition hover:shadow-lg hover:shadow-primary/10">
+                    <div class="trend-side"></div>
+                    <div class="flex items-start justify-between w-full">
+                        <div class="flex-1">
+                            <h3 class="trend-title text-foreground mb-2">
+                                <a href="{% url 'discussion' post.id %}" class="hover:text-primary">
+                                    {{ post.title }}
+                                </a>
+                            </h3>
+                            <p class="text-muted-foreground mb-3 line-clamp-2 text-sm leading-6">
+                                {{ post.content|truncatechars:150 }}
+                            </p>
+                            <div class="trend-meta">
+                                <span class="trend-pill">
+                                    {{ post.category }}
+                                </span>
+                                <span>{{ post.created_at|date:"M j, Y" }}</span>
+                                <span>{{ post.user.username }}</span>
+                            </div>
+                            <a href="{% url 'discussion' post.id %}" class="trend-open">
+                                Open discussion
+                                <span>→</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% empty %}
+                <div class="text-center py-12">
+                    <p class="text-muted-foreground">No suggestions available yet.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -678,4 +757,25 @@
     </div>
 </div>
 {% endif %}
+
+<script>
+function switchTab(tab) {
+    const trendingTab = document.getElementById('trending-tab');
+    const suggestedTab = document.getElementById('suggested-tab');
+    const trendingPosts = document.getElementById('trending-posts');
+    const suggestedPosts = document.getElementById('suggested-posts');
+
+    if (tab === 'trending') {
+        trendingTab.classList.add('active');
+        suggestedTab.classList.remove('active');
+        trendingPosts.classList.remove('hidden');
+        suggestedPosts.classList.add('hidden');
+    } else if (tab === 'suggested') {
+        suggestedTab.classList.add('active');
+        trendingTab.classList.remove('active');
+        suggestedPosts.classList.remove('hidden');
+        trendingPosts.classList.add('hidden');
+    }
+}
+</script>
 {% endblock %}

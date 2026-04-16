@@ -13,6 +13,18 @@ class Profile(models.Model):
     def __str__(self):
         return self.username
 
+    @property
+    def followers_count(self):
+        return self.user.follower_links.count()
+
+    @property
+    def following_count(self):
+        return self.user.following_links.count()
+
+    @property
+    def posts_count(self):
+        return self.user.posts.count()
+
     class Meta:
         ordering = ['-created_at']
 

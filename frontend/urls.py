@@ -6,6 +6,7 @@ urlpatterns = [
     path('category/<str:category_name>/', views.category, name='category'),
     path('discussion/<str:post_id>/', views.discussion, name='discussion'),
     path('profile/', views.profile, name='profile'),
+    path('user/<str:username>/', views.user_profile, name='user_profile'),
     path('search/', views.search, name='search'),
     path('search/quick/', views.quick_search, name='quick_search'),
     path('ask/', views.ask_question, name='ask_question'),

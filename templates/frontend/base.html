@@ -593,11 +593,13 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .chat-overflow-item-meta {
+        .chat-overflow-item-unread {
             display: block;
             margin-top: 2px;
             font-size: 10px;
-            color: hsl(var(--muted-foreground));
+            color: hsl(var(--primary));
+            font-weight: 600;
+            text-align: right;
         }
 
         .chat-fp {
@@ -2059,7 +2061,7 @@
                 const unread = unreadCounts.get(String(id)) || 0;
                 return `<button type="button" class="chat-overflow-item" onclick="ChatManager.focus('${id}')">
                     <span class="chat-overflow-item-title">${title}</span>
-                    <span class="chat-overflow-item-meta">with @${opponent}${unread > 0 ? ` • ${unread} unread` : ''}</span>
+                    ${unread > 0 ? `<span class="chat-overflow-item-unread">${unread}</span>` : ''}
                 </button>`;
             }).join('');
         }

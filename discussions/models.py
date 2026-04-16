@@ -148,6 +148,41 @@ class CommentModeratorBlock(models.Model):
         ]
 
 
+class PostFollow(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='followed_posts')
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='followers')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} follows post '{self.post.title}'"
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'post'], name='unique_post_follow'),
+        ]
+
+
+class Notification(models.Model):
+    NOTIFICATION_TYPES = [
+        ('post_comment', 'New Comment on Followed Post'),
+        ('post_activity', 'Active Conversation on Followed Post'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='notifications')
+    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Notification for {self.user.username}: {self.message}"
+
+    class Meta:
+        ordering = ['-created_at']
+
+
 class DebateMessage(models.Model):
     id = models.BigAutoField(primary_key=True)
     debate = models.ForeignKey(Debate, on_delete=models.CASCADE, related_name='messages')

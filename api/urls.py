@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from users.views import UserViewSet, ProfileViewSet
 from discussions.views import PostViewSet, CommentViewSet, DebateViewSet
+from . import views
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet, basename='user')
@@ -13,4 +14,5 @@ router.register(r'debates', DebateViewSet, basename='debate')
 urlpatterns = [
     path('', include(router.urls)),
     path('api-auth/', include('rest_framework.urls')),
+    path('follow-post/', views.follow_post, name='follow_post'),
 ]

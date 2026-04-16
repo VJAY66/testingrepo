@@ -205,8 +205,24 @@ def index(request):
     trending_posts = Post.objects.filter(id__isnull=False).exclude(id='').order_by('-created_at')[:10]
     categories = get_frontend_categories()
 
+    suggested_posts = []
+    if request.user.is_authenticated:
+        # Get posts from followed users first
+        following_users = request.user.following_links.values_list('following', flat=True)
+        followed_posts = Post.objects.filter(user__in=following_users).exclude(id='').order_by('-created_at')[:10]
+        suggested_posts = list(followed_posts)
+
+        # If not enough followed posts, fill with recent posts
+        if len(suggested_posts) < 10:
+            recent_posts = Post.objects.filter(id__isnull=False).exclude(id='').exclude(id__in=[p.id for p in suggested_posts]).order_by('-created_at')[:10 - len(suggested_posts)]
+            suggested_posts.extend(list(recent_posts))
+    else:
+        # For non-authenticated users, just show recent posts
+        suggested_posts = list(trending_posts)
+
     context = {
         'trending_posts': trending_posts,
+        'suggested_posts': suggested_posts,
         'categories': categories,
     }
     return render(request, 'frontend/index.html', context)
@@ -330,6 +346,10 @@ def discussion(request, post_id):
     is_post_creator = request.user == post.user
     show_post_submitted = is_post_creator and request.GET.get('created') == '1'
 
+    is_following_post = False
+    if request.user.is_authenticated:
+        is_following_post = PostFollow.objects.filter(user=request.user, post=post).exists()
+
     context = {
         'post': post,
         'yes_comments': yes_comments,
@@ -348,6 +368,7 @@ def discussion(request, post_id):
         'post_has_comments': post_has_comments,
         'top_yes_comment_id': top_yes_comment.id if top_yes_comment else '',
         'top_no_comment_id': top_no_comment.id if top_no_comment else '',
+        'is_following_post': is_following_post,
     }
     return render(request, 'frontend/discussion.html', context)
 
@@ -368,8 +389,45 @@ def profile(request):
         'avatar_url': avatar_url,
         'is_online': is_online,
         'presence_label': presence_label,
+        'followers_count': request.user.follower_links.count(),
+        'following_count': request.user.following_links.count(),
     }
     return render(request, 'frontend/profile.html', context)
+
+def user_profile(request, username):
+    """Public user profile page"""
+    try:
+        profile_user = User.objects.get(username=username)
+    except User.DoesNotExist:
+        from django.http import Http404
+        raise Http404("User not found")
+
+    user_posts = Post.objects.filter(user=profile_user).exclude(id='').order_by('-created_at')
+
+    profile_obj = Profile.objects.filter(user=profile_user).first()
+    avatar_url = profile_obj.avatar_url if profile_obj else ''
+    profile_last_seen = profile_obj.last_seen if profile_obj else None
+    now = timezone.now()
+    is_online = bool(profile_last_seen and profile_last_seen >= now - timedelta(minutes=5))
+    presence_label = 'Active now' if is_online else _presence_label(profile_last_seen, now=now)
+
+    # Check if current user is following this user
+    is_following = False
+    if request.user.is_authenticated:
+        is_following = Follow.objects.filter(follower=request.user, following=profile_user).exists()
+
+    context = {
+        'profile_user': profile_user,
+        'user_posts': user_posts,
+        'avatar_url': avatar_url,
+        'is_online': is_online,
+        'presence_label': presence_label,
+        'followers_count': profile_user.follower_links.count(),
+        'following_count': profile_user.following_links.count(),
+        'is_following': is_following,
+        'is_own_profile': request.user == profile_user,
+    }
+    return render(request, 'frontend/user_profile.html', context)
 
 def search(request):
     """Search page"""
