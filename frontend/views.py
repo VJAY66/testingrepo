@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from django.conf import settings
 from django.contrib.auth.models import User
 from users.models import Profile
 from users.serializers import UserSerializer, UserRegistrationSerializer, ProfileSerializer
@@ -13,13 +14,95 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.db.models import Q, F, Count, IntegerField, ExpressionWrapper
+from django.db import DataError
 from django.utils import timezone
 from datetime import timedelta
 import json
+import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory
+from users.models import Follow
 from discussions.limits import has_reached_daily_post_limit
+
+
+_EMOJI_TOKEN_RE = re.compile(r'__EMJ__([0-9A-F]{5,6})__')
+
+
+def _manual_editor_username():
+    return (getattr(settings, 'MANUAL_EDITOR_USERNAME', '') or '').strip()
+
+
+def _manual_editor_password():
+    return getattr(settings, 'MANUAL_EDITOR_PASSWORD', '') or ''
+
+
+def _manual_editor_email():
+    return (getattr(settings, 'MANUAL_EDITOR_EMAIL', '') or '').strip()
+
+
+def _ensure_manual_editor_user():
+    username = _manual_editor_username()
+    password = _manual_editor_password()
+    email = _manual_editor_email()
+
+    if not username or not password:
+        return None
+
+    user, _ = User.objects.get_or_create(username=username, defaults={'email': email})
+    update_fields = []
+
+    if email and user.email != email:
+        user.email = email
+        update_fields.append('email')
+
+    if not user.check_password(password):
+        user.set_password(password)
+        update_fields.append('password')
+
+    if not user.is_active:
+        user.is_active = True
+        update_fields.append('is_active')
+
+    if update_fields:
+        user.save(update_fields=update_fields)
+
+    return user
+
+
+def _is_manual_editor_user(user):
+    configured_username = _manual_editor_username()
+    return bool(
+        configured_username
+        and getattr(user, 'is_authenticated', False)
+        and user.username == configured_username
+    )
+
+
+def _can_manage_created_today(user, created_at):
+    if not _is_manual_editor_user(user):
+        return True
+    return timezone.localdate(created_at) == timezone.localdate()
+
+
+def _encode_chat_content_for_storage(content):
+    """Encode astral emoji into ASCII-safe tokens for DBs without utf8mb4."""
+    if not content:
+        return ''
+    out = []
+    for ch in content:
+        code = ord(ch)
+        if code > 0xFFFF:
+            out.append(f'__EMJ__{code:06X}__')
+        else:
+            out.append(ch)
+    return ''.join(out)
+
+
+def _decode_chat_content_from_storage(content):
+    if not content:
+        return ''
+    return _EMOJI_TOKEN_RE.sub(lambda m: chr(int(m.group(1), 16)), content)
 
 
 def _opposite_side(side):
@@ -200,29 +283,165 @@ def get_frontend_categories():
         categories.append({'name': category_name, **category_style})
     return categories
 
+
+@login_required
+@require_POST
+def post_action(request, post_id):
+    action = request.POST.get('action')
+    if action not in ['like', 'save', 'repost']:
+        return JsonResponse({'success': False, 'error': 'Invalid action.'}, status=400)
+
+    post = get_object_or_404(Post, id=post_id)
+    existing_action = PostAction.objects.filter(user=request.user, post=post, action=action).first()
+
+    if action in ['like', 'save']:
+        if existing_action:
+            existing_action.delete()
+            status = 'removed'
+        else:
+            PostAction.objects.create(user=request.user, post=post, action=action)
+            status = 'added'
+
+        # Get updated counts
+        like_count = PostAction.objects.filter(post=post, action='like').count()
+        save_count = PostAction.objects.filter(post=post, action='save').count()
+        repost_count = PostAction.objects.filter(post=post, action='repost').count()
+
+        return JsonResponse({
+            'success': True,
+            'action': action,
+            'status': status,
+            'counts': {
+                'like': like_count,
+                'save': save_count,
+                'repost': repost_count
+            }
+        })
+
+    if action == 'repost':
+        if existing_action:
+            like_count = PostAction.objects.filter(post=post, action='like').count()
+            save_count = PostAction.objects.filter(post=post, action='save').count()
+            repost_count = PostAction.objects.filter(post=post, action='repost').count()
+            return JsonResponse({
+                'success': True,
+                'action': action,
+                'status': 'already_reposted',
+                'counts': {
+                    'like': like_count,
+                    'save': save_count,
+                    'repost': repost_count
+                }
+            })
+
+        PostAction.objects.create(user=request.user, post=post, action=action)
+        new_post = Post.objects.create(
+            id=str(uuid.uuid4()),
+            user=request.user,
+            title=post.title,
+            content=post.content,
+            category=post.category,
+            hashtags=post.hashtags,
+        )
+
+        like_count = PostAction.objects.filter(post=post, action='like').count()
+        save_count = PostAction.objects.filter(post=post, action='save').count()
+        repost_count = PostAction.objects.filter(post=post, action='repost').count()
+
+        return JsonResponse({
+            'success': True,
+            'action': action,
+            'status': 'reposted',
+            'repost_id': new_post.id,
+            'counts': {
+                'like': like_count,
+                'save': save_count,
+                'repost': repost_count
+            }
+        })
+
+
 def index(request):
     """Home page with trending posts and categories"""
-    trending_posts = Post.objects.filter(id__isnull=False).exclude(id='').order_by('-created_at')[:10]
+    trending_posts = Post.objects.filter(id__isnull=False).exclude(id='').annotate(
+        like_count=Count('actions', filter=Q(actions__action='like')),
+        save_count=Count('actions', filter=Q(actions__action='save')),
+        repost_count=Count('actions', filter=Q(actions__action='repost')),
+        yes_count=Count('comments', filter=Q(comments__vote_type='yes')),
+        no_count=Count('comments', filter=Q(comments__vote_type='no'))
+    ).order_by('-created_at')[:10]
     categories = get_frontend_categories()
 
     suggested_posts = []
     if request.user.is_authenticated:
-        # Get posts from followed users first
         following_users = request.user.following_links.values_list('following', flat=True)
-        followed_posts = Post.objects.filter(user__in=following_users).exclude(id='').order_by('-created_at')[:10]
-        suggested_posts = list(followed_posts)
+        watched_post_ids = PostView.objects.filter(user=request.user).values_list('post_id', flat=True)
 
-        # If not enough followed posts, fill with recent posts
-        if len(suggested_posts) < 10:
-            recent_posts = Post.objects.filter(id__isnull=False).exclude(id='').exclude(id__in=[p.id for p in suggested_posts]).order_by('-created_at')[:10 - len(suggested_posts)]
-            suggested_posts.extend(list(recent_posts))
+        if following_users:
+            followed_posts = Post.objects.filter(user__in=following_users).exclude(id__in=watched_post_ids).exclude(id='').annotate(
+                like_count=Count('actions', filter=Q(actions__action='like')),
+                save_count=Count('actions', filter=Q(actions__action='save')),
+                repost_count=Count('actions', filter=Q(actions__action='repost')),
+                yes_count=Count('comments', filter=Q(comments__vote_type='yes')),
+                no_count=Count('comments', filter=Q(comments__vote_type='no'))
+            ).order_by('-created_at')[:10]
+            if followed_posts.exists():
+                suggested_posts = list(followed_posts)
+        if not suggested_posts:
+            suggested_posts = list(Post.objects.exclude(id__in=watched_post_ids).exclude(id='').annotate(
+                like_count=Count('actions', filter=Q(actions__action='like')),
+                save_count=Count('actions', filter=Q(actions__action='save')),
+                repost_count=Count('actions', filter=Q(actions__action='repost')),
+                yes_count=Count('comments', filter=Q(comments__vote_type='yes')),
+                no_count=Count('comments', filter=Q(comments__vote_type='no'))
+            ).order_by('-created_at')[:10])
+
+    active_tab = request.GET.get('tab', 'trending')
+    if active_tab == 'suggested' and not request.user.is_authenticated:
+        active_tab = 'trending'
+    if active_tab == 'suggested':
+        posts = suggested_posts
     else:
-        # For non-authenticated users, just show recent posts
-        suggested_posts = list(trending_posts)
+        posts = trending_posts
+
+    for post in posts:
+        yes_count = getattr(post, 'yes_count', 0) or 0
+        no_count = getattr(post, 'no_count', 0) or 0
+        total_votes = yes_count + no_count
+        if total_votes > 0:
+            post.yes_percentage = (yes_count * 100.0) / total_votes
+            post.no_percentage = 100.0 - post.yes_percentage
+        else:
+            post.yes_percentage = 0.0
+            post.no_percentage = 0.0
+
+    if request.user.is_authenticated:
+        post_ids = [post.id for post in posts]
+        liked_post_ids = set()
+        saved_post_ids = set()
+        reposted_post_ids = set()
+        if post_ids:
+            post_actions = PostAction.objects.filter(
+                user=request.user,
+                post__in=post_ids,
+                action__in=['like', 'save', 'repost']
+            ).values('post_id', 'action')
+            for item in post_actions:
+                if item['action'] == 'like':
+                    liked_post_ids.add(item['post_id'])
+                elif item['action'] == 'save':
+                    saved_post_ids.add(item['post_id'])
+                elif item['action'] == 'repost':
+                    reposted_post_ids.add(item['post_id'])
+
+        for post in posts:
+            post.is_liked = post.id in liked_post_ids
+            post.is_saved = post.id in saved_post_ids
+            post.is_reposted = post.id in reposted_post_ids
 
     context = {
-        'trending_posts': trending_posts,
-        'suggested_posts': suggested_posts,
+        'posts': posts,
+        'active_tab': active_tab,
         'categories': categories,
     }
     return render(request, 'frontend/index.html', context)
@@ -240,6 +459,9 @@ def category(request, category_name):
 def discussion(request, post_id):
     """Discussion page for a specific post"""
     post = get_object_or_404(Post, id=post_id)
+    if request.user.is_authenticated:
+        PostView.objects.get_or_create(user=request.user, post=post)
+
     comments = Comment.objects.filter(post=post).select_related('user', 'user__profile').annotate(
         reaction_score=ExpressionWrapper(F('likes') - F('dislikes'), output_field=IntegerField())
     )
@@ -344,6 +566,7 @@ def discussion(request, post_id):
 
     post_has_comments = comments.exists()
     is_post_creator = request.user == post.user
+    can_manage_post_today = is_post_creator and _can_manage_created_today(request.user, post.created_at)
     show_post_submitted = is_post_creator and request.GET.get('created') == '1'
 
     is_following_post = False
@@ -364,8 +587,10 @@ def discussion(request, post_id):
         'user_has_commented': user_has_commented,
         'is_post_creator': is_post_creator,
         'show_post_submitted': show_post_submitted,
-        'can_edit_post': is_post_creator and not post_has_comments,
+        'can_edit_post': can_manage_post_today and not post_has_comments,
+        'can_delete_post': can_manage_post_today,
         'post_has_comments': post_has_comments,
+        'post_change_locked_message': 'This account can only edit or delete posts created today.' if is_post_creator and not can_manage_post_today else '',
         'top_yes_comment_id': top_yes_comment.id if top_yes_comment else '',
         'top_no_comment_id': top_no_comment.id if top_no_comment else '',
         'is_following_post': is_following_post,
@@ -376,6 +601,18 @@ def discussion(request, post_id):
 def profile(request):
     """User profile page"""
     user_posts = Post.objects.filter(user=request.user).exclude(id='').order_by('-created_at')
+    user_reposts = PostAction.objects.filter(
+        user=request.user, action='repost'
+    ).select_related('post', 'post__user').order_by('-created_at')
+    user_saved = PostAction.objects.filter(
+        user=request.user, action='save'
+    ).select_related('post', 'post__user').order_by('-created_at')
+
+    for post in user_posts:
+        post.can_delete_today = _can_manage_created_today(request.user, post.created_at)
+
+    for action in user_reposts:
+        action.can_remove_today = _can_manage_created_today(request.user, action.created_at)
 
     profile_obj = Profile.objects.filter(user=request.user).first()
     avatar_url = profile_obj.avatar_url if profile_obj else ''
@@ -384,13 +621,24 @@ def profile(request):
     is_online = bool(profile_last_seen and profile_last_seen >= now - timedelta(minutes=5))
     presence_label = 'Active now' if is_online else _presence_label(profile_last_seen, now=now)
 
+    followers_qs = request.user.follower_links.select_related('follower__profile').order_by('-created_at')
+    following_qs = request.user.following_links.select_related('following__profile').order_by('-created_at')
+
+    def _card(u):
+        p = getattr(u, 'profile', None)
+        return {'username': u.username, 'avatar_url': p.avatar_url if p else ''}
+
     context = {
         'user_posts': user_posts,
+        'user_reposts': user_reposts,
+        'user_saved': user_saved,
         'avatar_url': avatar_url,
         'is_online': is_online,
         'presence_label': presence_label,
         'followers_count': request.user.follower_links.count(),
         'following_count': request.user.following_links.count(),
+        'followers_list': [_card(f.follower) for f in followers_qs],
+        'following_list': [_card(f.following) for f in following_qs],
     }
     return render(request, 'frontend/profile.html', context)
 
@@ -470,6 +718,84 @@ def quick_search(request):
 
     return JsonResponse({'success': True, 'results': results})
 
+def search_users(request):
+    """Lightweight JSON user search used by the navbar search overlay."""
+    query = request.GET.get('q', '').strip()
+    if not query:
+        return JsonResponse({'success': True, 'users': []})
+
+    profiles = Profile.objects.filter(
+        username__icontains=query
+    ).select_related('user').order_by('username')[:8]
+
+    users = [
+        {
+            'username': p.username,
+            'posts_count': p.posts_count,
+            'followers_count': p.followers_count,
+            'url': f'/user/{p.username}/',
+            'avatar_url': p.avatar_url or '',
+        }
+        for p in profiles
+    ]
+
+    return JsonResponse({'success': True, 'users': users})
+
+
+def hashtag_search(request):
+    """Search posts by hashtag"""
+    raw_tag = request.GET.get('tag', '').strip()
+    parsed = Post.parse_hashtags(raw_tag, max_tags=1)
+    tag = parsed[0] if parsed else ''
+    results = Post.objects.none()
+
+    if tag:
+        # Candidate set first, then exact tag match via parser for legacy/new formats.
+        candidates = Post.objects.filter(hashtags__icontains=tag).order_by('-created_at')
+        matching_ids = [post.id for post in candidates if tag in post.get_hashtags_list()]
+        results = Post.objects.filter(id__in=matching_ids).order_by('-created_at')
+
+    context = {
+        'tag': tag,
+        'results': results,
+        'is_hashtag_search': True,
+    }
+    return render(request, 'frontend/search.html', context)
+
+
+def hashtag_suggestions(request):
+    """Return hashtag suggestions while user types."""
+    raw_query = request.GET.get('q', '').strip()
+    parsed = Post.parse_hashtags(raw_query, max_tags=1)
+    query = parsed[0] if parsed else raw_query.lower().lstrip('#').strip()
+
+    if not query:
+        return JsonResponse({'success': True, 'hashtags': []})
+
+    counter = {}
+    hashtag_rows = (
+        Post.objects.exclude(hashtags='')
+        .order_by('-created_at')
+        .values_list('hashtags', flat=True)[:1000]
+    )
+
+    for row in hashtag_rows:
+        for tag in Post.parse_hashtags(row, max_tags=20):
+            if tag.startswith(query):
+                counter[tag] = counter.get(tag, 0) + 1
+
+    top = sorted(counter.items(), key=lambda item: (-item[1], item[0]))[:8]
+    suggestions = [
+        {
+            'tag': tag,
+            'count': count,
+            'url': f'/search/hashtags/?tag={tag}',
+        }
+        for tag, count in top
+    ]
+
+    return JsonResponse({'success': True, 'hashtags': suggestions})
+
 @login_required
 def ask_question(request):
     """Ask question page"""
@@ -528,8 +854,22 @@ def notifications(request):
 
     context = {
         'debates': debates,
+        'post_notifications': Notification.objects.filter(
+            user=request.user
+        ).select_related('post').order_by('-created_at')[:30],
     }
     return render(request, 'frontend/notifications.html', context)
+
+
+@login_required
+@require_POST
+def unfollow_post(request):
+    """Unfollow a post from a notification — stops future comment notifications."""
+    post_id = request.POST.get('post_id') or (json.loads(request.body).get('post_id') if request.content_type == 'application/json' else None)
+    if not post_id:
+        return JsonResponse({'success': False, 'error': 'post_id required'}, status=400)
+    deleted, _ = PostFollow.objects.filter(user=request.user, post_id=post_id).delete()
+    return JsonResponse({'success': True, 'unfollowed': deleted > 0})
 
 
 @login_required
@@ -606,6 +946,9 @@ def login_view(request):
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
+
+        if username == _manual_editor_username() and _manual_editor_password():
+            _ensure_manual_editor_user()
 
         user = authenticate(request, username=username, password=password)
         if user is not None:
@@ -687,6 +1030,7 @@ def create_post(request):
         title = request.POST.get('title', '').strip()
         content = request.POST.get('content', '').strip()
         category = request.POST.get('category', '').strip()
+        hashtags = request.POST.get('hashtags', '').strip()
 
         if not title or not category:
             messages.error(request, 'Title and category are required')
@@ -697,13 +1041,27 @@ def create_post(request):
             messages.error(request, f'You can create up to {limit} posts per day.')
             return redirect('index')
 
+        long_hashtags = [
+            token.lstrip('#')
+            for token in re.findall(r'#?[A-Za-z0-9_]+', hashtags)
+            if len(token.lstrip('#')) > Post.HASHTAG_MAX_LENGTH
+        ]
+        if long_hashtags:
+            messages.error(request, f'Each hashtag must be at most {Post.HASHTAG_MAX_LENGTH} characters.')
+            return redirect('ask_question')
+
+        # Process hashtags from free input (comma/space separated, with or without '#').
+        hashtag_list = Post.parse_hashtags(hashtags, max_tags=5)
+        processed_hashtags = ', '.join(hashtag_list)
+
         try:
             post = Post.objects.create(
                 id=str(uuid.uuid4()),
                 user=request.user,
                 title=title,
                 content=content,
-                category=category
+                category=category,
+                hashtags=processed_hashtags
             )
             
             if not post or not post.id:
@@ -727,6 +1085,9 @@ def update_post(request, post_id):
     if post.user != request.user:
         return JsonResponse({'success': False, 'error': 'You can only edit your own post.'}, status=403)
 
+    if not _can_manage_created_today(request.user, post.created_at):
+        return JsonResponse({'success': False, 'error': 'This account can only edit posts created today.'}, status=403)
+
     if Comment.objects.filter(post=post).exists():
         return JsonResponse({'success': False, 'error': 'You cannot edit this post after comments are added.'})
 
@@ -735,8 +1096,14 @@ def update_post(request, post_id):
     if not title:
         return JsonResponse({'success': False, 'error': 'Title is required.'})
 
+    PostEditHistory.objects.create(
+        post=post,
+        original_title=post.title,
+        original_content=post.content,
+    )
     post.title = title
-    post.save(update_fields=['title', 'updated_at'])
+    post.is_edited = True
+    post.save(update_fields=['title', 'is_edited', 'updated_at'])
 
     return JsonResponse({'success': True, 'message': 'Post updated successfully.'})
 
@@ -750,8 +1117,58 @@ def delete_post(request, post_id):
     if post.user != request.user:
         return JsonResponse({'success': False, 'error': 'You can only delete your own post.'}, status=403)
 
+    if not _can_manage_created_today(request.user, post.created_at):
+        return JsonResponse({'success': False, 'error': 'This account can only delete posts created today.'}, status=403)
+
     post.delete()
     return JsonResponse({'success': True, 'message': 'Post deleted successfully.', 'redirect_url': '/'})
+
+@login_required
+@require_POST
+def remove_repost(request, post_id):
+    """Remove a repost action and the duplicated post created during reposting."""
+    original = get_object_or_404(Post, id=post_id)
+    action = PostAction.objects.filter(user=request.user, post=original, action='repost').first()
+    if not action:
+        return JsonResponse({'success': False, 'error': 'Repost not found.'}, status=404)
+    if not _can_manage_created_today(request.user, action.created_at):
+        return JsonResponse({'success': False, 'error': 'This account can only remove reposts created today.'}, status=403)
+    # Delete the duplicated post copy (same user, title, content, category)
+    Post.objects.filter(
+        user=request.user,
+        title=original.title,
+        content=original.content,
+        category=original.category,
+    ).exclude(id=original.id).delete()
+    action.delete()
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_POST
+def remove_follower(request):
+    """Remove a follower from the current user's followers list."""
+    username = request.POST.get('username', '').strip()
+    if not username:
+        return JsonResponse({'success': False, 'error': 'Username is required.'}, status=400)
+
+    if username == request.user.username:
+        return JsonResponse({'success': False, 'error': 'You cannot remove yourself.'}, status=400)
+
+    target_user = User.objects.filter(username=username).first()
+    if not target_user:
+        return JsonResponse({'success': False, 'error': 'User not found.'}, status=404)
+
+    deleted_count, _ = Follow.objects.filter(follower=target_user, following=request.user).delete()
+    if not deleted_count:
+        return JsonResponse({'success': False, 'error': 'This user is not following you.'}, status=404)
+
+    return JsonResponse({
+        'success': True,
+        'removed_username': username,
+        'followers_count': request.user.follower_links.count(),
+    })
+
 
 @login_required
 @require_POST
@@ -1009,9 +1426,14 @@ def update_comment(request):
     if comment.user != request.user:
         return JsonResponse({'success': False, 'error': 'You can only edit your own comment'})
 
+    CommentEditHistory.objects.create(
+        comment=comment,
+        original_content=comment.content,
+    )
     comment.content = content
-    comment.save()
-    return JsonResponse({'success': True, 'message': 'Comment updated successfully', 'content': comment.content})
+    comment.is_edited = True
+    comment.save(update_fields=['content', 'is_edited', 'updated_at'])
+    return JsonResponse({'success': True, 'message': 'Comment updated successfully', 'content': comment.content, 'is_edited': True})
 
 @login_required
 @require_POST
@@ -1123,7 +1545,7 @@ def debate_chat(request, debate_id):
     messages_list = [
         {
             'id': message.id,
-            'content': message.content,
+            'content': _decode_chat_content_from_storage(message.content),
             'sender': message.sender.username,
             'sender_id': message.sender_id,
             'sender_avatar': _safe_avatar_url(message.sender),
@@ -1131,10 +1553,11 @@ def debate_chat(request, debate_id):
             'reply_to': ({
                 'id': message.reply_to.id,
                 'sender': message.reply_to.sender.username,
-                'content': message.reply_to.content,
+                'content': _decode_chat_content_from_storage(message.reply_to.content),
             } if message.reply_to_id else None),
             'is_own': message.sender_id == request.user.id,
             'can_remove_sender': request.user.id == debate.target_id and message.sender_id != request.user.id,
+            'is_edited': message.is_edited,
             'created_at': message.created_at,
             'created_date_label': message.created_at.strftime('%b %d, %Y'),
             'created_time': message.created_at.strftime('%I:%M %p'),
@@ -1181,8 +1604,8 @@ def send_debate_message(request, debate_id):
     if not participation.is_active:
         return JsonResponse({'success': False, 'error': 'You left this conversation. Rejoin to send messages.'})
 
-    content = request.POST.get('content', '').strip()
-    if not content:
+    content = request.POST.get('content', '')
+    if not content.strip():
         return JsonResponse({'success': False, 'error': 'Message cannot be empty'})
 
     reply_to = None
@@ -1193,18 +1616,21 @@ def send_debate_message(request, debate_id):
         except (ValueError, DebateMessage.DoesNotExist):
             return JsonResponse({'success': False, 'error': 'Invalid reply target'})
 
-    message = DebateMessage.objects.create(
-        debate=debate,
-        sender=request.user,
-        reply_to=reply_to,
-        content=content
-    )
+    try:
+        message = DebateMessage.objects.create(
+            debate=debate,
+            sender=request.user,
+            reply_to=reply_to,
+            content=_encode_chat_content_for_storage(content)
+        )
+    except DataError:
+        return JsonResponse({'success': False, 'error': 'Unable to store this message text. Please try a shorter one.'}, status=400)
 
     return JsonResponse({
         'success': True,
         'message': {
             'id': message.id,
-            'content': message.content,
+            'content': _decode_chat_content_from_storage(message.content),
             'sender': message.sender.username,
             'sender_id': message.sender_id,
             'sender_avatar': _safe_avatar_url(message.sender),
@@ -1212,16 +1638,45 @@ def send_debate_message(request, debate_id):
             'reply_to': ({
                 'id': reply_to.id,
                 'sender': reply_to.sender.username,
-                'content': reply_to.content,
+                'content': _decode_chat_content_from_storage(reply_to.content),
             } if reply_to else None),
             'is_own': True,
             'can_remove_sender': request.user.id == debate.target_id and message.sender_id != request.user.id,
             'is_system': False,
+            'is_edited': message.is_edited,
             'created_at': message.created_at.strftime('%b %d, %I:%M %p'),
             'created_date_label': message.created_at.strftime('%b %d, %Y'),
             'created_time': message.created_at.strftime('%I:%M %p'),
         }
     })
+
+
+@login_required
+@require_POST
+def update_debate_message(request, debate_id, message_id):
+    """Edit own debate message and record original in history."""
+    debate = get_object_or_404(Debate, id=debate_id)
+    message = get_object_or_404(DebateMessage, id=message_id, debate=debate)
+
+    if message.sender != request.user:
+        return JsonResponse({'success': False, 'error': 'You can only edit your own messages.'}, status=403)
+
+    if message.is_system:
+        return JsonResponse({'success': False, 'error': 'System messages cannot be edited.'}, status=400)
+
+    content = request.POST.get('content', '').strip()
+    if not content:
+        return JsonResponse({'success': False, 'error': 'Message cannot be empty.'})
+
+    DebateMessageEditHistory.objects.create(
+        message=message,
+        original_content=message.content,
+    )
+    message.content = _encode_chat_content_for_storage(content)
+    message.is_edited = True
+    message.save(update_fields=['content', 'is_edited'])
+
+    return JsonResponse({'success': True, 'content': content, 'is_edited': True})
 
 
 @login_required
@@ -1238,7 +1693,7 @@ def debate_messages(request, debate_id):
     messages = [
         {
             'id': message.id,
-            'content': message.content,
+            'content': _decode_chat_content_from_storage(message.content),
             'sender': message.sender.username,
             'sender_id': message.sender_id,
             'sender_avatar': _safe_avatar_url(message.sender),
@@ -1246,11 +1701,12 @@ def debate_messages(request, debate_id):
             'reply_to': ({
                 'id': message.reply_to.id,
                 'sender': message.reply_to.sender.username,
-                'content': message.reply_to.content,
+                'content': _decode_chat_content_from_storage(message.reply_to.content),
             } if message.reply_to_id else None),
             'is_own': message.sender_id == request.user.id,
             'can_remove_sender': request.user.id == debate.target_id and message.sender_id != request.user.id,
             'is_system': message.is_system,
+            'is_edited': message.is_edited,
             'created_at': message.created_at.strftime('%b %d, %I:%M %p'),
             'created_date_label': message.created_at.strftime('%b %d, %Y'),
             'created_time': message.created_at.strftime('%I:%M %p'),

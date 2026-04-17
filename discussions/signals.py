@@ -1,4 +1,4 @@
-from django.db.models.signals import post_save
+﻿from django.db.models.signals import post_save
 from django.dispatch import receiver
 from .models import Comment, Notification, PostFollow
 
@@ -10,18 +10,18 @@ def notify_post_followers(sender, instance, created, **kwargs):
     post = instance.post
     followers = PostFollow.objects.filter(post=post).exclude(user=instance.user).select_related('user')
 
-    # Count total comments on the post
-    total_comments = Comment.objects.filter(post=post).count()
-
     for follow in followers:
-        # Notify for every 5th comment or first comment (active conversation)
-        if total_comments == 1 or total_comments % 5 == 0:
-            notification_type = 'post_activity' if total_comments > 1 else 'post_comment'
-            message = f'New activity on "{post.title}": {instance.user.username} commented.' if total_comments == 1 else f'Active conversation on "{post.title}": {total_comments} comments so far.'
+        # Count comments made since this user followed the post
+        comments_since_follow = Comment.objects.filter(
+            post=post,
+            created_at__gte=follow.created_at
+        ).count()
 
+        # Notify for every 5 comments since the user followed
+        if comments_since_follow > 0 and comments_since_follow % 5 == 0:
             Notification.objects.create(
                 user=follow.user,
                 post=post,
-                notification_type=notification_type,
-                message=message
+                notification_type='post_activity',
+                message=f'{comments_since_follow} new comments on "{post.title}" since you followed it.'
             )

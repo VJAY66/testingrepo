@@ -1,0 +1,502 @@
+/* ============================================
+   Modern Futuristic Chatbox Enhancements
+   ============================================ */
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Enhanced glass morphism effects */
+.mc-glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+}
+
+/* Neon gradient text effect */
+.mc-neon-text {
+  background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)), hsl(var(--primary) / 0.7));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: neon-flow 3s linear infinite;
+}
+
+@keyframes neon-flow {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Message entrance with stagger */
+@keyframes msg-stagger-in {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.92);
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.mc-msg {
+  animation: msg-stagger-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both !important;
+}
+
+/* Pulsing effect for active status */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 12px hsl(var(--primary) / 0);
+  }
+}
+
+.mc-pulse {
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Shimmer effect for loading states */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.mc-shimmer {
+  animation: shimmer 2s infinite;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.2) 20%,
+    rgba(255, 255, 255, 0.5) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  background-size: 1000px 100%;
+}
+
+/* Smooth fade transitions */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Floating action button hover effect */
+@keyframes float-up {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.mc-float:hover {
+  animation: float-up 1s ease-in-out infinite;
+}
+
+/* Ripple effect for button clicks */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.mc-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.mc-ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: ripple 0.6s ease-out;
+}
+
+/* Enhanced message bubble shadows */
+.mc-msg.own .mc-bubble {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mc-msg.own .mc-bubble:hover {
+  box-shadow: 0 12px 32px hsl(var(--primary) / 0.25), 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.mc-msg.other .mc-bubble {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mc-msg.other .mc-bubble:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Smooth input focus effect */
+#mc-inp {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#mc-inp:focus {
+  transform: scale(1.02);
+}
+
+/* Send button glow effect */
+#mc-send {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+#mc-send::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.3), hsl(var(--accent) / 0.3));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+#mc-send:focus::before {
+  opacity: 1;
+  animation: pulse-glow 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Avatar animation */
+#mc-avatar-img,
+.mc-msg-avatar {
+  animation: avatar-float 3s ease-in-out infinite;
+}
+
+@keyframes avatar-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* Status badge animations */
+#mc-yes-limit,
+#mc-no-limit {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#mc-yes-limit:hover,
+#mc-no-limit:hover {
+  transform: scale(1.08);
+}
+
+/* Header gradient animation */
+#mc-header {
+  background-attachment: fixed;
+  background-size: 200% auto;
+}
+
+/* Smooth container transitions */
+#mc-shell {
+  will-change: transform, opacity;
+}
+
+/* Better message hover states */
+.mc-msg {
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.mc-msg:hover {
+  transform: translateX(2px);
+  filter: brightness(1.04);
+}
+
+/* Enhanced date divider */
+.mc-date-divider span {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mc-date-divider span:hover {
+  transform: scale(1.05);
+}
+
+/* Smooth member list scroll */
+#mc-members {
+  scroll-behavior: smooth;
+}
+
+/* Member hover effect */
+.mc-member {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.mc-member:hover {
+  transform: translateY(-2px);
+}
+
+/* Reply quote highlight */
+.mc-reply-quote {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-left-width: 4px;
+}
+
+.mc-reply-quote:hover {
+  background: hsl(var(--primary) / 0.12);
+  transform: translateX(2px);
+}
+
+/* Online dot pulse with glow */
+#mc-online-dot {
+  box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7), 
+              0 0 12px rgba(74, 222, 128, 0.5);
+}
+
+/* Caution box styling */
+#mc-caution {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Minimized chathead glow */
+#mc-chathead {
+  box-shadow: 0 12px 40px hsl(var(--primary) / 0.4),
+              0 6px 20px hsl(var(--primary) / 0.2),
+              inset 0 1px 0 rgba(255, 255, 255, 0.2),
+              0 0 20px hsl(var(--primary) / 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#mc-chathead:hover {
+  box-shadow: 0 16px 48px hsl(var(--primary) / 0.5),
+              0 8px 24px hsl(var(--primary) / 0.3),
+              inset 0 1px 0 rgba(255, 255, 255, 0.3),
+              0 0 28px hsl(var(--primary) / 0.4);
+  transform: scale(1.08);
+}
+
+/* Typing indicator smooth animation */
+.mc-typing-indicator {
+  animation: typing-fade 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes typing-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Mobile minimized chat state */
+@media (max-width: 767px) {
+  #mc-shell.mc-minimized {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    top: auto;
+    z-index: 7999;
+    width: 100%;
+    height: 60px;
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    border-radius: 0;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    background: linear-gradient(135deg, hsl(var(--card)), hsl(var(--card) / 0.8)),
+                radial-gradient(600px at 50% 0%, hsl(var(--primary) / 0.15), transparent 80%);
+    animation: mc-minimize 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    cursor: pointer;
+  }
+
+  @keyframes mc-minimize {
+    from {
+      height: 100dvh;
+      opacity: 1;
+    }
+    to {
+      height: 60px;
+      opacity: 1;
+    }
+  }
+
+  #mc-shell.mc-minimized > * {
+    display: none !important;
+  }
+
+  #mc-shell.mc-minimized #mc-header {
+    display: flex !important;
+    flex: 1;
+    border: none;
+    border-radius: 0;
+    padding: 0 14px;
+    height: 60px;
+    gap: 12px;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  #mc-shell.mc-minimized #mc-avatar-wrap {
+    width: 40px;
+    height: 40px;
+  }
+
+  #mc-shell.mc-minimized #mc-avatar,
+  #mc-shell.mc-minimized #mc-avatar-img {
+    width: 40px;
+    height: 40px;
+  }
+
+  #mc-shell.mc-minimized #mc-header-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  #mc-shell.mc-minimized #mc-opp-name {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  #mc-shell.mc-minimized #mc-sub {
+    display: none;
+  }
+
+  #mc-shell.mc-minimized #mc-hacts {
+    display: flex !important;
+    gap: 8px;
+  }
+
+  #mc-shell.mc-minimized #mc-hacts button {
+    width: auto;
+    min-width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #mc-shell.mc-minimized #mc-hacts button[onclick*="mcToggleMinimize"] {
+    width: 36px;
+    min-width: 36px;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  /* Expand animation */
+  #mc-shell.mc-expanding {
+    animation: mc-expand 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  @keyframes mc-expand {
+    from {
+      height: 60px;
+      opacity: 1;
+    }
+    to {
+      height: 100dvh;
+      opacity: 1;
+    }
+  }
+}
+
+/* Smooth emoji support */
+.mc-bubble {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Dark mode enhancements */
+@media (prefers-color-scheme: dark) {
+  .mc-glass {
+    background: rgba(20, 20, 30, 0.4);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  #mc-bubble {
+    background: linear-gradient(135deg, rgba(30, 30, 45, 0.6), rgba(30, 30, 45, 0.4));
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: more) {
+  .mc-bubble {
+    border-width: 2px;
+  }
+
+  #mc-send {
+    border-width: 2px;
+  }
+
+  #mc-inp {
+    border-width: 2px;
+  }
+}
+
+/* Print styles */
+@media print {
+  #mc-inputbar,
+  #mc-header,
+  #mc-replying {
+    display: none !important;
+  }
+
+  .mc-msg {
+    break-inside: avoid;
+  }
+}

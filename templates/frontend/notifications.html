@@ -3,130 +3,824 @@
 {% block title %}Notifications - Discussion Hub{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto space-y-8">
-    <!-- Header -->
-    <div>
-        <h1 class="text-3xl font-bold text-foreground mb-2">Notifications</h1>
-        <p class="text-muted-foreground">Your debate requests and discussions</p>
-    </div>
+<style>
+    .nf-page {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    .nf-title,
+    .nf-debate-title {
+        font-family: 'Playfair Display', Georgia, serif;
+    }
+    @keyframes nf-fade-up {
+        from {
+            opacity: 0;
+            transform: translateY(18px) scale(0.985);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+    @keyframes nf-glow-drift {
+        0%,
+        100% {
+            transform: translate3d(0, 0, 0);
+        }
+        50% {
+            transform: translate3d(0, -6px, 0);
+        }
+    }
+    .nf-reveal {
+        opacity: 0;
+        animation: nf-fade-up 560ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        animation-delay: var(--nf-delay, 0ms);
+        will-change: transform, opacity;
+    }
+    .nf-hero {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid hsl(var(--border) / 0.8);
+        border-radius: 32px;
+        padding: 1.5rem;
+        background:
+            radial-gradient(900px 320px at 0% 0%, hsl(var(--primary) / 0.16), transparent 65%),
+            radial-gradient(700px 280px at 100% 100%, hsl(var(--accent) / 0.12), transparent 65%),
+            linear-gradient(160deg, hsl(var(--card) / 0.97), hsl(var(--background) / 0.97));
+        box-shadow: 0 28px 70px -40px rgba(15, 23, 42, 0.55);
+    }
+    .nf-hero::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(120deg, rgba(255,255,255,0.06), transparent 34%, rgba(255,255,255,0.03));
+    }
+    .nf-hero::before {
+        content: "";
+        position: absolute;
+        width: 240px;
+        height: 240px;
+        right: -40px;
+        top: -60px;
+        border-radius: 999px;
+        background: radial-gradient(circle, hsl(var(--accent) / 0.18), transparent 68%);
+        filter: blur(6px);
+        animation: nf-glow-drift 8s ease-in-out infinite;
+        pointer-events: none;
+    }
+    .nf-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        border-radius: 999px;
+        border: 1px solid hsl(var(--border));
+        background: hsl(var(--background) / 0.68);
+        padding: 0.42rem 0.8rem;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: hsl(var(--muted-foreground));
+    }
+    .nf-title {
+        margin-top: 1rem;
+        font-size: clamp(2.2rem, 5vw, 4.4rem);
+        line-height: 0.94;
+        font-weight: 700;
+        letter-spacing: -0.026em;
+        color: hsl(var(--foreground));
+    }
+    .nf-subtitle {
+        margin-top: 0.85rem;
+        max-width: 52rem;
+        font-size: clamp(0.98rem, 1.5vw, 1.18rem);
+        line-height: 1.68;
+        letter-spacing: 0.004em;
+        color: hsl(var(--muted-foreground));
+    }
+    .nf-stats {
+        margin-top: 1.2rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+    .nf-stat {
+        min-width: 132px;
+        border-radius: 22px;
+        border: 1px solid hsl(var(--border));
+        background: hsl(var(--background) / 0.66);
+        padding: 0.9rem 1rem;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+    }
+    .nf-stat:hover {
+        transform: translateY(-3px);
+        border-color: hsl(var(--primary) / 0.28);
+        box-shadow: 0 18px 40px -30px hsl(var(--primary) / 0.55);
+    }
+    .nf-stat-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: hsl(var(--muted-foreground));
+    }
+    .nf-stat-value {
+        margin-top: 0.28rem;
+        font-size: 1.6rem;
+        line-height: 1;
+        font-weight: 800;
+        color: hsl(var(--foreground));
+    }
+    .nf-section {
+        border: 1px solid hsl(var(--border) / 0.8);
+        border-radius: 30px;
+        padding: 1.35rem;
+        background: linear-gradient(180deg, hsl(var(--card) / 0.98), hsl(var(--background) / 0.96));
+        box-shadow: 0 18px 50px -38px rgba(15, 23, 42, 0.5);
+    }
+    .nf-section-head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    .nf-section-title {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        font-size: clamp(1.08rem, 2vw, 1.35rem);
+        font-weight: 800;
+        color: hsl(var(--foreground));
+    }
+    .nf-section-title span:first-child {
+        display: inline-flex;
+        width: 2.3rem;
+        height: 2.3rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 18px;
+        background: linear-gradient(135deg, hsl(var(--primary) / 0.18), hsl(var(--accent) / 0.18));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .nf-section-caption {
+        font-size: 0.9rem;
+        color: hsl(var(--muted-foreground));
+    }
+    .nf-stream {
+        display: grid;
+        gap: 1rem;
+    }
+    .nf-post-card,
+    .nf-debate-card {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid hsl(var(--border));
+        border-radius: 26px;
+        background: linear-gradient(180deg, hsl(var(--card) / 0.96), hsl(var(--background) / 0.92));
+        transition: transform 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
+    }
+    .nf-post-card::before,
+    .nf-debate-card::before {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 4px;
+        background: linear-gradient(180deg, hsl(var(--primary)), hsl(var(--accent)));
+        opacity: 0.75;
+    }
+    .nf-post-card::after,
+    .nf-debate-card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.045) 30%, transparent 58%);
+        opacity: 0;
+        transition: opacity 240ms ease;
+    }
+    .nf-post-card:hover,
+    .nf-debate-card:hover {
+        transform: translateY(-4px);
+        border-color: hsl(var(--primary) / 0.26);
+        box-shadow: 0 24px 52px -36px rgba(15, 23, 42, 0.58);
+    }
+    .nf-post-card:hover::after,
+    .nf-debate-card:hover::after {
+        opacity: 1;
+    }
+    .nf-post-card {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem 1rem 1rem 1.05rem;
+    }
+    .nf-post-icon {
+        width: 2.7rem;
+        height: 2.7rem;
+        border-radius: 18px;
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, hsl(var(--primary) / 0.18), hsl(var(--accent) / 0.18));
+        color: hsl(var(--foreground));
+        font-size: 1.05rem;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 10px 25px -18px rgba(15, 23, 42, 0.45);
+    }
+    .nf-post-main {
+        min-width: 0;
+        flex: 1;
+    }
+    .nf-post-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.8rem;
+    }
+    .nf-dot {
+        width: 0.7rem;
+        height: 0.7rem;
+        border-radius: 999px;
+        background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+        box-shadow: 0 0 0 5px hsl(var(--primary) / 0.12);
+        margin-top: 0.36rem;
+        flex-shrink: 0;
+    }
+    .nf-post-message {
+        font-size: 1rem;
+        line-height: 1.62;
+        letter-spacing: 0.003em;
+        color: hsl(var(--foreground));
+    }
+    .nf-post-meta {
+        margin-top: 0.7rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 0.8rem;
+        font-size: 0.82rem;
+        color: hsl(var(--muted-foreground));
+    }
+    .nf-link {
+        color: hsl(var(--primary));
+        font-weight: 700;
+        transition: color 160ms ease;
+    }
+    .nf-link:hover {
+        color: hsl(var(--accent));
+    }
+    .nf-button,
+    .nf-button-ghost,
+    .nf-button-danger,
+    .nf-button-soft {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        border-radius: 999px;
+        padding: 0.72rem 1rem;
+        font-size: 0.82rem;
+        font-weight: 700;
+        letter-spacing: 0.016em;
+        line-height: 1;
+        transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, color 160ms ease, background 160ms ease;
+    }
+    .nf-button:hover,
+    .nf-button-ghost:hover,
+    .nf-button-danger:hover,
+    .nf-button-soft:hover {
+        transform: translateY(-1px);
+    }
+    .nf-button {
+        border: 1px solid transparent;
+        color: hsl(var(--primary-foreground));
+        background: linear-gradient(135deg, hsl(var(--primary)), hsl(186 72% 42%) 58%, hsl(var(--accent)));
+        box-shadow: 0 12px 26px -16px hsl(var(--primary) / 0.75);
+    }
+    .nf-button-ghost {
+        border: 1px solid hsl(var(--border));
+        color: hsl(var(--foreground));
+        background: hsl(var(--background) / 0.72);
+    }
+    .nf-button-soft {
+        border: 1px solid rgba(239, 68, 68, 0.28);
+        color: #dc2626;
+        background: rgba(239, 68, 68, 0.08);
+    }
+    .nf-button-danger {
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #ffffff;
+        background: linear-gradient(135deg, #dc2626, #b91c1c);
+        box-shadow: 0 12px 24px -16px rgba(220, 38, 38, 0.75);
+    }
+    .nf-debate-card {
+        padding: 1.15rem;
+    }
+    .nf-debate-shell {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        min-width: 0;
+    }
+    .nf-avatar {
+        width: 3.1rem;
+        height: 3.1rem;
+        border-radius: 20px;
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, hsl(var(--primary)), hsl(186 72% 42%) 55%, hsl(var(--accent)));
+        color: hsl(var(--primary-foreground));
+        font-size: 1rem;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        box-shadow: 0 16px 34px -24px hsl(var(--primary) / 0.8);
+    }
+    .nf-debate-main {
+        min-width: 0;
+        flex: 1;
+    }
+    .nf-debate-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 1rem;
+        align-items: start;
+    }
+    .nf-debate-summary {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem 0.55rem;
+        font-size: 0.9rem;
+        color: hsl(var(--muted-foreground));
+    }
+    .nf-debate-user {
+        color: hsl(var(--foreground));
+        font-weight: 800;
+    }
+    .nf-debate-title {
+        display: inline-block;
+        margin-top: 0.72rem;
+        font-size: clamp(1.15rem, 2vw, 1.65rem);
+        line-height: 1.14;
+        font-weight: 700;
+        letter-spacing: -0.015em;
+        color: hsl(var(--foreground));
+    }
+    .nf-debate-excerpt {
+        margin-top: 0.8rem;
+        max-width: 62ch;
+        font-size: 0.98rem;
+        line-height: 1.74;
+        letter-spacing: 0.002em;
+        color: hsl(var(--muted-foreground));
+    }
+    .nf-quote {
+        margin-top: 0.9rem;
+        border-radius: 20px;
+        border: 1px solid hsl(var(--border));
+        background: linear-gradient(180deg, hsl(var(--background) / 0.74), hsl(var(--background) / 0.56));
+        padding: 0.9rem 1rem;
+    }
+    .nf-quote-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.7rem;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: hsl(var(--muted-foreground));
+    }
+    .nf-quote-copy {
+        margin-top: 0.55rem;
+        font-size: 0.98rem;
+        line-height: 1.75;
+        color: hsl(var(--foreground));
+    }
+    .nf-meta-row {
+        margin-top: 1rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        align-items: center;
+    }
+    .nf-action-stack {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.8rem;
+    }
+    .nf-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.38rem;
+        border-radius: 999px;
+        border: 1px solid hsl(var(--border));
+        background: hsl(var(--background) / 0.68);
+        padding: 0.46rem 0.75rem;
+        font-size: 0.76rem;
+        font-weight: 700;
+        color: hsl(var(--muted-foreground));
+    }
+    .nf-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.38rem;
+        border-radius: 999px;
+        padding: 0.5rem 0.88rem;
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        border: 1px solid transparent;
+    }
+    .nf-status.pending {
+        color: #a16207;
+        background: rgba(245, 158, 11, 0.14);
+        border-color: rgba(245, 158, 11, 0.3);
+    }
+    .nf-status.accepted {
+        color: #166534;
+        background: rgba(34, 197, 94, 0.14);
+        border-color: rgba(34, 197, 94, 0.3);
+    }
+    .nf-status.rejected {
+        color: #b91c1c;
+        background: rgba(239, 68, 68, 0.14);
+        border-color: rgba(239, 68, 68, 0.3);
+    }
+    .nf-debate-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+        justify-content: flex-end;
+    }
+    .nf-debate-controls {
+        margin-top: 1rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+    }
+    .nf-participants {
+        margin-top: 1rem;
+        border-radius: 22px;
+        border: 1px solid hsl(var(--border));
+        background: hsl(var(--background) / 0.45);
+        padding: 0.95rem;
+    }
+    .nf-participants-title {
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: hsl(var(--muted-foreground));
+    }
+    .nf-participant-list {
+        margin-top: 0.75rem;
+        display: grid;
+        gap: 0.65rem;
+    }
+    .nf-participant {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        border-radius: 18px;
+        border: 1px solid hsl(var(--border));
+        background: hsl(var(--card) / 0.72);
+        padding: 0.78rem 0.82rem;
+    }
+    .nf-participant-name {
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: hsl(var(--foreground));
+    }
+    .nf-participant-side {
+        margin-top: 0.15rem;
+        font-size: 0.76rem;
+        color: hsl(var(--muted-foreground));
+    }
+    .nf-empty {
+        text-align: center;
+        border-radius: 32px;
+        border: 1px solid hsl(var(--border));
+        background:
+            radial-gradient(520px 180px at 50% 0%, hsl(var(--primary) / 0.12), transparent 70%),
+            linear-gradient(180deg, hsl(var(--card) / 0.98), hsl(var(--background) / 0.96));
+        padding: 3.2rem 1.5rem;
+    }
+    .nf-empty-mark {
+        font-size: 3rem;
+        line-height: 1;
+    }
+    .nf-empty-title {
+        margin-top: 1rem;
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: hsl(var(--foreground));
+    }
+    .nf-empty-copy {
+        margin-top: 0.6rem;
+        color: hsl(var(--muted-foreground));
+        line-height: 1.7;
+    }
+    .nf-empty-action {
+        margin-top: 1.2rem;
+    }
+    .nf-stats .nf-stat:nth-child(1) {
+        --nf-delay: 120ms;
+    }
+    .nf-stats .nf-stat:nth-child(2) {
+        --nf-delay: 180ms;
+    }
+    .nf-stream > *:nth-child(1) {
+        --nf-delay: 70ms;
+    }
+    .nf-stream > *:nth-child(2) {
+        --nf-delay: 130ms;
+    }
+    .nf-stream > *:nth-child(3) {
+        --nf-delay: 190ms;
+    }
+    .nf-stream > *:nth-child(4) {
+        --nf-delay: 250ms;
+    }
+    .nf-stream > *:nth-child(5) {
+        --nf-delay: 310ms;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .nf-reveal,
+        .nf-hero::before {
+            animation: none !important;
+            opacity: 1;
+        }
+        .nf-stat,
+        .nf-post-card,
+        .nf-debate-card,
+        .nf-button,
+        .nf-button-ghost,
+        .nf-button-danger,
+        .nf-button-soft {
+            transition: none !important;
+            transform: none !important;
+        }
+    }
+    @media (max-width: 900px) {
+        .nf-debate-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+        .nf-action-stack {
+            align-items: flex-start;
+        }
+        .nf-debate-actions {
+            justify-content: flex-start;
+        }
+    }
+    @media (max-width: 640px) {
+        .nf-page {
+            gap: 1rem;
+        }
+        .nf-title {
+            font-size: clamp(1.95rem, 9vw, 2.7rem);
+            line-height: 0.98;
+        }
+        .nf-subtitle {
+            font-size: 0.96rem;
+            line-height: 1.64;
+            max-width: 100%;
+        }
+        .nf-hero,
+        .nf-section,
+        .nf-empty {
+            border-radius: 24px;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        .nf-section {
+            padding-top: 1.1rem;
+            padding-bottom: 1.1rem;
+        }
+        .nf-post-card {
+            flex-direction: column;
+        }
+        .nf-post-row,
+        .nf-debate-shell {
+            gap: 0.75rem;
+        }
+        .nf-post-card > button {
+            width: 100%;
+        }
+        .nf-debate-card {
+            padding: 1rem;
+        }
+        .nf-debate-actions,
+        .nf-debate-controls {
+            width: 100%;
+        }
+        .nf-debate-actions > *,
+        .nf-debate-controls > * {
+            flex: 1 1 calc(50% - 0.4rem);
+        }
+        .nf-participant {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .nf-participant button {
+            width: 100%;
+        }
+    }
+</style>
 
-    <!-- Debates List -->
-    {% if debates %}
-    <div class="space-y-4">
-        {% for debate in debates %}
-        <div class="bg-card border border-border rounded-2xl p-6" data-debate-id="{{ debate.id }}">
-            <div class="flex items-start justify-between">
-                <div class="flex-1">
-                    <div class="flex items-center space-x-2 mb-2">
-                        {% if debate.initiator == user %}
-                        <span class="text-sm text-muted-foreground">You challenged</span>
-                        <span class="font-medium text-foreground">{{ debate.target.username }}</span>
-                        {% else %}
-                        <span class="font-medium text-foreground">{{ debate.initiator.username }}</span>
-                        <span class="text-sm text-muted-foreground">challenged you</span>
-                        {% endif %}
-                        <span class="text-sm text-muted-foreground">in</span>
-                        <a href="{% url 'discussion' debate.post.id %}" class="text-primary hover:text-primary/80 font-medium">
-                            "{{ debate.post.title|truncatechars:50 }}"
-                        </a>
-                    </div>
+<div class="nf-page">
+    <section class="nf-hero nf-reveal">
+        <div class="nf-eyebrow">Signal Center</div>
+        <h1 class="nf-title">Notifications</h1>
+        <p class="nf-subtitle">Track debate requests, accepted conversations, and post activity from one cleaner command surface.</p>
+        <div class="nf-stats">
+            <div class="nf-stat nf-reveal">
+                <div class="nf-stat-label">Debate Threads</div>
+                <div class="nf-stat-value">{{ debates|length }}</div>
+            </div>
+            <div class="nf-stat nf-reveal">
+                <div class="nf-stat-label">Post Alerts</div>
+                <div class="nf-stat-value">{{ post_notifications|length }}</div>
+            </div>
+        </div>
+    </section>
 
-                    <p class="text-muted-foreground mb-3">
-                        "{{ debate.comment.content|truncatechars:100 }}" - {{ debate.comment.user.username }}
-                    </p>
-
-                    <div class="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <span>{{ debate.created_at|date:"M j, Y g:i A" }}</span>
-                        {% if debate.status == 'accepted' %}
-                        <span>Yes {{ debate.yes_supporters }}</span>
-                        <span>No {{ debate.no_supporters }}</span>
-                        {% endif %}
-                        <span id="debate-status-{{ debate.id }}" class="px-2 py-1 rounded-full text-xs
-                            {% if debate.status == 'pending' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200{% endif %}
-                            {% if debate.status == 'accepted' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}
-                            {% if debate.status == 'rejected' %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% endif %}">
-                            {{ debate.status|title }}
-                        </span>
-                    </div>
+    {% if post_notifications or debates %}
+        {% if post_notifications %}
+        <section class="nf-section nf-reveal" style="--nf-delay: 120ms;">
+            <div class="nf-section-head">
+                <div>
+                    <div class="nf-section-title"><span>🔔</span><span>Post Activity</span></div>
+                    <p class="nf-section-caption">Fresh comment and follow updates tied to discussions you care about.</p>
                 </div>
-
-                {% if debate.status == 'pending' and debate.target == user %}
-                <div id="debate-actions-{{ debate.id }}" class="flex space-x-2 ml-4">
-                    <button type="button" onclick="acceptDebate('{{ debate.id }}')" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 text-sm">
-                        Accept
-                    </button>
-                    <form method="post" action="{% url 'reject_debate' debate.id %}" class="inline">
-                        {% csrf_token %}
-                        <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 text-sm">
-                            Reject
-                        </button>
-                    </form>
-                </div>
-                {% elif debate.status == 'accepted' %}
-                <div class="ml-4">
-                    <!-- Desktop: opens floating panel. Mobile: navigate to full page -->
-                    {% if debate.user_can_post or debate.user_is_view_only %}
+            </div>
+            <div class="nf-stream">
+                {% for notif in post_notifications %}
+                <article class="nf-post-card nf-reveal" id="post-notif-{{ notif.id }}" data-post-id="{{ notif.post.id }}">
+                    <div class="nf-post-main">
+                        <div class="nf-post-row">
+                            <span class="nf-post-icon">🔔</span>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    {% if not notif.is_read %}
+                                    <span class="nf-dot"></span>
+                                    {% endif %}
+                                    <p class="nf-post-message">{{ notif.message }}</p>
+                                </div>
+                                <div class="nf-post-meta">
+                                    <a href="{% url 'discussion' notif.post.id %}" class="nf-link">{{ notif.post.title|truncatechars:72 }}</a>
+                                    <span>{{ notif.created_at|date:"M j, Y g:i A" }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <button
-                        onclick="openDebateChat('{{ debate.id }}', '{{ debate.post.title|escapejs }}', '{% if user == debate.initiator %}{{ debate.target.username|escapejs }}{% else %}{{ debate.initiator.username|escapejs }}{% endif %}', {{ debate.yes_supporters }}, {{ debate.no_supporters }}, {% if debate.user_is_active_participant %}true{% else %}false{% endif %}, {% if debate.user_can_end %}true{% else %}false{% endif %}, '{{ debate.status }}', {% if debate.user_can_post %}true{% else %}false{% endif %}, {% if debate.user_can_rejoin %}true{% else %}false{% endif %}, {% if debate.user_is_view_only %}true{% else %}false{% endif %}, {% if debate.user_can_moderate %}true{% else %}false{% endif %})"
-                        class="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition shadow-sm">
-                        <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                        {% if debate.user_is_view_only %}View Conversation{% else %}Open Chat{% endif %}
+                        type="button"
+                        class="nf-button-ghost"
+                        onclick="unfollowPostFromNotif('{{ notif.post.id }}', '{{ notif.post.title|escapejs }}', this)"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.437L4 17h5m6 0a3 3 0 11-6 0m6 0H9"/>
+                        </svg>
+                        Unfollow Post
                     </button>
-                    {% endif %}
-                    <div class="mt-2 flex flex-wrap gap-2">
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        {% if debates %}
+        <section class="nf-section nf-reveal" style="--nf-delay: 180ms;">
+            <div class="nf-section-head">
+                <div>
+                    <div class="nf-section-title"><span>⚔️</span><span>Debate Requests</span></div>
+                    <p class="nf-section-caption">Incoming challenges, resolved requests, and active conversation controls.</p>
+                </div>
+            </div>
+            <div class="nf-stream">
+                {% for debate in debates %}
+                <article class="nf-debate-card nf-reveal" data-debate-id="{{ debate.id }}">
+                    <div class="nf-debate-grid">
+                        <div class="nf-debate-shell">
+                            <div class="nf-avatar">
+                                {% if debate.initiator == user %}
+                                {{ debate.target.username|slice:":2"|upper }}
+                                {% else %}
+                                {{ debate.initiator.username|slice:":2"|upper }}
+                                {% endif %}
+                            </div>
+                            <div class="nf-debate-main">
+                                <div class="nf-debate-summary">
+                                    {% if debate.initiator == user %}
+                                    <span>You challenged</span>
+                                    <span class="nf-debate-user">{{ debate.target.username }}</span>
+                                    {% else %}
+                                    <span class="nf-debate-user">{{ debate.initiator.username }}</span>
+                                    <span>challenged you</span>
+                                    {% endif %}
+                                    <span>in</span>
+                                </div>
+                                <a href="{% url 'discussion' debate.post.id %}" class="nf-debate-title">{{ debate.post.title|truncatechars:88 }}</a>
+                                <p class="nf-debate-excerpt">The challenge is anchored to a specific comment and can turn into a live conversation with moderators, limits, and active participants.</p>
+                                <div class="nf-quote">
+                                    <div class="nf-quote-label">Quoted Argument</div>
+                                    <p class="nf-quote-copy">"{{ debate.comment.content|truncatechars:150 }}" - {{ debate.comment.user.username }}</p>
+                                </div>
+                                <div class="nf-meta-row">
+                                    <span class="nf-chip">{{ debate.created_at|date:"M j, Y g:i A" }}</span>
+                                    {% if debate.status == 'accepted' %}
+                                    <span class="nf-chip">Yes {{ debate.yes_supporters }}</span>
+                                    <span class="nf-chip">No {{ debate.no_supporters }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="nf-action-stack">
+                            <span id="debate-status-{{ debate.id }}" class="nf-status {% if debate.status == 'pending' %}pending{% elif debate.status == 'accepted' %}accepted{% else %}rejected{% endif %}">{{ debate.status|title }}</span>
+
+                            {% if debate.status == 'pending' and debate.target == user %}
+                            <div id="debate-actions-{{ debate.id }}" class="nf-debate-actions">
+                                <button type="button" onclick="acceptDebate('{{ debate.id }}')" class="nf-button">Accept</button>
+                                <form method="post" action="{% url 'reject_debate' debate.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="nf-button-danger">Reject</button>
+                                </form>
+                            </div>
+                            {% elif debate.status == 'accepted' %}
+                            <div class="nf-debate-actions">
+                                {% if debate.user_can_post or debate.user_is_view_only %}
+                                <button
+                                    onclick="openDebateChat('{{ debate.id }}', '{{ debate.post.title|escapejs }}', '{% if user == debate.initiator %}{{ debate.target.username|escapejs }}{% else %}{{ debate.initiator.username|escapejs }}{% endif %}', {{ debate.yes_supporters }}, {{ debate.no_supporters }}, {% if debate.user_is_active_participant %}true{% else %}false{% endif %}, {% if debate.user_can_end %}true{% else %}false{% endif %}, '{{ debate.status }}', {% if debate.user_can_post %}true{% else %}false{% endif %}, {% if debate.user_can_rejoin %}true{% else %}false{% endif %}, {% if debate.user_is_view_only %}true{% else %}false{% endif %}, {% if debate.user_can_moderate %}true{% else %}false{% endif %})"
+                                    class="nf-button"
+                                >
+                                    {% if debate.user_is_view_only %}View Conversation{% else %}Open Chat{% endif %}
+                                </button>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if debate.status == 'accepted' %}
+                    <div class="nf-debate-controls">
                         {% if debate.user_can_leave %}
-                        <button type="button" onclick="leaveDebate('{{ debate.id }}')" class="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary transition">
-                            Leave
-                        </button>
+                        <button type="button" onclick="leaveDebate('{{ debate.id }}')" class="nf-button-ghost">Leave</button>
                         {% endif %}
                         {% if debate.user_can_rejoin %}
-                        <button type="button" onclick="rejoinDebate('{{ debate.id }}')" class="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary hover:text-primary transition">
-                            Rejoin
-                        </button>
+                        <button type="button" onclick="rejoinDebate('{{ debate.id }}')" class="nf-button-ghost">Rejoin</button>
                         {% endif %}
                         {% if debate.user_can_end %}
-                        <button type="button" onclick="endDebate('{{ debate.id }}')" class="inline-flex items-center rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition">
-                            End Chat
-                        </button>
+                        <button type="button" onclick="endDebate('{{ debate.id }}')" class="nf-button-danger">End Chat</button>
                         {% endif %}
                     </div>
                     {% if debate.user_can_moderate %}
-                    <div class="mt-3 rounded-xl border border-border bg-background/60 p-3">
-                        <p class="text-xs font-semibold text-foreground mb-2">Participant Controls</p>
+                    <div class="nf-participants">
+                        <p class="nf-participants-title">Participant Controls</p>
                         {% if debate.moderatable_participants %}
-                        <div class="space-y-2">
+                        <div class="nf-participant-list">
                             {% for participant in debate.moderatable_participants %}
-                            <div class="flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-card px-2.5 py-2">
+                            <div class="nf-participant">
                                 <div class="min-w-0">
-                                    <p class="text-xs font-semibold text-foreground truncate">{{ participant.user.username }}</p>
-                                    <p class="text-[11px] text-muted-foreground">{{ participant.side|upper }} side</p>
+                                    <p class="nf-participant-name">{{ participant.user.username }}</p>
+                                    <p class="nf-participant-side">{{ participant.side|upper }} side</p>
                                 </div>
-                                <button type="button" onclick="removeParticipantFromDebate('{{ debate.id }}', '{{ participant.user.id }}', '{{ participant.user.username|escapejs }}')" class="inline-flex items-center rounded-lg border border-red-400/50 bg-red-500/10 px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-500/15">
-                                    Remove
-                                </button>
+                                <button type="button" onclick="removeParticipantFromDebate('{{ debate.id }}', '{{ participant.user.id }}', '{{ participant.user.username|escapejs }}')" class="nf-button-soft">Remove</button>
                             </div>
                             {% endfor %}
                         </div>
                         {% else %}
-                        <p class="text-[11px] text-muted-foreground">No other active participants right now.</p>
+                        <p class="mt-3 text-sm text-muted-foreground">No other active participants right now.</p>
                         {% endif %}
                     </div>
                     {% endif %}
-                </div>
-                {% endif %}
+                    {% endif %}
+                </article>
+                {% endfor %}
             </div>
-        </div>
-        {% endfor %}
-    </div>
+        </section>
+        {% endif %}
     {% else %}
-    <div class="text-center py-12">
-        <div class="text-6xl mb-4">🔔</div>
-        <h3 class="text-xl font-semibold text-foreground mb-2">No notifications yet</h3>
-        <p class="text-muted-foreground mb-6">When someone challenges your comments or you challenge others, you'll see them here.</p>
-        <a href="{% url 'index' %}" class="bg-primary text-primary-foreground px-6 py-2 rounded-lg hover:bg-primary/90">
-            Browse Discussions
-        </a>
-    </div>
+    <section class="nf-empty nf-reveal" style="--nf-delay: 140ms;">
+        <div class="nf-empty-mark">🔔</div>
+        <h3 class="nf-empty-title">No notifications yet</h3>
+        <p class="nf-empty-copy">When someone challenges your comment, joins a debate, or activity happens on followed posts, it will appear here.</p>
+        <div class="nf-empty-action">
+            <a href="{% url 'index' %}" class="nf-button">Browse Discussions</a>
+        </div>
+    </section>
     {% endif %}
 </div>
 
@@ -266,12 +960,12 @@ function _openAcceptedDebateChat(debateId) {
 function _markDebateRowAccepted(debateId) {
     const actionsEl = document.getElementById('debate-actions-' + debateId);
     if (actionsEl) {
-        actionsEl.outerHTML = '<div class="ml-4"><button type="button" onclick="window.ChatManager && window.ChatManager.open(\'' + debateId + '\')" class="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition shadow-sm"><svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>Open Chat</button></div>';
+        actionsEl.outerHTML = '<div class="nf-debate-actions"><button type="button" onclick="window.ChatManager && window.ChatManager.open(\'' + debateId + '\')" class="nf-button">Open Chat</button></div>';
     }
     const statusEl = document.getElementById('debate-status-' + debateId);
     if (statusEl) {
         statusEl.textContent = 'Accepted';
-        statusEl.className = 'px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+        statusEl.className = 'nf-status accepted';
     }
 }
 
@@ -398,6 +1092,34 @@ function removeParticipantFromDebate(debateId, userId, username) {
         }
     })
     .catch(() => window.showToast('Failed to remove participant.', 'error'));
+}
+
+async function unfollowPostFromNotif(postId, postTitle, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Unfollowing…';
+    try {
+        const resp = await fetch('/notifications/unfollow-post/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
+            },
+            body: new URLSearchParams({ post_id: postId }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+            document.querySelectorAll('[data-post-id="' + CSS.escape(String(postId)) + '"]').forEach(card => card.remove());
+            window.showToast && window.showToast('You will no longer get notifications for "' + postTitle + '".', 'success');
+        } else {
+            btn.disabled = false;
+            btn.textContent = 'Unfollow post';
+            window.showToast && window.showToast(data.error || 'Could not unfollow.', 'error');
+        }
+    } catch {
+        btn.disabled = false;
+        btn.textContent = 'Unfollow post';
+        window.showToast && window.showToast('Network error — try again.', 'error');
+    }
 }
 </script>
 {% endblock %}

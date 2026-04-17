@@ -55,6 +55,17 @@
                 </select>
             </div>
 
+            <div>
+                <label for="hashtags" class="block text-sm font-medium text-foreground mb-2">Hashtags (Optional)</label>
+                  <input type="text" id="hashtags" name="hashtags" autocomplete="off"
+                       class="w-full rounded-2xl border border-border bg-background px-4 py-3 text-foreground text-sm shadow-sm placeholder-muted-foreground/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                                            placeholder="#technology #ai #learning (space or comma separated, max 5)">
+                <div id="hashtags-current-counter" class="mt-1 text-xs text-muted-foreground">Current tag: 0/40</div>
+                  <div id="hashtags-suggestions" class="hidden mt-2 rounded-xl border border-border bg-card shadow-md overflow-hidden"></div>
+                                    <p class="text-xs text-muted-foreground mt-1">Type hashtag words to get suggestions. Max 40 characters per hashtag. Example: #ai #business #travel</p>
+                                    <p id="hashtags-error" class="hidden text-xs text-red-500 mt-1"></p>
+            </div>
+
             <button type="submit" id="submit-btn"
                     class="w-full rounded-full bg-primary text-primary-foreground px-6 py-3 text-sm font-semibold hover:bg-primary/90 transition">
                 Post Question
@@ -71,6 +82,13 @@
     const titleInput = document.getElementById('title');
     const charCount = document.getElementById('char-count');
     const submitBtn = document.getElementById('submit-btn');
+    const askForm = document.getElementById('ask-form');
+    const hashtagsInput = document.getElementById('hashtags');
+    const hashtagsCurrentCounter = document.getElementById('hashtags-current-counter');
+    const hashtagsSuggestions = document.getElementById('hashtags-suggestions');
+    const hashtagsError = document.getElementById('hashtags-error');
+    const HASHTAG_MAX_LENGTH = 40;
+    let hashtagDebounce = null;
 
     titleInput.addEventListener('input', function() {
         charCount.textContent = this.value.length;
@@ -88,6 +106,142 @@
         } else {
             submitBtn.classList.remove('opacity-70');
             submitBtn.title = '';
+        }
+    });
+
+    function getHashtagFragment(value) {
+        const match = value.match(/(?:^|[\s,])#?([A-Za-z0-9_]*)$/);
+        return match ? match[1].toLowerCase() : '';
+    }
+
+    function updateCurrentHashtagCounter() {
+        const fragment = getHashtagFragment(hashtagsInput.value);
+        const length = fragment.length;
+        hashtagsCurrentCounter.textContent = `Current tag: ${length}/${HASHTAG_MAX_LENGTH}`;
+
+        hashtagsCurrentCounter.classList.remove('text-muted-foreground', 'text-amber-500', 'text-red-500');
+        if (length > HASHTAG_MAX_LENGTH) {
+            hashtagsCurrentCounter.classList.add('text-red-500');
+        } else if (length >= Math.floor(HASHTAG_MAX_LENGTH * 0.75)) {
+            hashtagsCurrentCounter.classList.add('text-amber-500');
+        } else {
+            hashtagsCurrentCounter.classList.add('text-muted-foreground');
+        }
+    }
+
+    function getLongHashtags(value) {
+        const tokens = (value.match(/#?[A-Za-z0-9_]+/g) || []).map(function(token) {
+            return token.replace(/^#/, '');
+        });
+        return tokens.filter(function(tag) {
+            return tag.length > HASHTAG_MAX_LENGTH;
+        });
+    }
+
+    function validateHashtagsInput() {
+        const longTags = getLongHashtags(hashtagsInput.value);
+        if (longTags.length) {
+            hashtagsError.textContent = `Each hashtag must be at most ${HASHTAG_MAX_LENGTH} characters.`;
+            hashtagsError.classList.remove('hidden');
+            return false;
+        }
+        hashtagsError.textContent = '';
+        hashtagsError.classList.add('hidden');
+        return true;
+    }
+
+    function hideHashtagSuggestions() {
+        hashtagsSuggestions.classList.add('hidden');
+        hashtagsSuggestions.innerHTML = '';
+    }
+
+    function applyHashtagSuggestion(tag) {
+        const current = hashtagsInput.value;
+        hashtagsInput.value = current.replace(/(?:^|[\s,])#?[A-Za-z0-9_]*$/, function(part) {
+            const prefixMatch = part.match(/^[\s,]*/);
+            const prefix = prefixMatch ? prefixMatch[0] : '';
+            return `${prefix}#${tag} `;
+        });
+        hideHashtagSuggestions();
+        hashtagsInput.focus();
+    }
+
+    function renderHashtagSuggestions(items) {
+        if (!items.length) {
+            hideHashtagSuggestions();
+            return;
+        }
+
+        hashtagsSuggestions.innerHTML = items.map(function(item) {
+            return `
+                <button type="button" data-tag="${item.tag}" class="w-full text-left px-3 py-2 hover:bg-secondary/60 transition flex items-center justify-between">
+                    <span class="text-sm text-foreground">#${item.tag}</span>
+                    <span class="text-xs text-muted-foreground">${item.count} post${item.count === 1 ? '' : 's'}</span>
+                </button>
+            `;
+        }).join('');
+
+        hashtagsSuggestions.classList.remove('hidden');
+
+        hashtagsSuggestions.querySelectorAll('button[data-tag]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                applyHashtagSuggestion(this.getAttribute('data-tag'));
+            });
+        });
+    }
+
+    hashtagsInput.addEventListener('input', function() {
+        updateCurrentHashtagCounter();
+        validateHashtagsInput();
+        const fragment = getHashtagFragment(this.value);
+
+        if (hashtagDebounce) {
+            clearTimeout(hashtagDebounce);
+        }
+
+        if (!fragment) {
+            hideHashtagSuggestions();
+            return;
+        }
+
+        hashtagDebounce = setTimeout(function() {
+            fetch(`/search/hashtags/suggest/?q=${encodeURIComponent(fragment)}`)
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (!data.success) {
+                        hideHashtagSuggestions();
+                        return;
+                    }
+                    renderHashtagSuggestions(data.hashtags || []);
+                })
+                .catch(function() {
+                    hideHashtagSuggestions();
+                });
+        }, 180);
+    });
+
+    hashtagsInput.addEventListener('blur', function() {
+        setTimeout(hideHashtagSuggestions, 120);
+    });
+
+    hashtagsInput.addEventListener('focus', function() {
+        updateCurrentHashtagCounter();
+        if (getHashtagFragment(this.value)) {
+            this.dispatchEvent(new Event('input'));
+        }
+    });
+
+    hashtagsInput.addEventListener('keyup', function() {
+        updateCurrentHashtagCounter();
+    });
+
+    // Initialize counter on first load.
+    updateCurrentHashtagCounter();
+
+    askForm.addEventListener('submit', function(event) {
+        if (!validateHashtagsInput()) {
+            event.preventDefault();
+            hashtagsInput.focus();
         }
     });
 </script>

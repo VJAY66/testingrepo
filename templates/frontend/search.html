@@ -1,19 +1,30 @@
 {% extends 'frontend/base.html' %}
 
-{% block title %}Search - Discussion Hub{% endblock %}
+{% block title %}{% if is_hashtag_search %}#{{ tag }}{% else %}Search{% endif %} - Discussion Hub{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-8">
     <!-- Search Header -->
     <div>
+        {% if is_hashtag_search %}
+        <h1 class="text-3xl font-bold text-foreground mb-4">Posts with <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 via-teal-500 to-amber-500">#{{ tag }}</span></h1>
+        {% else %}
         <h1 class="text-3xl font-bold text-foreground mb-4">Search Discussions</h1>
+        {% endif %}
 
         <!-- Search Form -->
         <form method="get" class="mb-8">
+            {% if is_hashtag_search %}
+            <input type="hidden" name="tag" value="{{ tag }}">
+            {% endif %}
             <div class="flex space-x-4">
-                <input type="text" name="q" value="{{ query }}"
-                       placeholder="Search for discussions..."
+                {% if is_hashtag_search %}
+                <input type="text" name="tag" value="{{ tag }}" placeholder="Search hashtags..." disabled
+                       class="flex-1 px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent opacity-60 cursor-not-allowed">
+                {% else %}
+                <input type="text" name="q" value="{{ query }}" placeholder="Search for discussions..."
                        class="flex-1 px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                {% endif %}
                 <button type="submit"
                         class="bg-primary text-primary-foreground px-6 py-2 rounded-lg hover:bg-primary/90">
                     Search
@@ -23,11 +34,15 @@
     </div>
 
     <!-- Search Results -->
-    {% if query %}
+    {% if query or is_hashtag_search %}
     <div>
         {% if results %}
         <h2 class="text-xl font-semibold text-foreground mb-4">
+            {% if is_hashtag_search %}
+            Found {{ results.count }} post{{ results.count|pluralize }} with #{{ tag }}
+            {% else %}
             Found {{ results.count }} result{{ results.count|pluralize }} for "{{ query }}"
+            {% endif %}
         </h2>
         <div class="space-y-4">
             {% for post in results %}
@@ -42,6 +57,19 @@
                         <p class="text-muted-foreground mb-3 line-clamp-2">
                             {{ post.content|truncatechars:200 }}
                         </p>
+                        
+                        <!-- Hashtags Display -->
+                        {% if post.hashtags %}
+                        <div class="mb-3 flex flex-wrap gap-2">
+                            {% for hashtag in post.get_hashtags_list %}
+                            <a href="{% url 'hashtag_search' %}?tag={{ hashtag }}" 
+                               class="inline-flex items-center px-2 py-1 rounded-full text-cyan-600 dark:text-cyan-400 text-xs font-medium bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 transition">
+                                <span>#</span>{{ hashtag }}
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
                         <div class="flex items-center space-x-4 text-sm text-muted-foreground">
                             <span>{{ post.created_at|date:"M j, Y" }}</span>
                             <span>{{ post.user.username }}</span>
@@ -58,7 +86,11 @@
         <div class="text-center py-12">
             <div class="text-6xl mb-4">🔍</div>
             <h3 class="text-xl font-semibold text-foreground mb-2">No results found</h3>
+            {% if is_hashtag_search %}
+            <p class="text-muted-foreground">No posts found with #{{ tag }}</p>
+            {% else %}
             <p class="text-muted-foreground">Try different keywords or check your spelling.</p>
+            {% endif %}
         </div>
         {% endif %}
     </div>

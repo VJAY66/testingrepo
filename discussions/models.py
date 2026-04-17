@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+import re
 
 CATEGORY_CHOICES = [
     ('Technology', 'Technology'),
@@ -23,16 +24,41 @@ CATEGORY_CHOICES = [
 ]
 
 class Post(models.Model):
+    HASHTAG_MAX_LENGTH = 40
     id = models.CharField(max_length=36, primary_key=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
     title = models.CharField(max_length=255)
     content = models.TextField()
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
+    hashtags = models.TextField(blank=True, default='', help_text='Comma-separated hashtags')
+    is_edited = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.title
+
+    @staticmethod
+    def parse_hashtags(raw_value, max_tags=5):
+        """Parse hashtags from free text like '#ai #ml,python' into clean unique tags."""
+        if not raw_value:
+            return []
+
+        # Accept both comma-separated and space-separated tags, with or without '#'.
+        tokens = re.findall(r'#?([A-Za-z0-9_]+)', str(raw_value).lower())
+        unique = []
+        seen = set()
+        for token in tokens:
+            if token and len(token) <= Post.HASHTAG_MAX_LENGTH and token not in seen:
+                seen.add(token)
+                unique.append(token)
+            if len(unique) >= max_tags:
+                break
+        return unique
+    
+    def get_hashtags_list(self):
+        """Return hashtags as a clean list even for legacy text formats."""
+        return Post.parse_hashtags(self.hashtags, max_tags=20)
 
     class Meta:
         ordering = ['-created_at']
@@ -50,6 +76,7 @@ class Comment(models.Model):
     vote_type = models.CharField(max_length=10, choices=VOTE_CHOICES)
     likes = models.IntegerField(default=0)
     dislikes = models.IntegerField(default=0)
+    is_edited = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -163,6 +190,44 @@ class PostFollow(models.Model):
         ]
 
 
+class PostView(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='post_views')
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='views')
+    viewed_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} viewed post '{self.post.title}'"
+
+    class Meta:
+        ordering = ['-viewed_at']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'post'], name='unique_post_view'),
+        ]
+
+
+class PostAction(models.Model):
+    ACTION_CHOICES = [
+        ('like', 'Like'),
+        ('save', 'Save'),
+        ('repost', 'Repost'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='post_actions')
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='actions')
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username} {self.action}d post '{self.post.title}'"
+
+    class Meta:
+        ordering = ['-updated_at']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'post', 'action'], name='unique_post_action'),
+        ]
+
+
 class Notification(models.Model):
     NOTIFICATION_TYPES = [
         ('post_comment', 'New Comment on Followed Post'),
@@ -190,6 +255,7 @@ class DebateMessage(models.Model):
     reply_to = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='replies')
     content = models.TextField()
     is_system = models.BooleanField(default=False)
+    is_edited = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -197,3 +263,40 @@ class DebateMessage(models.Model):
 
     class Meta:
         ordering = ['created_at']
+
+
+class PostEditHistory(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='edit_history')
+    original_title = models.CharField(max_length=255)
+    original_content = models.TextField(blank=True)
+    edited_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Edit of post '{self.post_id}' at {self.edited_at}"
+
+    class Meta:
+        ordering = ['-edited_at']
+
+
+class CommentEditHistory(models.Model):
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='edit_history')
+    original_content = models.TextField()
+    edited_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Edit of comment '{self.comment_id}' at {self.edited_at}"
+
+    class Meta:
+        ordering = ['-edited_at']
+
+
+class DebateMessageEditHistory(models.Model):
+    message = models.ForeignKey(DebateMessage, on_delete=models.CASCADE, related_name='edit_history')
+    original_content = models.TextField()
+    edited_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Edit of message '{self.message_id}' at {self.edited_at}"
+
+    class Meta:
+        ordering = ['-edited_at']

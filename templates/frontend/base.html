@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -167,6 +168,39 @@
             background-color: transparent !important;
         }
 
+        .nav-shell {
+            position: sticky;
+            top: 0;
+            z-index: 110;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            background: hsl(var(--card) / 0.86);
+            box-shadow: 0 16px 38px -28px rgba(15, 23, 42, 0.55);
+        }
+
+        @keyframes nav-badge-pop {
+            0% {
+                transform: scale(0.92);
+            }
+            55% {
+                transform: scale(1.14);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        @keyframes nav-panel-in {
+            from {
+                opacity: 0;
+                transform: translateY(-10px) scale(0.985);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
         .nav-icon-pill {
             display: inline-flex;
             align-items: center;
@@ -175,19 +209,36 @@
             height: 2rem;
             border-radius: 999px;
             color: hsl(var(--muted-foreground));
-            background: transparent;
+            background: linear-gradient(180deg, hsl(var(--background) / 0.86), hsl(var(--background) / 0.62));
             border: 1px solid hsl(var(--border));
-            transition: transform 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+            transition: transform 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
         }
 
         .nav-icon-pill:hover {
             transform: translateY(-1px) scale(1.03);
             border-color: hsl(var(--primary));
             color: hsl(var(--primary));
+            background: linear-gradient(180deg, hsl(var(--background) / 0.96), hsl(var(--background) / 0.78));
+            box-shadow: 0 12px 22px -18px hsl(var(--primary) / 0.65), inset 0 1px 0 rgba(255,255,255,0.08);
+        }
+
+        .nav-counter-badge {
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            box-shadow: 0 8px 18px -10px rgba(15, 23, 42, 0.85);
+        }
+        .nav-counter-badge.bump {
+            animation: nav-badge-pop 360ms cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .theme-toggle-label {
             display: none;
+        }
+
+        .theme-toggle-btn {
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
         }
 
         .nav-bar-inner {
@@ -198,6 +249,14 @@
         .nav-brand {
             min-width: 0;
             flex-shrink: 1;
+        }
+
+        .nav-brand a {
+            font-family: 'Playfair Display', Georgia, serif;
+            letter-spacing: 0.01em;
+            font-size: 1.42rem;
+            line-height: 1;
+            font-weight: 700;
         }
 
         .nav-left {
@@ -221,9 +280,9 @@
             border: 1px solid hsl(var(--border));
             background: hsl(var(--background) / 0.6);
             color: hsl(var(--foreground));
-            font-size: 12px;
+            font-size: 12.5px;
             font-weight: 600;
-            padding: 6px 11px;
+            padding: 6px 12px;
             transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
             white-space: nowrap;
         }
@@ -341,9 +400,94 @@
             display: flex;
             align-items: center;
             justify-content: flex-end;
-            gap: 0.75rem;
+            gap: 0.62rem;
             min-width: 0;
             flex-shrink: 0;
+        }
+
+        .nav-mobile-auth {
+            display: none;
+            align-items: center;
+            gap: 0.45rem;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        .nav-mobile-auth-link,
+        .nav-mobile-signup-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 2rem;
+            padding: 0.45rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid hsl(var(--border));
+            font-size: 0.8rem;
+            font-weight: 700;
+            line-height: 1;
+            white-space: nowrap;
+            transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+        }
+
+        .nav-mobile-search-btn {
+            gap: 0.35rem;
+            color: hsl(var(--foreground));
+            background: hsl(var(--background) / 0.72);
+            cursor: pointer;
+        }
+
+        .nav-mobile-search-btn svg {
+            width: 0.88rem;
+            height: 0.88rem;
+        }
+
+        .nav-mobile-search-btn:hover {
+            border-color: hsl(var(--primary));
+            color: hsl(var(--primary));
+        }
+
+        .nav-mobile-auth-link {
+            color: hsl(var(--foreground));
+            background: hsl(var(--background) / 0.72);
+        }
+
+        .nav-mobile-auth-link:hover {
+            border-color: hsl(var(--primary));
+            color: hsl(var(--primary));
+        }
+
+        .nav-mobile-signup-link {
+            border-color: hsl(var(--primary));
+            background: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+        }
+
+        .nav-mobile-signup-link:hover {
+            background: hsl(var(--primary) / 0.88);
+        }
+
+        .nav-mobile-logout-link {
+            color: hsl(var(--foreground));
+            background: hsl(var(--background) / 0.72);
+        }
+
+        .nav-mobile-logout-link:hover {
+            border-color: hsl(var(--primary));
+            background: hsl(var(--background) / 0.92);
+            color: hsl(var(--primary));
+        }
+
+        @media (min-width: 1024px) {
+            .nav-bar-inner {
+                min-height: 4.2rem;
+            }
+            .nav-brand a {
+                font-size: 1.54rem;
+                letter-spacing: 0.012em;
+            }
+            .nav-controls {
+                gap: 0.7rem;
+            }
         }
 
         .nav-logout-link {
@@ -375,7 +519,9 @@
             justify-content: space-between;
             border-radius: 10px;
             padding: 8px 10px;
-            font-size: 13px;
+            font-size: 12.5px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
             color: hsl(var(--foreground));
             border: 1px solid transparent;
         }
@@ -400,8 +546,9 @@
             }
 
             .nav-brand a {
-                font-size: 1rem;
+                font-size: 1.02rem;
                 line-height: 1.2;
+                letter-spacing: 0.008em;
             }
 
             .nav-controls {
@@ -444,6 +591,17 @@
 
             .nav-controls {
                 display: none;
+            }
+
+            .nav-mobile-auth {
+                display: flex;
+            }
+
+            .nav-mobile-auth-link,
+            .nav-mobile-signup-link {
+                padding-left: 0.7rem;
+                padding-right: 0.7rem;
+                font-size: 0.76rem;
             }
         }
 
@@ -603,61 +761,96 @@
         }
 
         .chat-fp {
-            position: fixed; bottom: 0; width: 320px; pointer-events: all;
+            position: fixed; bottom: 16px; width: 360px; pointer-events: all;
             display: flex; flex-direction: column;
-            border-radius: 14px 14px 0 0; overflow: hidden;
-            box-shadow: 0 16px 48px rgba(0,0,0,0.20), 0 4px 14px rgba(0,0,0,0.12);
-            transition: right 0.35s cubic-bezier(.4,0,.2,1);
-            border: 1px solid hsl(var(--border)); border-bottom: none;
+            height: min(62dvh, calc(100dvh - 110px));
+            max-height: calc(100dvh - 110px);
+            border-radius: 22px; overflow: hidden;
+            box-shadow: 0 36px 88px rgba(2, 6, 23, 0.34), 0 12px 28px rgba(2, 6, 23, 0.2),
+                        0 0 0 1px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.1);
+            transition: right 0.38s cubic-bezier(.4,0,.2,1);
+            border: 1px solid transparent;
+            background:
+                linear-gradient(165deg, hsl(var(--card) / 0.98), hsl(var(--background) / 0.98)) padding-box,
+                linear-gradient(135deg, hsl(var(--primary) / 0.55), hsl(var(--accent) / 0.5)) border-box;
             font-family: 'Manrope', sans-serif;
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+        .chat-fp.chat-fp-minimized {
+            height: auto;
+            max-height: none;
+            min-height: 0;
+            border-radius: 20px;
+        }
+        .chat-fp.chat-fp-minimized .chat-fp-body {
+            display: none !important;
         }
         @media (max-width: 767px) { .chat-fp { display: none !important; } }
 
-        .chat-fp-enter { animation: cfpUp 0.3s cubic-bezier(.4,0,.2,1) both; }
+        .chat-fp-enter { animation: cfpUp 0.36s cubic-bezier(.4,0,.2,1) both; }
         @keyframes cfpUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes msgSlideIn { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
         .chat-fp-header {
-            display: flex; align-items: center; gap: 8px; padding: 8px 10px;
-            background: var(--float-gradient);
+            display: flex; align-items: center; gap: 10px; padding: 11px 12px;
+            background:
+                radial-gradient(520px 120px at 10% -40%, rgba(255,255,255,0.22), transparent 65%),
+                linear-gradient(120deg, hsl(var(--primary) / 0.92), hsl(186 72% 38%) 52%, hsl(var(--accent) / 0.88));
             color: hsl(var(--primary-foreground)); cursor: pointer; user-select: none;
-            min-height: 46px;
+            min-height: 58px;
+            box-shadow: 0 10px 26px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(255,255,255,0.16);
+            position: relative;
         }
         .chat-fp-avatar {
-            width: 30px; height: 30px; border-radius: 50%;
-            background: rgba(255,255,255,0.20); display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 12px; flex-shrink: 0;
-            border: 2px solid rgba(255,255,255,0.32); letter-spacing: 0;
+            width: 36px; height: 36px; border-radius: 50%;
+            background: rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 14px; flex-shrink: 0;
+            border: 2px solid rgba(255,255,255,0.42); letter-spacing: 0;
+            box-shadow: 0 0 0 3px rgba(255,255,255,0.10), 0 2px 8px rgba(0,0,0,0.20);
         }
         .chat-fp-header-info { flex: 1; min-width: 0; }
         .chat-fp-htitle {
-            font-size: 12.5px; font-weight: 600; color: inherit;
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 14.2px; font-weight: 700; color: inherit; letter-spacing: 0.012em;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;
         }
-        .chat-fp-hmeta { font-size: 10.5px; opacity: 0.76; margin-top: 1px; }
+        .chat-fp-hmeta { font-size: 10.8px; opacity: 0.8; margin-top: 2px; letter-spacing: 0.015em; }
         .chat-fp-hacts { display: flex; gap: 4px; }
         .chat-fp-hacts button {
-            background: rgba(255,255,255,0.14); border: none; color: inherit;
+            background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.24); color: inherit;
             width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
-            font-size: 13px; line-height: 1; transition: background 0.15s; font-family: inherit;
+            font-size: 13px; line-height: 1; transition: background 0.15s, transform 0.15s; font-family: inherit;
         }
-        .chat-fp-hacts button:hover { background: rgba(255,255,255,0.30); }
+        .chat-fp-hacts button:hover { background: rgba(255,255,255,0.30); transform: translateY(-1px); }
 
         .chat-fp-participants-toggle.active {
             background: rgba(255,255,255,0.30);
         }
 
-        .chat-fp-body { display: flex; flex-direction: column; background: hsl(var(--card)); }
+        .chat-fp-body {
+            display: flex; flex-direction: column; flex: 1; min-height: 0;
+            background:
+                radial-gradient(480px 230px at 100% 0%, hsl(var(--primary) / 0.09), transparent 74%),
+                linear-gradient(180deg, hsl(var(--card) / 0.98), hsl(var(--background) / 0.96));
+        }
+        .chat-fp-main {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
 
         .chat-fp-msgs {
-            height: 250px; overflow-y: auto; padding: 8px 8px 4px;
-            display: flex; flex-direction: column; gap: 6px;
-            background: hsl(var(--background));
+            flex: 1; min-height: 0; overflow-y: auto; padding: 14px 13px 9px;
+            display: flex; flex-direction: column; gap: 8px;
+            background: linear-gradient(180deg, hsl(var(--card) / 0.9), hsl(var(--background) / 0.84));
             position: relative;
         }
         .chat-fp-msgs::-webkit-scrollbar { width: 3px; }
         .chat-fp-msgs::-webkit-scrollbar-track { background: transparent; }
-        .chat-fp-msgs::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 2px; }
+        .chat-fp-msgs::-webkit-scrollbar-thumb { background: hsl(var(--primary)/0.38); border-radius: 2px; }
 
         .chat-fp-empty {
             text-align: center; color: hsl(var(--muted-foreground));
@@ -672,12 +865,13 @@
         .chat-fp-date-divider span {
             font-size: 10px;
             color: hsl(var(--muted-foreground));
-            background: hsl(var(--background) / 0.7);
-            border: 1px solid hsl(var(--border));
+            background: hsl(var(--card));
+            border: 1px solid hsl(var(--border)/0.7);
             border-radius: 999px;
-            padding: 2px 8px;
-            opacity: 0.78;
-            letter-spacing: 0.01em;
+            padding: 2px 10px;
+            opacity: 0.88;
+            letter-spacing: 0.05em;
+            font-weight: 600;
         }
         .chat-fp-sticky-date {
             position: sticky;
@@ -686,7 +880,7 @@
             z-index: 3;
             font-size: 10px;
             color: hsl(var(--muted-foreground));
-            background: hsl(var(--background) / 0.82);
+            background: hsl(var(--card));
             border: 1px solid hsl(var(--border));
             border-radius: 999px;
             padding: 2px 8px;
@@ -700,7 +894,7 @@
             transform: translateY(0);
         }
 
-        .chat-fp-msg { display: flex; flex-direction: column; width: 100%; }
+        .chat-fp-msg { display: flex; flex-direction: column; width: 100%; animation: msgSlideIn 0.22s cubic-bezier(.4,0,.2,1) both; }
         .chat-fp-msg.own { align-items: flex-end; }
         .chat-fp-msg.other { align-items: flex-start; }
                 .chat-fp-msg.system { align-items: center; margin: 4px 0; }
@@ -722,31 +916,32 @@
             width: 20px; height: 20px; border-radius: 999px; flex-shrink: 0;
             display: flex; align-items: center; justify-content: center;
             background-image: var(--float-gradient); color: hsl(var(--primary-foreground));
-            font-size: 10px; font-weight: 700; border: 1px solid hsl(var(--border));
+            font-size: 10px; font-weight: 700; border: 1px solid transparent;
         }
 
         .chat-fp-msg.own .chat-fp-msg-avatar,
         .chat-fp-msg.own .chat-fp-msg-avatar-fallback { display: none; }
 
-        .chat-fp-bubble { max-width: 96%; padding: 8px 12px; font-size: 13px; line-height: 1.45; word-break: break-word; }
+        .chat-fp-bubble { max-width: 94%; padding: 10px 14px; font-size: 13.5px; line-height: 1.62; letter-spacing: 0.004em; word-break: break-word; }
         .chat-fp-msg.own .chat-fp-bubble {
-            background-image: var(--float-gradient); color: hsl(var(--primary-foreground));
-            border-radius: 14px 14px 3px 14px;
+            border: 1px solid transparent;
+            background:
+                linear-gradient(150deg, hsl(var(--primary) / 0.14), hsl(var(--primary) / 0.06)) padding-box,
+                linear-gradient(135deg, hsl(var(--primary) / 0.5), hsl(var(--primary) / 0.25)) border-box;
+            color: hsl(var(--foreground));
+            border-radius: 18px 18px 6px 18px;
+            box-shadow: 0 8px 22px hsl(var(--primary)/0.2), 0 2px 7px rgba(0,0,0,0.08);
         }
         .chat-fp-msg.other .chat-fp-bubble {
-            background: #ffffff; color: #111827;
-            border-radius: 14px 14px 14px 3px;
-            box-shadow: inset 0 0 0 1px rgba(148,163,184,0.38);
+            border: 1px solid transparent;
+            background:
+                linear-gradient(145deg, hsl(var(--card) / 0.95), hsl(var(--card) / 0.8)) padding-box,
+                linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.06)) border-box;
+            color: hsl(var(--foreground));
+            border-radius: 18px 18px 18px 6px;
+            box-shadow: 0 5px 14px rgba(2, 6, 23, 0.12);
         }
-        .chat-fp-msg.other.sender-v1 .chat-fp-bubble { background: #f8fafc; }
-        .chat-fp-msg.other.sender-v2 .chat-fp-bubble { background: #eefaf8; }
-        .chat-fp-msg.other.sender-v3 .chat-fp-bubble { background: #fff7ed; }
-        .chat-fp-msg.other.sender-v4 .chat-fp-bubble { background: #f0fdf4; }
-        html[data-theme="dark"] .chat-fp-msg.other .chat-fp-bubble { background: #1f2937; color: #e5e7eb; box-shadow: inset 0 0 0 1px rgba(100,116,139,0.5); }
-        html[data-theme="dark"] .chat-fp-msg.other.sender-v1 .chat-fp-bubble { background: #1f2937; }
-        html[data-theme="dark"] .chat-fp-msg.other.sender-v2 .chat-fp-bubble { background: #1c3135; }
-        html[data-theme="dark"] .chat-fp-msg.other.sender-v3 .chat-fp-bubble { background: #3a2d1f; }
-        html[data-theme="dark"] .chat-fp-msg.other.sender-v4 .chat-fp-bubble { background: #20322b; }
+        html[data-theme="dark"] .chat-fp-msg.other .chat-fp-bubble { color: hsl(var(--foreground)); box-shadow: none; }
         .chat-fp-meta {
             display: flex;
             align-items: center;
@@ -754,15 +949,15 @@
             gap: 8px;
             margin-bottom: 2px;
         }
-        .chat-fp-sender { display: block; font-size: 10px; font-weight: 600; opacity: 0.70; }
+        .chat-fp-sender { display: block; font-size: 10px; font-weight: 700; opacity: 0.76; }
         .chat-fp-time-inline {
             font-size: 9px;
-            opacity: 0.56;
+            opacity: 0.62;
             white-space: nowrap;
         }
         .chat-fp-reply-quote {
             margin-bottom: 4px; border-left: 2px solid hsl(var(--primary));
-            background: hsl(var(--background) / 0.35); border-radius: 8px;
+            background: hsl(var(--primary)/0.06); border-radius: 8px;
             padding: 4px 7px;
         }
         .chat-fp-reply-quote-name { display: block; font-size: 9px; font-weight: 700; opacity: 0.8; }
@@ -795,22 +990,26 @@
         .chat-fp-reply-btn:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
 
         .chat-fp-sup {
-            display: flex; gap: 6px; align-items: center;
-            padding: 4px 12px; background: hsl(var(--card)); border-top: 1px solid hsl(var(--border));
+            display: flex; gap: 7px; align-items: center;
+            padding: 7px 12px;
+            background: linear-gradient(90deg, hsl(var(--card) / 0.97), hsl(var(--card) / 0.84));
+            border-top: 1px solid hsl(var(--border) / 0.9);
+            backdrop-filter: blur(6px);
         }
         .chat-fp-caution {
             padding: 7px 12px;
-            font-size: 11px;
+            font-size: 10px;
             line-height: 1.45;
-            color: hsl(var(--foreground));
-            background: rgba(251, 191, 36, 0.14);
-            border-top: 1px solid hsl(var(--border));
+            color: hsl(var(--muted-foreground));
+            background: linear-gradient(90deg, hsl(var(--primary) / 0.07), hsl(var(--primary) / 0.03));
+            border-top: 1px solid hsl(var(--border) / 0.85);
+            letter-spacing: 0.01em;
         }
         .chat-fp-participants-view {
             display: none;
             flex-direction: column;
             height: 100%;
-            background: hsl(var(--background));
+            background: hsl(var(--card));
             border-top: 1px solid hsl(var(--border));
         }
         .chat-fp-participants-view.show {
@@ -834,8 +1033,8 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            border: 1px solid hsl(var(--border));
-            background: hsl(var(--background));
+            border: 1px solid hsl(var(--border) / 0.9);
+            background: linear-gradient(135deg, hsl(var(--card) / 0.95), hsl(var(--background) / 0.85));
             border-radius: 12px;
             padding: 8px;
             max-width: 100%;
@@ -886,14 +1085,14 @@
             line-height: 1;
         }
         .chat-fp-member-side.yes {
-            color: #0d9970;
-            background: rgba(16, 207, 145, 0.14);
-            border-color: rgba(16, 207, 145, 0.3);
+            color: hsl(var(--foreground));
+            background: hsl(var(--secondary));
+            border-color: hsl(var(--border));
         }
         .chat-fp-member-side.no {
-            color: #dc2626;
-            background: rgba(239, 68, 68, 0.13);
-            border-color: rgba(239, 68, 68, 0.28);
+            color: hsl(var(--foreground));
+            background: hsl(var(--secondary));
+            border-color: hsl(var(--border));
         }
         .chat-fp-member-state {
             font-size: 8px;
@@ -916,26 +1115,20 @@
             border: 1px solid transparent;
         }
         .chat-fp-member-presence.online {
-            color: #0d9970;
-            background: rgba(16, 207, 145, 0.14);
-            border-color: rgba(16, 207, 145, 0.3);
+            color: hsl(var(--foreground));
+            background: hsl(var(--secondary));
+            border-color: hsl(var(--border));
         }
         .chat-fp-member-presence.offline {
             color: hsl(var(--muted-foreground));
             background: hsl(var(--secondary));
             border-color: hsl(var(--border));
         }
-        html[data-theme="dark"] .chat-fp-member-side.yes {
-            color: #34d399;
-            background: rgba(16, 207, 145, 0.24);
-        }
-        html[data-theme="dark"] .chat-fp-member-side.no {
-            color: #f87171;
-            background: rgba(239, 68, 68, 0.22);
-        }
+        html[data-theme="dark"] .chat-fp-member-side.yes,
+        html[data-theme="dark"] .chat-fp-member-side.no,
         html[data-theme="dark"] .chat-fp-member-presence.online {
-            color: #34d399;
-            background: rgba(16, 207, 145, 0.24);
+            color: hsl(var(--foreground));
+            background: hsl(var(--secondary));
         }
         .chat-fp-sup-actions {
             margin-left: auto;
@@ -947,17 +1140,19 @@
         }
         .chat-fp-act-btn {
             border: 1px solid hsl(var(--border));
-            background: hsl(var(--background));
+            background: hsl(var(--background) / 0.8);
             color: hsl(var(--foreground));
             border-radius: 999px;
-            padding: 3px 8px;
+            padding: 4px 10px;
             font-size: 10px;
             font-weight: 700;
             cursor: pointer;
+            transition: border-color 0.15s, color 0.15s, transform 0.15s;
         }
         .chat-fp-act-btn:hover {
             border-color: hsl(var(--primary));
             color: hsl(var(--primary));
+            transform: translateY(-1px);
         }
         .chat-fp-act-btn.danger {
             background: #dc2626;
@@ -970,7 +1165,9 @@
         }
         .chat-fp-replying {
             display: none; align-items: center; justify-content: space-between; gap: 8px;
-            padding: 6px 10px; background: hsl(var(--secondary) / 0.55); border-top: 1px solid hsl(var(--border));
+            padding: 7px 10px;
+            background: linear-gradient(90deg, hsl(var(--primary) / 0.06), hsl(var(--card) / 0.96));
+            border-top: 1px solid hsl(var(--border));
             border-bottom: 1px solid hsl(var(--border));
         }
         .chat-fp-replying.show { display: flex; }
@@ -985,26 +1182,36 @@
             width: 18px; height: 18px; border-radius: 999px; cursor: pointer;
             display: inline-flex; align-items: center; justify-content: center;
         }
-        .chat-fp-replying-close:hover { background: hsl(var(--background)); color: hsl(var(--foreground)); }
-        .fp-badge { font-size: 10px; font-weight: 600; padding: 2px 9px; border-radius: 999px; letter-spacing: 0.03em; }
-        .fp-badge-y { background: rgba(16,207,145,0.13); color: #0d9970; }
-        .fp-badge-n { background: rgba(239,68,68,0.12); color: #dc2626; }
-        html[data-theme="dark"] .fp-badge-y { background: rgba(16,207,145,0.22); color: #34d399; }
-        html[data-theme="dark"] .fp-badge-n { background: rgba(239,68,68,0.20); color: #f87171; }
+        .chat-fp-replying-close:hover { background: hsl(var(--card)); color: hsl(var(--foreground)); }
+        .fp-badge { font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 999px; letter-spacing: 0.03em; }
+        .fp-badge-y,
+        .fp-badge-n {
+            background: hsl(var(--secondary));
+            color: hsl(var(--foreground));
+            border: 1px solid hsl(var(--border));
+        }
+        html[data-theme="dark"] .fp-badge-y,
+        html[data-theme="dark"] .fp-badge-n {
+            background: hsl(var(--secondary));
+            color: hsl(var(--foreground));
+        }
 
         .chat-fp-foot {
-            display: flex; align-items: center; gap: 7px;
-            padding: 8px 10px 10px; background: hsl(var(--card));
-            border-top: 1px solid hsl(var(--border));
+            display: flex; align-items: center; gap: 8px;
+            padding: 10px 10px 13px;
+            background: linear-gradient(180deg, hsl(var(--card) / 0.96), hsl(var(--card) / 0.9));
+            border-top: 1px solid hsl(var(--border)/0.65);
         }
         .chat-fp-inp {
-            flex: 1; border: 1px solid hsl(var(--input)); background: hsl(var(--background));
-            color: hsl(var(--foreground)); border-radius: 999px; padding: 7px 14px;
-            font-size: 12.5px; font-family: 'Manrope', sans-serif; font-weight: 300; outline: none;
+            flex: 1; border: 1px solid hsl(var(--input)); background: hsl(var(--background) / 0.95);
+            color: hsl(var(--foreground)); border-radius: 999px; padding: 8px 16px;
+            font-size: 13px; font-family: 'Manrope', sans-serif; font-weight: 400; outline: none;
             transition: border-color 0.15s, box-shadow 0.15s;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
         .chat-fp-inp:focus {
-            border-color: hsl(var(--primary)); box-shadow: 0 0 0 3px hsl(var(--primary) / 0.14);
+            border-color: hsl(var(--primary));
+            box-shadow: 0 0 0 3px hsl(var(--primary) / 0.14), 0 0 14px hsl(var(--primary)/0.08);
         }
         .chat-fp-inp::placeholder { color: hsl(var(--muted-foreground)); }
         .chat-fp-inp:disabled {
@@ -1012,17 +1219,20 @@
             cursor: not-allowed;
         }
         .chat-fp-snd {
-            width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
-            background-image: var(--float-gradient); color: hsl(var(--primary-foreground)); border: none;
+            width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+            background: linear-gradient(145deg, hsl(var(--primary)), hsl(var(--primary) / 0.72));
+            color: hsl(var(--primary-foreground)); border: none;
             cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: background 0.15s, transform 0.12s; line-height: 1;
+            transition: filter 0.15s, transform 0.12s, box-shadow 0.15s; line-height: 1;
+            box-shadow: 0 6px 18px hsl(var(--primary)/0.36);
         }
-        .chat-fp-snd:hover { filter: brightness(1.04); transform: scale(1.07); }
-        .chat-fp-snd:active { transform: scale(0.94); }
+        .chat-fp-snd:hover { filter: brightness(1.10); transform: scale(1.08); box-shadow: 0 6px 22px hsl(var(--primary)/0.56); }
+        .chat-fp-snd:active { transform: scale(0.93); }
         .chat-fp-snd:disabled {
-            opacity: 0.6;
+            opacity: 0.55;
             cursor: not-allowed;
             transform: none;
+            box-shadow: none;
         }
 
         #toast-root {
@@ -1067,14 +1277,18 @@
             right: 0;
             top: calc(100% + 8px);
             width: min(340px, calc(100vw - 2rem));
-            border-radius: 16px;
+            border-radius: 18px;
             border: 1px solid hsl(var(--border));
-            background: hsl(var(--card) / 0.96);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            box-shadow: 0 18px 48px -24px rgba(15,23,42,0.5);
+            background:
+                radial-gradient(320px 140px at 0% 0%, hsl(var(--primary) / 0.14), transparent 72%),
+                radial-gradient(280px 140px at 100% 100%, hsl(var(--accent) / 0.12), transparent 72%),
+                hsl(var(--card) / 0.97);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 28px 72px -20px rgba(15,23,42,0.60), 0 0 0 1px rgba(255,255,255,0.03);
             z-index: 120;
             overflow: hidden;
+            animation: nav-panel-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
         }
         .nav-chat-panel-header {
             display: flex;
@@ -1082,12 +1296,26 @@
             justify-content: space-between;
             padding: 12px 14px 10px;
             border-bottom: 1px solid hsl(var(--border));
+            background: linear-gradient(180deg, rgba(255,255,255,0.03), transparent);
+        }
+        .nav-chat-panel-title-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
         }
         .nav-chat-panel-title {
             font-size: 13px;
             font-weight: 800;
             color: hsl(var(--foreground));
             letter-spacing: 0.01em;
+        }
+        .nav-chat-panel-subtitle {
+            font-size: 10px;
+            color: hsl(var(--muted-foreground));
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            font-weight: 700;
         }
         .nav-chat-list {
             max-height: 400px;
@@ -1107,16 +1335,17 @@
             width: 100%;
             border-radius: 12px;
             border: 1px solid hsl(var(--border));
-            background: hsl(var(--background) / 0.6);
+            background: linear-gradient(180deg, hsl(var(--background) / 0.75), hsl(var(--background) / 0.62));
             padding: 10px 12px;
             cursor: pointer;
             text-align: left;
-            transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+            transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
         }
         .nav-chat-item:hover {
             border-color: hsl(var(--primary) / 0.55);
             background: hsl(var(--background));
             transform: translateY(-1px);
+            box-shadow: 0 10px 24px -18px hsl(var(--primary) / 0.45);
         }
         .nav-chat-item-avatar {
             width: 36px;
@@ -1204,6 +1433,18 @@
             font-size: 12px;
             color: hsl(var(--muted-foreground));
             padding: 20px 12px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .nav-chat-panel,
+            .nav-counter-badge {
+                animation: none !important;
+            }
+            .nav-icon-pill,
+            .nav-chat-item {
+                transition: none !important;
+                transform: none !important;
+            }
         }
 
         /* ── Emoji Picker ───────────────────────────────────── */
@@ -1395,13 +1636,60 @@
             padding: 4px 8px;
             border-top: 1px solid hsl(var(--border));
         }
+
+        /* Premium Action Button Effects */
+        .action-btn-like:hover svg {
+            filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.4));
+        }
+
+        .action-btn-repost:hover svg {
+            filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.4));
+        }
+
+        .action-btn-save:hover svg {
+            filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.4));
+        }
+
+        .action-btn-like.active svg {
+            filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.6));
+        }
+
+        .action-btn-save.active svg {
+            filter: drop-shadow(0 0 12px rgba(139, 92, 246, 0.6));
+        }
+
+        /* Futuristic pulse animation for active states */
+        @keyframes quantum-pulse {
+            0%, 100% {
+                opacity: 0.4;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.8;
+                transform: scale(1.05);
+            }
+        }
+
+        .quantum-pulse {
+            animation: quantum-pulse 2s ease-in-out infinite;
+        }
+
+        /* Enhanced hover effects */
+        .action-btn-enhanced:hover {
+            transform: translateY(-1px);
+        }
+
+        .action-btn-enhanced svg {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
         /* ─────────────────────────────────────────────────────── */
     </style>
 </head>
 <body class="bg-background text-foreground min-h-screen">
     <div id="toast-root" aria-live="polite" aria-atomic="true"></div>
     <!-- Navigation -->
-    <nav class="bg-card border-b border-border">
+    <nav class="nav-shell bg-card border-b border-border">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div class="nav-bar-inner flex justify-between h-16">
                 <div class="nav-left">
@@ -1411,10 +1699,15 @@
                         </svg>
                     </button>
                     <div class="nav-brand flex items-center">
-                    <a href="{% url 'index' %}" class="text-xl font-bold text-primary">
-                        Discussion Hub
-                    </a>
+                        <a href="{% url 'index' %}" class="text-xl font-bold text-primary">
+                            Discussion Hub
+                        </a>
                     </div>
+                    {% if user.is_authenticated %}
+                    <div class="nav-quick-links">
+                        <a href="{% url 'index' %}?tab=suggested" class="nav-quick-link">Suggested for You</a>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="nav-controls">
                     <button type="button" onclick="toggleTheme()" class="theme-toggle-btn inline-flex items-center justify-center rounded-full border border-border px-3 py-2 text-sm font-medium text-foreground transition hover:border-primary hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/50" aria-label="Toggle theme" title="Toggle theme">
@@ -1422,7 +1715,7 @@
                         <span id="theme-label" class="theme-toggle-label">Light</span>
                     </button>
                     {% if user.is_authenticated %}
-                        <button type="button" id="nav-search-toggle" class="nav-icon-pill" aria-label="Search" aria-expanded="false">
+                        <button type="button" id="nav-search-toggle" class="nav-icon-pill" aria-label="Search" aria-expanded="false" data-nav-search-toggle>
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                             </svg>
@@ -1432,7 +1725,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"></path>
                             </svg>
                             {% if pending_notifications_count > 0 %}
-                            <span id="nav-notification-badge" class="absolute -right-2 -top-2 inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground">
+                            <span id="nav-notification-badge" class="nav-counter-badge absolute -right-2 -top-2 inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground">
                                 {{ pending_notifications_count }}
                             </span>
                             {% endif %}
@@ -1442,11 +1735,14 @@
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                                 </svg>
-                                <span id="nav-chat-badge" class="absolute -right-2 -top-2 hidden inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"></span>
+                                <span id="nav-chat-badge" class="nav-counter-badge absolute -right-2 -top-2 hidden inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"></span>
                             </button>
                             <div id="nav-chat-panel" class="nav-chat-panel hidden" style="right:0;top:calc(100% + 8px);position:absolute;">
                                 <div class="nav-chat-panel-header">
-                                    <span class="nav-chat-panel-title">💬 Chats</span>
+                                    <div class="nav-chat-panel-title-wrap">
+                                        <span class="nav-chat-panel-title">💬 Chats</span>
+                                        <span class="nav-chat-panel-subtitle">Live conversations</span>
+                                    </div>
                                     <span id="nav-chat-panel-count" class="text-xs text-muted-foreground"></span>
                                 </div>
                                 <div id="nav-chat-list" class="nav-chat-list">
@@ -1455,11 +1751,11 @@
                             </div>
                         </div>
                         <div class="user-menu-wrap">
-                            <button type="button" id="user-menu-toggle" class="nav-icon-pill" aria-label="User menu" aria-expanded="false">
+                            <a id="user-menu-toggle" href="{% url 'profile' %}" class="nav-icon-pill" aria-label="User menu" aria-expanded="false">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                                 </svg>
-                            </button>
+                            </a>
                             <div id="user-menu-panel" class="user-menu-panel hidden">
                                 <div class="px-2 py-1">
                                     <p class="text-sm font-semibold text-foreground">{{ user.username }}</p>
@@ -1479,15 +1775,46 @@
                         </a>
                     {% endif %}
                 </div>
+                <div class="nav-mobile-auth">
+                    {% if user.is_authenticated %}
+                    <button type="button" id="mobile-nav-search-toggle" class="nav-mobile-auth-link nav-mobile-search-btn" aria-label="Search" aria-expanded="false" data-nav-search-toggle>
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        <span>Search</span>
+                    </button>
+                    <a href="{% url 'logout' %}" class="nav-mobile-auth-link nav-mobile-logout-link">
+                        Logout
+                    </a>
+                    {% else %}
+                    <a href="{% url 'login' %}" class="nav-mobile-auth-link">
+                        Login
+                    </a>
+                    <a href="{% url 'register' %}" class="nav-mobile-signup-link">
+                        Sign Up
+                    </a>
+                    {% endif %}
+                </div>
             </div>
 
             {% if user.is_authenticated %}
             <div id="nav-search-panel" class="nav-search-panel hidden">
                 <form id="nav-search-form" autocomplete="off">
-                    <input id="nav-search-input" class="nav-search-input" type="text" placeholder="Search discussions...">
+                    <input id="nav-search-input" class="nav-search-input" type="text" placeholder="Search discussions, @username, or #hashtags...">
                 </form>
+                <div class="flex border-b border-border mb-2 mt-1">
+                    <button type="button" id="search-tab-posts" class="flex-1 py-1.5 text-xs font-semibold text-primary border-b-2 border-primary transition">Discussions</button>
+                    <button type="button" id="search-tab-users" class="flex-1 py-1.5 text-xs font-medium text-muted-foreground border-b-2 border-transparent hover:text-foreground transition">Accounts</button>
+                    <button type="button" id="search-tab-hashtags" class="flex-1 py-1.5 text-xs font-medium text-muted-foreground border-b-2 border-transparent hover:text-foreground transition">Hashtags</button>
+                </div>
                 <div id="nav-search-results" class="nav-search-results">
                     <div class="nav-search-empty">Type to search discussions.</div>
+                </div>
+                <div id="nav-search-users" class="nav-search-results hidden">
+                    <div class="nav-search-empty">Type to search accounts.</div>
+                </div>
+                <div id="nav-search-hashtags" class="nav-search-results hidden">
+                    <div class="nav-search-empty">Type to search hashtags.</div>
                 </div>
             </div>
             {% endif %}
@@ -1507,9 +1834,6 @@
         <a href="{% url 'notifications' %}" class="mobile-menu-link">Notifications</a>
         <a href="{% url 'profile' %}" class="mobile-menu-link">Profile</a>
         <a href="{% url 'logout' %}" class="mobile-menu-link">Logout</a>
-        {% else %}
-        <a href="{% url 'login' %}" class="mobile-menu-link">Login</a>
-        <a href="{% url 'register' %}" class="mobile-menu-link">Sign Up</a>
         {% endif %}
 
         <button type="button" id="mobile-menu-theme" class="mobile-menu-link mobile-menu-theme" onclick="toggleTheme()">
@@ -1663,7 +1987,7 @@
                 }, showDelay);
             });
 
-            const searchToggle = document.getElementById('nav-search-toggle');
+            const searchToggles = Array.from(document.querySelectorAll('[data-nav-search-toggle]'));
             const searchPanel = document.getElementById('nav-search-panel');
             const searchInput = document.getElementById('nav-search-input');
             const searchForm = document.getElementById('nav-search-form');
@@ -1688,7 +2012,7 @@
                 if (!badge) {
                     badge = document.createElement('span');
                     badge.id = 'nav-notification-badge';
-                    badge.className = 'absolute -right-2 -top-2 inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground';
+                    badge.className = 'nav-counter-badge absolute -right-2 -top-2 inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground';
                     notificationsLink.appendChild(badge);
                 }
 
@@ -1733,7 +2057,8 @@
             {% endif %}
 
             if (userMenuToggle && userMenuPanel) {
-                userMenuToggle.addEventListener('click', function() {
+                userMenuToggle.addEventListener('click', function(event) {
+                    event.preventDefault();
                     const isHidden = userMenuPanel.classList.contains('hidden');
                     userMenuPanel.classList.toggle('hidden');
                     userMenuToggle.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
@@ -1750,11 +2075,56 @@
                 });
             }
 
-            if (!searchToggle || !searchPanel || !searchInput || !searchForm || !resultsBox) {
+            if (!searchToggles.length || !searchPanel || !searchInput || !searchForm || !resultsBox) {
                 return;
             }
 
+            const usersBox = document.getElementById('nav-search-users');
+            const hashtagsBox = document.getElementById('nav-search-hashtags');
+            const tabPosts = document.getElementById('search-tab-posts');
+            const tabUsers = document.getElementById('search-tab-users');
+            const tabHashtags = document.getElementById('search-tab-hashtags');
+            let activeTab = 'posts';
             let debounceTimer = null;
+
+            function setTab(tab) {
+                activeTab = tab;
+                if (tab === 'posts') {
+                    tabPosts.classList.add('text-primary', 'border-primary');
+                    tabPosts.classList.remove('text-muted-foreground', 'border-transparent');
+                    tabUsers.classList.remove('text-primary', 'border-primary');
+                    tabUsers.classList.add('text-muted-foreground', 'border-transparent');
+                    tabHashtags.classList.remove('text-primary', 'border-primary');
+                    tabHashtags.classList.add('text-muted-foreground', 'border-transparent');
+                    resultsBox.classList.remove('hidden');
+                    usersBox.classList.add('hidden');
+                    hashtagsBox.classList.add('hidden');
+                } else if (tab === 'users') {
+                    tabUsers.classList.add('text-primary', 'border-primary');
+                    tabUsers.classList.remove('text-muted-foreground', 'border-transparent');
+                    tabPosts.classList.remove('text-primary', 'border-primary');
+                    tabPosts.classList.add('text-muted-foreground', 'border-transparent');
+                    tabHashtags.classList.remove('text-primary', 'border-primary');
+                    tabHashtags.classList.add('text-muted-foreground', 'border-transparent');
+                    usersBox.classList.remove('hidden');
+                    resultsBox.classList.add('hidden');
+                    hashtagsBox.classList.add('hidden');
+                } else {
+                    tabHashtags.classList.add('text-primary', 'border-primary');
+                    tabHashtags.classList.remove('text-muted-foreground', 'border-transparent');
+                    tabPosts.classList.remove('text-primary', 'border-primary');
+                    tabPosts.classList.add('text-muted-foreground', 'border-transparent');
+                    tabUsers.classList.remove('text-primary', 'border-primary');
+                    tabUsers.classList.add('text-muted-foreground', 'border-transparent');
+                    hashtagsBox.classList.remove('hidden');
+                    resultsBox.classList.add('hidden');
+                    usersBox.classList.add('hidden');
+                }
+            }
+
+            tabPosts.addEventListener('click', () => { setTab('posts'); doSearch(); });
+            tabUsers.addEventListener('click', () => { setTab('users'); doSearch(); });
+            tabHashtags.addEventListener('click', () => { setTab('hashtags'); doSearch(); });
 
             function renderResults(items, query) {
                 if (!items.length) {
@@ -1770,34 +2140,98 @@
                 `).join('');
             }
 
+            function renderUsers(users, query) {
+                if (!users.length) {
+                    usersBox.innerHTML = `<div class="nav-search-empty">No accounts found for "${query}".</div>`;
+                    return;
+                }
+                usersBox.innerHTML = users.map(u => `
+                    <a href="${u.url}" class="nav-search-item flex items-center gap-3">
+                        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                            ${u.avatar_url ? `<img src="${u.avatar_url}" class="w-8 h-8 rounded-full object-cover" alt="${u.username}">` : u.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-foreground">@${u.username}</p>
+                            <p class="text-xs text-muted-foreground">${u.posts_count} posts · ${u.followers_count} followers</p>
+                        </div>
+                    </a>
+                `).join('');
+            }
+
+            function renderHashtagResults(query) {
+                // Remove # if included
+                let searchTag = query.toLowerCase().startsWith('#') ? query.substring(1).trim() : query.trim().toLowerCase();
+                
+                if (!searchTag) {
+                    hashtagsBox.innerHTML = '<div class="nav-search-empty">Type to search hashtags.</div>';
+                    return;
+                }
+
+                // Navigate to hashtag search page
+                window.location.href = `/search/hashtags/?tag=${encodeURIComponent(searchTag)}`;
+            }
+
+
             function doSearch() {
                 const query = searchInput.value.trim();
                 if (!query) {
                     resultsBox.innerHTML = '<div class="nav-search-empty">Type to search discussions.</div>';
+                    usersBox.innerHTML = '<div class="nav-search-empty">Type to search accounts.</div>';
+                    hashtagsBox.innerHTML = '<div class="nav-search-empty">Type to search hashtags.</div>';
                     return;
                 }
 
-                fetch(`/search/quick/?q=${encodeURIComponent(query)}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (!data.success) {
+                if (activeTab === 'posts') {
+                    fetch(`/search/quick/?q=${encodeURIComponent(query)}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (!data.success) {
+                                resultsBox.innerHTML = '<div class="nav-search-empty">Search unavailable right now.</div>';
+                                return;
+                            }
+                            renderResults(data.results || [], query);
+                        })
+                        .catch(() => {
                             resultsBox.innerHTML = '<div class="nav-search-empty">Search unavailable right now.</div>';
-                            return;
-                        }
-                        renderResults(data.results || [], query);
-                    })
-                    .catch(() => {
-                        resultsBox.innerHTML = '<div class="nav-search-empty">Search unavailable right now.</div>';
-                    });
+                        });
+                } else if (activeTab === 'users') {
+                    fetch(`/search/users/?q=${encodeURIComponent(query)}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (!data.success) {
+                                usersBox.innerHTML = '<div class="nav-search-empty">Search unavailable right now.</div>';
+                                return;
+                            }
+                            renderUsers(data.users || [], query);
+                        })
+                        .catch(() => {
+                            usersBox.innerHTML = '<div class="nav-search-empty">Search unavailable right now.</div>';
+                        });
+                } else {
+                    // Hashtag search - use client-side extraction
+                    renderHashtagResults(query);
+                }
             }
 
-            searchToggle.addEventListener('click', function() {
+            function setSearchExpandedState(isExpanded) {
+                searchToggles.forEach(toggle => {
+                    toggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+                });
+            }
+
+            function toggleSearchPanel() {
                 const isHidden = searchPanel.classList.contains('hidden');
                 searchPanel.classList.toggle('hidden');
-                searchToggle.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+                setSearchExpandedState(isHidden);
                 if (isHidden) {
                     searchInput.focus();
                 }
+            }
+
+            searchToggles.forEach(toggle => {
+                toggle.addEventListener('click', function() {
+                    toggleSearchPanel();
+                });
             });
 
             searchForm.addEventListener('submit', function(event) {
@@ -1815,9 +2249,10 @@
                     return;
                 }
 
-                if (!searchPanel.contains(event.target) && !searchToggle.contains(event.target)) {
+                const clickedToggle = searchToggles.some(toggle => toggle.contains(event.target));
+                if (!searchPanel.contains(event.target) && !clickedToggle) {
                     searchPanel.classList.add('hidden');
-                    searchToggle.setAttribute('aria-expanded', 'false');
+                    setSearchExpandedState(false);
                 }
             });
         });
@@ -1836,7 +2271,7 @@
     {{ active_chat_debates|json_script:"dh-auto-chats-data" }}
     <script>
     const ChatManager = (() => {
-        const W = 320, GAP = 10, MAX_VISIBLE = 3;
+        const W = 360, GAP = 10, MAX_VISIBLE = 3;
         const SK = 'dhOpenChats', SK_CLOSED = 'dhClosedChats';
         const panels = new Map();   // id(str) → {debate, minimized}
         const polls  = new Map();   // id(str) → intervalId
@@ -1936,7 +2371,7 @@
                     </div>
                     <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;">
                         <button id="dh-limit-cancel" type="button" style="border:1px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground));border-radius:999px;padding:7px 12px;font-size:12px;font-weight:700;">Cancel</button>
-                        <button id="dh-limit-save" type="button" style="border:none;background-image:var(--float-gradient);color:hsl(var(--primary-foreground));border-radius:999px;padding:7px 14px;font-size:12px;font-weight:800;">Save</button>
+                        <button id="dh-limit-save" type="button" style="border:none;background:hsl(var(--primary));color:hsl(var(--primary-foreground));border-radius:999px;padding:7px 14px;font-size:12px;font-weight:800;">Save</button>
                     </div>
                 `;
 
@@ -2083,10 +2518,10 @@
                                 ? `<img src="${esc(db.opponent_avatar)}" alt="${esc(db.opponent)}" class="chat-fp-avatar" loading="lazy">`
                                 : `<div class="chat-fp-avatar">${ini}</div>`;
             return `
-              <div class="chat-fp-header" onclick="ChatManager.toggleMin('${id}')">
+                            <div class="chat-fp-header" data-chat-header="${id}">
                                 ${avatar}
-                <div class="chat-fp-header-info">
-                                    <p class="chat-fp-htitle" title="${esc(db.title)}">${esc(db.title)}</p>
+                                <div class="chat-fp-header-info" data-chat-title="${id}">
+                                                                        <p class="chat-fp-htitle" title="${esc(db.title)}">${esc(db.title)}</p>
                                     <p class="chat-fp-hmeta" id="cfp-meta-${id}">${db.current_controller_name ? `Controller: ${esc(db.current_controller_name)}${db.current_controller_side ? ' (' + esc(String(db.current_controller_side).toUpperCase()) + ')' : ''}` : `vs @${esc(db.opponent)}`}</p>
                 </div>
                 <div class="chat-fp-hacts" onclick="event.stopPropagation()">
@@ -2098,7 +2533,7 @@
                 </div>
               </div>
               <div class="chat-fp-body" id="cfp-body-${id}">
-                                <div id="cfp-chat-main-${id}">
+                                <div class="chat-fp-main" id="cfp-chat-main-${id}">
                                     <div class="chat-fp-msgs" id="cfp-msgs-${id}">
                                                                             <div class="chat-fp-sticky-date" id="cfp-sticky-date-${id}"></div>
                                         <div class="chat-fp-empty">Loading messages…</div>
@@ -2347,9 +2782,19 @@
                 container.appendChild(el);
                 const form = el.querySelector('.chat-fp-foot');
                 if (form) form.addEventListener('submit', e => { e.preventDefault(); sendMsg(id); });
+                const header = el.querySelector('.chat-fp-header');
+                if (header) {
+                    header.addEventListener('click', function(event) {
+                        if (event.target.closest('.chat-fp-hacts')) {
+                            return;
+                        }
+                        toggleMinState(id);
+                    });
+                }
             }
             const body = document.getElementById('cfp-body-' + id);
             const minBtn = el.querySelector('.cfp-min-btn');
+            el.classList.toggle('chat-fp-minimized', !!p.minimized);
             if (body) body.style.display = p.minimized ? 'none' : 'flex';
             if (minBtn) minBtn.textContent = p.minimized ? '▴' : '▾';
             syncPanelState(id);
@@ -2560,6 +3005,7 @@
         async function sendMsg(id) {
             const inp = document.getElementById('cfp-inp-' + id);
             if (!inp) return;
+            const sendBtn = document.getElementById('cfp-send-' + id);
             const panel = panelState(id);
             if (panel && (panel.debate.debate_status && panel.debate.debate_status !== 'accepted')) return;
             if (panel && (panel.debate.can_post === false || panel.debate.user_is_active === false)) {
@@ -2570,27 +3016,39 @@
                 }
                 return;
             }
-            const content = inp.value.trim();
+            const rawContent = inp.value;
+            const content = rawContent.trim();
             if (!content) return;
-            inp.value = '';
             const reply = replyTargets.get(id);
             try {
+                if (sendBtn) sendBtn.disabled = true;
                 const r = await fetch('/debates/' + id + '/messages/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrf() },
                     body: 'content=' + encodeURIComponent(content)
                         + (reply ? '&reply_to_id=' + encodeURIComponent(String(reply.id)) : '')
                 });
-                const d = await r.json();
+                let d = null;
+                try {
+                    d = await r.json();
+                } catch {
+                    d = { success: false, error: 'Unable to send message right now.' };
+                }
                 if (d.success) {
+                    inp.value = '';
                     appendMsg(id, d.message);
                     replyTargets.delete(id);
                     setReplyUI(id, null);
                 } else {
                     window.showToast(d.error || 'Unable to send message.', 'error');
+                    inp.value = rawContent;
                 }
             } catch {
                 window.showToast('Unable to send message.', 'error');
+                inp.value = rawContent;
+            } finally {
+                if (sendBtn) sendBtn.disabled = false;
+                inp.focus();
             }
         }
 
@@ -2600,6 +3058,18 @@
         }
         function stopPoll(id) {
             if (polls.has(id)) { clearInterval(polls.get(id)); polls.delete(id); }
+        }
+
+        function toggleMinState(debateId) {
+            const id = String(debateId);
+            const p = panels.get(id);
+            if (!p) return;
+            p.minimized = !p.minimized;
+            if (!p.minimized && isChatVisible(id)) {
+                markAsRead(id);
+            }
+            save();
+            renderAll();
         }
 
         return {
@@ -2688,15 +3158,7 @@
             },
 
             toggleMin(debateId) {
-                const id = String(debateId);
-                const p = panels.get(id);
-                if (!p) return;
-                p.minimized = !p.minimized;
-                if (!p.minimized && isChatVisible(id)) {
-                    markAsRead(id);
-                }
-                save();
-                renderAll();
+                toggleMinState(debateId);
             },
 
             reply(debateId, messageId) {
@@ -2900,6 +3362,7 @@
     const ChatListManager = (() => {
         const LS_KEY = 'dhChatLastRead';
         let chats = [];
+        let lastTotalUnread = 0;
         let pollTimer = null;
         let isOpen = false;
 
@@ -2928,16 +3391,29 @@
             return chats.reduce((acc, c) => acc + unreadCount(c), 0);
         }
 
+        function animateChatBadge(badge) {
+            badge.classList.remove('bump');
+            // force reflow to restart keyframes for each count change
+            void badge.offsetWidth;
+            badge.classList.add('bump');
+        }
+
         function updateBadge() {
             const badge = document.getElementById('nav-chat-badge');
             if (!badge) return;
             const count = totalUnread();
+            const changed = count !== lastTotalUnread;
             if (count > 0) {
                 badge.textContent = count > 9 ? '9+' : String(count);
                 badge.classList.remove('hidden');
+                if (changed) {
+                    animateChatBadge(badge);
+                }
             } else {
                 badge.classList.add('hidden');
+                badge.classList.remove('bump');
             }
+            lastTotalUnread = count;
         }
 
         function esc(s) {
@@ -3125,6 +3601,24 @@
         const FUN_SPECIAL = [
             '💯','🔥🔥🔥','👑','🏆','💪','🎯','⚡💥⚡','✨🌟✨','🎊🎉🎊','🚀🌙','🎸🤘','💎👑💎','🌈🦄','🤌💋','👀👀','🧠💡','💭💬','🔑🗝','⚔️🛡','🎭','+1','100%','GG','EZ','LOL','LMAO','ROFL','NGL','IMO','TBH','RIP','BRB','GLHF','wp','>:D'];
 
+        const FALLBACK_GIFS = [
+            'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExM21udWp2MXl6M2Y2ejA1aXJtbWQ2a3Vza2V5Mm5zYzY2dWgyeTh6diZlcD12MV9naWZzX3NlYXJjaCZjdD1n/xT9IgG50Fb7Mi0prBC/giphy.gif',
+            'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExa2ZwYWhqbmN2aWdrOW9rN2xoc3M5dnN4b2Y4aW9jMnliN2liMnE4YiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/3o7aD2saalBwwftBIY/giphy.gif',
+            'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdHRud3RvZXNzYjNrcjNwbHN6N2NodjJhYWQzY3RhaGlyZ2QwN2pmbiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/l0MYt5jPR6QX5pnqM/giphy.gif',
+            'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdnVwdzk5bDl2d2U4NTJzcjBwa2xjaWl2OXluZW4zM3R6MDN5bTJ4YiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/ICOgUNjpvO0PC/giphy.gif',
+            'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExN2xwZ2xvZzM2dWVjM3N2aTc4Y2s2NmN4ZWQ0eXk1a2J5eW9udnNlNCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/26ufdipQqU2lhNA4g/giphy.gif',
+            'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExd3J2YmNobHk2ejVnM3I2YmFqeTRyZ3N4YXVkM2h5a2J3c2N4a2xweiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/3oriO0OEd9QIDdllqo/giphy.gif',
+            'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMHFoZXdwNTN4eWxwd2Qya2M2MzJ5MzQ4OXQ5d2g3ZzNlNnR5M2U1ZiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/3oEjI6SIIHBdRxXI40/giphy.gif',
+            'https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdnN5dW16dW4zaXBiMHA1Z2s0aGE4ejRlMmxsNmVqZ2h4bXN2MnZ5aiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/111ebonMs90YLu/giphy.gif'
+        ];
+
+        function renderGifFallback(grid, debateId) {
+            if (!grid) return;
+            grid.innerHTML = FALLBACK_GIFS.map((url) =>
+                `<button type="button" class="gif-item" onclick="EmojiPicker._pickGif('${debateId}',${JSON.stringify(url)})"><img src="${esc(url)}" alt="gif" loading="lazy"></button>`
+            ).join('');
+        }
+
         function renderFunTab(panel, debateId) {
             panel.innerHTML = `
                 <div class="emoji-picker-tabs">
@@ -3151,23 +3645,27 @@
             grid.innerHTML = '<div class="gif-loading">⏳ Loading…</div>';
             try {
                 const url = query
-                    ? `https://api.tenor.com/v1/search?q=${encodeURIComponent(query)}&key=${TENOR_KEY}&limit=16&media_filter=minimal`
-                    : `https://api.tenor.com/v1/trending?key=${TENOR_KEY}&limit=16&media_filter=minimal`;
+                    ? `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=${TENOR_KEY}&limit=16&media_filter=tinygif,gif&contentfilter=medium`
+                    : `https://tenor.googleapis.com/v2/featured?key=${TENOR_KEY}&limit=16&media_filter=tinygif,gif&contentfilter=medium`;
                 const r = await fetch(url);
+                if (!r.ok) throw new Error('gif_fetch_failed');
                 const d = await r.json();
                 const results = d.results || [];
                 if (!results.length) {
-                    grid.innerHTML = '<div class="gif-loading">No GIFs found.</div>';
+                    renderGifFallback(grid, debateId);
                     return;
                 }
                 grid.innerHTML = results.map((item) => {
-                    const gif = item.media?.[0]?.tinygif?.url || item.media?.[0]?.gif?.url || '';
+                    const gif = item.media_formats?.tinygif?.url || item.media_formats?.gif?.url || '';
                     if (!gif) return '';
-                    const fullGif = item.media?.[0]?.gif?.url || gif;
+                    const fullGif = item.media_formats?.gif?.url || gif;
                     return `<button type="button" class="gif-item" onclick="EmojiPicker._pickGif('${debateId}',${JSON.stringify(fullGif)})"><img src="${esc(gif)}" alt="gif" loading="lazy"></button>`;
                 }).join('');
+                if (!grid.innerHTML.trim()) {
+                    renderGifFallback(grid, debateId);
+                }
             } catch {
-                grid.innerHTML = '<div class="gif-loading">Unable to load GIFs.</div>';
+                renderGifFallback(grid, debateId);
             }
         }
 

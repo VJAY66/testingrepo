@@ -56,13 +56,22 @@ class UserViewSet(viewsets.ModelViewSet):
         if action == 'follow':
             Follow.objects.get_or_create(follower=request.user, following=target_user)
             message = f'Now following {username}'
+            is_following = True
         elif action == 'unfollow':
             Follow.objects.filter(follower=request.user, following=target_user).delete()
             message = f'Unfollowed {username}'
+            is_following = False
         else:
             return Response({'success': False, 'message': 'Invalid action'}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({'success': True, 'message': message})
+        return Response({
+            'success': True,
+            'message': message,
+            'is_following': is_following,
+            'followers_count': target_user.follower_links.count(),
+            'following_count': target_user.following_links.count(),
+            'my_following_count': request.user.following_links.count(),
+        })
 
 class ProfileViewSet(viewsets.ModelViewSet):
     queryset = Profile.objects.all()

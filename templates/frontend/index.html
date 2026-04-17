@@ -548,6 +548,16 @@
     .posts-container.hidden {
         display: none;
     }
+
+    .like-animation {
+        animation: likePulse 0.6s ease-in-out;
+    }
+
+    @keyframes likePulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.3); }
+        100% { transform: scale(1); }
+    }
 </style>
 <div class="home-fullbleed ag-stage galaxy-stage space-y-8">
     <div class="galaxy-layer" aria-hidden="true">
@@ -564,6 +574,7 @@
     <div class="ag-orb ag-orb-2"></div>
     <div class="ag-orb ag-orb-3"></div>
 
+    {% if active_tab != 'suggested' %}
     <!-- Hero Section -->
     <div class="text-center py-11 px-4 sm:px-8 glass-panel hero-glow rounded-[2rem] sm:rounded-[2.2rem]">
         <h1 class="hero-title text-foreground">
@@ -573,6 +584,9 @@
                 <span class="hero-kinetic-word">Discover.</span>
             </span>
         </h1>
+        <p class="mx-auto mt-4 mb-7 max-w-2xl rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-base sm:text-lg font-semibold tracking-[0.01em] text-foreground shadow-sm">
+            Ask a question, choose your side, and debate with the world
+        </p>
         <form action="{% url 'search' %}" method="get" class="search-shell">
             <div class="flex items-center gap-2 sm:gap-3">
                 <input type="text" name="q" placeholder="Search discussions or questions..."
@@ -604,7 +618,7 @@
         <div class="section-head">
             <h2 class="section-title text-foreground">Explore Categories</h2>
         </div>
-        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-2.5 sm:gap-3">
+        <div id="cat-grid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-2.5 sm:gap-3" style="max-height: var(--cat-row-h, 9999px); overflow: hidden; transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1);">
             {% for category in categories %}
             <a href="{% url 'category' category.name %}"
                class="cat-card text-center {{ category.color }}">
@@ -613,30 +627,72 @@
             </a>
             {% endfor %}
         </div>
+        <div class="flex justify-center mt-3">
+            <button id="cat-toggle" type="button" onclick="toggleCatGrid()" class="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors px-3 py-1.5 rounded-full border border-primary/20 hover:border-primary/40 hover:bg-primary/5">
+                <span id="cat-toggle-label">Show more</span>
+                <svg id="cat-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.3s ease;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+        </div>
     </div>
+    <script>
+    (function() {
+        function initCatGrid() {
+            const grid = document.getElementById('cat-grid');
+            if (!grid) return;
+            const firstCard = grid.querySelector('.cat-card');
+            if (!firstCard) return;
+            const rowH = firstCard.offsetHeight;
+            const gap = parseFloat(getComputedStyle(grid).rowGap) || 10;
+            const oneRow = rowH + gap;
+            grid.style.setProperty('--cat-row-h', oneRow + 'px');
+            grid.style.maxHeight = oneRow + 'px';
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initCatGrid);
+        } else {
+            initCatGrid();
+        }
+    })();
+    window.toggleCatGrid = function() {
+        const grid = document.getElementById('cat-grid');
+        const label = document.getElementById('cat-toggle-label');
+        const icon = document.getElementById('cat-toggle-icon');
+        if (!grid) return;
+        const isCollapsed = grid.style.maxHeight !== 'none' && grid.style.maxHeight !== '9999px';
+        if (isCollapsed) {
+            grid.style.maxHeight = grid.scrollHeight + 'px';
+            setTimeout(function() { grid.style.maxHeight = 'none'; }, 420);
+            label.textContent = 'Show less';
+            icon.style.transform = 'rotate(180deg)';
+        } else {
+            const firstCard = grid.querySelector('.cat-card');
+            const rowH = firstCard ? firstCard.offsetHeight : 80;
+            const gap = parseFloat(getComputedStyle(grid).rowGap) || 10;
+            grid.style.maxHeight = grid.scrollHeight + 'px';
+            requestAnimationFrame(function() {
+                grid.style.maxHeight = (rowH + gap) + 'px';
+            });
+            label.textContent = 'Show more';
+            icon.style.transform = 'rotate(0deg)';
+        }
+    };
+    </script>
+    {% endif %}
 
     <!-- Posts Tabs -->
     <div id="posts-section">
         <div class="section-head">
-            <div class="flex items-center gap-4">
-                <button id="trending-tab" class="tab-button active" onclick="switchTab('trending')">
-                    <h2 class="section-title text-foreground">Trending Discussions</h2>
-                </button>
-                {% if user.is_authenticated %}
-                <button id="suggested-tab" class="tab-button" onclick="switchTab('suggested')">
-                    <h2 class="section-title text-foreground">Suggested for You</h2>
-                </button>
-                {% endif %}
-            </div>
+            <h2 class="section-title text-foreground">
+                {% if active_tab == 'suggested' %}Suggested for You{% else %}Trending Discussions{% endif %}
+            </h2>
             <span class="section-chip">Live Pulse</span>
         </div>
 
-        <!-- Trending Posts -->
-        <div id="trending-posts" class="posts-container">
+        <div class="posts-container">
             <div class="space-y-4">
-                {% for post in trending_posts %}
+                {% for post in posts %}
                 {% if post.id %}
-                <div class="glass-panel trend-card transition hover:shadow-lg hover:shadow-primary/10">
+                <div class="glass-panel trend-card transition hover:shadow-lg hover:shadow-primary/10" data-post-id="{{ post.id }}" data-share-url="{% url 'discussion' post.id %}">
                     <div class="trend-side"></div>
                     <div class="flex items-start justify-between w-full">
                         <div class="flex-1">
@@ -645,73 +701,128 @@
                                     {{ post.title }}
                                 </a>
                             </h3>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-sm text-muted-foreground">by</span>
+                                <a href="{% url 'user_profile' post.user.username %}" class="text-sm font-medium text-primary hover:text-primary/80">
+                                    @{{ post.user.username }}
+                                </a>
+                            </div>
                             <p class="text-muted-foreground mb-3 line-clamp-2 text-sm leading-6">
                                 {{ post.content|truncatechars:150 }}
                             </p>
+                            <div class="mb-3" data-vote-card>
+                                <div class="mb-1 flex items-center justify-between text-xs sm:text-sm">
+                                    <span class="font-medium text-emerald-600" data-vote-label="yes" data-target="{{ post.yes_percentage|floatformat:1 }}">Yes: 0.0%</span>
+                                    <span class="font-medium text-red-600" data-vote-label="no" data-target="{{ post.no_percentage|floatformat:1 }}">No: 0.0%</span>
+                                </div>
+                                <div class="h-2 w-full overflow-hidden rounded-full bg-muted flex">
+                                    <div class="h-full bg-emerald-500 transition-all duration-700" data-vote-bar="yes" data-target="{{ post.yes_percentage|floatformat:2 }}" style="width: 0%"></div>
+                                    <div class="h-full bg-red-500 transition-all duration-700" data-vote-bar="no" data-target="{{ post.no_percentage|floatformat:2 }}" style="width: 0%"></div>
+                                </div>
+                            </div>
                             <div class="trend-meta">
                                 <span class="trend-pill">
                                     {{ post.category }}
                                 </span>
                                 <span>{{ post.created_at|date:"M j, Y" }}</span>
-                                <span>{{ post.user.username }}</span>
                             </div>
-                            <a href="{% url 'discussion' post.id %}" class="trend-open">
-                                Open discussion
-                                <span>→</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                {% empty %}
-                <div class="text-center py-12">
-                    <p class="text-muted-foreground">No discussions yet. Be the first to start one!</p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
 
-        <!-- Suggested Posts -->
-        {% if user.is_authenticated %}
-        <div id="suggested-posts" class="posts-container hidden">
-            <div class="space-y-4">
-                {% for post in suggested_posts %}
-                {% if post.id %}
-                <div class="glass-panel trend-card transition hover:shadow-lg hover:shadow-primary/10">
-                    <div class="trend-side"></div>
-                    <div class="flex items-start justify-between w-full">
-                        <div class="flex-1">
-                            <h3 class="trend-title text-foreground mb-2">
-                                <a href="{% url 'discussion' post.id %}" class="hover:text-primary">
-                                    {{ post.title }}
+                            {% if user.is_authenticated %}
+                                <div class="mt-3 flex items-center sm:gap-6 gap-3">
+                                    <button type="button" data-action="like" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-like {% if post.is_liked %}active text-red-500 shadow-md shadow-red-500/20 bg-red-50/50 dark:bg-red-950/30{% else %}text-muted-foreground hover:text-red-500{% endif %} hover:bg-red-50 dark:hover:bg-red-950/20 hover:shadow-md overflow-hidden">
+                                        <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_liked %}fill-current scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                                        </svg>
+                                        <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.like_count|default:0 }}</span>
+                                    </button>
+                                    <button type="button" data-action="repost" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-repost {% if post.is_reposted %}text-green-500 shadow-md shadow-green-500/20 bg-green-50/50 dark:bg-green-950/30{% else %}text-muted-foreground hover:text-green-500{% endif %} hover:bg-green-50 dark:hover:bg-green-950/20 hover:shadow-md overflow-hidden">
+                                        <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M17 1l4 4-4 4"/>
+                                            <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                                            <path d="M7 23l-4-4 4-4"/>
+                                            <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                                        </svg>
+                                        <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.repost_count|default:0 }}</span>
+                                    </button>
+                                    <button type="button" data-action="save" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-save {% if post.is_saved %}active text-primary shadow-md shadow-primary/20 bg-primary/5{% else %}text-muted-foreground hover:text-primary{% endif %} hover:bg-primary/10 hover:shadow-md overflow-hidden">
+                                        <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_saved %}fill-current scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/>
+                                        </svg>
+                                        <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.save_count|default:0 }}</span>
+                                    </button>
+                                    <button type="button" onclick="openSharePanel(this)" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced text-muted-foreground hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/20 hover:shadow-md overflow-hidden">
+                                        <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <circle cx="18" cy="5" r="3"></circle>
+                                            <circle cx="6" cy="12" r="3"></circle>
+                                            <circle cx="18" cy="19" r="3"></circle>
+                                            <path d="M8.59 13.51L15.42 17.49"></path>
+                                            <path d="M15.41 6.51L8.59 10.49"></path>
+                                        </svg>
+                                        <span class="sm:text-sm text-xs font-medium relative z-10">Share</span>
+                                    </button>
+                                    <a href="{% url 'discussion' post.id %}" class="group inline-flex items-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full border border-primary/35 bg-primary/12 text-primary shadow-sm shadow-primary/20 transition-all duration-300 hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/35 focus:outline-none focus:ring-2 focus:ring-primary/35">
+                                        <span class="sm:text-sm text-xs font-medium">Open discussion</span>
+                                        <span class="sm:text-sm text-xs">→</span>
+                                    </a>
+                                </div>
+                            {% else %}
+                            <div class="mt-3 flex items-center sm:gap-6 gap-3">
+                                <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 action-btn-enhanced action-btn-like text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 hover:shadow-md overflow-hidden cursor-pointer">
+                                    <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-sm relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 2L14 8L20 6L16 12L20 18L14 16L12 22L10 16L4 18L8 12L4 6L10 8L12 2Z"/>
+                                        <circle cx="12" cy="12" r="1.5" class="fill-current"/>
+                                        <circle cx="12" cy="12" r="0.5" class="fill-white"/>
+                                    </svg>
+                                    <span class="sm:text-sm text-xs font-medium relative z-10">{{ post.like_count|default:0 }}</span>
+                                </button>
+                                <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full text-muted-foreground hover:text-primary transition-all duration-300 action-btn-enhanced action-btn-repost hover:bg-primary/10 hover:shadow-md overflow-hidden cursor-pointer">
+                                    <div class="absolute inset-0 bg-gradient-to-r from-primary/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                    <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-sm relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M17 1l4 4-4 4"/>
+                                        <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                                        <path d="M7 23l-4-4 4-4"/>
+                                        <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                                    </svg>
+                                    <span class="sm:text-sm text-xs font-medium relative z-10">{{ post.repost_count|default:0 }}</span>
+                                </button>
+                                <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full text-muted-foreground hover:text-primary transition-all duration-300 action-btn-enhanced action-btn-save hover:bg-primary/10 hover:shadow-md overflow-hidden cursor-pointer">
+                                    <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-sm relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/>
+                                        <circle cx="9" cy="9" r="1.5" class="fill-current"/>
+                                        <circle cx="9" cy="9" r="0.5" class="fill-white"/>
+                                    </svg>
+                                    <span class="sm:text-sm text-xs font-medium relative z-10">{{ post.save_count|default:0 }}</span>
+                                </button>
+                                <button type="button" onclick="openSharePanel(this)" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full text-muted-foreground hover:text-sky-600 transition-all duration-300 action-btn-enhanced hover:bg-sky-50 dark:hover:bg-sky-950/20 hover:shadow-md overflow-hidden cursor-pointer">
+                                    <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="18" cy="5" r="3"></circle>
+                                        <circle cx="6" cy="12" r="3"></circle>
+                                        <circle cx="18" cy="19" r="3"></circle>
+                                        <path d="M8.59 13.51L15.42 17.49"></path>
+                                        <path d="M15.41 6.51L8.59 10.49"></path>
+                                    </svg>
+                                    <span class="sm:text-sm text-xs font-medium relative z-10">Share</span>
+                                </button>
+                                <a href="{% url 'discussion' post.id %}" class="group inline-flex items-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full border border-primary/35 bg-primary/12 text-primary shadow-sm shadow-primary/20 transition-all duration-300 hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/35 focus:outline-none focus:ring-2 focus:ring-primary/35">
+                                    <span class="sm:text-sm text-xs font-medium">Open discussion</span>
+                                    <span class="sm:text-sm text-xs">→</span>
                                 </a>
-                            </h3>
-                            <p class="text-muted-foreground mb-3 line-clamp-2 text-sm leading-6">
-                                {{ post.content|truncatechars:150 }}
-                            </p>
-                            <div class="trend-meta">
-                                <span class="trend-pill">
-                                    {{ post.category }}
-                                </span>
-                                <span>{{ post.created_at|date:"M j, Y" }}</span>
-                                <span>{{ post.user.username }}</span>
                             </div>
-                            <a href="{% url 'discussion' post.id %}" class="trend-open">
-                                Open discussion
-                                <span>→</span>
-                            </a>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
                 {% endif %}
                 {% empty %}
                 <div class="text-center py-12">
+                    {% if active_tab == 'suggested' %}
                     <p class="text-muted-foreground">No suggestions available yet.</p>
+                    {% else %}
+                    <p class="text-muted-foreground">No discussions yet. Be the first to start one!</p>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
-        </div>
-        {% endif %}
     </div>
 </div>
 
@@ -758,24 +869,660 @@
 </div>
 {% endif %}
 
-<script>
-function switchTab(tab) {
-    const trendingTab = document.getElementById('trending-tab');
-    const suggestedTab = document.getElementById('suggested-tab');
-    const trendingPosts = document.getElementById('trending-posts');
-    const suggestedPosts = document.getElementById('suggested-posts');
+<div id="toast-root" class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none"></div>
 
-    if (tab === 'trending') {
-        trendingTab.classList.add('active');
-        suggestedTab.classList.remove('active');
-        trendingPosts.classList.remove('hidden');
-        suggestedPosts.classList.add('hidden');
-    } else if (tab === 'suggested') {
-        suggestedTab.classList.add('active');
-        trendingTab.classList.remove('active');
-        suggestedPosts.classList.remove('hidden');
-        trendingPosts.classList.add('hidden');
+<div id="share-post-modal" class="hidden fixed inset-0 z-[7600] items-center justify-center bg-black/45 px-4">
+    <div class="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
+        <div class="mb-4 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-foreground">Share Discussion</h3>
+            <button type="button" onclick="closeSharePanel()" class="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close share panel">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6L6 18"></path>
+                    <path d="M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <p id="share-post-title" class="mb-3 text-sm text-muted-foreground"></p>
+
+        <div class="mb-4 flex items-center gap-2">
+            <input id="share-url-input" type="text" readonly class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground" />
+            <button type="button" onclick="copyShareUrl()" class="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90">Copy</button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2.5 sm:grid-cols-6 sm:gap-3">
+            <button type="button" onclick="shareToPlatform('facebook')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300/60 hover:bg-card/80 hover:text-foreground" aria-label="Share to Facebook" title="Facebook">
+                <span class="flex h-8 w-8 items-center justify-center rounded-full border border-blue-200/70 bg-blue-50/70 text-blue-600 transition group-hover:scale-105">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M13.5 8H16V5h-2.5C10.46 5 9 6.57 9 9.19V11H7v3h2v5h3v-5h2.4l.6-3H12V9.4c0-.87.23-1.4 1.5-1.4z"/>
+                    </svg>
+                </span>
+            </button>
+            <button type="button" onclick="shareToPlatform('whatsapp')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/60 hover:bg-card/80 hover:text-foreground" aria-label="Share to WhatsApp" title="WhatsApp">
+                <span class="flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200/70 bg-emerald-50/70 text-emerald-600 transition group-hover:scale-105">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 2a10 10 0 0 0-8.65 15.02L2 22l5.13-1.34A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.07-1.12l-.29-.17-3.04.8.82-2.96-.19-.3A8 8 0 1 1 12 20zm4.58-5.75c-.25-.13-1.48-.73-1.71-.81-.23-.08-.39-.13-.56.13s-.64.81-.78.97c-.14.16-.29.18-.54.06a6.47 6.47 0 0 1-1.9-1.17 7.17 7.17 0 0 1-1.33-1.65c-.14-.25-.02-.38.11-.51.12-.12.25-.3.37-.45.12-.15.16-.26.25-.44.08-.17.04-.32-.02-.45-.06-.13-.56-1.35-.76-1.84-.2-.48-.41-.41-.56-.42h-.48c-.17 0-.45.06-.68.32-.23.25-.88.86-.88 2.1s.9 2.45 1.03 2.62c.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.43.53.6.19 1.14.16 1.57.1.48-.07 1.48-.6 1.69-1.19.21-.58.21-1.09.15-1.19-.06-.1-.23-.16-.48-.29z"/>
+                    </svg>
+                </span>
+            </button>
+            <button type="button" onclick="shareToPlatform('gmail')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-300/60 hover:bg-card/80 hover:text-foreground" aria-label="Share via Gmail" title="Gmail">
+                <span class="flex h-8 w-8 items-center justify-center rounded-full border border-rose-200/70 bg-rose-50/70 text-rose-600 transition group-hover:scale-105">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+                        <path d="M3 6h18v12H3z"/>
+                        <path d="m3 7 9 6 9-6"/>
+                    </svg>
+                </span>
+            </button>
+            <button type="button" onclick="shareToPlatform('instagram')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-fuchsia-300/60 hover:bg-card/80 hover:text-foreground" aria-label="Share to Instagram" title="Instagram">
+                <span class="flex h-8 w-8 items-center justify-center rounded-full border border-fuchsia-200/70 bg-fuchsia-50/70 text-fuchsia-600 transition group-hover:scale-105">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="5" ry="5"></rect>
+                        <circle cx="12" cy="12" r="4"></circle>
+                        <circle cx="17.2" cy="6.8" r="1"></circle>
+                    </svg>
+                </span>
+            </button>
+            <button type="button" onclick="shareToPlatform('x')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300/70 hover:bg-card/80 hover:text-foreground" aria-label="Share to X" title="X">
+                <span class="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300/70 bg-slate-100/70 text-slate-700 transition group-hover:scale-105">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M18.9 3H21l-6.9 7.88L22 21h-6.26l-4.9-6.39L5.2 21H3l7.39-8.45L2 3h6.42l4.42 5.86L18.9 3zm-2.19 16h1.72L7.5 4.9H5.65L16.71 19z"/>
+                    </svg>
+                </span>
+            </button>
+            <button type="button" onclick="shareViaSystem()" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/45 hover:bg-card/80 hover:text-foreground" aria-label="Share to more apps" title="More apps">
+                <span class="flex h-8 w-8 items-center justify-center rounded-full border border-primary/25 bg-primary/10 text-primary transition group-hover:scale-105">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="18" cy="5" r="2.2"></circle>
+                        <circle cx="6" cy="12" r="2.2"></circle>
+                        <circle cx="18" cy="19" r="2.2"></circle>
+                        <path d="M8.2 12.9L15.8 17.2"></path>
+                        <path d="M15.8 6.8L8.2 11.1"></path>
+                    </svg>
+                </span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+
+let currentShareUrl = '';
+let currentShareTitle = 'Discussion Hub';
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function addPostActionDelegates() {
+    document.body.addEventListener('click', function(event) {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+
+        const postCard = button.closest('[data-post-id]');
+        if (!postCard) return;
+
+        const action = button.dataset.action;
+        const postId = postCard.dataset.postId;
+        if (!action || !postId) return;
+
+        event.preventDefault();
+        handlePostAction(postId, action);
+    });
+}
+
+function setVoteCardProgress(card, yesValue, noValue) {
+    const yesBar = card.querySelector('[data-vote-bar="yes"]');
+    const noBar = card.querySelector('[data-vote-bar="no"]');
+    const yesLabel = card.querySelector('[data-vote-label="yes"]');
+    const noLabel = card.querySelector('[data-vote-label="no"]');
+    if (!yesBar || !noBar || !yesLabel || !noLabel) return;
+
+    yesBar.style.width = `${yesValue.toFixed(2)}%`;
+    noBar.style.width = `${noValue.toFixed(2)}%`;
+    yesLabel.textContent = `Yes: ${yesValue.toFixed(1)}%`;
+    noLabel.textContent = `No: ${noValue.toFixed(1)}%`;
+}
+
+function resetVoteCard(card) {
+    if (!card) return;
+    card.dataset.voteAnimated = 'false';
+    card.dataset.voteAnimating = 'false';
+    setVoteCardProgress(card, 0, 0);
+}
+
+function animateVoteCard(card) {
+    if (!card || card.dataset.voteAnimating === 'true') return;
+    if (card.dataset.voteAnimated === 'true') return;
+
+    const yesBar = card.querySelector('[data-vote-bar="yes"]');
+    const noBar = card.querySelector('[data-vote-bar="no"]');
+    const yesLabel = card.querySelector('[data-vote-label="yes"]');
+    const noLabel = card.querySelector('[data-vote-label="no"]');
+    if (!yesBar || !noBar || !yesLabel || !noLabel) return;
+
+    const yesTarget = parseFloat(yesBar.dataset.target || '0') || 0;
+    const noTarget = parseFloat(noBar.dataset.target || '0') || 0;
+    const duration = 700;
+    const start = performance.now();
+    card.dataset.voteAnimating = 'true';
+
+    function step(now) {
+        const progress = Math.min((now - start) / duration, 1);
+        const yesValue = yesTarget * progress;
+        const noValue = noTarget * progress;
+        setVoteCardProgress(card, yesValue, noValue);
+
+        if (progress < 1) {
+            requestAnimationFrame(step);
+        } else {
+            card.dataset.voteAnimated = 'true';
+            card.dataset.voteAnimating = 'false';
+            setVoteCardProgress(card, yesTarget, noTarget);
+        }
+    }
+
+    requestAnimationFrame(step);
+}
+
+function initVoteAnimations() {
+    const voteCards = document.querySelectorAll('[data-vote-card]');
+    if (!voteCards.length) return;
+
+    if (!('IntersectionObserver' in window)) {
+        voteCards.forEach(animateVoteCard);
+        return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                animateVoteCard(entry.target);
+            } else {
+                resetVoteCard(entry.target);
+            }
+        });
+    }, { threshold: 0.35 });
+
+    voteCards.forEach((card) => observer.observe(card));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    addPostActionDelegates();
+    initVoteAnimations();
+});
+
+function handlePostAction(postId, action) {
+    fetch(`/posts/${encodeURIComponent(postId)}/action/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: `action=${encodeURIComponent(action)}`,
+    })
+    .then(async response => {
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            throw new Error('login_required');
+        }
+    })
+    .then(data => {
+        if (!data.success) {
+            alert(data.error || 'Unable to perform action.');
+            return;
+        }
+
+        // Update button states and counts
+        updatePostActionUI(postId, action, data.status, data.counts);
+
+        // Add like animation if liked
+        if (action === 'like' && data.status === 'added') {
+            const postCard = document.querySelector(`[data-post-id="${postId}"]`);
+            const likeButton = postCard.querySelector('button[data-action="like"]');
+            if (likeButton) {
+                likeButton.classList.add('like-animation');
+                setTimeout(() => likeButton.classList.remove('like-animation'), 600);
+            }
+        }
+
+        const message = {
+            added: 'Saved!',
+            removed: 'Removed!',
+            reposted: 'Post reposted. You can view it in your profile posts.',
+            already_reposted: 'Repost removed.',
+        }[data.status] || 'Action completed.';
+
+        // Show toast notification instead of alert
+        showToast(message, data.status === 'error' ? 'error' : 'success');
+
+        if (action === 'repost' && data.status === 'reposted') {
+            showToast('Post reposted successfully!');
+        }
+    })
+    .catch((error) => {
+        if (error.message === 'login_required') {
+            showToast('Please login to use post actions.', 'error');
+        } else {
+            showToast('Network error. Please try again.', 'error');
+        }
+    });
+}
+
+function updatePostActionUI(postId, action, status, counts) {
+    const postCard = document.querySelector(`[data-post-id="${postId}"]`);
+    if (!postCard) return;
+
+    // Update button states and counts using stable data-action selectors
+    const likeButton = postCard.querySelector('button[data-action="like"]');
+    const repostButton = postCard.querySelector('button[data-action="repost"]');
+    const saveButton = postCard.querySelector('button[data-action="save"]');
+
+    if (likeButton && counts) {
+        const likeSpan = likeButton.querySelector('span');
+        if (likeSpan) likeSpan.textContent = counts.like || 0;
+
+        if (status === 'added' && action === 'like') {
+            likeButton.classList.remove('text-muted-foreground');
+            likeButton.classList.add('text-red-500');
+        } else if (status === 'removed' && action === 'like') {
+            likeButton.classList.remove('text-red-500');
+            likeButton.classList.add('text-muted-foreground');
+        }
+    }
+
+    if (repostButton && counts) {
+        const repostSpan = repostButton.querySelector('span');
+        if (repostSpan) {
+            let newCount = counts.repost || 0;
+            if (status === 'already_reposted' && action === 'repost') {
+                newCount = Math.max(0, newCount - 1); // Decrement for un-repost
+            }
+            repostSpan.textContent = newCount;
+        }
+
+        if (status === 'added' && action === 'repost') {
+            repostButton.classList.remove('text-muted-foreground');
+            repostButton.classList.add('text-green-500', 'shadow-md', 'shadow-green-500/20', 'bg-green-50/50');
+        } else if ((status === 'removed' || status === 'already_reposted') && action === 'repost') {
+            repostButton.classList.remove('text-green-500', 'shadow-md', 'shadow-green-500/20', 'bg-green-50/50');
+            repostButton.classList.add('text-muted-foreground');
+        }
+    }
+
+    if (saveButton && counts) {
+        const saveSpan = saveButton.querySelector('span');
+        if (saveSpan) saveSpan.textContent = counts.save || 0;
+
+        if (status === 'added' && action === 'save') {
+            saveButton.classList.remove('text-muted-foreground');
+            saveButton.classList.add('text-primary');
+        } else if (status === 'removed' && action === 'save') {
+            saveButton.classList.remove('text-primary');
+            saveButton.classList.add('text-muted-foreground');
+        }
+    }
+
+
+}
+
+function showToast(message, type = 'success') {
+    const toastRoot = document.getElementById('toast-root');
+    if (!toastRoot) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <div class="flex items-center gap-2">
+            <span>${message}</span>
+        </div>
+    `;
+
+    toastRoot.appendChild(toast);
+
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
+
+function openSharePanel(triggerButton) {
+    const postCard = triggerButton.closest('[data-post-id]');
+    if (!postCard) return;
+
+    const sharePath = postCard.dataset.shareUrl || '/';
+    const titleEl = postCard.querySelector('.trend-title a');
+    const title = titleEl ? titleEl.textContent.trim() : 'Discussion';
+
+    currentShareUrl = new URL(sharePath, window.location.origin).toString();
+    currentShareTitle = title;
+
+    const modal = document.getElementById('share-post-modal');
+    const input = document.getElementById('share-url-input');
+    const titleText = document.getElementById('share-post-title');
+    if (!modal || !input || !titleText) return;
+
+    input.value = currentShareUrl;
+    titleText.textContent = title;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeSharePanel() {
+    const modal = document.getElementById('share-post-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+async function copyShareUrl() {
+    if (!currentShareUrl) return;
+
+    try {
+        await navigator.clipboard.writeText(currentShareUrl);
+        showToast('Share URL copied.', 'success');
+    } catch (error) {
+        const input = document.getElementById('share-url-input');
+        if (!input) return;
+        input.focus();
+        input.select();
+        document.execCommand('copy');
+        showToast('Share URL copied.', 'success');
     }
 }
+
+function shareToPlatform(platform) {
+    if (!currentShareUrl) return;
+
+    const encodedUrl = encodeURIComponent(currentShareUrl);
+    const encodedText = encodeURIComponent(`${currentShareTitle} ${currentShareUrl}`);
+    let targetUrl = '';
+
+    if (platform === 'facebook') {
+        targetUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
+    } else if (platform === 'whatsapp') {
+        targetUrl = `https://wa.me/?text=${encodedText}`;
+    } else if (platform === 'gmail') {
+        const subject = encodeURIComponent(`Discussion: ${currentShareTitle}`);
+        targetUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${encodedText}`;
+    } else if (platform === 'x') {
+        targetUrl = `https://twitter.com/intent/tweet?text=${encodedText}`;
+    } else if (platform === 'instagram') {
+        copyShareUrl();
+        targetUrl = 'https://www.instagram.com/';
+        showToast('URL copied. Paste it in Instagram.', 'success');
+    }
+
+    if (!targetUrl) return;
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+}
+
+async function shareViaSystem() {
+    if (!currentShareUrl) return;
+
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: currentShareTitle,
+                text: currentShareTitle,
+                url: currentShareUrl,
+            });
+            return;
+        } catch (error) {
+            if (error && error.name === 'AbortError') {
+                return;
+            }
+        }
+    }
+
+    await copyShareUrl();
+    showToast('Native share unavailable. URL copied instead.', 'success');
+}
+
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('share-post-modal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    if (event.target === modal) closeSharePanel();
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeSharePanel();
+    }
+});
+
+// Mobile: if a debate chat was minimized, show a small resume button on Home.
+(function() {
+    if (window.innerWidth >= 768) {
+        return;
+    }
+
+    let debateId = '';
+    try {
+        debateId = sessionStorage.getItem('dhMobileMinimizedDebateId') || '';
+    } catch {}
+
+    if (!debateId) {
+        return;
+    }
+
+    const stateKey = 'dhMobileChatState:' + debateId;
+
+    function readState() {
+        try {
+            const raw = sessionStorage.getItem(stateKey);
+            if (!raw) {
+                return { mode: 'minimized', lastSeenMessageId: 0 };
+            }
+            const parsed = JSON.parse(raw);
+            return {
+                mode: parsed && parsed.mode === 'closed' ? 'closed' : 'minimized',
+                lastSeenMessageId: Number(parsed && parsed.lastSeenMessageId) || 0,
+            };
+        } catch {
+            return { mode: 'minimized', lastSeenMessageId: 0 };
+        }
+    }
+
+    function writeState(next) {
+        try {
+            sessionStorage.setItem(stateKey, JSON.stringify({
+                mode: next.mode === 'closed' ? 'closed' : 'minimized',
+                lastSeenMessageId: Number(next.lastSeenMessageId) || 0,
+                updatedAt: Date.now(),
+            }));
+        } catch {}
+    }
+
+    function clearState() {
+        try {
+            sessionStorage.removeItem('dhMobileMinimizedDebateId');
+            sessionStorage.removeItem('dhMobileMinimizedPostId');
+            sessionStorage.removeItem('dhMobileMinimizedAt');
+            sessionStorage.removeItem(stateKey);
+        } catch {}
+    }
+
+    const style = document.createElement('style');
+    style.textContent = `
+        .dh-mobile-chat-resume {
+            position: fixed;
+            right: 14px;
+            bottom: 18px;
+            z-index: 7000;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, hsl(var(--primary)), hsl(186 84% 28%));
+            color: hsl(var(--primary-foreground));
+            padding: 10px 14px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.24);
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+            letter-spacing: 0.01em;
+        }
+        .dh-mobile-chat-resume-icon {
+            width: 26px;
+            height: 26px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.16);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .dh-mobile-chat-resume-close {
+            width: 20px;
+            height: 20px;
+            border: none;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.14);
+            color: inherit;
+            font-size: 12px;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        @keyframes dhResumeBadgePop {
+            0% { transform: scale(0.9); }
+            55% { transform: scale(1.16); }
+            100% { transform: scale(1); }
+        }
+        .dh-mobile-chat-resume-badge {
+            min-width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            padding: 0 6px;
+            background: rgba(239, 68, 68, 0.95);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 800;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.22);
+        }
+        .dh-mobile-chat-resume-badge.show {
+            display: inline-flex;
+        }
+        .dh-mobile-chat-resume-badge.bump {
+            animation: dhResumeBadgePop 360ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .dh-mobile-chat-resume.hidden {
+            display: none;
+        }
+    `;
+    document.head.appendChild(style);
+
+    const wrapper = document.createElement('a');
+    wrapper.className = 'dh-mobile-chat-resume hidden';
+    wrapper.href = '/debates/' + encodeURIComponent(debateId) + '/chat/';
+    wrapper.innerHTML = `
+        <span class="dh-mobile-chat-resume-icon">💬</span>
+        <span>Resume chat</span>
+        <span class="dh-mobile-chat-resume-badge" id="dh-mobile-chat-resume-badge"></span>
+        <button type="button" class="dh-mobile-chat-resume-close" aria-label="Dismiss">✕</button>
+    `;
+
+    const badge = wrapper.querySelector('#dh-mobile-chat-resume-badge');
+    let lastResumeUnread = 0;
+
+    function animateResumeBadge() {
+        if (!badge) return;
+        badge.classList.remove('bump');
+        void badge.offsetWidth;
+        badge.classList.add('bump');
+    }
+
+    function setBadge(count) {
+        const n = Number(count) || 0;
+        if (!badge) return;
+        badge.textContent = n > 99 ? '99+' : String(n);
+        badge.classList.toggle('show', n > 0);
+        if (n > 0 && n !== lastResumeUnread) {
+            animateResumeBadge();
+        }
+        if (n < 1) {
+            badge.classList.remove('bump');
+        }
+        lastResumeUnread = n;
+    }
+
+    function setVisible(isVisible) {
+        wrapper.classList.toggle('hidden', !isVisible);
+    }
+
+    function refreshVisibility() {
+        fetch('/chats/list/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data || !data.success || !Array.isArray(data.chats)) {
+                    setVisible(false);
+                    return;
+                }
+                const chat = data.chats.find(c => String(c.id) === String(debateId));
+                if (!chat) {
+                    setVisible(false);
+                    return;
+                }
+
+                const latestId = Number(chat.last_message_id || 0);
+                const state = readState();
+                const unread = Math.max(latestId - Number(state.lastSeenMessageId || 0), 0);
+                const shouldShow = state.mode === 'minimized' || (state.mode === 'closed' && unread > 0);
+
+                setVisible(shouldShow);
+                setBadge(unread);
+            })
+            .catch(() => {});
+    }
+
+    const closeBtn = wrapper.querySelector('.dh-mobile-chat-resume-close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            const state = readState();
+            writeState({ mode: 'closed', lastSeenMessageId: Number(state.lastSeenMessageId || 0) });
+            wrapper.remove();
+        });
+    }
+
+    wrapper.addEventListener('click', function(event) {
+        if (event.target && event.target.closest('.dh-mobile-chat-resume-close')) {
+            return;
+        }
+        clearState();
+    });
+
+    document.body.appendChild(wrapper);
+    refreshVisibility();
+    const pollTimer = window.setInterval(refreshVisibility, 4000);
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            refreshVisibility();
+        }
+    });
+    window.addEventListener('beforeunload', function() {
+        clearInterval(pollTimer);
+    });
+})();
+
 </script>
+
 {% endblock %}

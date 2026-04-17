@@ -1,9 +1,11 @@
 {% extends 'frontend/base.html' %}
+{% load static %}
 
 {% block title %}Debate Chat - Discussion Hub{% endblock %}
 
 {% block content %}
 {{ active_participants|json_script:"dh-debate-active-participants" }}
+<link rel="stylesheet" href="{% static 'css/chatbox_modern.css' %}" defer>
 {# ── Desktop: open floating panel and redirect away ───────── #}
 <script>
 (function() {
@@ -45,136 +47,562 @@
 <style>
   @media (min-width: 768px) { #mc-shell, #mc-chathead { display: none !important; } }
   @media (max-width: 767px) {
-    /* hide default page chrome (nav, footer, main padding) when chat is open */
-    body.mc-open > nav,
-    body.mc-open > footer,
-    body.mc-open > main > .mc-hide-when-open { display: none; }
-    body.mc-open > main { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+    @keyframes mcSheetIn {
+      from { opacity: 0; transform: translateY(20px) scale(0.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes mcAmbientDrift {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+    body.mc-open {
+      background:
+        radial-gradient(1200px 700px at 50% -20%, hsl(var(--primary) / 0.16), transparent 72%),
+        linear-gradient(180deg, hsl(var(--background)), hsl(var(--background) / 0.98));
+    }
+    body.mc-open > main {
+      padding-bottom: calc(100dvh - 120px) !important;
+    }
 
     #mc-shell {
-      position: fixed; inset: 0; z-index: 8000;
+      position: fixed;
+      left: 10px;
+      right: 10px;
+      top: calc(env(safe-area-inset-top, 0px) + 76px);
+      bottom: 10px;
+      height: auto;
+      z-index: 100;
       display: flex; flex-direction: column;
-      background: hsl(var(--background));
-      transition: transform 0.32s cubic-bezier(.4,0,.2,1), opacity 0.28s ease;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 28px;
+      background:
+        radial-gradient(900px 500px at 20% 0%, hsl(var(--primary) / 0.12), transparent 75%),
+        radial-gradient(900px 500px at 80% 100%, hsl(var(--primary) / 0.09), transparent 75%),
+        linear-gradient(180deg, hsl(var(--card) / 0.98), hsl(var(--background) / 0.98));
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      transition: transform 0.32s cubic-bezier(.34, 1.56, .64, 1), opacity 0.28s ease;
+      box-shadow: 0 24px 60px rgba(2, 6, 23, 0.34), 0 12px 24px rgba(2, 6, 23, 0.16);
+      overflow: hidden;
+      animation: mcSheetIn 420ms cubic-bezier(0.2, 0.9, 0.35, 1) both;
+    }
+    #mc-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(120deg, rgba(255, 255, 255, 0.03), transparent 45%, rgba(255, 255, 255, 0.02));
+    }
+    #mc-shell::after {
+      content: "";
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      width: 54px;
+      height: 5px;
+      border-radius: 999px;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,0.18);
+      pointer-events: none;
+      animation: mcAmbientDrift 6s ease-in-out infinite;
     }
     #mc-shell.mc-hidden {
-      transform: translateY(100%); opacity: 0; pointer-events: none;
+      transform: translateY(100%) scale(0.95); opacity: 0; pointer-events: none;
     }
 
     /* ─── Header ─── */
     #mc-header {
-      display: flex; align-items: center; gap: 10px; padding: 10px 14px;
-      padding-top: max(10px, env(safe-area-inset-top, 10px));
-      background-image: var(--float-gradient);
+      display: flex; align-items: center; gap: 10px; padding: 18px 14px 10px;
+      padding-top: max(18px, calc(env(safe-area-inset-top, 0px) + 10px));
+      background: linear-gradient(135deg, hsl(var(--card) / 0.95), hsl(var(--card) / 0.78));
+      background-image: 
+        linear-gradient(135deg, hsl(var(--card) / 0.95), hsl(var(--card) / 0.78)),
+        radial-gradient(600px at 50% 0%, hsl(var(--primary) / 0.14), transparent 80%);
       color: hsl(var(--primary-foreground));
-      box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+      box-shadow: 0 10px 26px rgba(2, 6, 23, 0.22), inset 0 1px 0 rgba(255,255,255,0.12);
       flex-shrink: 0;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      position: sticky;
+      top: 0;
+      z-index: 4;
     }
-    #mc-back {
-      background: rgba(255,255,255,0.15); border: none; color: inherit;
-      width: 36px; height: 36px; border-radius: 50%; cursor: pointer; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px; transition: background 0.15s;
-    }
-    #mc-back:hover { background: rgba(255,255,255,0.28); }
     #mc-avatar-wrap { position: relative; flex-shrink: 0; }
     #mc-avatar {
       width: 40px; height: 40px; border-radius: 50%;
-      background-image: var(--float-gradient);
+      background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.6));
       display: flex; align-items: center; justify-content: center;
-      font-size: 17px; font-weight: 700;
-      border: 2px solid rgba(255,255,255,0.36);
+      font-size: 17px; font-weight: 800;
+      border: 2.5px solid rgba(255,255,255,0.3);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.15), 0 4px 12px rgba(0,0,0,0.1);
     }
     #mc-avatar-img {
       width: 40px; height: 40px; border-radius: 50%;
-      object-fit: cover; border: 2px solid rgba(255,255,255,0.36);
+      object-fit: cover; border: 2.5px solid rgba(255,255,255,0.3);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
     #mc-online-dot {
       position: absolute; bottom: 1px; right: 1px;
-      width: 10px; height: 10px; border-radius: 50%;
-      background: #4ade80; border: 2px solid hsl(var(--primary));
+      width: 12px; height: 12px; border-radius: 50%;
+      background: linear-gradient(135deg, #4ade80, #22c55e); 
+      border: 3px solid hsl(var(--background));
+      animation: onlinePulse 2.4s cubic-bezier(.5,0,.5,1) infinite;
+      box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
     }
-    #mc-header-info { flex: 1; min-width: 0; }
+    @keyframes onlinePulse {
+      0%   { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
+      70%  { box-shadow: 0 0 0 8px rgba(74, 222, 128, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+    }
+    #mc-header-info {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+    }
     #mc-opp-name {
-      font-size: 15px; font-weight: 600; letter-spacing: 0.01em;
+      font-size: 13.4px; font-weight: 800; letter-spacing: 0.012em;
+      color: hsl(var(--foreground));
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 100%;
+      line-height: 1.2;
     }
     #mc-sub {
-      font-size: 11px; opacity: 0.75; margin-top: 1px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+      font-size: 10.5px; opacity: 0.84; margin-top: 0;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-weight: 700;
+      letter-spacing: 0.012em;
+      color: hsl(var(--muted-foreground));
     }
-    #mc-hacts { display: flex; gap: 6px; }
+    #mc-peer-name,
+    #mc-controller-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #mc-controller-text {
+      flex: 1;
+      min-width: 0;
+    }
+    #mc-hacts { display: flex; gap: 4px; align-items: center; }
     #mc-hacts button {
-      background: rgba(255,255,255,0.15); border: none; color: inherit;
-      width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.15s; flex-shrink: 0;
+      background: hsl(var(--background) / 0.82);
+      border: 1px solid hsl(var(--border) / 0.9);
+      color: hsl(var(--foreground));
+      width: 34px;
+      min-width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      padding: 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      flex-shrink: 0;
+      font-weight: 700;
+      font-size: 11px;
+      line-height: 1;
+      white-space: nowrap;
     }
-    #mc-hacts button:hover { background: rgba(255,255,255,0.30); }
+    #mc-menu-btn.is-active {
+      background: hsl(var(--background));
+      box-shadow: 0 0 0 3px hsl(var(--primary) / 0.12);
+    }
+    #mc-hacts button[onclick*="mcToggleMinimize"] {
+      width: 34px;
+      min-width: 34px;
+      padding: 0;
+      border-radius: 50%;
+    }
+    #mc-hacts button:active { 
+      transform: scale(0.88);
+      background: hsl(var(--background));
+      box-shadow: 0 0 0 4px hsl(var(--primary) / 0.15);
+    }
+    #mc-leave-btn {
+      background: rgba(245, 158, 11, 0.16);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #b45309;
+    }
+    #mc-end-btn {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.35);
+      color: #b91c1c;
+    }
+    #mc-rejoin-btn {
+      background: rgba(34, 197, 94, 0.16);
+      border-color: rgba(34, 197, 94, 0.35);
+      color: #166534;
+    }
+    html[data-theme="dark"] #mc-hacts button {
+      background: hsl(var(--secondary));
+      border-color: hsl(var(--border));
+      color: hsl(var(--foreground));
+    }
+    html[data-theme="dark"] #mc-leave-btn {
+      background: rgba(245, 158, 11, 0.24);
+      border-color: rgba(245, 158, 11, 0.5);
+      color: #fcd34d;
+    }
+    html[data-theme="dark"] #mc-end-btn {
+      background: rgba(239, 68, 68, 0.24);
+      border-color: rgba(239, 68, 68, 0.5);
+      color: #fca5a5;
+    }
+    html[data-theme="dark"] #mc-rejoin-btn {
+      background: rgba(34, 197, 94, 0.24);
+      border-color: rgba(34, 197, 94, 0.5);
+      color: #86efac;
+    }
 
     /* ── Supporters strip ── */
     #mc-sup-strip {
-      display: flex; align-items: center; gap: 8px; padding: 6px 16px;
-      background: hsl(var(--card)); border-bottom: 1px solid hsl(var(--border));
+      display: flex; align-items: center; gap: 8px; padding: 8px 16px;
+      background: hsl(var(--card) / 0.82); 
+      border-bottom: 1px solid rgba(255,255,255,0.08);
       flex-shrink: 0;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      background: linear-gradient(90deg, hsl(var(--card) / 0.96), hsl(var(--card) / 0.82));
+    }
+    #mc-top-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 8px 14px;
+      background: linear-gradient(90deg, hsl(var(--card) / 0.95), hsl(var(--card) / 0.86));
+      border-bottom: 1px solid hsl(var(--border) / 0.7);
+    }
+    #mc-top-actions button {
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--background) / 0.82);
+      color: hsl(var(--foreground));
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #mc-top-actions button:hover {
+      border-color: hsl(var(--primary) / 0.55);
+      box-shadow: 0 10px 20px -16px hsl(var(--primary) / 0.52);
+      transform: translateY(-1px);
+    }
+    #mc-top-actions button:active {
+      transform: scale(0.93);
+      box-shadow: 0 0 0 3px hsl(var(--primary) / 0.14);
+    }
+    #mc-overflow-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 14px;
+      z-index: 6;
+      min-width: 148px;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      border-radius: 18px;
+      border: 1px solid hsl(var(--border));
+      background: linear-gradient(180deg, hsl(var(--card) / 0.98), hsl(var(--background) / 0.96));
+      box-shadow: 0 16px 32px rgba(2, 6, 23, 0.24);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    #mc-overflow-menu.show {
+      display: flex;
+    }
+    #mc-overflow-menu button {
+      width: 100%;
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--background) / 0.84);
+      color: hsl(var(--foreground));
+      border-radius: 14px;
+      padding: 9px 12px;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      text-align: left;
+      cursor: pointer;
+    }
+    #mc-overflow-menu button.leave,
+    #mc-overflow-menu button.rejoin {
+      border-radius: 999px;
+      text-align: center;
+    }
+    #mc-overflow-menu button.leave {
+      background: rgba(245, 158, 11, 0.14);
+      border-color: rgba(245, 158, 11, 0.35);
+      color: #b45309;
+    }
+    #mc-overflow-menu button.rejoin {
+      background: rgba(34, 197, 94, 0.14);
+      border-color: rgba(34, 197, 94, 0.35);
+      color: #166534;
     }
     #mc-caution {
-      padding: 8px 16px;
+      padding: 9px 16px;
+      font-size: 10px;
+      line-height: 1.5;
+      color: hsl(var(--muted-foreground));
+      background: linear-gradient(90deg, hsl(var(--primary) / 0.08), hsl(var(--primary) / 0.03));
+      border-bottom: 1px solid hsl(var(--border) / 0.45);
+      border-top: 1px solid hsl(var(--primary) / 0.12);
+      font-weight: 600;
+      letter-spacing: 0.015em;
+    }
+    #mc-chat-presence {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 14px;
+      background: linear-gradient(90deg, hsl(var(--card) / 0.96), hsl(var(--card) / 0.88));
+      border-bottom: 1px solid hsl(var(--border) / 0.55);
+    }
+    #mc-chat-presence.show {
+      display: flex;
+    }
+    #mc-chat-presence-label {
+      min-width: 0;
       font-size: 11px;
-      line-height: 1.45;
+      font-weight: 700;
+      color: hsl(var(--muted-foreground));
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #mc-chat-presence-toggle {
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--background) / 0.82);
       color: hsl(var(--foreground));
-      background: rgba(251, 191, 36, 0.14);
-      border-bottom: 1px solid hsl(var(--border));
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #mc-chat-presence-toggle.has-unread {
+      border-color: hsl(var(--primary) / 0.5);
+      box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+    }
+    #mc-other-chats {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px 14px;
+      background: linear-gradient(180deg, hsl(var(--card) / 0.94), hsl(var(--background) / 0.9));
+      border-bottom: 1px solid hsl(var(--border) / 0.55);
+    }
+    #mc-other-chats.show {
+      display: flex;
+    }
+    .mc-other-chat-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--background) / 0.76);
+      border-radius: 18px;
+      padding: 9px 10px;
+      text-align: left;
+      cursor: pointer;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    .mc-other-chat-item:hover {
+      border-color: hsl(var(--primary) / 0.52);
+      box-shadow: 0 10px 18px -16px hsl(var(--primary) / 0.56);
+      transform: translateY(-1px);
+    }
+    .mc-other-chat-avatar,
+    .mc-other-chat-avatar-fallback {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .mc-other-chat-avatar {
+      object-fit: cover;
+      border: 1px solid rgba(255,255,255,0.14);
+    }
+    .mc-other-chat-avatar-fallback {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.6));
+      color: hsl(var(--primary-foreground));
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .mc-other-chat-copy {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .mc-other-chat-name,
+    .mc-other-chat-title,
+    .mc-other-chat-preview {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mc-other-chat-name {
+      font-size: 12px;
+      font-weight: 800;
+      color: hsl(var(--foreground));
+    }
+    .mc-other-chat-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: hsl(var(--muted-foreground));
+    }
+    .mc-other-chat-preview {
+      font-size: 10px;
+      color: hsl(var(--muted-foreground));
+      opacity: 0.9;
+    }
+    .mc-other-chat-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+    .mc-other-chat-time {
+      font-size: 9px;
+      font-weight: 700;
+      color: hsl(var(--muted-foreground));
+    }
+    .mc-other-chat-unread {
+      min-width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      padding: 0 5px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+      color: hsl(var(--primary-foreground));
+      font-size: 10px;
+      font-weight: 800;
     }
     .mc-badge {
-      font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+      font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 999px;
+      animation: badgeSlide 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid transparent;
+      background: linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.08));
+      border-color: hsl(var(--primary) / 0.25);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
-    .mc-badge-y { background: rgba(16,207,145,0.14); color: #0d9970; }
-    .mc-badge-n { background: rgba(239,68,68,0.13); color: #dc2626; }
-    html[data-theme="dark"] .mc-badge-y { background: rgba(16,207,145,0.24); color:#34d399; }
-    html[data-theme="dark"] .mc-badge-n { background: rgba(239,68,68,0.22); color:#f87171; }
+    @keyframes badgeSlide {
+      from { opacity: 0; transform: translateY(-4px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .mc-badge-y,
+    .mc-badge-n {
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(22, 163, 74, 0.1));
+      color: hsl(var(--foreground));
+      border-color: rgba(34, 197, 94, 0.25);
+    }
+    html[data-theme="dark"] .mc-badge-y,
+    html[data-theme="dark"] .mc-badge-n {
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(22, 163, 74, 0.1));
+      color: hsl(var(--foreground));
+    }
     #mc-topic {
-      flex: 1; font-size: 11px; color: hsl(var(--muted-foreground));
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right;
+      flex: 1; min-width: 0; font-size: 11.5px; color: hsl(var(--foreground));
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left;
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      opacity: 0.86;
     }
 
     /* ── Messages ── */
     #mc-msgs {
-      flex: 1; overflow-y: auto; padding: 8px 6px 4px;
-      display: flex; flex-direction: column; gap: 8px;
+      flex: 1; overflow-y: auto; padding: 14px 10px 8px;
+      display: flex; flex-direction: column; gap: 10px;
       -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+      background:
+        radial-gradient(650px 280px at 100% 0%, hsl(var(--primary) / 0.07), transparent 72%),
+        linear-gradient(180deg, hsl(var(--background) / 0.75), hsl(var(--background) / 0.98));
     }
-    #mc-msgs::-webkit-scrollbar { display: none; }
+    #mc-msgs .mc-bubble {
+      line-height: 1.64;
+      letter-spacing: 0.003em;
+    }
+    #mc-msgs::-webkit-scrollbar { width: 6px; }
+    #mc-msgs::-webkit-scrollbar-track { background: transparent; }
+    #mc-msgs::-webkit-scrollbar-thumb {
+      background: hsl(var(--border));
+      border-radius: 3px;
+    }
+    #mc-msgs::-webkit-scrollbar-thumb:hover {
+      background: hsl(var(--primary) / 0.5);
+    }
 
     .mc-date-divider {
       display: flex;
       justify-content: center;
-      margin: 4px 0 2px;
+      margin: 8px 0 4px;
     }
     .mc-date-divider span {
       font-size: 10px;
       color: hsl(var(--muted-foreground));
-      background: hsl(var(--background) / 0.72);
+      background: hsl(var(--muted) / 0.5);
       border: 1px solid hsl(var(--border));
       border-radius: 999px;
-      padding: 2px 8px;
-      opacity: 0.78;
+      padding: 3px 12px;
+      opacity: 0.8;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+      backdrop-filter: blur(8px);
+      animation: dateSlide 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+    @keyframes dateSlide {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 0.8; transform: scale(1); }
     }
     .mc-sticky-date {
       position: sticky;
-      top: 6px;
+      top: 8px;
       align-self: center;
       z-index: 3;
       font-size: 10px;
       color: hsl(var(--muted-foreground));
-      background: hsl(var(--background) / 0.82);
+      background: hsl(var(--muted) / 0.6);
       border: 1px solid hsl(var(--border));
       border-radius: 999px;
-      padding: 2px 8px;
+      padding: 3px 12px;
       opacity: 0;
-      transform: translateY(-2px);
-      transition: opacity 0.18s ease, transform 0.18s ease;
+      transform: translateY(-6px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
       pointer-events: none;
+      backdrop-filter: blur(8px);
+      font-weight: 700;
     }
     .mc-sticky-date.show {
       opacity: 0.9;
@@ -183,182 +611,245 @@
 
     #mc-empty {
       text-align: center; color: hsl(var(--muted-foreground));
-      font-size: 13px; padding: 40px 20px; line-height: 1.7;
+      font-size: 13px; padding: 60px 20px; line-height: 1.8;
+      font-weight: 500;
     }
-    #mc-empty span { display: block; font-size: 32px; margin-bottom: 10px; }
+    #mc-empty span { display: block; font-size: 48px; margin-bottom: 12px; animation: float 3s ease-in-out infinite; }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-12px); }
+    }
 
-    .mc-msg { display: flex; flex-direction: column; max-width: 96%; width: 100%; }
+    .mc-msg { 
+      display: flex; flex-direction: column; max-width: 100%; width: 100%; 
+      animation: mcMsgIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
     .mc-msg.own { align-self: flex-end; align-items: flex-end; }
     .mc-msg.other { align-self: flex-start; align-items: flex-start; }
-    .mc-row { display: flex; align-items: flex-end; gap: 6px; width: 100%; }
+    .mc-row { display: flex; align-items: flex-end; gap: 8px; width: 100%; }
     .mc-msg.own .mc-row { flex-direction: row-reverse; }
     .mc-msg.own .mc-row { justify-content: flex-start; }
     .mc-msg.other .mc-row { justify-content: flex-start; }
     .mc-msg-avatar {
-      width: 22px; height: 22px; border-radius: 999px; object-fit: cover;
-      border: 1px solid hsl(var(--border)); flex-shrink: 0;
+      width: 28px; height: 28px; border-radius: 50%; object-fit: cover;
+      border: 1.5px solid rgba(255,255,255,0.15);
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
     .mc-msg-avatar-fallback {
-      width: 22px; height: 22px; border-radius: 999px; flex-shrink: 0;
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
-      background-image: var(--float-gradient); color: hsl(var(--primary-foreground));
-      border: 1px solid hsl(var(--border)); font-size: 10px; font-weight: 700;
+      background: linear-gradient(135deg, hsl(var(--primary) / 0.4), hsl(var(--primary) / 0.2));
+      color: hsl(var(--primary-foreground));
+      border: 1.5px solid rgba(255,255,255,0.15);
+      font-size: 11px; font-weight: 800;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
     .mc-msg.own .mc-msg-avatar,
     .mc-msg.own .mc-msg-avatar-fallback { display: none; }
 
-    .mc-msg-main { max-width: 96%; }
+    .mc-msg-main { max-width: 90%; }
 
     .mc-bubble {
-      padding: 9px 13px; font-size: 14px; line-height: 1.5;
+      padding: 11px 15px; font-size: 13.5px; line-height: 1.55;
       word-break: break-word; position: relative;
     }
+    .mc-edited-label {
+      display: block; font-size: 10px; opacity: 0.55; font-style: italic;
+      padding: 0 2px; margin-top: 2px;
+    }
+    .mc-edit-btn {
+      display: none; background: none; border: none; cursor: pointer;
+      font-size: 13px; opacity: 0.45; padding: 2px 4px; line-height: 1;
+      color: hsl(var(--foreground)); border-radius: 4px;
+    }
+    .mc-msg:hover .mc-edit-btn,
+    .mc-msg:focus-within .mc-edit-btn { display: inline-block; }
+    .mc-edit-btn:hover { opacity: 0.9; background: hsl(var(--accent) / 0.15); }
     .mc-msg.own .mc-bubble {
-      background-image: var(--float-gradient); color: hsl(var(--primary-foreground));
-      border-radius: 18px 18px 4px 18px;
+      border: 1px solid transparent;
+      background:
+        linear-gradient(135deg, hsl(var(--primary) / 0.12), hsl(var(--primary) / 0.06)) padding-box,
+        linear-gradient(135deg, hsl(var(--primary) / 0.3), hsl(var(--primary) / 0.15)) border-box;
+      color: hsl(var(--foreground));
+      border-radius: 22px 22px 6px 22px;
+      box-shadow: 0 8px 24px hsl(var(--primary) / 0.15), 0 2px 6px rgba(0,0,0,0.08);
+      backdrop-filter: blur(12px);
     }
     .mc-msg.other .mc-bubble {
-      background: #ffffff; color: #111827;
-      border-radius: 18px 18px 18px 4px;
-      box-shadow: inset 0 0 0 1px rgba(148,163,184,0.42);
+      border: 1px solid transparent;
+      background:
+        linear-gradient(135deg, hsl(var(--card)), hsl(var(--card) / 0.9)) padding-box,
+        linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05)) border-box;
+      color: hsl(var(--foreground));
+      border-radius: 22px 22px 22px 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      backdrop-filter: blur(8px);
     }
-    .mc-msg.other.sender-v1 .mc-bubble { background: #f8fafc; }
-    .mc-msg.other.sender-v2 .mc-bubble { background: #eefaf8; }
-    .mc-msg.other.sender-v3 .mc-bubble { background: #fff7ed; }
-    .mc-msg.other.sender-v4 .mc-bubble { background: #f0fdf4; }
-    html[data-theme="dark"] .mc-msg.other .mc-bubble { background: #1f2937; color: #e5e7eb; box-shadow: inset 0 0 0 1px rgba(100,116,139,0.5); }
-    html[data-theme="dark"] .mc-msg.other.sender-v1 .mc-bubble { background: #1f2937; }
-    html[data-theme="dark"] .mc-msg.other.sender-v2 .mc-bubble { background: #1c3135; }
-    html[data-theme="dark"] .mc-msg.other.sender-v3 .mc-bubble { background: #3a2d1f; }
-    html[data-theme="dark"] .mc-msg.other.sender-v4 .mc-bubble { background: #20322b; }
+    html[data-theme="dark"] .mc-msg.other .mc-bubble { 
+      color: hsl(var(--foreground)); 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2); 
+    }
     .mc-sender {
-      font-size: 10.5px; font-weight: 600; opacity: 0.68; margin-bottom: 3px;
+      font-size: 11px; font-weight: 700; opacity: 0.75; margin-bottom: 4px;
       padding: 0 2px;
+      letter-spacing: 0.01em;
     }
     .mc-meta {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      margin-bottom: 3px;
+      margin-bottom: 4px;
       padding: 0 2px;
     }
     .mc-time-inline {
       font-size: 10px;
-      opacity: 0.55;
+      opacity: 0.5;
       white-space: nowrap;
+      font-weight: 600;
     }
     .mc-time {
-      font-size: 10px; opacity: 0.55; margin-top: 4px; padding: 0 3px;
+      font-size: 10px; opacity: 0.5; margin-top: 5px; padding: 0 3px;
+      font-weight: 600;
     }
     .mc-msg-actions {
       display: flex;
       justify-content: flex-end;
-      margin-top: 4px;
+      margin-top: 6px;
+      gap: 6px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .mc-msg:hover .mc-msg-actions {
+      opacity: 1;
     }
     .mc-remove-btn {
       border: 1px solid rgba(239, 68, 68, 0.4);
       background: rgba(239, 68, 68, 0.12);
       color: #dc2626;
       border-radius: 999px;
-      padding: 3px 8px;
+      padding: 4px 10px;
       font-size: 10px;
       font-weight: 700;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+    .mc-remove-btn:active {
+      transform: scale(0.92);
+      background: rgba(239, 68, 68, 0.2);
     }
     #mc-members {
-      display: flex;
-      gap: 8px;
+      display: none;
+      gap: 10px;
       overflow-x: auto;
-      padding: 8px 12px;
-      background: hsl(var(--card));
-      border-bottom: 1px solid hsl(var(--border));
+      padding: 10px 12px;
+      background: linear-gradient(90deg, hsl(var(--card)), hsl(var(--card) / 0.95));
+      border-bottom: 1px solid rgba(255,255,255,0.05);
       -webkit-overflow-scrolling: touch;
     }
-    #mc-members::-webkit-scrollbar { display: none; }
+    #mc-members.show {
+      display: flex;
+    }
+    #mc-members::-webkit-scrollbar { height: 4px; }
+    #mc-members::-webkit-scrollbar-track { background: transparent; }
+    #mc-members::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+    }
     .mc-member {
       flex: 0 0 auto;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      border: 1px solid hsl(var(--border));
-      background: hsl(var(--background));
-      border-radius: 999px;
-      padding: 4px 6px 4px 4px;
+      gap: 8px;
+      border: 1.5px solid hsl(var(--border));
+      background: hsl(var(--muted) / 0.4);
+      border-radius: 24px;
+      padding: 6px 8px 6px 6px;
       max-width: 78vw;
+      backdrop-filter: blur(8px);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      animation: memberSlide 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+    @keyframes memberSlide {
+      from { opacity: 0; transform: translateX(-8px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .mc-member:hover {
+      background: hsl(var(--muted) / 0.7);
+      border-color: hsl(var(--primary) / 0.4);
     }
     .mc-member-avatar,
     .mc-member-avatar-fallback {
-      width: 20px;
-      height: 20px;
-      border-radius: 999px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
       flex-shrink: 0;
     }
     .mc-member-avatar {
       object-fit: cover;
-      border: 1px solid hsl(var(--border));
+      border: 1.5px solid rgba(255,255,255,0.15);
     }
     .mc-member-avatar-fallback {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      background-image: var(--float-gradient);
+      background: linear-gradient(135deg, hsl(var(--primary) / 0.4), hsl(var(--primary) / 0.2));
       color: hsl(var(--primary-foreground));
       font-size: 10px;
-      font-weight: 700;
+      font-weight: 800;
+      border: 1.5px solid rgba(255,255,255,0.15);
     }
     .mc-member-side {
       display: inline-flex;
       font-size: 8px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
+      font-weight: 800;
+      letter-spacing: 0.05em;
       border-radius: 999px;
       padding: 2px 6px;
-      border: 1px solid transparent;
+      border: 1px solid rgba(255,255,255,0.15);
       line-height: 1;
-      margin-left: 5px;
+      margin-left: 4px;
       vertical-align: middle;
-    }
-    .mc-member-side.yes {
-      color: #0d9970;
-      background: rgba(16, 207, 145, 0.14);
-      border-color: rgba(16, 207, 145, 0.3);
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
     }
     .mc-member-side.no {
-      color: #dc2626;
-      background: rgba(239, 68, 68, 0.13);
-      border-color: rgba(239, 68, 68, 0.28);
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
     }
     .mc-member-presence {
       display: inline-flex;
       font-size: 8px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
+      font-weight: 800;
+      letter-spacing: 0.05em;
       border-radius: 999px;
       padding: 2px 6px;
-      border: 1px solid transparent;
+      border: 1px solid rgba(255,255,255,0.15);
       line-height: 1;
-      margin-left: 5px;
+      margin-left: 4px;
       vertical-align: middle;
     }
     .mc-member-presence.online {
-      color: #0d9970;
-      background: rgba(16, 207, 145, 0.14);
-      border-color: rgba(16, 207, 145, 0.3);
+      color: #22c55e;
+      background: rgba(34, 197, 94, 0.12);
     }
     .mc-member-presence.offline {
       color: hsl(var(--muted-foreground));
-      background: hsl(var(--secondary));
-      border-color: hsl(var(--border));
+      background: rgba(255,255,255,0.06);
     }
-    html[data-theme="dark"] .mc-member-side.yes { color:#34d399; background: rgba(16,207,145,0.24); }
-    html[data-theme="dark"] .mc-member-side.no { color:#f87171; background: rgba(239,68,68,0.22); }
-    html[data-theme="dark"] .mc-member-presence.online { color:#34d399; background: rgba(16,207,145,0.24); }
+    html[data-theme="dark"] .mc-member-side.yes,
+    html[data-theme="dark"] .mc-member-side.no,
+    html[data-theme="dark"] .mc-member-presence.online {
+      color: hsl(var(--foreground));
+      background: hsl(var(--secondary));
+    }
     .mc-member-text { min-width: 0; display: inline-flex; align-items: center; }
     .mc-member-name {
       display: inline-block;
       font-size: 10px;
-      font-weight: 700;
+      font-weight: 800;
       line-height: 1.1;
       white-space: nowrap;
       overflow: hidden;
@@ -366,87 +857,192 @@
     }
     .mc-msg.own .mc-time { text-align: right; }
     .mc-reply-quote {
-      margin-bottom: 5px; border-left: 2px solid hsl(var(--primary));
-      background: hsl(var(--background) / 0.45); border-radius: 8px; padding: 4px 7px;
+      margin-bottom: 7px; border-left: 3px solid hsl(var(--primary) / 0.5);
+      background: hsl(var(--primary) / 0.08); border-radius: 10px; padding: 6px 10px;
     }
-    .mc-reply-quote-name { display: block; font-size: 10px; font-weight: 700; opacity: 0.82; }
+    .mc-reply-quote-name { display: block; font-size: 10px; font-weight: 800; opacity: 0.9; }
     .mc-reply-quote-text {
-      display: block; font-size: 11px; opacity: 0.72;
+      display: block; font-size: 11px; opacity: 0.7;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
     /* ── Input bar ── */
     #mc-inputbar {
-      display: flex; align-items: center; gap: 9px;
-      padding: 10px 12px;
-      padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
-      background: hsl(var(--card)); border-top: 1px solid hsl(var(--border));
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+      background: linear-gradient(to top, hsl(var(--card) / 0.98), hsl(var(--card) / 0.88));
+      border-top: 1px solid rgba(255,255,255,0.1);
       flex-shrink: 0;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 -8px 18px rgba(2, 6, 23, 0.15);
     }
     #mc-replying {
-      display: none; align-items: center; justify-content: space-between; gap: 10px;
-      padding: 7px 12px; border-top: 1px solid hsl(var(--border));
-      background: hsl(var(--secondary) / 0.55);
+      display: none; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 10px 14px; border-top: 1px solid hsl(var(--border) / 0.5);
+      background: linear-gradient(to bottom, hsl(var(--primary) / 0.04), transparent);
+      animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     #mc-replying.show { display: flex; }
     #mc-reply-meta { min-width: 0; }
-    #mc-reply-to { font-size: 11px; font-weight: 700; color: hsl(var(--foreground)); }
+    #mc-reply-to { font-size: 12px; font-weight: 700; color: hsl(var(--foreground)); }
     #mc-reply-text {
       font-size: 11px; color: hsl(var(--muted-foreground));
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     #mc-reply-close {
-      width: 22px; height: 22px; border-radius: 999px; border: none;
-      background: transparent; color: hsl(var(--muted-foreground));
+      width: 24px; height: 24px; border-radius: 50%; border: none;
+      background: rgba(255,255,255,0.1); color: hsl(var(--muted-foreground));
       display: inline-flex; align-items: center; justify-content: center;
-      cursor: pointer;
+      cursor: pointer; flex-shrink: 0;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      font-weight: 700;
     }
-    #mc-reply-close:active { transform: scale(0.92); }
+    #mc-reply-close:active { transform: scale(0.85); background: rgba(255,255,255,0.15); }
     #mc-inp {
-      flex: 1; border: 1.5px solid hsl(var(--input));
-      background: hsl(var(--background)); color: hsl(var(--foreground));
-      border-radius: 999px; padding: 10px 18px; font-size: 14px;
-      font-family: 'Manrope', sans-serif; font-weight: 300; outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
+      flex: 1; border: 1.5px solid hsl(var(--border));
+      background: linear-gradient(to bottom, hsl(var(--background) / 0.98), hsl(var(--background) / 0.92));
+      color: hsl(var(--foreground));
+      border-radius: 24px; padding: 12px 18px; font-size: 14px;
+      font-family: 'Manrope', sans-serif; font-weight: 400; outline: none;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       -webkit-appearance: none;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
     }
     #mc-inp:focus {
-      border-color: hsl(var(--primary));
-      box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+      border-color: hsl(var(--primary) / 0.6);
+      background: linear-gradient(to bottom, hsl(var(--background)), hsl(var(--background) / 0.95));
+      box-shadow: 0 0 0 3px hsl(var(--primary) / 0.12), 0 0 20px hsl(var(--primary) / 0.15), inset 0 0 0 1px hsl(var(--primary) / 0.15);
     }
-    #mc-inp::placeholder { color: hsl(var(--muted-foreground)); }
+    #mc-inp::placeholder { color: hsl(var(--muted-foreground) / 0.6); font-weight: 400; }
+    #mc-inp:disabled { opacity: 0.6; cursor: not-allowed; }
     #mc-send {
-      width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
-      background-image: var(--float-gradient); color: hsl(var(--primary-foreground));
-      border: none; cursor: pointer;
+      width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(145deg, hsl(var(--primary)), hsl(var(--primary) / 0.7));
+      color: hsl(var(--primary-foreground));
+      border: 1px solid rgba(255,255,255,0.2);
+      cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      transition: transform 0.12s, background 0.15s;
-      box-shadow: 0 3px 10px hsl(var(--primary) / 0.35);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 8px 24px hsl(var(--primary) / 0.32), 0 2px 8px rgba(0,0,0,0.12);
+      font-weight: 700;
+      font-size: 20px;
     }
-    #mc-send:active { transform: scale(0.90); }
+    #mc-send:active { 
+      transform: scale(0.88);
+      box-shadow: 0 2px 12px hsl(var(--primary) / 0.25);
+    }
+    #mc-send:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #mc-shell,
+      #mc-shell::after,
+      .mc-badge {
+        animation: none !important;
+      }
+      #mc-top-actions button,
+      .mc-other-chat-item,
+      #mc-send {
+        transition: none !important;
+        transform: none !important;
+      }
+    }
+
+    @media (max-height: 760px) {
+      #mc-shell {
+        top: calc(env(safe-area-inset-top, 0px) + 68px);
+        bottom: 8px;
+      }
+      body.mc-open > main {
+        padding-bottom: calc(100dvh - 112px) !important;
+      }
+      #mc-header {
+        padding-top: 16px;
+      }
+    }
 
     /* ── Minimized chat-head bubble ── */
     #mc-chathead {
-      position: fixed; bottom: 22px; right: 18px; z-index: 8001;
-      width: 58px; height: 58px; border-radius: 50%;
-      background-image: var(--float-gradient);
+      position: fixed; bottom: 24px; right: 20px; z-index: 8001;
+      width: 64px; height: 64px; border-radius: 50%;
+      background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.6));
       color: hsl(var(--primary-foreground));
       display: none; align-items: center; justify-content: center;
-      font-size: 21px; font-weight: 700;
-      box-shadow: 0 6px 24px rgba(0,0,0,0.28), 0 2px 8px hsl(var(--primary)/0.45);
-      cursor: pointer; border: 3px solid rgba(255,255,255,0.28);
-      animation: mc-pop 0.26s cubic-bezier(.4,0,.2,1) both;
+      font-size: 24px; font-weight: 800;
+      box-shadow: 0 12px 40px hsl(var(--primary) / 0.4), 0 6px 20px hsl(var(--primary) / 0.2), inset 0 1px 0 rgba(255,255,255,0.2);
+      cursor: pointer; border: 2px solid rgba(255,255,255,0.25);
+      animation: mc-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
       user-select: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #mc-chathead:active {
+      transform: scale(0.92);
+      box-shadow: 0 6px 24px hsl(var(--primary) / 0.3);
     }
     @keyframes mc-pop {
-      from { transform: scale(0.5); opacity: 0; }
-      to   { transform: scale(1);   opacity: 1; }
+      from { transform: scale(0) rotate(-45deg); opacity: 0; }
+      to   { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    @keyframes mcMsgIn {
+      from { 
+        opacity: 0; 
+        transform: translateY(12px) scale(0.95);
+      }
+      to   { 
+        opacity: 1; 
+        transform: translateY(0) scale(1); 
+      }
     }
     #mc-chathead .mc-unread-dot {
-      position: absolute; top: 2px; right: 2px;
-      width: 14px; height: 14px; border-radius: 50%;
-      background: #ef4444; border: 2px solid hsl(var(--background));
+      position: absolute; top: 4px; right: 4px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      border: 3px solid hsl(var(--background));
       display: none;
+      animation: pulse-notify 2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+    }
+    @keyframes pulse-notify {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 12px rgba(239, 68, 68, 0.6); }
+      50% { transform: scale(1.15); box-shadow: 0 0 20px rgba(239, 68, 68, 0.8); }
+    }
+    
+    /* Typing indicator */
+    .mc-typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 20px;
+      width: fit-content;
+      animation: typingSlide 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+    @keyframes typingSlide {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .mc-typing-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: hsl(var(--muted-foreground));
+      animation: typingBounce 1.4s infinite;
+    }
+    .mc-typing-dot:nth-child(1) { animation-delay: 0s; }
+    .mc-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .mc-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typingBounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.6; }
+      30% { transform: translateY(-8px); opacity: 1; }
     }
   }
 </style>
@@ -454,9 +1050,6 @@
 {# ── Chat shell (mobile) ── #}
 <div id="mc-shell">
   <div id="mc-header">
-    <button id="mc-back" aria-label="Back" onclick="mcBack()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-    </button>
     <div id="mc-avatar-wrap">
       {% if opponent_avatar %}
       <img id="mc-avatar-img" src="{{ opponent_avatar }}" alt="Profile picture" loading="lazy">
@@ -466,23 +1059,24 @@
       <div id="mc-online-dot"></div>
     </div>
     <div id="mc-header-info">
-      <p id="mc-opp-name">{% if user == debate.initiator %}{{ debate.target.username }}{% else %}{{ debate.initiator.username }}{% endif %}</p>
-      <p id="mc-sub">Controller: {% if current_controller_name %}{{ current_controller_name }}{% if current_controller_side %} ({{ current_controller_side|upper }}){% endif %}{% else %}None{% endif %}</p>
+      <p id="mc-opp-name">{{ debate.post.title }}</p>
+      <p id="mc-sub"><span id="mc-peer-name">{% if user == debate.initiator %}{{ debate.target.username }}{% else %}{{ debate.initiator.username }}{% endif %}</span><span>•</span><span id="mc-controller-text">{% if current_controller_name %}Controller: {{ current_controller_name }}{% if current_controller_side %} ({{ current_controller_side|upper }}){% endif %}{% else %}Controller: None{% endif %}</span></p>
     </div>
     <div id="mc-hacts">
-      {% if is_active_participant %}
-      <button id="mc-leave-btn" onclick="mcLeaveConversation()" aria-label="Leave conversation" title="Leave conversation">Leave</button>
-      {% endif %}
-      {% if can_rejoin %}
-      <button id="mc-rejoin-btn" onclick="mcRejoinConversation()" aria-label="Rejoin conversation" title="Rejoin conversation">Rejoin</button>
-      {% endif %}
-      {% if can_end_chat %}
-      <button id="mc-end-btn" onclick="mcEndConversation()" aria-label="End conversation" title="End conversation">End</button>
-      {% endif %}
-      <button onclick="mcMinimize()" aria-label="Minimize" title="Minimize">
+      <button id="mc-members-btn" onclick="mcToggleMembers()" aria-label="Participants" title="Participants">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </button>
+      <button id="mc-min-btn" onclick="mcMinimize()" aria-label="Minimize" title="Minimize chat">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </button>
+      <button id="mc-close-btn" onclick="mcClose()" aria-label="Close" title="Close chat">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
+      <button id="mc-menu-btn" onclick="mcToggleMenu()" aria-label="Options" title="More options">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+      </button>
     </div>
+    <div id="mc-overflow-menu"></div>
   </div>
 
   <div id="mc-sup-strip">
@@ -492,6 +1086,17 @@
   </div>
 
   <div id="mc-caution">Please do not insult others, maintain respect and collaborate effectively.</div>
+
+  <div id="mc-chat-presence">
+    <div id="mc-chat-presence-label">Other chats stay available while you debate.</div>
+    <button type="button" id="mc-chat-presence-toggle" onclick="mcToggleOtherChats()">Chats</button>
+  </div>
+
+  <div id="mc-other-chats"></div>
+
+  <div id="mc-top-actions"></div>
+
+  <div id="mc-members"></div>
 
   <div id="mc-msgs">
     <div id="mc-sticky-date" class="mc-sticky-date"></div>
@@ -521,6 +1126,8 @@
             </div>
             {% endif %}
             <div class="mc-bubble">{{ message.content }}</div>
+            {% if message.is_edited %}<span class="mc-edited-label">edited</span>{% endif %}
+            {% if message.is_own and not message.is_system %}<button class="mc-edit-btn" data-msg-id="{{ message.id }}" aria-label="Edit message">✎</button>{% endif %}
           </div>
         </div>
       </div>
@@ -561,6 +1168,7 @@
   const mobileDebateId = '{{ debate.id }}';
   const mobilePostId = '{{ debate.post.id }}';
   const mobilePostUrl = '{% url "discussion" debate.post.id %}';
+  const mobileHomeUrl = '{% url "index" %}';
 
   // Open full-screen
   document.body.classList.add('mc-open');
@@ -574,9 +1182,15 @@
   const replyWrap = document.getElementById('mc-replying');
   const replyToEl = document.getElementById('mc-reply-to');
   const replyTxtEl = document.getElementById('mc-reply-text');
-  const leaveBtn = document.getElementById('mc-leave-btn');
-  const rejoinBtn = document.getElementById('mc-rejoin-btn');
-  const endBtn = document.getElementById('mc-end-btn');
+  const presenceBar = document.getElementById('mc-chat-presence');
+  const presenceLabel = document.getElementById('mc-chat-presence-label');
+  const presenceToggle = document.getElementById('mc-chat-presence-toggle');
+  const otherChatsBox = document.getElementById('mc-other-chats');
+  const menuBtn = document.getElementById('mc-menu-btn');
+  const overflowMenu = document.getElementById('mc-overflow-menu');
+  const topActions = document.getElementById('mc-top-actions');
+  const membersBox = document.getElementById('mc-members');
+  const membersBtn = document.getElementById('mc-members-btn');
   const yesLimitBadge = document.getElementById('mc-yes-limit');
   const noLimitBadge = document.getElementById('mc-no-limit');
 
@@ -593,6 +1207,11 @@
   let yesSupporters = {{ debate.yes_supporters }};
   let noSupporters = {{ debate.no_supporters }};
   let lastDateLabel = '';
+  let participantsExpanded = false;
+  let otherChatsExpanded = false;
+  let actionMenuOpen = false;
+  let mobileChatList = [];
+  let chatsPresenceTimer = null;
   let activeParticipants = (() => {
     const node = document.getElementById('dh-debate-active-participants');
     if (!node) return [];
@@ -605,16 +1224,150 @@
   })();
   const msgIndex = new Map();
   let pollTimer = null;
+  let typingTimeouts = new Map();
+
+  function getLastReadChats() {
+    try {
+      return JSON.parse(localStorage.getItem('dhChatLastRead') || '{}');
+    } catch {
+      return {};
+    }
+  }
+
+  function countUnreadChat(chat) {
+    const lastRead = getLastReadChats();
+    const stored = Number(lastRead[String(chat.id)] || 0);
+    const latest = Number(chat.last_message_id || 0);
+    return latest > stored ? 1 : 0;
+  }
+
+  function updateOtherChatsVisibility() {
+    if (otherChatsBox) {
+      otherChatsBox.classList.toggle('show', otherChatsExpanded && mobileChatList.length > 0);
+    }
+  }
+
+  function updatePresenceSummary() {
+    if (!presenceBar || !presenceLabel || !presenceToggle) return;
+    const count = mobileChatList.length;
+    const unread = mobileChatList.reduce((acc, chat) => acc + countUnreadChat(chat), 0);
+    presenceBar.classList.toggle('show', count > 0);
+    if (!count) {
+      otherChatsExpanded = false;
+      updateOtherChatsVisibility();
+      return;
+    }
+    presenceLabel.textContent = count === 1 ? '1 other chat is active right now.' : `${count} other chats are active right now.`;
+    presenceToggle.textContent = unread > 0 ? `Chats (${unread})` : `Chats (${count})`;
+    presenceToggle.classList.toggle('has-unread', unread > 0);
+    updateOtherChatsVisibility();
+  }
+
+  function renderOtherChats() {
+    if (!otherChatsBox) return;
+    if (!mobileChatList.length) {
+      otherChatsBox.innerHTML = '';
+      updatePresenceSummary();
+      return;
+    }
+
+    otherChatsBox.innerHTML = mobileChatList.map(chat => {
+      const unread = countUnreadChat(chat);
+      const avatar = chat.opponent_avatar
+        ? `<img src="${esc(chat.opponent_avatar)}" alt="${esc(chat.opponent)}" class="mc-other-chat-avatar" loading="lazy">`
+        : `<span class="mc-other-chat-avatar-fallback">${esc((chat.opponent || '?').charAt(0).toUpperCase())}</span>`;
+      const preview = chat.last_message
+        ? `${chat.last_message_sender === '{{ user.username }}' ? 'You: ' : ''}${chat.last_message}`
+        : 'No messages yet';
+      const unreadBadge = unread > 0 ? `<span class="mc-other-chat-unread">${unread > 9 ? '9+' : unread}</span>` : '';
+      return `<button type="button" class="mc-other-chat-item" onclick="mcOpenOtherChat('${esc(String(chat.id))}')">`
+        + `${avatar}`
+        + `<span class="mc-other-chat-copy"><span class="mc-other-chat-name">@${esc(chat.opponent || 'Chat')}</span><span class="mc-other-chat-title">${esc(chat.title || 'Conversation')}</span><span class="mc-other-chat-preview">${esc(preview)}</span></span>`
+        + `<span class="mc-other-chat-meta"><span class="mc-other-chat-time">${esc(chat.last_message_time || '')}</span>${unreadBadge}</span>`
+        + `</button>`;
+    }).join('');
+
+    updatePresenceSummary();
+  }
+
+  function refreshOtherChats() {
+    fetch('/chats/list/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d || !d.success || !Array.isArray(d.chats)) return;
+        mobileChatList = d.chats.filter(chat => String(chat.id) !== String(mobileDebateId));
+        renderOtherChats();
+      })
+      .catch(() => {});
+  }
+
+  window.mcToggleOtherChats = function() {
+    otherChatsExpanded = !otherChatsExpanded;
+    updateOtherChatsVisibility();
+  };
+
+  window.mcOpenOtherChat = function(debateId) {
+    try {
+      const lastRead = getLastReadChats();
+      const target = mobileChatList.find(chat => String(chat.id) === String(debateId));
+      if (target) {
+        lastRead[String(debateId)] = Number(target.last_message_id || 0);
+        localStorage.setItem('dhChatLastRead', JSON.stringify(lastRead));
+      }
+    } catch {}
+    window.location.href = '/debates/' + encodeURIComponent(String(debateId)) + '/chat/';
+  };
+
+  function showTypingIndicator(username) {
+    const existing = document.getElementById('mc-typing-' + username);
+    if (existing) return;
+
+    const typingDiv = document.createElement('div');
+    typingDiv.id = 'mc-typing-' + username;
+    typingDiv.className = 'mc-msg other';
+    typingDiv.innerHTML = `<div class="mc-row">
+      <div class="mc-msg-avatar-fallback">${esc(username.charAt(0).toUpperCase())}</div>
+      <div>
+        <div class="mc-sender" style="opacity: 0.6; font-size: 10px;">${esc(username)}</div>
+        <div class="mc-typing-indicator">
+          <div class="mc-typing-dot"></div>
+          <div class="mc-typing-dot"></div>
+          <div class="mc-typing-dot"></div>
+        </div>
+      </div>
+    </div>`;
+    msgs.appendChild(typingDiv);
+    if (!minimized) scrollBottom();
+
+    // Auto-remove typing indicator after 3 seconds
+    if (typingTimeouts.has(username)) {
+      clearTimeout(typingTimeouts.get(username));
+    }
+    const timeout = setTimeout(() => {
+      typingDiv.remove();
+      typingTimeouts.delete(username);
+    }, 3000);
+    typingTimeouts.set(username, timeout);
+  }
+
+  function removeTypingIndicator(username) {
+    const typingDiv = document.getElementById('mc-typing-' + username);
+    if (typingDiv) typingDiv.remove();
+    if (typingTimeouts.has(username)) {
+      clearTimeout(typingTimeouts.get(username));
+      typingTimeouts.delete(username);
+    }
+  }
 
   function updateControllerLabel() {
-    const sub = document.getElementById('mc-sub');
-    if (!sub) return;
+    const controllerText = document.getElementById('mc-controller-text');
+    if (!controllerText) return;
     if (!currentControllerName) {
-      sub.textContent = 'Controller: None';
+      controllerText.textContent = 'Controller: None';
       return;
     }
     const sideText = currentControllerSide ? ` (${String(currentControllerSide).toUpperCase()})` : '';
-    sub.textContent = `Controller: ${currentControllerName}${sideText}`;
+    controllerText.textContent = `Controller: ${currentControllerName}${sideText}`;
   }
 
   function updateComposerState() {
@@ -627,7 +1380,7 @@
   }
 
   function ensureActionButton(id, label, onClick) {
-    const acts = document.getElementById('mc-hacts');
+    const acts = topActions;
     if (!acts) return null;
     let btn = document.getElementById(id);
     if (!btn) {
@@ -640,6 +1393,35 @@
     return btn;
   }
 
+  function ensureOverflowActionButton(id, label, onClick, variant) {
+    if (!overflowMenu) return null;
+    let btn = document.getElementById(id);
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = id;
+      overflowMenu.appendChild(btn);
+    }
+    btn.textContent = label;
+    btn.className = variant || '';
+    btn.onclick = function() {
+      mcCloseMenu();
+      onClick();
+    };
+    return btn;
+  }
+
+  function mcCloseMenu() {
+    actionMenuOpen = false;
+    if (overflowMenu) overflowMenu.classList.remove('show');
+    if (menuBtn) menuBtn.classList.remove('is-active');
+  }
+
+  window.mcToggleMenu = function() {
+    actionMenuOpen = !actionMenuOpen;
+    if (overflowMenu) overflowMenu.classList.toggle('show', actionMenuOpen);
+    if (menuBtn) menuBtn.classList.toggle('is-active', actionMenuOpen);
+  };
+
   function refreshActionButtons() {
     if (canModerate && debateStatus === 'accepted') {
       ensureActionButton('mc-limits-btn', 'Limits', function() { mcIncreaseLimits(); });
@@ -648,14 +1430,19 @@
       if (xb) xb.remove();
     }
 
+    const lb = document.getElementById('mc-leave-btn');
+    if (lb) lb.remove();
+    const rb = document.getElementById('mc-rejoin-btn');
+    if (rb) rb.remove();
+
     if (canSend) {
-      ensureActionButton('mc-leave-btn', 'Leave', function() { mcLeaveConversation(); });
-      const rb = document.getElementById('mc-rejoin-btn');
-      if (rb) rb.remove();
-    } else {
-      ensureActionButton('mc-rejoin-btn', 'Rejoin', function() { mcRejoinConversation(); });
-      const lb = document.getElementById('mc-leave-btn');
-      if (lb) lb.remove();
+      ensureOverflowActionButton('mc-leave-btn', 'Leave conversation', function() { mcLeaveConversation(); }, 'leave');
+      const xrb = document.getElementById('mc-rejoin-btn');
+      if (xrb) xrb.remove();
+    } else if (canRejoin) {
+      ensureOverflowActionButton('mc-rejoin-btn', 'Rejoin conversation', function() { mcRejoinConversation(); }, 'rejoin');
+      const xlb = document.getElementById('mc-leave-btn');
+      if (xlb) xlb.remove();
     }
 
     if (canEnd && canSend && debateStatus === 'accepted') {
@@ -664,7 +1451,27 @@
       const eb = document.getElementById('mc-end-btn');
       if (eb) eb.remove();
     }
+
+    if (overflowMenu && !overflowMenu.children.length) {
+      mcCloseMenu();
+      if (menuBtn) menuBtn.style.display = 'none';
+    } else if (menuBtn) {
+      menuBtn.style.display = '';
+    }
   }
+
+  function updateMembersVisibility() {
+    if (!membersBox) return;
+    membersBox.classList.toggle('show', participantsExpanded);
+    if (membersBtn) {
+      membersBtn.classList.toggle('active', participantsExpanded);
+    }
+  }
+
+  window.mcToggleMembers = function() {
+    participantsExpanded = !participantsExpanded;
+    updateMembersVisibility();
+  };
 
   function updateSupporterBadges() {
     if (yesLimitBadge) {
@@ -677,6 +1484,12 @@
 
   function renderMembers() {
     if (!membersBox) return;
+    if (!activeParticipants.length) {
+      membersBox.innerHTML = '<div class="mc-member"><span class="mc-member-text"><span class="mc-member-name">No active participants</span></span></div>';
+      if (membersBtn) membersBtn.title = 'Participants (0)';
+      updateMembersVisibility();
+      return;
+    }
     membersBox.innerHTML = activeParticipants.map(member => {
       const side = String(member.side || '').toLowerCase();
       const sideClass = side === 'yes' ? 'yes' : (side === 'no' ? 'no' : '');
@@ -691,6 +1504,10 @@
         : '';
       return `<div class="mc-member">${avatar}<span class="mc-member-text"><span class="mc-member-name">${esc(member.username)}</span><span class="mc-member-side ${sideClass}">${esc(String(member.side || '').toUpperCase())}</span><span title="${presenceTitle}" class="mc-member-presence ${onlineClass}">${onlineLabel}</span></span>${removeAction}</div>`;
     }).join('');
+    if (membersBtn) {
+      membersBtn.title = `Participants (${activeParticipants.length})`;
+    }
+    updateMembersVisibility();
   }
 
   function updateStickyDate() {
@@ -839,7 +1656,7 @@
         </div>
         <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;">
           <button id="mc-limit-cancel" type="button" style="border:1px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground));border-radius:999px;padding:7px 12px;font-size:12px;font-weight:700;">Cancel</button>
-          <button id="mc-limit-save" type="button" style="border:none;background-image:var(--float-gradient);color:hsl(var(--primary-foreground));border-radius:999px;padding:7px 14px;font-size:12px;font-weight:800;">Save</button>
+          <button id="mc-limit-save" type="button" style="border:none;background:hsl(var(--primary));color:hsl(var(--primary-foreground));border-radius:999px;padding:7px 14px;font-size:12px;font-weight:800;">Save</button>
         </div>
       `;
 
@@ -1028,6 +1845,8 @@
       + `<div class="mc-msg-main"><div class="mc-meta"><p class="mc-sender">${esc(m.sender)}</p><p class="mc-time-inline">${esc(m.created_time || m.created_at || '')}</p></div>`
       + `${replyQuote}`
       + `<div class="mc-bubble">${esc(m.content)}</div>`
+      + (m.is_edited ? `<span class="mc-edited-label">edited</span>` : '')
+      + (m.is_own && !m.is_system ? `<button class="mc-edit-btn" data-msg-id="${m.id}" aria-label="Edit message">✎</button>` : '')
       + `</div></div>`;
     msgs.appendChild(div);
     wireSwipe(div, m.id);
@@ -1124,9 +1943,17 @@
       sessionStorage.setItem('dhMobileMinimizedDebateId', mobileDebateId);
       sessionStorage.setItem('dhMobileMinimizedPostId', mobilePostId);
       sessionStorage.setItem('dhMobileMinimizedAt', String(Date.now()));
+      sessionStorage.setItem(
+        'dhMobileChatState:' + mobileDebateId,
+        JSON.stringify({
+          mode: 'minimized',
+          lastSeenMessageId: Number(lastMsgId || 0),
+          updatedAt: Date.now(),
+        })
+      );
     } catch {}
     document.body.classList.remove('mc-open');
-    window.location.href = mobilePostUrl;
+    window.location.href = mobileHomeUrl;
   };
 
   window.mcRestore = function() {
@@ -1139,16 +1966,74 @@
     scrollBottom();
   };
 
-  window.mcBack = function() {
+    window.mcToggleMinimize = function() {
+      const isMinimized = shell.classList.contains('mc-minimized');
+      if (isMinimized) {
+        // Expand
+        shell.classList.remove('mc-minimized');
+        shell.classList.add('mc-expanding');
+        minimized = false;
+        unread = 0;
+        unreadDot.style.display = 'none';
+        setTimeout(() => {
+          shell.classList.remove('mc-expanding');
+          scrollBottom();
+        }, 320);
+      } else {
+        // Minimize
+        shell.classList.add('mc-minimized');
+        minimized = true;
+      }
+    };
+
+  window.mcClose = function() {
+    try {
+      sessionStorage.setItem('dhMobileMinimizedDebateId', mobileDebateId);
+      sessionStorage.setItem('dhMobileMinimizedPostId', mobilePostId);
+      sessionStorage.setItem(
+        'dhMobileChatState:' + mobileDebateId,
+        JSON.stringify({
+          mode: 'closed',
+          lastSeenMessageId: Number(lastMsgId || 0),
+          updatedAt: Date.now(),
+        })
+      );
+    } catch {}
     document.body.classList.remove('mc-open');
     window.location.href = mobilePostUrl;
   };
 
+  window.mcBack = window.mcClose;
+
+  // Expand chat when tapping the minimized header area.
+  shell.addEventListener('click', function(e) {
+    if (!shell.classList.contains('mc-minimized')) return;
+    if (!e.target.closest('#mc-header')) return;
+    if (e.target.closest('#mc-hacts button')) return;
+    if (e.target.closest('#mc-close-btn')) return;
+
+    mcToggleMinimize();
+  });
+
+  // Prevent action button taps from bubbling into header-expand behavior.
+  const hacts = document.getElementById('mc-hacts');
+  if (hacts) {
+    hacts.addEventListener('click', function(e) {
+      e.stopPropagation();
+    });
+  }
+  document.addEventListener('click', function(e) {
+    if (!actionMenuOpen) return;
+    if (overflowMenu && overflowMenu.contains(e.target)) return;
+    if (menuBtn && menuBtn.contains(e.target)) return;
+    mcCloseMenu();
+  });
+
   form.addEventListener('submit', function(e) {
     e.preventDefault();
-    const content = inp.value.trim();
+    const rawContent = inp.value;
+    const content = rawContent.trim();
     if (!content) return;
-    inp.value = '';
     const reply = replyTarget;
     fetch('{% url "send_debate_message" debate.id %}', {
       method: 'POST',
@@ -1156,18 +2041,41 @@
       body: 'content=' + encodeURIComponent(content)
         + (reply ? '&reply_to_id=' + encodeURIComponent(String(reply.id)) : '')
     })
-    .then(r => r.json())
-    .then(d => {
-      if (d.success) {
-        addMsg(d.message);
-        setReply(null);
+    .then(async r => {
+      try {
+        return await r.json();
+      } catch {
+        return { success: false, error: 'Unable to send message right now.' };
       }
     })
-    .catch(() => {});
+    .then(d => {
+      if (d.success) {
+        inp.value = '';
+        addMsg(d.message);
+        setReply(null);
+      } else {
+        inp.value = rawContent;
+        window.showToast(d.error || 'Unable to send message.', 'error');
+      }
+    })
+    .catch(() => {
+      inp.value = rawContent;
+      window.showToast('Unable to send message.', 'error');
+    });
   });
 
   // Keep input bar above keyboard on iOS
   inp.addEventListener('focus', () => setTimeout(scrollBottom, 350));
+
+  // Enhance input with character count animation
+  inp.addEventListener('input', function() {
+    const isEmpty = !this.value.trim();
+    const sendBtn = document.getElementById('mc-send');
+    if (sendBtn) {
+      sendBtn.style.opacity = isEmpty ? '0.5' : '1';
+      sendBtn.style.pointerEvents = isEmpty ? 'none' : 'auto';
+    }
+  });
 
   document.querySelectorAll('.mc-msg[id^="mc-m-"]').forEach(function(el) {
     const id = Number((el.id || '').replace('mc-m-', ''));
@@ -1205,10 +2113,97 @@
   updateSupporterBadges();
   updateControllerLabel();
   renderMembers();
+  refreshOtherChats();
+  chatsPresenceTimer = setInterval(refreshOtherChats, 15000);
   updateStickyDate();
   msgs.addEventListener('scroll', updateStickyDate, { passive: true });
+
+  // ── Edit message ──
+  let editingMsgId = null;
+  const editOverlay = document.createElement('div');
+  editOverlay.id = 'mc-edit-overlay';
+  editOverlay.style.cssText = 'display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;';
+  editOverlay.innerHTML = `
+    <div style="background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:18px;padding:20px 18px;width:min(92vw,480px);box-shadow:0 8px 32px rgba(0,0,0,0.22);">
+      <p style="font-size:13px;font-weight:700;margin-bottom:10px;color:hsl(var(--foreground));">Edit Message</p>
+      <textarea id="mc-edit-input" rows="3" style="width:100%;border:1px solid hsl(var(--border));border-radius:10px;background:hsl(var(--background));color:hsl(var(--foreground));padding:10px 12px;font-size:13px;resize:none;box-sizing:border-box;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
+        <button id="mc-edit-cancel" style="background:none;border:1px solid hsl(var(--border));border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;color:hsl(var(--foreground));">Cancel</button>
+        <button id="mc-edit-save" style="background:hsl(var(--primary));border:none;border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;color:hsl(var(--primary-foreground));">Save</button>
+      </div>
+    </div>`;
+  document.body.appendChild(editOverlay);
+
+  function openEditOverlay(msgId) {
+    const el = document.getElementById('mc-m-' + msgId);
+    const bubble = el && el.querySelector('.mc-bubble');
+    if (!bubble) return;
+    editingMsgId = msgId;
+    document.getElementById('mc-edit-input').value = bubble.textContent.trim();
+    editOverlay.style.display = 'flex';
+    document.getElementById('mc-edit-input').focus();
+  }
+
+  document.getElementById('mc-edit-cancel').addEventListener('click', function() {
+    editOverlay.style.display = 'none';
+    editingMsgId = null;
+  });
+
+  document.getElementById('mc-edit-save').addEventListener('click', function() {
+    if (!editingMsgId) return;
+    const content = document.getElementById('mc-edit-input').value.trim();
+    if (!content) { window.showToast && window.showToast('Message cannot be empty.', 'error'); return; }
+    const btn = this;
+    btn.disabled = true;
+    fetch(`/debates/{{ debate.id }}/messages/${editingMsgId}/update/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrf() },
+      body: `content=${encodeURIComponent(content)}`
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        const el = document.getElementById('mc-m-' + editingMsgId);
+        if (el) {
+          const bubble = el.querySelector('.mc-bubble');
+          if (bubble) bubble.textContent = data.content;
+          let lbl = el.querySelector('.mc-edited-label');
+          if (!lbl) {
+            lbl = document.createElement('span');
+            lbl.className = 'mc-edited-label';
+            lbl.textContent = 'edited';
+            const msgMain = el.querySelector('.mc-msg-main');
+            if (msgMain) msgMain.appendChild(lbl);
+          }
+          const idx = msgIndex.get(Number(editingMsgId));
+          if (idx) idx.content = data.content;
+        }
+        editOverlay.style.display = 'none';
+        editingMsgId = null;
+      } else {
+        window.showToast && window.showToast(data.error || 'Failed to update message.', 'error');
+      }
+    })
+    .catch(() => window.showToast && window.showToast('Failed to update message.', 'error'))
+    .finally(() => { btn.disabled = false; });
+  });
+
+  msgs.addEventListener('click', function(e) {
+    const btn = e.target.closest('.mc-edit-btn');
+    if (btn) {
+      const msgId = btn.dataset.msgId;
+      if (msgId) openEditOverlay(Number(msgId));
+    }
+  });
+
   poll();
   pollTimer = setInterval(poll, 3000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      refreshOtherChats();
+    }
+  });
 })();
 </script>
+<script src="{% static 'js/chatbox_features.js' %}" defer></script>
 {% endblock %}
