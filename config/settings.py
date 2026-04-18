@@ -171,6 +171,9 @@ LOGIN_ATTEMPT_RETENTION_DAYS = int(os.getenv('LOGIN_ATTEMPT_RETENTION_DAYS', '30
 
 DAILY_POST_LIMIT = int(os.getenv('DAILY_POST_LIMIT', '50'))
 
+# OpenAI Configuration
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '').strip()
+
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = _split_env_list('CORS_ALLOWED_ORIGINS', '')
 if DEBUG and not CORS_ALLOWED_ORIGINS:
@@ -204,3 +207,7 @@ LOGIN_REDIRECT_URL = '/'
 MANUAL_EDITOR_USERNAME = os.getenv('MANUAL_EDITOR_USERNAME', '').strip()
 MANUAL_EDITOR_PASSWORD = os.getenv('MANUAL_EDITOR_PASSWORD', '')
 MANUAL_EDITOR_EMAIL = os.getenv('MANUAL_EDITOR_EMAIL', '').strip()
+
+# Backend-only moderator accounts for chat abuse reports.
+# Example: MODERATOR_USERNAMES=alice,bob,charlie
+MODERATOR_USERNAMES = _split_env_list('MODERATOR_USERNAMES', 'seshu.seshu')

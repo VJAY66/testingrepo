@@ -6,24 +6,34 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, authenticate, logout
 from django.contrib import messages
 from django.http import JsonResponse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from django.core.cache import cache
+from django.core.paginator import Paginator
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.db.models import Q, F, Count, IntegerField, ExpressionWrapper
-from django.db import DataError
+from django.db import DataError, IntegrityError
 from django.utils import timezone
 from datetime import timedelta
 import json
+import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReport
 from users.models import Follow
 from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
+from utils.moderation import check_content_moderation
 
 
 _EMOJI_TOKEN_RE = re.compile(r'__EMJ__([0-9A-F]{5,6})__')
+
+
+def _normalize_post_content(content):
+    """Trim post content and collapse repeated empty lines to reduce visual gaps."""
+    text = (content or '').replace('\r\n', '\n').replace('\r', '\n').strip()
+    # Keep intentional paragraph spacing, but avoid huge blank blocks.
+    return re.sub(r'\n{3,}', '\n\n', text)
 
 
 def _public_rate_limit_key(request, scope):
@@ -60,6 +70,24 @@ def _manual_editor_password():
 
 def _manual_editor_email():
     return (getattr(settings, 'MANUAL_EDITOR_EMAIL', '') or '').strip()
+
+
+def _configured_moderator_usernames():
+    raw = getattr(settings, 'MODERATOR_USERNAMES', []) or []
+    return {str(name).strip().lower() for name in raw if str(name).strip()}
+
+
+def _is_configured_moderator(user):
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    return user.username.lower() in _configured_moderator_usernames()
+
+
+def _moderator_users():
+    names = list(_configured_moderator_usernames())
+    if not names:
+        return User.objects.none()
+    return User.objects.filter(username__iregex=r'^(' + '|'.join(re.escape(name) for name in names) + r')$')
 
 
 def _safe_next_url(request, next_url):
@@ -156,18 +184,74 @@ def _ensure_debate_core_participants(debate):
         user=debate.initiator,
         defaults={'side': initiator_side, 'is_active': True}
     )
+    initiator_updated_fields = []
     if initiator_participant.side != initiator_side:
         initiator_participant.side = initiator_side
-        initiator_participant.save(update_fields=['side'])
+        initiator_updated_fields.append('side')
+    if not initiator_participant.is_active:
+        initiator_participant.is_active = True
+        initiator_updated_fields.append('is_active')
+    if initiator_participant.left_at is not None:
+        initiator_participant.left_at = None
+        initiator_updated_fields.append('left_at')
+    if initiator_updated_fields:
+        initiator_participant.save(update_fields=initiator_updated_fields)
 
     target_participant, _ = DebateParticipant.objects.get_or_create(
         debate=debate,
         user=debate.target,
         defaults={'side': target_side, 'is_active': True}
     )
+    target_updated_fields = []
     if target_participant.side != target_side:
         target_participant.side = target_side
-        target_participant.save(update_fields=['side'])
+        target_updated_fields.append('side')
+    if not target_participant.is_active:
+        target_participant.is_active = True
+        target_updated_fields.append('is_active')
+    if target_participant.left_at is not None:
+        target_participant.left_at = None
+        target_updated_fields.append('left_at')
+    if target_updated_fields:
+        target_participant.save(update_fields=target_updated_fields)
+
+
+def _pick_debate_side_for_user(debate, desired_side, active_counts=None, fallback_side=None):
+    """Choose a side for joining an accepted debate, preferring sides with room."""
+    if desired_side in ('yes', 'no'):
+        return desired_side
+
+    if active_counts is None:
+        active_counts = {
+            item['side']: item['total']
+            for item in DebateParticipant.objects.filter(
+                debate=debate,
+                is_active=True,
+            ).values('side').annotate(total=Count('id'))
+        }
+
+    yes_active = active_counts.get('yes', 0)
+    no_active = active_counts.get('no', 0)
+    yes_room = (debate.yes_supporters <= 0) or (yes_active < debate.yes_supporters)
+    no_room = (debate.no_supporters <= 0) or (no_active < debate.no_supporters)
+
+    if yes_room and not no_room:
+        return 'yes'
+    if no_room and not yes_room:
+        return 'no'
+    if yes_room and no_room:
+        if yes_active < no_active:
+            return 'yes'
+        if no_active < yes_active:
+            return 'no'
+        if fallback_side in ('yes', 'no'):
+            return fallback_side
+        return 'yes'
+
+    # Both sides are full; return a deterministic side for queue placement.
+    if fallback_side in ('yes', 'no'):
+        return fallback_side
+    return 'yes'
 
 
 def _set_end_controller_with_fallback(debate, preferred_side, exclude_user_id=None):
@@ -202,9 +286,9 @@ def _set_end_controller_with_fallback(debate, preferred_side, exclude_user_id=No
 
 
 def _safe_avatar_url(user):
-    """Return avatar URL if profile exists, else empty string."""
+    """Return best available picture URL if profile exists, else empty string."""
     try:
-        return user.profile.avatar_url or ''
+        return user.profile.get_picture_url
     except Profile.DoesNotExist:
         return ''
 
@@ -287,6 +371,13 @@ def _active_participants_payload(debate, viewer):
 
 FRONTEND_CATEGORY_STYLES = {
     'Technology': {'icon': '💻', 'color': 'bg-blue-500/10 text-blue-400 border-blue-500/20'},
+    'Relationships': {'icon': '💞', 'color': 'bg-rose-500/10 text-rose-400 border-rose-500/20'},
+    'Photography': {'icon': '📷', 'color': 'bg-sky-500/10 text-sky-400 border-sky-500/20'},
+    'Music': {'icon': '🎵', 'color': 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20'},
+    'Painting': {'icon': '🎨', 'color': 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'},
+    'Fashion': {'icon': '👗', 'color': 'bg-pink-500/10 text-pink-400 border-pink-500/20'},
+    'Beauty': {'icon': '💄', 'color': 'bg-purple-500/10 text-purple-400 border-purple-500/20'},
+    'Medicenes': {'icon': '💊', 'color': 'bg-lime-500/10 text-lime-400 border-lime-500/20'},
     'Sports': {'icon': '⚽', 'color': 'bg-green-500/10 text-green-400 border-green-500/20'},
     'Science': {'icon': '🔬', 'color': 'bg-purple-500/10 text-purple-400 border-purple-500/20'},
     'History': {'icon': '🏺', 'color': 'bg-stone-500/10 text-stone-400 border-stone-500/20'},
@@ -345,15 +436,18 @@ def post_action(request, post_id):
         return JsonResponse({'success': False, 'error': 'Invalid action.'}, status=400)
 
     post = get_object_or_404(Post, id=post_id)
-    existing_action = PostAction.objects.filter(user=request.user, post=post, action=action).first()
-
     if action in ['like', 'save']:
+        existing_action = PostAction.objects.filter(user=request.user, post=post, action=action).first()
         if existing_action:
             existing_action.delete()
             status = 'removed'
         else:
-            PostAction.objects.create(user=request.user, post=post, action=action)
-            status = 'added'
+            try:
+                PostAction.objects.create(user=request.user, post=post, action=action)
+                status = 'added'
+            except IntegrityError:
+                # If two add requests race, keep it liked/saved instead of crashing.
+                status = 'added'
 
         # Get updated counts
         like_count = PostAction.objects.filter(post=post, action='like').count()
@@ -372,6 +466,7 @@ def post_action(request, post_id):
         })
 
     if action == 'repost':
+        existing_action = PostAction.objects.filter(user=request.user, post=post, action=action).first()
         if existing_action:
             existing_action.delete()
             _remove_repost_copy_for_user(request.user, post)
@@ -390,7 +485,23 @@ def post_action(request, post_id):
                 }
             })
 
-        PostAction.objects.create(user=request.user, post=post, action=action)
+        try:
+            PostAction.objects.create(user=request.user, post=post, action=action)
+        except IntegrityError:
+            # Another request already created the repost action; return current counters.
+            like_count = PostAction.objects.filter(post=post, action='like').count()
+            save_count = PostAction.objects.filter(post=post, action='save').count()
+            repost_count = PostAction.objects.filter(post=post, action='repost').count()
+            return JsonResponse({
+                'success': True,
+                'action': action,
+                'status': 'added',
+                'counts': {
+                    'like': like_count,
+                    'save': save_count,
+                    'repost': repost_count
+                }
+            })
         new_post = Post.objects.create(
             id=str(uuid.uuid4()),
             user=request.user,
@@ -417,49 +528,47 @@ def post_action(request, post_id):
         })
 
 
-def index(request):
-    """Home page with trending posts and categories"""
-    trending_posts = Post.objects.filter(id__isnull=False).exclude(id='').annotate(
-        like_count=Count('actions', filter=Q(actions__action='like')),
-        save_count=Count('actions', filter=Q(actions__action='save')),
-        repost_count=Count('actions', filter=Q(actions__action='repost')),
-        yes_count=Count('comments', filter=Q(comments__vote_type='yes')),
-        no_count=Count('comments', filter=Q(comments__vote_type='no'))
-    ).order_by('-created_at')[:10]
-    categories = get_frontend_categories()
+@require_GET
+def post_likes(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    liked_actions = (
+        PostAction.objects.filter(post=post, action='like')
+        .select_related('user', 'user__profile')
+        .order_by('-updated_at', '-created_at')
+    )
 
-    suggested_posts = []
-    if request.user.is_authenticated:
-        following_users = request.user.following_links.values_list('following', flat=True)
-        watched_post_ids = PostView.objects.filter(user=request.user).values_list('post_id', flat=True)
+    liked_users = [
+        {
+            'username': item.user.username,
+            'avatar_url': _safe_avatar_url(item.user),
+            'profile_url': f'/user/{item.user.username}/',
+        }
+        for item in liked_actions
+    ]
 
-        if following_users:
-            followed_posts = Post.objects.filter(user__in=following_users).exclude(id__in=watched_post_ids).exclude(id='').annotate(
-                like_count=Count('actions', filter=Q(actions__action='like')),
-                save_count=Count('actions', filter=Q(actions__action='save')),
-                repost_count=Count('actions', filter=Q(actions__action='repost')),
-                yes_count=Count('comments', filter=Q(comments__vote_type='yes')),
-                no_count=Count('comments', filter=Q(comments__vote_type='no'))
-            ).order_by('-created_at')[:10]
-            if followed_posts.exists():
-                suggested_posts = list(followed_posts)
-        if not suggested_posts:
-            suggested_posts = list(Post.objects.exclude(id__in=watched_post_ids).exclude(id='').annotate(
-                like_count=Count('actions', filter=Q(actions__action='like')),
-                save_count=Count('actions', filter=Q(actions__action='save')),
-                repost_count=Count('actions', filter=Q(actions__action='repost')),
-                yes_count=Count('comments', filter=Q(comments__vote_type='yes')),
-                no_count=Count('comments', filter=Q(comments__vote_type='no'))
-            ).order_by('-created_at')[:10])
+    return JsonResponse({
+        'success': True,
+        'post_id': post.id,
+        'count': len(liked_users),
+        'liked_users': liked_users,
+    })
 
-    active_tab = request.GET.get('tab', 'trending')
-    if active_tab == 'suggested' and not request.user.is_authenticated:
-        active_tab = 'trending'
-    if active_tab == 'suggested':
-        posts = suggested_posts
-    else:
-        posts = trending_posts
 
+def _annotated_feed_posts_queryset():
+    base_posts = Post.objects.filter(id__isnull=False).exclude(id='')
+    return base_posts.annotate(
+        like_count=Count('actions', filter=Q(actions__action='like'), distinct=True),
+        save_count=Count('actions', filter=Q(actions__action='save'), distinct=True),
+        repost_count=Count('actions', filter=Q(actions__action='repost'), distinct=True),
+        yes_count=Count('comments', filter=Q(comments__vote_type='yes'), distinct=True),
+        no_count=Count('comments', filter=Q(comments__vote_type='no'), distinct=True),
+        comment_count=Count('comments', distinct=True),
+        conversation_count=Count('debates', distinct=True),
+        author_posts_count=Count('user__posts', distinct=True),
+    ).select_related('user')
+
+
+def _enrich_posts_for_feed(posts, user):
     for post in posts:
         yes_count = getattr(post, 'yes_count', 0) or 0
         no_count = getattr(post, 'no_count', 0) or 0
@@ -471,36 +580,139 @@ def index(request):
             post.yes_percentage = 0.0
             post.no_percentage = 0.0
 
-    if request.user.is_authenticated:
-        post_ids = [post.id for post in posts]
-        liked_post_ids = set()
-        saved_post_ids = set()
-        reposted_post_ids = set()
-        if post_ids:
-            post_actions = PostAction.objects.filter(
-                user=request.user,
-                post__in=post_ids,
-                action__in=['like', 'save', 'repost']
-            ).values('post_id', 'action')
-            for item in post_actions:
-                if item['action'] == 'like':
-                    liked_post_ids.add(item['post_id'])
-                elif item['action'] == 'save':
-                    saved_post_ids.add(item['post_id'])
-                elif item['action'] == 'repost':
-                    reposted_post_ids.add(item['post_id'])
+    if not getattr(user, 'is_authenticated', False):
+        return
 
-        for post in posts:
-            post.is_liked = post.id in liked_post_ids
-            post.is_saved = post.id in saved_post_ids
-            post.is_reposted = post.id in reposted_post_ids
+    post_ids = [post.id for post in posts]
+    liked_post_ids = set()
+    saved_post_ids = set()
+    reposted_post_ids = set()
+    if post_ids:
+        post_actions = PostAction.objects.filter(
+            user=user,
+            post__in=post_ids,
+            action__in=['like', 'save', 'repost']
+        ).values('post_id', 'action')
+        for item in post_actions:
+            if item['action'] == 'like':
+                liked_post_ids.add(item['post_id'])
+            elif item['action'] == 'save':
+                saved_post_ids.add(item['post_id'])
+            elif item['action'] == 'repost':
+                reposted_post_ids.add(item['post_id'])
+
+    for post in posts:
+        post.is_liked = post.id in liked_post_ids
+        post.is_saved = post.id in saved_post_ids
+        post.is_reposted = post.id in reposted_post_ids
+
+
+def _build_suggested_posts_for_user(user, annotated_posts):
+    watched_post_ids = set(PostView.objects.filter(user=user).values_list('post_id', flat=True))
+    following_user_ids = set(user.following_links.values_list('following_id', flat=True))
+
+    followed_unseen_posts = list(
+        annotated_posts.filter(user_id__in=following_user_ids).exclude(id__in=watched_post_ids).order_by('-created_at')
+    )
+
+    interaction_scores = {}
+    liked_authors = (
+        PostAction.objects.filter(user=user, action='like')
+        .exclude(post__user=user)
+        .values('post__user_id')
+        .annotate(total=Count('id'))
+    )
+    commented_authors = (
+        Comment.objects.filter(user=user)
+        .exclude(post__user=user)
+        .values('post__user_id')
+        .annotate(total=Count('id'))
+    )
+
+    for row in liked_authors:
+        uid = row['post__user_id']
+        interaction_scores[uid] = interaction_scores.get(uid, 0) + row['total']
+    for row in commented_authors:
+        uid = row['post__user_id']
+        interaction_scores[uid] = interaction_scores.get(uid, 0) + row['total']
+
+    top_author_id = max(interaction_scores, key=interaction_scores.get) if interaction_scores else None
+
+    selected_post_ids = {post.id for post in followed_unseen_posts}
+
+    top_author_posts = []
+    if top_author_id:
+        top_author_posts = list(
+            annotated_posts.filter(user_id=top_author_id).exclude(id__in=selected_post_ids).order_by('-created_at')
+        )
+        selected_post_ids.update(post.id for post in top_author_posts)
+
+    remaining_posts = list(annotated_posts.exclude(id__in=selected_post_ids).order_by('-created_at'))
+
+    # Keep recency bias, but shuffle the recent pool to diversify discovery.
+    recent_pool_size = 60
+    recent_pool = remaining_posts[:recent_pool_size]
+    random.shuffle(recent_pool)
+    remaining_posts = recent_pool + remaining_posts[recent_pool_size:]
+
+    return followed_unseen_posts + top_author_posts + remaining_posts
+
+
+def index(request):
+    """Home page with trending posts and categories"""
+    annotated_posts = _annotated_feed_posts_queryset()
+    trending_posts = annotated_posts.order_by(
+        '-like_count',
+        '-comment_count',
+        '-conversation_count',
+        '-author_posts_count',
+        '-created_at',
+    )
+
+    paginator = Paginator(trending_posts, 10)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    posts = list(page_obj.object_list)
+    _enrich_posts_for_feed(posts, request.user)
 
     context = {
         'posts': posts,
-        'active_tab': active_tab,
-        'categories': categories,
+        'page_obj': page_obj,
+        'active_tab': 'trending',
+        'categories': get_frontend_categories(),
+        'is_suggested_page': False,
     }
     return render(request, 'frontend/index.html', context)
+
+
+@login_required
+def suggested(request):
+    """Suggested feed page based on follow graph and engagement preferences."""
+    annotated_posts = _annotated_feed_posts_queryset()
+    search_query = request.GET.get('q', '').strip()
+    if search_query:
+        annotated_posts = annotated_posts.filter(
+            Q(title__icontains=search_query)
+            | Q(content__icontains=search_query)
+            | Q(category__icontains=search_query)
+            | Q(user__username__icontains=search_query)
+            | Q(hashtags__icontains=search_query)
+        ).distinct()
+
+    ordered_posts = _build_suggested_posts_for_user(request.user, annotated_posts)
+
+    paginator = Paginator(ordered_posts, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    posts = list(page_obj.object_list)
+    _enrich_posts_for_feed(posts, request.user)
+
+    context = {
+        'posts': posts,
+        'page_obj': page_obj,
+        'active_tab': 'suggested',
+        'is_suggested_page': True,
+        'search_query': search_query,
+    }
+    return render(request, 'frontend/suggested.html', context)
 
 def category(request, category_name):
     """Category page showing posts in a specific category"""
@@ -514,7 +726,15 @@ def category(request, category_name):
 
 def discussion(request, post_id):
     """Discussion page for a specific post"""
-    post = get_object_or_404(Post, id=post_id)
+    post = _annotated_feed_posts_queryset().filter(id=post_id).first()
+    if not post:
+        messages.error(request, 'This discussion is no longer available.')
+        return redirect('index')
+
+    # Keep detail-page counters and action state in sync with home/suggested feeds.
+    _enrich_posts_for_feed([post], request.user)
+
+    is_post_creator = request.user == post.user
     if request.user.is_authenticated:
         PostView.objects.get_or_create(user=request.user, post=post)
 
@@ -582,14 +802,43 @@ def discussion(request, post_id):
             for target_id, debate in latest_accepted_by_target.items():
                 mode = 'join'
                 label = 'Join Debate'
+                desired_side = user_vote_type if user_vote_type in ('yes', 'no') else None
+                if desired_side is None and request.user.id == post.user_id:
+                    desired_side = _opposite_side(debate.comment.vote_type)
 
                 participant = user_participation.get(debate.id)
                 if participant:
                     mode = 'view'
                     label = 'View Debate'
-                elif user_has_voted and user_vote_type in ('yes', 'no'):
-                    side_limit = debate.yes_supporters if user_vote_type == 'yes' else debate.no_supporters
-                    active_side_count = active_side_counts.get((debate.id, user_vote_type), 0)
+                else:
+                    yes_active = active_side_counts.get((debate.id, 'yes'), 0)
+                    no_active = active_side_counts.get((debate.id, 'no'), 0)
+                    yes_limit = debate.yes_supporters
+                    no_limit = debate.no_supporters
+                    conversation_full = (
+                        yes_limit > 0 and no_limit > 0
+                        and yes_active >= yes_limit and no_active >= no_limit
+                    )
+
+                    if conversation_full:
+                        mode = 'view'
+                        label = 'View Debate'
+                        debate_lookup[target_id] = {
+                            'id': debate.id,
+                            'mode': mode,
+                            'label': label,
+                            'chat_url': f'/debates/{debate.id}/chat/',
+                        }
+                        continue
+
+                    chosen_side = _pick_debate_side_for_user(
+                        debate,
+                        desired_side,
+                        active_counts={'yes': yes_active, 'no': no_active},
+                        fallback_side=_opposite_side(debate.comment.vote_type),
+                    )
+                    side_limit = debate.yes_supporters if chosen_side == 'yes' else debate.no_supporters
+                    active_side_count = yes_active if chosen_side == 'yes' else no_active
                     if side_limit and active_side_count >= side_limit:
                         mode = 'view'
                         label = 'View Debate'
@@ -601,17 +850,45 @@ def discussion(request, post_id):
                     'chat_url': f'/debates/{debate.id}/chat/',
                 }
 
+        completed_lookup = {}
+        completed_debates = Debate.objects.filter(
+            post=post,
+            target_id__in=visible_comment_owners,
+            status='completed',
+        ).order_by('target_id', '-updated_at')
+        for debate in completed_debates:
+            if debate.target_id not in completed_lookup:
+                completed_lookup[debate.target_id] = debate
+
     for comment in yes_comments:
         debate_state = debate_lookup.get(comment.user_id)
+        completed_state = completed_lookup.get(comment.user_id) if request.user.is_authenticated else None
         comment.debate_action_mode = debate_state['mode'] if debate_state else 'start'
         comment.debate_action_label = debate_state['label'] if debate_state else 'Start Debate'
         comment.debate_chat_url = debate_state['chat_url'] if debate_state else ''
+        comment.show_debate_action = False
+        if request.user.is_authenticated and request.user != comment.user:
+            comment.show_debate_action = bool(debate_state) or is_post_creator or (user_has_voted and user_vote_type != comment.vote_type)
+        comment.show_debate_view_link = False
+        comment.debate_view_url = ''
+        if completed_state and not debate_state:
+            comment.show_debate_view_link = True
+            comment.debate_view_url = f'/debates/{completed_state.id}/chat/'
 
     for comment in no_comments:
         debate_state = debate_lookup.get(comment.user_id)
+        completed_state = completed_lookup.get(comment.user_id) if request.user.is_authenticated else None
         comment.debate_action_mode = debate_state['mode'] if debate_state else 'start'
         comment.debate_action_label = debate_state['label'] if debate_state else 'Start Debate'
         comment.debate_chat_url = debate_state['chat_url'] if debate_state else ''
+        comment.show_debate_action = False
+        if request.user.is_authenticated and request.user != comment.user:
+            comment.show_debate_action = bool(debate_state) or is_post_creator or (user_has_voted and user_vote_type != comment.vote_type)
+        comment.show_debate_view_link = False
+        comment.debate_view_url = ''
+        if completed_state and not debate_state:
+            comment.show_debate_view_link = True
+            comment.debate_view_url = f'/debates/{completed_state.id}/chat/'
 
     now = timezone.now()
     online_cutoff = now - timedelta(minutes=5)
@@ -621,7 +898,6 @@ def discussion(request, post_id):
         comment.presence_label = _presence_label(last_seen, now=now)
 
     post_has_comments = comments.exists()
-    is_post_creator = request.user == post.user
     can_manage_post_today = is_post_creator and _can_manage_created_today(request.user, post.created_at)
     show_post_submitted = is_post_creator and request.GET.get('created') == '1'
 
@@ -631,6 +907,7 @@ def discussion(request, post_id):
 
     context = {
         'post': post,
+        'post_display_content': _normalize_post_content(post.content),
         'yes_comments': yes_comments,
         'no_comments': no_comments,
         'yes_vote_count': yes_vote_count,
@@ -660,6 +937,14 @@ def profile(request):
     user_reposts = PostAction.objects.filter(
         user=request.user, action='repost'
     ).select_related('post', 'post__user').order_by('-created_at')
+    user_debate_participations = DebateParticipant.objects.filter(
+        user=request.user
+    ).select_related(
+        'debate',
+        'debate__post',
+        'debate__initiator',
+        'debate__target',
+    ).order_by('-debate__created_at')
     user_saved = PostAction.objects.filter(
         user=request.user, action='save'
     ).select_related('post', 'post__user').order_by('-created_at')
@@ -671,7 +956,8 @@ def profile(request):
         action.can_remove_today = _can_manage_created_today(request.user, action.created_at)
 
     profile_obj = Profile.objects.filter(user=request.user).first()
-    avatar_url = profile_obj.avatar_url if profile_obj else ''
+    avatar_url = profile_obj.get_picture_url if profile_obj else ''
+    profile_picture_url = profile_obj.profile_picture.url if profile_obj and profile_obj.profile_picture else ''
     profile_last_seen = profile_obj.last_seen if profile_obj else None
     now = timezone.now()
     is_online = bool(profile_last_seen and profile_last_seen >= now - timedelta(minutes=5))
@@ -682,13 +968,15 @@ def profile(request):
 
     def _card(u):
         p = getattr(u, 'profile', None)
-        return {'username': u.username, 'avatar_url': p.avatar_url if p else ''}
+        return {'username': u.username, 'avatar_url': p.get_picture_url if p else ''}
 
     context = {
         'user_posts': user_posts,
         'user_reposts': user_reposts,
+        'user_debate_participations': user_debate_participations,
         'user_saved': user_saved,
         'avatar_url': avatar_url,
+        'profile_picture_url': profile_picture_url,
         'is_online': is_online,
         'presence_label': presence_label,
         'followers_count': request.user.follower_links.count(),
@@ -697,6 +985,47 @@ def profile(request):
         'following_list': [_card(f.following) for f in following_qs],
     }
     return render(request, 'frontend/profile.html', context)
+
+def upload_profile_picture(request):
+    """Handle profile picture upload"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+    
+    if 'profile_picture' not in request.FILES:
+        return JsonResponse({'success': False, 'error': 'No file provided'}, status=400)
+    
+    try:
+        profile = Profile.objects.get(user=request.user)
+    except Profile.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Profile not found'}, status=404)
+    
+    file = request.FILES['profile_picture']
+    
+    # Validate file size (max 5MB)
+    if file.size > 5 * 1024 * 1024:
+        return JsonResponse({'success': False, 'error': 'File size exceeds 5MB'}, status=400)
+    
+    # Validate file type
+    allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    if file.content_type not in allowed_types:
+        return JsonResponse({'success': False, 'error': 'Invalid file type. Only JPEG, PNG, GIF, and WebP allowed'}, status=400)
+    
+    # Delete old picture if exists
+    if profile.profile_picture:
+        profile.profile_picture.delete()
+    
+    # Save new picture
+    profile.profile_picture = file
+    profile.save()
+    
+    return JsonResponse({
+        'success': True,
+        'message': 'Profile picture updated successfully',
+        'profile_picture_url': profile.profile_picture.url if profile.profile_picture else ''
+    })
 
 def user_profile(request, username):
     """Public user profile page"""
@@ -709,7 +1038,7 @@ def user_profile(request, username):
     user_posts = Post.objects.filter(user=profile_user).exclude(id='').order_by('-created_at')
 
     profile_obj = Profile.objects.filter(user=profile_user).first()
-    avatar_url = profile_obj.avatar_url if profile_obj else ''
+    avatar_url = profile_obj.get_picture_url if profile_obj else ''
     profile_last_seen = profile_obj.last_seen if profile_obj else None
     now = timezone.now()
     is_online = bool(profile_last_seen and profile_last_seen >= now - timedelta(minutes=5))
@@ -796,7 +1125,7 @@ def search_users(request):
             'posts_count': p.posts_count,
             'followers_count': p.followers_count,
             'url': f'/user/{p.username}/',
-            'avatar_url': p.avatar_url or '',
+            'avatar_url': p.get_picture_url,
         }
         for p in profiles
     ]
@@ -917,11 +1246,39 @@ def notifications(request):
             debate.user_can_moderate = False
             debate.moderatable_participants = []
 
+    moderation_reports = []
+    if _is_configured_moderator(request.user):
+        moderation_reports = list(
+            DebateMessageReport.objects.filter(status='pending')
+            .select_related('debate__post', 'message', 'reporter', 'reported_user')
+            .order_by('-created_at')[:50]
+        )
+
+        report_counts = {
+            row['reported_user_id']: row
+            for row in DebateMessageReport.objects.values('reported_user_id').annotate(
+                total_reports=Count('id'),
+                pending_reports=Count('id', filter=Q(status='pending')),
+                actioned_reports=Count('id', filter=Q(status='actioned')),
+                dismissed_reports=Count('id', filter=Q(status='dismissed')),
+            )
+        }
+
+        for report in moderation_reports:
+            report.message_preview = _decode_chat_content_from_storage(report.message.content)
+            counts = report_counts.get(report.reported_user_id, {})
+            report.total_reports = counts.get('total_reports', 0)
+            report.pending_reports = counts.get('pending_reports', 0)
+            report.actioned_reports = counts.get('actioned_reports', 0)
+            report.dismissed_reports = counts.get('dismissed_reports', 0)
+
     context = {
         'debates': debates,
         'post_notifications': Notification.objects.filter(
             user=request.user
         ).select_related('post').order_by('-created_at')[:30],
+        'is_configured_moderator': _is_configured_moderator(request.user),
+        'moderation_reports': moderation_reports,
     }
     return render(request, 'frontend/notifications.html', context)
 
@@ -940,12 +1297,20 @@ def unfollow_post(request):
 @login_required
 def chat_list(request):
     """Return list of active chats sorted by most recent message."""
-    from discussions.models import DebateMessage as DMsg
+    chats = _build_chat_payload_for_user(request.user, only_active=False)
+    return JsonResponse({'success': True, 'chats': chats})
+
+
+def _build_chat_payload_for_user(user, only_active=False):
     participations = DebateParticipant.objects.filter(
-        user=request.user,
+        user=user,
         debate__status='accepted',
         is_banned=False,
-    ).select_related(
+    )
+    if only_active:
+        participations = participations.filter(is_active=True)
+
+    participations = participations.select_related(
         'debate__post',
         'debate__initiator',
         'debate__target',
@@ -954,14 +1319,14 @@ def chat_list(request):
     chats = []
     for p in participations:
         debate = p.debate
-        opponent = debate.target if request.user.id == debate.initiator_id else debate.initiator
-        last_msg = DMsg.objects.filter(
+        opponent = debate.target if user.id == debate.initiator_id else debate.initiator
+        last_msg = DebateMessage.objects.filter(
             debate=debate,
             is_system=False,
         ).order_by('-created_at').first()
 
         try:
-            opp_avatar = opponent.profile.avatar_url or ''
+            opp_avatar = opponent.profile.get_picture_url
         except Exception:
             opp_avatar = ''
 
@@ -971,7 +1336,7 @@ def chat_list(request):
             'opponent': opponent.username,
             'opponent_avatar': opp_avatar,
             'is_active': p.is_active,
-            'last_message': last_msg.content[:100] if last_msg else None,
+            'last_message': _decode_chat_content_from_storage(last_msg.content)[:100] if last_msg else None,
             'last_message_sender': last_msg.sender.username if last_msg else None,
             'last_message_time': last_msg.created_at.strftime('%b %d, %H:%M') if last_msg else None,
             'last_message_id': last_msg.id if last_msg else 0,
@@ -979,7 +1344,14 @@ def chat_list(request):
         })
 
     chats.sort(key=lambda x: x['last_message_id'] or 0, reverse=True)
-    return JsonResponse({'success': True, 'chats': chats})
+    return chats
+
+
+@login_required
+def chats(request):
+    """Dedicated page listing all active conversations."""
+    chats_data = _build_chat_payload_for_user(request.user, only_active=True)
+    return render(request, 'frontend/chats.html', {'chats': chats_data})
 
 
 @login_required
@@ -988,6 +1360,13 @@ def notification_count(request):
         target=request.user,
         status='pending'
     ).count()
+
+    if _is_configured_moderator(request.user):
+        pending_count += Notification.objects.filter(
+            user=request.user,
+            notification_type='moderation_alert',
+            is_read=False,
+        ).count()
 
     accepted_ids = list(
         DebateParticipant.objects.filter(
@@ -1010,26 +1389,38 @@ def login_view(request):
     next_url = _safe_next_url(request, raw_next)
 
     if request.method == 'POST':
-        username = (request.POST.get('username') or '').strip()
+        identifier = (request.POST.get('username') or '').strip()
         password = request.POST.get('password')
 
-        if is_login_rate_limited(request, username, source='web'):
+        if is_login_rate_limited(request, identifier, source='web'):
             messages.error(request, 'Too many login attempts. Please try again in a few minutes.')
             return render(request, 'frontend/login.html', {'next': next_url})
 
-        if username == _manual_editor_username() and _manual_editor_password():
+        if identifier == _manual_editor_username() and _manual_editor_password():
             _ensure_manual_editor_user()
 
-        user = authenticate(request, username=username, password=password)
+        user = authenticate(request, username=identifier, password=password)
+        if user is None and '@' in identifier:
+            matched_user = User.objects.filter(email__iexact=identifier).first()
+            if matched_user is not None:
+                user = authenticate(request, username=matched_user.username, password=password)
+
         if user is not None:
-            record_login_attempt(request, username, successful=True, source='web')
+            record_login_attempt(request, user.username, successful=True, source='web')
             login(request, user)
+            Profile.objects.update_or_create(
+                user=user,
+                defaults={
+                    'username': user.username,
+                    'last_seen': timezone.now(),
+                },
+            )
             messages.success(request, 'Welcome back!')
             if next_url:
                 return redirect(next_url)
             return redirect('index')
         else:
-            record_login_attempt(request, username, successful=False, source='web')
+            record_login_attempt(request, identifier, successful=False, source='web')
             messages.error(request, 'Invalid credentials')
 
     return render(request, 'frontend/login.html', {'next': next_url})
@@ -1080,7 +1471,7 @@ def register_view(request):
                 email=email,
                 password=password
             )
-            messages.success(request, 'Account created successfully! Please login.')
+            messages.success(request, 'thannks for registering with debatehub')
             if next_url:
                 return redirect(f'/login/?next={next_url}')
             return redirect('login')
@@ -1095,13 +1486,25 @@ def logout_view(request):
     messages.success(request, 'Logged out successfully')
     return redirect('index')
 
+
+@login_required
+@require_POST
+def mark_offline(request):
+    """Mark the authenticated user offline immediately (used on tab close/unload)."""
+    offline_at = timezone.now() - timedelta(minutes=10)
+    Profile.objects.filter(user=request.user).update(last_seen=offline_at)
+    # Keep middleware heartbeat state aligned so next request can refresh immediately.
+    request.session['dh_last_seen_epoch'] = offline_at.timestamp()
+    return JsonResponse({'success': True})
+
+
 @login_required
 @require_POST
 def create_post(request):
     """Create a new post"""
     if request.method == 'POST':
         title = request.POST.get('title', '').strip()
-        content = request.POST.get('content', '').strip()
+        content = _normalize_post_content(request.POST.get('content', ''))
         category = request.POST.get('category', '').strip()
         hashtags = request.POST.get('hashtags', '').strip()
 
@@ -1242,14 +1645,37 @@ def remove_follower(request):
 def create_comment(request, post_id):
     """Create a comment on a post"""
     post = get_object_or_404(Post, id=post_id)
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    def build_vote_payload(message, has_comment):
+        yes_vote_count = post.comments.filter(vote_type='yes').count()
+        no_vote_count = post.comments.filter(vote_type='no').count()
+        total_votes = yes_vote_count + no_vote_count
+        yes_percentage = (yes_vote_count / total_votes * 100) if total_votes > 0 else 0
+        no_percentage = (no_vote_count / total_votes * 100) if total_votes > 0 else 0
+        return {
+            'success': True,
+            'message': message,
+            'yes_vote_count': yes_vote_count,
+            'no_vote_count': no_vote_count,
+            'yes_percentage': yes_percentage,
+            'no_percentage': no_percentage,
+            'has_comment': has_comment,
+            'reload_required': has_comment,
+        }
+
+    def handle_error(message, status=400):
+        if is_ajax:
+            return JsonResponse({'success': False, 'error': message}, status=status)
+        messages.error(request, message)
+        return redirect('discussion', post_id=post_id)
 
     if request.method == 'POST':
         vote_type = request.POST.get('vote_type')
         content = request.POST.get('content', '').strip()
 
         if not vote_type or vote_type not in ['yes', 'no']:
-            messages.error(request, 'Invalid vote type')
-            return redirect('discussion', post_id=post_id)
+            return handle_error('Invalid vote type')
 
         # Enforce a single comment per user per post.
         existing_comment = Comment.objects.filter(post=post, user=request.user).first()
@@ -1257,16 +1683,25 @@ def create_comment(request, post_id):
             existing_has_content = bool((existing_comment.content or '').strip())
 
             if existing_has_content:
-                messages.error(request, 'You can comment only once on a post.')
-                return redirect('discussion', post_id=post_id)
+                return handle_error('You can comment only once on a post.')
 
             if not content:
-                messages.error(request, 'Comment content is required')
+                existing_comment.vote_type = vote_type
+                existing_comment.save(update_fields=['vote_type', 'updated_at'])
+
+                if is_ajax:
+                    return JsonResponse(build_vote_payload('Vote updated!', has_comment=False))
+
+                messages.success(request, 'Vote updated!')
                 return redirect('discussion', post_id=post_id)
 
             existing_comment.vote_type = vote_type
             existing_comment.content = content
             existing_comment.save(update_fields=['vote_type', 'content', 'updated_at'])
+
+            if is_ajax:
+                return JsonResponse(build_vote_payload('Comment submitted!', has_comment=True))
+
             messages.success(request, 'Comment submitted!')
             return redirect('discussion', post_id=post_id)
         else:
@@ -1279,7 +1714,10 @@ def create_comment(request, post_id):
                 content=content if content else ''
             )
 
-            messages.success(request, 'Vote submitted!')
+            if is_ajax:
+                return JsonResponse(build_vote_payload('Vote submitted!' if not content else 'Comment submitted!', has_comment=bool(content)))
+
+            messages.success(request, 'Vote submitted!' if not content else 'Comment submitted!')
             return redirect('discussion', post_id=post_id)
 
     return redirect('discussion', post_id=post_id)
@@ -1300,11 +1738,18 @@ def like_comment(request):
         if comment.user_id == request.user.id:
             return JsonResponse({'success': False, 'error': 'You cannot react to your own comment.'}, status=403)
 
-        reaction, created = CommentReaction.objects.get_or_create(
-            comment=comment,
-            user=request.user,
-            defaults={'reaction': action}
-        )
+        try:
+            reaction, created = CommentReaction.objects.get_or_create(
+                comment=comment,
+                user=request.user,
+                defaults={'reaction': action}
+            )
+        except IntegrityError:
+            # Handle concurrent taps on mobile that can race against unique constraints.
+            reaction = CommentReaction.objects.filter(comment=comment, user=request.user).first()
+            if not reaction:
+                return JsonResponse({'success': False, 'error': 'Could not apply reaction. Please try again.'}, status=409)
+            created = False
 
         if not created and reaction.reaction != action:
             reaction.reaction = action
@@ -1338,8 +1783,9 @@ def start_debate(request):
             return JsonResponse({'success': False, 'error': 'You are not allowed to send debate requests to this commentor.'})
 
         user_comment = Comment.objects.filter(post=comment.post, user=request.user).first()
-        if not user_comment:
-            return JsonResponse({'success': False, 'error': 'Please vote yes or no first before starting a debate.'}, status=400)
+        desired_side = user_comment.vote_type if user_comment else None
+        if desired_side is None and request.user == comment.post.user:
+            desired_side = _opposite_side(comment.vote_type)
 
         accepted_debate = Debate.objects.filter(
             post=comment.post,
@@ -1347,9 +1793,90 @@ def start_debate(request):
             status='accepted'
         ).order_by('-updated_at').first()
 
-        if accepted_debate and user_comment:
+        if desired_side not in ('yes', 'no') and not accepted_debate:
+            return JsonResponse({'success': False, 'error': 'Please vote yes or no first before starting a debate.'}, status=400)
+
+        if (
+            accepted_debate is None
+            and request.user != comment.post.user
+            and desired_side == comment.vote_type
+        ):
+            return JsonResponse({
+                'success': False,
+                'error': 'You can only start a debate with comments from the opposite side.'
+            }, status=400)
+
+        reusable_completed = Debate.objects.filter(
+            post=comment.post,
+            target=target_user,
+            status='completed',
+        ).order_by('-updated_at').first()
+
+        if reusable_completed:
+            pending_for_target = Debate.objects.filter(target=target_user, status='pending').exclude(id=reusable_completed.id)
+            category_pending_count = pending_for_target.filter(comment__vote_type=comment.vote_type).count()
+            total_pending_count = pending_for_target.count()
+            side_label = 'YES' if comment.vote_type == 'yes' else 'NO'
+
+            if category_pending_count >= 5:
+                return JsonResponse({
+                    'success': False,
+                    'queued': True,
+                    'error': f'You are in queue. {side_label} queue is full (5/5), commentor still not responding to existing requests.'
+                })
+
+            if total_pending_count >= 10:
+                return JsonResponse({
+                    'success': False,
+                    'queued': True,
+                    'error': 'You are in queue. This user already has 10 pending requests, commentor still not responding to existing requests.'
+                })
+
+            reusable_completed.comment = comment
+            reusable_completed.initiator = request.user
+            reusable_completed.status = 'pending'
+            reusable_completed.end_controller = None
+            reusable_completed.end_controller_side = ''
+            reusable_completed.save(update_fields=['comment', 'initiator', 'status', 'end_controller', 'end_controller_side', 'updated_at'])
+
+            DebateParticipant.objects.filter(debate=reusable_completed).exclude(
+                user_id__in=[reusable_completed.initiator_id, reusable_completed.target_id]
+            ).update(is_active=False, left_at=timezone.now())
+
+            DebateMessage.objects.create(
+                debate=reusable_completed,
+                sender=request.user,
+                content=f"{request.user.username} requested to restart the debate.",
+                is_system=True,
+            )
+
+            return JsonResponse({'success': True, 'message': 'Debate restart request sent!'})
+
+        if accepted_debate:
             _ensure_debate_core_participants(accepted_debate)
-            side = user_comment.vote_type
+
+            active_counts = {
+                item['side']: item['total']
+                for item in DebateParticipant.objects.filter(
+                    debate=accepted_debate,
+                    is_active=True,
+                ).values('side').annotate(total=Count('id'))
+            }
+            desired_side = _pick_debate_side_for_user(
+                accepted_debate,
+                desired_side,
+                active_counts=active_counts,
+                fallback_side=_opposite_side(comment.vote_type),
+            )
+
+            side = desired_side
+            yes_active = active_counts.get('yes', 0)
+            no_active = active_counts.get('no', 0)
+            conversation_full = (
+                accepted_debate.yes_supporters > 0 and accepted_debate.no_supporters > 0
+                and yes_active >= accepted_debate.yes_supporters
+                and no_active >= accepted_debate.no_supporters
+            )
             side_limit = accepted_debate.yes_supporters if side == 'yes' else accepted_debate.no_supporters
             participant = DebateParticipant.objects.filter(
                 debate=accepted_debate,
@@ -1373,11 +1900,22 @@ def start_debate(request):
                     'redirect_url': f'/debates/{accepted_debate.id}/chat/'
                 })
 
-            active_side_count = DebateParticipant.objects.filter(
-                debate=accepted_debate,
-                side=side,
-                is_active=True
-            ).count()
+            if conversation_full:
+                if not participant:
+                    DebateParticipant.objects.create(
+                        debate=accepted_debate,
+                        user=request.user,
+                        side=side,
+                        is_active=False,
+                    )
+                return JsonResponse({
+                    'success': True,
+                    'queued': True,
+                    'message': 'Conversation participant limit is reached. You can view the debate.',
+                    'redirect_url': f'/debates/{accepted_debate.id}/chat/'
+                })
+
+            active_side_count = active_counts.get(side, 0)
 
             if side_limit and active_side_count >= side_limit:
                 side_label = 'YES' if side == 'yes' else 'NO'
@@ -1422,7 +1960,8 @@ def start_debate(request):
         existing_debate = Debate.objects.filter(
             comment=comment,
             initiator=request.user,
-            target=target_user
+            target=target_user,
+            status='pending',
         ).exists()
 
         if existing_debate:
@@ -1597,7 +2136,7 @@ def debate_chat(request, debate_id):
         id=debate_id
     )
 
-    if debate.status != 'accepted':
+    if debate.status not in ('accepted', 'completed'):
         messages.error(request, 'This conversation is not active.')
         return redirect('notifications')
 
@@ -1639,10 +2178,10 @@ def debate_chat(request, debate_id):
         'opponent_avatar': _safe_avatar_url(opponent),
         'active_participants': _active_participants_payload(debate, request.user),
         'is_active_participant': participation.is_active and not participation.is_banned,
-        'can_post': participation.is_active and not participation.is_banned,
+        'can_post': debate.status == 'accepted' and participation.is_active and not participation.is_banned,
         'can_rejoin': (not participation.is_active) and (not participation.is_banned),
-        'is_view_only': participation.is_banned,
-        'can_end_chat': participation.is_active and not participation.is_banned and debate.end_controller_id == request.user.id,
+        'is_view_only': participation.is_banned or debate.status == 'completed',
+        'can_end_chat': debate.status == 'accepted' and participation.is_active and not participation.is_banned and debate.end_controller_id == request.user.id,
         'current_controller_name': debate.end_controller.username if debate.end_controller else '',
         'current_controller_side': debate.end_controller_side,
         'can_moderate_chat': request.user.id == debate.target_id,
@@ -1674,6 +2213,17 @@ def send_debate_message(request, debate_id):
     content = request.POST.get('content', '')
     if not content.strip():
         return JsonResponse({'success': False, 'error': 'Message cannot be empty'})
+
+    # Check content moderation
+    if check_content_moderation(content):
+        # Create notification for abusive content
+        Notification.objects.create(
+            user=request.user,
+            post=debate.post,
+            notification_type='moderation_warning',
+            message='Your message was removed due to containing abusive language. Please follow community guidelines.'
+        )
+        return JsonResponse({'success': False, 'error': 'Your message contains abusive language and has been removed.'})
 
     reply_to = None
     reply_to_id = request.POST.get('reply_to_id', '').strip()
@@ -1734,6 +2284,17 @@ def update_debate_message(request, debate_id, message_id):
     content = request.POST.get('content', '').strip()
     if not content:
         return JsonResponse({'success': False, 'error': 'Message cannot be empty.'})
+
+    # Check content moderation
+    if check_content_moderation(content):
+        # Create notification for abusive content
+        Notification.objects.create(
+            user=request.user,
+            post=debate.post,
+            notification_type='moderation_warning',
+            message='Your message edit was rejected due to containing abusive language. Please follow community guidelines.'
+        )
+        return JsonResponse({'success': False, 'error': 'Your message edit contains abusive language and has been rejected.'})
 
     DebateMessageEditHistory.objects.create(
         message=message,
@@ -1797,6 +2358,172 @@ def debate_messages(request, debate_id):
         'current_controller_side': debate.end_controller_side,
         'can_moderate_chat': request.user.id == debate.target_id,
     })
+
+
+@login_required
+@require_POST
+def react_to_debate_message(request, debate_id, message_id):
+    """React to a debate message with like/dislike (mobile long-press)"""
+    debate = get_object_or_404(Debate, id=debate_id)
+
+    if debate.status != 'accepted':
+        return JsonResponse({'success': False, 'error': 'Conversation is not active'}, status=400)
+
+    _ensure_debate_core_participants(debate)
+    participation = DebateParticipant.objects.filter(debate=debate, user=request.user).first()
+
+    if not participation:
+        return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
+
+    if participation.is_banned:
+        return JsonResponse({'success': False, 'error': 'You cannot react to messages.'}, status=403)
+
+    message = get_object_or_404(DebateMessage, id=message_id, debate=debate)
+
+    if message.sender_id == request.user.id:
+        return JsonResponse({'success': False, 'error': 'You cannot react to your own messages.'}, status=400)
+    reaction_type = request.POST.get('reaction_type', '').strip().lower()
+
+    if reaction_type not in ['like', 'dislike']:
+        return JsonResponse({'success': False, 'error': 'Invalid reaction type'}, status=400)
+
+    # For now, we just acknowledge the reaction locally
+    # Future enhancement: Store reactions in database if needed
+    return JsonResponse({
+        'success': True,
+        'message': f'{reaction_type.title()}d message successfully',
+        'reaction_type': reaction_type,
+        'message_id': message_id
+    })
+
+
+@login_required
+@require_POST
+def report_debate_message(request, debate_id, message_id):
+    """Report an abusive debate message to configured moderators."""
+    debate = get_object_or_404(Debate, id=debate_id)
+    _ensure_debate_core_participants(debate)
+
+    participation = DebateParticipant.objects.filter(debate=debate, user=request.user).first()
+    if not participation:
+        return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
+
+    if participation.is_banned:
+        return JsonResponse({'success': False, 'error': 'You cannot report from this conversation.'}, status=403)
+
+    message = get_object_or_404(DebateMessage, id=message_id, debate=debate)
+    if message.sender_id == request.user.id:
+        return JsonResponse({'success': False, 'error': 'You cannot report your own message.'}, status=400)
+
+    details = (request.POST.get('details') or '').strip()
+    report, created = DebateMessageReport.objects.get_or_create(
+        message=message,
+        reporter=request.user,
+        defaults={
+            'debate': debate,
+            'reported_user': message.sender,
+            'reason': 'abusive_language',
+            'details': details,
+        },
+    )
+
+    if not created:
+        if details and not report.details:
+            report.details = details
+            report.save(update_fields=['details', 'updated_at'])
+        return JsonResponse({'success': True, 'message': 'This message is already reported. Moderators will review it.'})
+
+    moderators = _moderator_users().exclude(id=request.user.id)
+    preview = _decode_chat_content_from_storage(message.content)
+    for moderator in moderators:
+        Notification.objects.create(
+            user=moderator,
+            post=debate.post,
+            notification_type='moderation_alert',
+            message=(
+                f"Message report in debate '{debate.post.title}': "
+                f"{request.user.username} reported {message.sender.username}. "
+                f"Preview: {preview[:120]}"
+            ),
+        )
+
+    return JsonResponse({'success': True, 'message': 'Message reported. Moderators have been notified.'})
+
+
+@login_required
+@require_POST
+def moderate_debate_message_report(request, report_id):
+    """Moderator review action for reported debate messages."""
+    if not _is_configured_moderator(request.user):
+        return JsonResponse({'success': False, 'error': 'Only configured moderators can review reports.'}, status=403)
+
+    report = get_object_or_404(
+        DebateMessageReport.objects.select_related('debate__post', 'message', 'reported_user', 'reporter'),
+        id=report_id,
+    )
+
+    if report.status != 'pending':
+        return JsonResponse({'success': True, 'message': 'This report was already reviewed.'})
+
+    action = (request.POST.get('action') or '').strip().lower()
+    note = (request.POST.get('note') or '').strip()
+    warning_message = (request.POST.get('warning_message') or '').strip()
+    confirm_phrase = (request.POST.get('confirm_phrase') or '').strip()
+
+    if action not in {'dismiss', 'delete_warn', 'delete_user'}:
+        return JsonResponse({'success': False, 'error': 'Invalid moderation action.'}, status=400)
+
+    report.reviewed_by = request.user
+    report.reviewed_at = timezone.now()
+    report.resolution_note = note
+
+    if action == 'dismiss':
+        report.status = 'dismissed'
+        report.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'resolution_note', 'updated_at'])
+        return JsonResponse({'success': True, 'message': 'Report dismissed.'})
+
+    if action == 'delete_user':
+        if confirm_phrase.upper() != 'DELETE':
+            return JsonResponse({'success': False, 'error': 'Type DELETE to confirm user deletion.'}, status=400)
+
+        reported_user = report.reported_user
+        if reported_user.id == request.user.id:
+            return JsonResponse({'success': False, 'error': 'You cannot delete your own account.'}, status=400)
+        if _is_configured_moderator(reported_user):
+            return JsonResponse({'success': False, 'error': 'Configured moderator accounts cannot be deleted here.'}, status=400)
+
+        username = reported_user.username
+        reported_user.delete()
+        return JsonResponse({'success': True, 'message': f"User '{username}' deleted successfully."})
+
+    debate = report.debate
+    reported_user = report.reported_user
+    message_exists = DebateMessage.objects.filter(id=report.message_id).exists()
+    if message_exists:
+        DebateMessage.objects.filter(id=report.message_id).delete()
+        DebateMessage.objects.create(
+            debate=debate,
+            sender=debate.target,
+            content='A message was removed by moderation due to abusive content.',
+            is_system=True,
+        )
+
+    if not warning_message:
+        warning_message = (
+            "Moderator warning: Your message was removed for abusive content. "
+            "If we get two more reports, your account will be deleted from this website."
+        )
+
+    Notification.objects.create(
+        user=reported_user,
+        post=debate.post,
+        notification_type='moderation_warning',
+        message=warning_message,
+    )
+
+    report.status = 'actioned'
+    report.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'resolution_note', 'updated_at'])
+    return JsonResponse({'success': True, 'message': 'Message deleted and warning sent.'})
 
 
 @login_required
@@ -2001,6 +2728,8 @@ def end_debate(request, debate_id):
 
     debate.status = 'completed'
     debate.save(update_fields=['status', 'updated_at'])
+
+    DebateParticipant.objects.filter(debate=debate, is_active=True).update(is_active=False, left_at=timezone.now())
 
     return JsonResponse({'success': True, 'message': 'Conversation ended.'})
 

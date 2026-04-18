@@ -1,0 +1,909 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Suggested For You - Discussion Hub{% endblock %}
+
+{% block content %}
+<style>
+    html { scroll-behavior: smooth; }
+
+    .home-fullbleed {
+        width: 100vw;
+        margin-left: calc(50% - 50vw);
+        margin-right: calc(50% - 50vw);
+        padding-left: clamp(14px, 4vw, 64px);
+        padding-right: clamp(14px, 4vw, 64px);
+        padding-bottom: 1.75rem;
+    }
+
+    .galaxy-stage {
+        --planet-a: rgba(34, 211, 238, 0.18);
+        --planet-b: rgba(20, 184, 166, 0.16);
+        --planet-c: rgba(245, 158, 11, 0.15);
+        --ring: rgba(148, 163, 184, 0.22);
+        --star: rgba(15, 23, 42, 0.18);
+        --nebula-1: rgba(255, 255, 255, 0.32);
+        --nebula-2: rgba(56, 189, 248, 0.14);
+    }
+
+    html[data-theme="dark"] .galaxy-stage,
+    html.dark .galaxy-stage {
+        --planet-a: rgba(56, 189, 248, 0.22);
+        --planet-b: rgba(45, 212, 191, 0.2);
+        --planet-c: rgba(251, 191, 36, 0.18);
+        --ring: rgba(148, 163, 184, 0.28);
+        --star: rgba(241, 245, 249, 0.2);
+        --nebula-1: rgba(255, 255, 255, 0.1);
+        --nebula-2: rgba(45, 212, 191, 0.1);
+    }
+
+    .ag-stage {
+        position: relative;
+        isolation: isolate;
+        overflow: hidden;
+    }
+
+    .ag-stage::before {
+        content: "";
+        position: absolute;
+        inset: -15% -10% auto -10%;
+        height: 74%;
+        background:
+            radial-gradient(circle at 18% 24%, rgba(255,255,255,0.22), transparent 38%),
+            radial-gradient(circle at 82% 18%, rgba(45,212,191,0.12), transparent 34%),
+            radial-gradient(circle at 52% -2%, rgba(245,158,11,0.10), transparent 30%);
+        z-index: -2;
+        pointer-events: none;
+    }
+
+    .ag-stage::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+            linear-gradient(to right, rgba(148,163,184,0.06) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(148,163,184,0.05) 1px, transparent 1px);
+        background-size: 28px 28px;
+        mask-image: radial-gradient(circle at 50% 20%, black 38%, transparent 80%);
+        opacity: 0.45;
+        z-index: -1;
+        pointer-events: none;
+    }
+
+    .galaxy-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: -1;
+        overflow: hidden;
+    }
+
+    .galaxy-nebula {
+        position: absolute;
+        inset: -8% -10% auto -10%;
+        height: 78%;
+        background:
+            radial-gradient(circle at 20% 24%, var(--nebula-1), transparent 36%),
+            radial-gradient(circle at 78% 20%, var(--nebula-2), transparent 34%),
+            radial-gradient(circle at 56% 4%, rgba(251, 191, 36, 0.07), transparent 30%);
+        filter: blur(2px);
+        opacity: 0.9;
+    }
+
+    .galaxy-stars,
+    .galaxy-stars::before,
+    .galaxy-stars::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(circle, var(--star) 1px, transparent 1.5px);
+        background-size: 26px 26px;
+        opacity: 0.28;
+    }
+
+    .galaxy-stars::before {
+        transform: translate3d(-8px, 10px, 0) scale(1.05);
+        opacity: 0.2;
+        background-size: 34px 34px;
+    }
+
+    .galaxy-stars::after {
+        transform: translate3d(10px, -6px, 0) scale(0.95);
+        opacity: 0.14;
+        background-size: 18px 18px;
+    }
+
+    .planet {
+        position: absolute;
+        border-radius: 999px;
+        pointer-events: none;
+        box-shadow: inset -8px -10px 20px rgba(15, 23, 42, 0.12), inset 6px 8px 12px rgba(255, 255, 255, 0.18);
+        filter: saturate(110%);
+    }
+
+    .planet-a {
+        width: 138px;
+        height: 138px;
+        top: 7%;
+        left: 5%;
+        background: radial-gradient(circle at 34% 30%, rgba(255,255,255,0.5), var(--planet-a) 58%, transparent 100%);
+    }
+
+    .planet-b {
+        width: 112px;
+        height: 112px;
+        top: 19%;
+        right: 8%;
+        background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.42), var(--planet-b) 60%, transparent 100%);
+    }
+
+    .planet-c {
+        width: 92px;
+        height: 92px;
+        bottom: 12%;
+        left: 18%;
+        background: radial-gradient(circle at 35% 32%, rgba(255,255,255,0.36), var(--planet-c) 62%, transparent 100%);
+    }
+
+    .planet-ring {
+        position: absolute;
+        border-radius: 999px;
+        border: 1px solid var(--ring);
+        pointer-events: none;
+        opacity: 0.65;
+    }
+
+    .planet-ring-a {
+        width: 178px;
+        height: 62px;
+        top: 11%;
+        left: 1.6%;
+        transform: rotate(-18deg);
+    }
+
+    .planet-ring-b {
+        width: 146px;
+        height: 50px;
+        top: 23%;
+        right: 4.7%;
+        transform: rotate(14deg);
+    }
+
+    .ag-orb {
+        position: absolute;
+        border-radius: 999px;
+        filter: blur(0.5px);
+        pointer-events: none;
+        z-index: -1;
+    }
+
+    .ag-orb-1 {
+        width: 240px;
+        height: 240px;
+        top: -42px;
+        left: -58px;
+        background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.36), rgba(34,211,238,0.12) 52%, transparent 74%);
+    }
+
+    .ag-orb-2 {
+        width: 210px;
+        height: 210px;
+        top: 26%;
+        right: -48px;
+        background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.28), rgba(245,158,11,0.13) 58%, transparent 78%);
+    }
+
+    .ag-orb-3 {
+        width: 170px;
+        height: 170px;
+        bottom: 8%;
+        left: 18%;
+        background: radial-gradient(circle at 38% 38%, rgba(255,255,255,0.28), rgba(45,212,191,0.16) 55%, transparent 76%);
+    }
+
+    .glass-panel {
+        background:
+            linear-gradient(152deg, hsl(var(--card) / 0.84), hsl(var(--card) / 0.58)),
+            radial-gradient(circle at 8% 10%, rgba(255,255,255,0.34), transparent 30%);
+        box-shadow:
+            0 24px 64px -44px rgba(15, 23, 42, 0.78),
+            inset 0 1px 0 rgba(255,255,255,0.18);
+        backdrop-filter: blur(16px) saturate(130%);
+        -webkit-backdrop-filter: blur(16px) saturate(130%);
+    }
+
+    .trend-card {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.15rem;
+        padding: 1.1rem 1.1rem;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        box-shadow: inset 0 0 0 1px hsl(var(--border) / 0.28);
+    }
+
+    .trend-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.06) 32%, transparent 67%);
+        opacity: 0;
+        transform: translateX(-32%);
+        transition: opacity 230ms ease, transform 310ms ease;
+        pointer-events: none;
+    }
+
+    .trend-card:hover::before {
+        opacity: 1;
+        transform: translateX(16%);
+    }
+
+    .trend-side {
+        width: 4px;
+        flex-shrink: 0;
+        align-self: stretch;
+        border-radius: 999px;
+        background: linear-gradient(to bottom, hsl(var(--primary)), #14b8a6, hsl(var(--accent)));
+        opacity: 0.86;
+    }
+
+    .trend-title {
+        font-size: 1.08rem;
+        line-height: 1.35;
+        font-weight: 700;
+    }
+
+    .trend-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        color: hsl(var(--muted-foreground));
+        font-size: 12px;
+    }
+
+    .trend-pill {
+        border-radius: 999px;
+        border: 1px solid hsl(var(--border));
+        background: hsl(var(--background) / 0.64);
+        padding: 4px 9px;
+        font-weight: 600;
+    }
+
+    .feed-star-like svg {
+        transform-origin: 50% 46%;
+    }
+
+    @keyframes starHoverTwinkle {
+        0%,
+        100% {
+            transform: scale(1) rotate(0deg);
+            filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0));
+        }
+        45% {
+            transform: scale(1.1) rotate(-7deg);
+            filter: drop-shadow(0 0 10px rgba(250, 204, 21, 0.45));
+        }
+        75% {
+            transform: scale(1.06) rotate(5deg);
+            filter: drop-shadow(0 0 8px rgba(253, 224, 71, 0.35));
+        }
+    }
+
+    @keyframes starLikePop {
+        0% {
+            transform: scale(0.86) rotate(-14deg);
+        }
+        48% {
+            transform: scale(1.22) rotate(10deg);
+        }
+        100% {
+            transform: scale(1) rotate(0deg);
+        }
+    }
+
+    .feed-star-like:hover svg {
+        animation: starHoverTwinkle 820ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .feed-star-like.like-pop svg {
+        animation: starLikePop 460ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .suggested-search-wrap {
+        max-width: 58rem;
+        margin: 0 auto 1rem;
+        padding-top: 0.5rem;
+    }
+
+    .suggested-search-shell {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.6rem;
+        border-radius: 999px;
+        background: hsl(var(--background) / 0.62);
+        box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.22),
+            0 14px 34px -26px rgba(15, 23, 42, 0.55);
+    }
+
+    .suggested-search-input {
+        flex: 1;
+        border: 1px solid hsl(var(--border) / 0.7);
+        border-radius: 999px;
+        padding: 0.92rem 1.15rem;
+        background: hsl(var(--background) / 0.88);
+        color: hsl(var(--foreground));
+        font-size: 1rem;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+
+    .suggested-search-input:focus {
+        outline: none;
+        border-color: hsl(var(--primary));
+        box-shadow: 0 0 0 3px hsl(var(--primary) / 0.18);
+    }
+
+    .suggested-search-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 3rem;
+        height: 3rem;
+        border-radius: 999px;
+        color: hsl(var(--primary-foreground));
+        background-image: var(--float-gradient);
+        box-shadow: 0 12px 24px -14px hsl(var(--primary) / 0.78);
+        transition: transform 180ms ease, box-shadow 180ms ease;
+    }
+
+    .suggested-search-btn:hover {
+        transform: translateY(-1px) scale(1.02);
+        box-shadow: 0 16px 28px -14px hsl(var(--primary) / 0.92);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .feed-star-like:hover svg,
+        .feed-star-like.like-pop svg {
+            animation: none !important;
+        }
+    }
+</style>
+
+<div class="home-fullbleed ag-stage galaxy-stage">
+    <div class="galaxy-layer" aria-hidden="true">
+        <div class="galaxy-nebula"></div>
+        <div class="galaxy-stars"></div>
+        <div class="planet planet-a"></div>
+        <div class="planet-ring planet-ring-a"></div>
+        <div class="planet planet-b"></div>
+        <div class="planet-ring planet-ring-b"></div>
+        <div class="planet planet-c"></div>
+    </div>
+
+    <div class="ag-orb ag-orb-1"></div>
+    <div class="ag-orb ag-orb-2"></div>
+    <div class="ag-orb ag-orb-3"></div>
+
+    <div id="posts-section" class="pt-2">
+        <div class="suggested-search-wrap">
+            <form method="get" action="{% url 'suggested' %}" class="suggested-search-shell" role="search" aria-label="Search suggested posts">
+                <input
+                    type="text"
+                    name="q"
+                    id="suggested-search-input"
+                    value="{{ search_query|default:'' }}"
+                    placeholder="Search suggested posts..."
+                    class="suggested-search-input"
+                />
+                <button type="submit" class="suggested-search-btn" aria-label="Search posts">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </button>
+            </form>
+        </div>
+
+        <div id="suggested-results">
+        <div class="space-y-4">
+            {% for post in posts %}
+            {% if post.id %}
+            <div class="glass-panel trend-card transition hover:shadow-lg hover:shadow-primary/10" data-post-id="{{ post.id }}" data-share-url="{% url 'discussion' post.id %}">
+                <div class="trend-side"></div>
+                <div class="flex items-start justify-between w-full">
+                    <div class="flex-1">
+                        <h3 class="trend-title text-foreground mb-2">
+                            <a href="{% url 'discussion' post.id %}" class="hover:text-primary">
+                                {{ post.title }}
+                            </a>
+                        </h3>
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-sm text-muted-foreground">by</span>
+                            <a href="{% url 'user_profile' post.user.username %}" class="text-sm font-medium text-primary hover:text-primary/80">
+                                @{{ post.user.username }}
+                            </a>
+                        </div>
+                        <p class="text-muted-foreground mb-3 line-clamp-2 text-sm leading-6">
+                            {{ post.content|truncatechars:150 }}
+                        </p>
+                        <div class="mb-3" data-vote-card>
+                            <div class="mb-1 flex items-center justify-between text-xs sm:text-sm">
+                                <span class="font-medium text-emerald-600" data-vote-label="yes" data-target="{{ post.yes_percentage|floatformat:1 }}">Yes: 0.0%</span>
+                                <span class="font-medium text-red-600" data-vote-label="no" data-target="{{ post.no_percentage|floatformat:1 }}">No: 0.0%</span>
+                            </div>
+                            <div class="h-2 w-full overflow-hidden rounded-full bg-muted flex">
+                                <div class="h-full bg-emerald-500 transition-all duration-700" data-vote-bar="yes" data-target="{{ post.yes_percentage|floatformat:2 }}" style="width: 0%"></div>
+                                <div class="h-full bg-red-500 transition-all duration-700" data-vote-bar="no" data-target="{{ post.no_percentage|floatformat:2 }}" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="trend-meta">
+                            <span class="trend-pill">{{ post.category }}</span>
+                            <span>{{ post.created_at|date:"M j, Y" }}</span>
+                        </div>
+
+                        {% if user.is_authenticated %}
+                            <div class="mt-3 flex items-center sm:gap-6 gap-3">
+                                <button type="button" data-action="like" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-like feed-star-like {% if post.is_liked %}active text-amber-500 shadow-md shadow-amber-500/20 bg-amber-50/60 dark:bg-amber-950/30{% else %}text-muted-foreground hover:text-amber-500{% endif %} hover:bg-amber-50/70 dark:hover:bg-amber-950/20 hover:shadow-md overflow-hidden">
+                                    <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_liked %}fill-current scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="{% if post.is_liked %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L4.22 13.45 12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                                    </svg>
+                                    <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.like_count|default:0 }}</span>
+                                </button>
+                                <button type="button" data-action="repost" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-repost {% if post.is_reposted %}text-green-500 shadow-md shadow-green-500/20 bg-green-50/50 dark:bg-green-950/30{% else %}text-muted-foreground hover:text-green-500{% endif %} hover:bg-green-50 dark:hover:bg-green-950/20 hover:shadow-md overflow-hidden">
+                                    <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M17 1l4 4-4 4"/>
+                                        <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                                        <path d="M7 23l-4-4 4-4"/>
+                                        <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                                    </svg>
+                                    <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.repost_count|default:0 }}</span>
+                                </button>
+                                <button type="button" data-action="save" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-save {% if post.is_saved %}active text-primary shadow-md shadow-primary/20 bg-primary/5{% else %}text-muted-foreground hover:text-primary{% endif %} hover:bg-primary/10 hover:shadow-md overflow-hidden">
+                                    <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_saved %}fill-current scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="{% if post.is_saved %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2">
+                                        <path d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/>
+                                    </svg>
+                                    <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.save_count|default:0 }}</span>
+                                </button>
+                                <button type="button" onclick="openSharePanel(this)" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced text-muted-foreground hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/20 hover:shadow-md overflow-hidden">
+                                    <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="18" cy="5" r="3"></circle>
+                                        <circle cx="6" cy="12" r="3"></circle>
+                                        <circle cx="18" cy="19" r="3"></circle>
+                                        <path d="M8.59 13.51L15.42 17.49"></path>
+                                        <path d="M15.41 6.51L8.59 10.49"></path>
+                                    </svg>
+                                    <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Share</span>
+                                </button>
+                                <a href="{% url 'discussion' post.id %}" class="ml-auto group inline-flex items-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full border border-primary/35 bg-primary/12 text-primary shadow-sm shadow-primary/20 transition-all duration-300 hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/35 focus:outline-none focus:ring-2 focus:ring-primary/35 whitespace-nowrap">
+                                    <span class="sm:hidden text-xs font-medium">Open</span>
+                                    <span class="hidden sm:inline sm:text-sm font-medium">Open discussion</span>
+                                    <span class="sm:text-sm text-xs">→</span>
+                                </a>
+                            </div>
+                        {% else %}
+                        <div class="mt-3 flex items-center sm:gap-6 gap-3">
+                            <button type="button" onclick="window.location.href='/login/'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 action-btn-enhanced action-btn-like feed-star-like text-muted-foreground hover:text-amber-500 hover:bg-amber-50/70 dark:hover:bg-amber-950/20 hover:shadow-md overflow-hidden cursor-pointer">
+                                <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-sm relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L4.22 13.45 12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                                </svg>
+                                <span class="sm:text-sm text-xs font-medium relative z-10">{{ post.like_count|default:0 }}</span>
+                            </button>
+                            <button type="button" onclick="window.location.href='/login/'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full text-muted-foreground hover:text-primary transition-all duration-300 action-btn-enhanced action-btn-repost hover:bg-primary/10 hover:shadow-md overflow-hidden cursor-pointer">
+                                <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-sm relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M17 1l4 4-4 4"/>
+                                    <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                                    <path d="M7 23l-4-4 4-4"/>
+                                    <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                                </svg>
+                                <span class="sm:text-sm text-xs font-medium relative z-10">{{ post.repost_count|default:0 }}</span>
+                            </button>
+                            <button type="button" onclick="window.location.href='/login/'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full text-muted-foreground hover:text-primary transition-all duration-300 action-btn-enhanced action-btn-save hover:bg-primary/10 hover:shadow-md overflow-hidden cursor-pointer">
+                                <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-sm relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/>
+                                    <circle cx="9" cy="9" r="1.5" class="fill-current"/>
+                                    <circle cx="9" cy="9" r="0.5" class="fill-white"/>
+                                </svg>
+                                <span class="sm:text-sm text-xs font-medium relative z-10">{{ post.save_count|default:0 }}</span>
+                            </button>
+                            <button type="button" onclick="openSharePanel(this)" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full text-muted-foreground hover:text-sky-600 transition-all duration-300 action-btn-enhanced hover:bg-sky-50 dark:hover:bg-sky-950/20 hover:shadow-md overflow-hidden cursor-pointer">
+                                <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="18" cy="5" r="3"></circle>
+                                    <circle cx="6" cy="12" r="3"></circle>
+                                    <circle cx="18" cy="19" r="3"></circle>
+                                    <path d="M8.59 13.51L15.42 17.49"></path>
+                                    <path d="M15.41 6.51L8.59 10.49"></path>
+                                </svg>
+                                <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Share</span>
+                            </button>
+                            <a href="{% url 'discussion' post.id %}" class="ml-auto group inline-flex items-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full border border-primary/35 bg-primary/12 text-primary shadow-sm shadow-primary/20 transition-all duration-300 hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/35 focus:outline-none focus:ring-2 focus:ring-primary/35 whitespace-nowrap">
+                                <span class="sm:hidden text-xs font-medium">Open</span>
+                                <span class="hidden sm:inline sm:text-sm font-medium">Open discussion</span>
+                                <span class="sm:text-sm text-xs">→</span>
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% empty %}
+            <div class="text-center py-12">
+                <p class="text-muted-foreground">No suggested posts available yet.</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if page_obj and page_obj.paginator.num_pages > 1 %}
+        <div class="mt-6 flex items-center justify-center gap-2 sm:gap-3">
+            {% if page_obj.has_previous %}
+            <a href="?{% if search_query %}q={{ search_query|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}#posts-section" class="inline-flex items-center justify-center rounded-full border border-border bg-card px-3 py-1.5 text-xs sm:text-sm font-semibold text-foreground hover:border-primary hover:text-primary">
+                Previous
+            </a>
+            {% else %}
+            <span class="inline-flex items-center justify-center rounded-full border border-border/60 bg-card/60 px-3 py-1.5 text-xs sm:text-sm font-semibold text-muted-foreground">Previous</span>
+            {% endif %}
+
+            <span class="inline-flex items-center justify-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs sm:text-sm font-semibold text-primary">
+                Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+            </span>
+
+            {% if page_obj.has_next %}
+            <a href="?{% if search_query %}q={{ search_query|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}#posts-section" class="inline-flex items-center justify-center rounded-full border border-border bg-card px-3 py-1.5 text-xs sm:text-sm font-semibold text-foreground hover:border-primary hover:text-primary">
+                Next
+            </a>
+            {% else %}
+            <span class="inline-flex items-center justify-center rounded-full border border-border/60 bg-card/60 px-3 py-1.5 text-xs sm:text-sm font-semibold text-muted-foreground">Next</span>
+            {% endif %}
+        </div>
+        {% endif %}
+        </div>
+    </div>
+</div>
+
+<div id="toast-root" class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none"></div>
+
+<div id="share-post-modal" class="hidden fixed inset-0 z-[7600] items-center justify-center bg-black/45 px-4">
+    <div class="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
+        <div class="mb-4 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-foreground">Share Discussion</h3>
+            <button type="button" onclick="closeSharePanel()" class="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close share panel">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6L6 18"></path>
+                    <path d="M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <p id="share-post-title" class="mb-3 text-sm text-muted-foreground"></p>
+
+        <div class="mb-4 flex items-center gap-2">
+            <input id="share-url-input" type="text" readonly class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground" />
+            <button type="button" onclick="copyShareUrl()" class="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90">Copy</button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2.5 sm:grid-cols-6 sm:gap-3">
+            <button type="button" onclick="shareToPlatform('facebook')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300/60 hover:bg-card/80 hover:text-foreground" aria-label="Share to Facebook" title="Facebook">
+                <span class="flex h-8 w-8 items-center justify-center rounded-full border border-blue-200/70 bg-blue-50/70 text-blue-600 transition group-hover:scale-105">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M13.5 8H16V5h-2.5C10.46 5 9 6.57 9 9.19V11H7v3h2v5h3v-5h2.4l.6-3H12V9.4c0-.87.23-1.4 1.5-1.4z"/>
+                    </svg>
+                </span>
+            </button>
+            <button type="button" onclick="shareToPlatform('whatsapp')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/60 hover:bg-card/80 hover:text-foreground" aria-label="Share to WhatsApp" title="WhatsApp">
+                <span class="flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200/70 bg-emerald-50/70 text-emerald-600 transition group-hover:scale-105">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 2a10 10 0 0 0-8.65 15.02L2 22l5.13-1.34A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.07-1.12l-.29-.17-3.04.8.82-2.96-.19-.3A8 8 0 1 1 12 20zm4.58-5.75c-.25-.13-1.48-.73-1.71-.81-.23-.08-.39-.13-.56.13s-.64.81-.78.97c-.14.16-.29.18-.54.06a6.47 6.47 0 0 1-1.9-1.17 7.17 7.17 0 0 1-1.33-1.65c-.14-.25-.02-.38.11-.51.12-.12.25-.3.37-.45.12-.15.16-.26.25-.44.08-.17.04-.32-.02-.45-.06-.13-.56-1.35-.76-1.84-.2-.48-.41-.41-.56-.42h-.48c-.17 0-.45.06-.68.32-.23.25-.88.86-.88 2.1s.9 2.45 1.03 2.62c.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.43.53.6.19 1.14.16 1.57.1.48-.07 1.48-.6 1.69-1.19.21-.58.21-1.09.15-1.19-.06-.1-.23-.16-.48-.29z"/>
+                    </svg>
+                </span>
+            </button>
+            <button type="button" onclick="shareToPlatform('gmail')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-300/60 hover:bg-card/80 hover:text-foreground" aria-label="Share via Gmail" title="Gmail">
+                <span class="flex h-8 w-8 items-center justify-center rounded-full border border-rose-200/70 bg-rose-50/70 text-rose-600 transition group-hover:scale-105">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+                        <path d="M3 6h18v12H3z"/>
+                        <path d="m3 7 9 6 9-6"/>
+                    </svg>
+                </span>
+            </button>
+            <button type="button" onclick="shareToPlatform('instagram')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-fuchsia-300/60 hover:bg-card/80 hover:text-foreground" aria-label="Share to Instagram" title="Instagram">
+                <span class="flex h-8 w-8 items-center justify-center rounded-full border border-fuchsia-200/70 bg-fuchsia-50/70 text-fuchsia-600 transition group-hover:scale-105">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="5" ry="5"></rect>
+                        <circle cx="12" cy="12" r="4"></circle>
+                        <circle cx="17.2" cy="6.8" r="1"></circle>
+                    </svg>
+                </span>
+            </button>
+            <button type="button" onclick="shareToPlatform('x')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300/70 hover:bg-card/80 hover:text-foreground" aria-label="Share to X" title="X">
+                <span class="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300/70 bg-slate-100/70 text-slate-700 transition group-hover:scale-105">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M18.9 3H21l-6.9 7.88L22 21h-6.26l-4.9-6.39L5.2 21H3l7.39-8.45L2 3h6.42l4.42 5.86L18.9 3zm-2.19 16h1.72L7.5 4.9H5.65L16.71 19z"/>
+                    </svg>
+                </span>
+            </button>
+            <button type="button" onclick="shareViaSystem()" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/45 hover:bg-card/80 hover:text-foreground" aria-label="Share to more apps" title="More apps">
+                <span class="flex h-8 w-8 items-center justify-center rounded-full border border-primary/25 bg-primary/10 text-primary transition group-hover:scale-105">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="18" cy="5" r="2.2"></circle>
+                        <circle cx="6" cy="12" r="2.2"></circle>
+                        <circle cx="18" cy="19" r="2.2"></circle>
+                        <path d="M8.2 12.9L15.8 17.2"></path>
+                        <path d="M15.8 6.8L8.2 11.1"></path>
+                    </svg>
+                </span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentShareUrl = '';
+let currentShareTitle = 'Discussion Hub';
+
+function setVoteCardProgress(card, yesValue, noValue) {
+    const yesBar = card.querySelector('[data-vote-bar="yes"]');
+    const noBar = card.querySelector('[data-vote-bar="no"]');
+    const yesLabel = card.querySelector('[data-vote-label="yes"]');
+    const noLabel = card.querySelector('[data-vote-label="no"]');
+    if (!yesBar || !noBar || !yesLabel || !noLabel) return;
+
+    yesBar.style.width = `${yesValue.toFixed(2)}%`;
+    noBar.style.width = `${noValue.toFixed(2)}%`;
+    yesLabel.textContent = `Yes: ${yesValue.toFixed(1)}%`;
+    noLabel.textContent = `No: ${noValue.toFixed(1)}%`;
+}
+
+function animateVoteCard(card) {
+    if (!card || card.dataset.voteAnimating === 'true') return;
+    if (card.dataset.voteAnimated === 'true') return;
+
+    const yesBar = card.querySelector('[data-vote-bar="yes"]');
+    const noBar = card.querySelector('[data-vote-bar="no"]');
+    const yesLabel = card.querySelector('[data-vote-label="yes"]');
+    const noLabel = card.querySelector('[data-vote-label="no"]');
+    if (!yesBar || !noBar || !yesLabel || !noLabel) return;
+
+    const yesTarget = parseFloat(yesBar.dataset.target || '0') || 0;
+    const noTarget = parseFloat(noBar.dataset.target || '0') || 0;
+    const duration = 700;
+    const start = performance.now();
+    card.dataset.voteAnimating = 'true';
+
+    function step(now) {
+        const progress = Math.min((now - start) / duration, 1);
+        const yesValue = yesTarget * progress;
+        const noValue = noTarget * progress;
+        setVoteCardProgress(card, yesValue, noValue);
+
+        if (progress < 1) {
+            requestAnimationFrame(step);
+        } else {
+            card.dataset.voteAnimated = 'true';
+            card.dataset.voteAnimating = 'false';
+            setVoteCardProgress(card, yesTarget, noTarget);
+        }
+    }
+
+    requestAnimationFrame(step);
+}
+
+function initVoteAnimations() {
+    const voteCards = document.querySelectorAll('[data-vote-card]');
+    if (!voteCards.length) return;
+
+    if (!('IntersectionObserver' in window)) {
+        voteCards.forEach(animateVoteCard);
+        return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                animateVoteCard(entry.target);
+            }
+        });
+    }, { threshold: 0.35 });
+
+    voteCards.forEach((card) => observer.observe(card));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    initVoteAnimations();
+    initLiveSuggestedSearch();
+});
+
+function initLiveSuggestedSearch() {
+    const form = document.querySelector('.suggested-search-shell');
+    const input = document.getElementById('suggested-search-input');
+    const resultsContainer = document.getElementById('suggested-results');
+    if (!form || !input || !resultsContainer) return;
+
+    let debounceTimer = null;
+    let requestCounter = 0;
+    let activeController = null;
+
+    function applyResultsFromHtml(htmlText, requestId) {
+        if (requestId !== requestCounter) return;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlText, 'text/html');
+        const nextResults = doc.getElementById('suggested-results');
+        if (!nextResults) return;
+
+        resultsContainer.innerHTML = nextResults.innerHTML;
+        initVoteAnimations();
+    }
+
+    function fetchAndRender(url) {
+        requestCounter += 1;
+        const requestId = requestCounter;
+
+        if (activeController) {
+            activeController.abort();
+        }
+        activeController = new AbortController();
+
+        fetch(url.toString(), {
+            method: 'GET',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            signal: activeController.signal,
+        })
+            .then((response) => response.text())
+            .then((htmlText) => applyResultsFromHtml(htmlText, requestId))
+            .catch((error) => {
+                if (error && error.name === 'AbortError') return;
+            });
+
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState({}, '', url.pathname + url.search);
+        }
+    }
+
+    function runSearch() {
+        const q = (input.value || '').trim();
+        const url = new URL(form.action, window.location.origin);
+        if (q) {
+            url.searchParams.set('q', q);
+        }
+        fetchAndRender(url);
+    }
+
+    input.addEventListener('input', function() {
+        if (debounceTimer) {
+            clearTimeout(debounceTimer);
+        }
+        debounceTimer = setTimeout(runSearch, 250);
+    });
+
+    form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        if (debounceTimer) {
+            clearTimeout(debounceTimer);
+        }
+        runSearch();
+    });
+
+    resultsContainer.addEventListener('click', function(event) {
+        const link = event.target.closest('a[href]');
+        if (!link) return;
+
+        const href = link.getAttribute('href') || '';
+        if (!href.includes('page=')) return;
+
+        event.preventDefault();
+        if (debounceTimer) {
+            clearTimeout(debounceTimer);
+        }
+
+        const url = new URL(href, window.location.origin);
+        const q = url.searchParams.get('q') || '';
+        input.value = q;
+        fetchAndRender(url);
+    });
+}
+
+function openSharePanel(triggerButton) {
+    const postCard = triggerButton.closest('[data-post-id]');
+    if (!postCard) return;
+
+    const sharePath = postCard.dataset.shareUrl || '/';
+    const titleEl = postCard.querySelector('.trend-title a');
+    const title = titleEl ? titleEl.textContent.trim() : 'Discussion';
+
+    currentShareUrl = new URL(sharePath, window.location.origin).toString();
+    currentShareTitle = title;
+
+    const modal = document.getElementById('share-post-modal');
+    const input = document.getElementById('share-url-input');
+    const titleText = document.getElementById('share-post-title');
+    if (!modal || !input || !titleText) return;
+
+    input.value = currentShareUrl;
+    titleText.textContent = title;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeSharePanel() {
+    const modal = document.getElementById('share-post-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+async function copyShareUrl() {
+    if (!currentShareUrl) return;
+
+    try {
+        await navigator.clipboard.writeText(currentShareUrl);
+        showToast('Share URL copied.', 'success');
+    } catch (error) {
+        const input = document.getElementById('share-url-input');
+        if (!input) return;
+        input.focus();
+        input.select();
+        document.execCommand('copy');
+        showToast('Share URL copied.', 'success');
+    }
+}
+
+function shareToPlatform(platform) {
+    if (!currentShareUrl) return;
+
+    const encodedUrl = encodeURIComponent(currentShareUrl);
+    const encodedText = encodeURIComponent(`${currentShareTitle} ${currentShareUrl}`);
+    let targetUrl = '';
+
+    if (platform === 'facebook') {
+        targetUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
+    } else if (platform === 'whatsapp') {
+        targetUrl = `https://wa.me/?text=${encodedText}`;
+    } else if (platform === 'gmail') {
+        const subject = encodeURIComponent(`Discussion: ${currentShareTitle}`);
+        targetUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${encodedText}`;
+    } else if (platform === 'x') {
+        targetUrl = `https://twitter.com/intent/tweet?text=${encodedText}`;
+    } else if (platform === 'instagram') {
+        copyShareUrl();
+        targetUrl = 'https://www.instagram.com/';
+        showToast('URL copied. Paste it in Instagram.', 'success');
+    }
+
+    if (!targetUrl) return;
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+}
+
+async function shareViaSystem() {
+    if (!currentShareUrl) return;
+
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: currentShareTitle,
+                text: currentShareTitle,
+                url: currentShareUrl,
+            });
+            return;
+        } catch (error) {
+            if (error && error.name === 'AbortError') {
+                return;
+            }
+        }
+    }
+
+    await copyShareUrl();
+    showToast('Native share unavailable. URL copied instead.', 'success');
+}
+
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('share-post-modal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    if (event.target === modal) closeSharePanel();
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeSharePanel();
+    }
+});
+</script>
+{% endblock %}

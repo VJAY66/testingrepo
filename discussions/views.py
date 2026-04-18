@@ -7,8 +7,9 @@ from django.db.models import Q
 import uuid
 
 from discussions.limits import has_reached_daily_post_limit
-from discussions.models import Post, Comment, Debate, CommentReaction
+from discussions.models import Post, Comment, Debate, CommentReaction, Notification
 from discussions.serializers import PostSerializer, CommentSerializer, DebateSerializer
+from utils.moderation import check_content_moderation
 
 class PostViewSet(viewsets.ModelViewSet):
     queryset = Post.objects.all()
@@ -24,9 +25,39 @@ class PostViewSet(viewsets.ModelViewSet):
         limit_reached, _, limit = has_reached_daily_post_limit(self.request.user)
         if limit_reached:
             raise ValidationError({'detail': f'You can create up to {limit} posts per day.'})
-        serializer.save(user=self.request.user, id=str(uuid.uuid4()))
+        
+        # Check content moderation
+        title = serializer.validated_data.get('title', '')
+        content = serializer.validated_data.get('content', '')
+        combined_text = f"{title} {content}".strip()
+        
+        if combined_text and check_content_moderation(combined_text):
+            # Create notification for abusive content
+            Notification.objects.create(
+                user=self.request.user,
+                post=None,  # Will be set after post creation, but since we're not creating it, keep None
+                notification_type='moderation_warning',
+                message='Your post was removed due to containing abusive language. Please follow community guidelines.'
+            )
+            raise ValidationError({'detail': 'Your post contains abusive language and has been removed.'})
 
     def perform_update(self, serializer):
+        # Check content moderation for updates
+        title = serializer.validated_data.get('title', '')
+        content = serializer.validated_data.get('content', '')
+        combined_text = f"{title} {content}".strip()
+        
+        if combined_text and check_content_moderation(combined_text):
+            # Create notification for abusive content
+            post = self.get_object()
+            Notification.objects.create(
+                user=self.request.user,
+                post=post,
+                notification_type='moderation_warning',
+                message='Your post edit was rejected due to containing abusive language. Please follow community guidelines.'
+            )
+            raise ValidationError({'detail': 'Your post edit contains abusive language and has been rejected.'})
+        
         serializer.save(user=self.request.user)
 
     @action(detail=False, methods=['get'])
@@ -77,6 +108,19 @@ class CommentViewSet(viewsets.ModelViewSet):
         post = serializer.validated_data.get('post')
         if post and Comment.objects.filter(post=post, user=self.request.user).exists():
             raise ValidationError({'detail': 'You can comment only once on a post.'})
+        
+        # Check content moderation
+        content = serializer.validated_data.get('content', '').strip()
+        if content and check_content_moderation(content):
+            # Create notification for abusive content
+            Notification.objects.create(
+                user=self.request.user,
+                post=post,
+                notification_type='moderation_warning',
+                message='Your comment was removed due to containing abusive language. Please follow community guidelines.'
+            )
+            raise ValidationError({'detail': 'Your comment contains abusive language and has been removed.'})
+        
         serializer.save(user=self.request.user, id=str(uuid.uuid4()))
 
     @action(detail=False, methods=['get'])

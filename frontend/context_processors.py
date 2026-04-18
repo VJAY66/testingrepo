@@ -1,4 +1,6 @@
-from discussions.models import Debate, DebateParticipant
+from django.conf import settings
+
+from discussions.models import Debate, DebateParticipant, Notification
 
 
 def _safe_profile_avatar(user):
@@ -19,6 +21,18 @@ def notification_counts(request):
         target=request.user,
         status='pending'
     ).count()
+
+    moderator_usernames = {
+        str(name).strip().lower()
+        for name in (getattr(settings, 'MODERATOR_USERNAMES', []) or [])
+        if str(name).strip()
+    }
+    if request.user.username.lower() in moderator_usernames:
+        pending_notifications_count += Notification.objects.filter(
+            user=request.user,
+            notification_type='moderation_alert',
+            is_read=False,
+        ).count()
 
     if pending_notifications_count > 10:
         pending_notifications_count = 10

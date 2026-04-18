@@ -13,21 +13,20 @@ class UpdateLastSeenMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        response = self.get_response(request)
-
         user = getattr(request, 'user', None)
-        if not user or not user.is_authenticated:
-            return response
+        if user and user.is_authenticated:
+            now = timezone.now()
+            should_write = True
+            last_seen_epoch = request.session.get(self.SESSION_KEY)
 
-        now = timezone.now()
-        should_write = True
-        last_seen_epoch = request.session.get(self.SESSION_KEY)
+            if isinstance(last_seen_epoch, (int, float)):
+                should_write = (now.timestamp() - float(last_seen_epoch)) >= self.WRITE_INTERVAL_SECONDS
 
-        if isinstance(last_seen_epoch, (int, float)):
-            should_write = (now.timestamp() - float(last_seen_epoch)) >= self.WRITE_INTERVAL_SECONDS
+            if should_write:
+                # Write before view execution so presence checks in the same request
+                # can immediately render the user as online.
+                Profile.objects.filter(user=user).update(last_seen=now)
+                request.session[self.SESSION_KEY] = now.timestamp()
 
-        if should_write:
-            Profile.objects.filter(user=user).update(last_seen=now)
-            request.session[self.SESSION_KEY] = now.timestamp()
-
+        response = self.get_response(request)
         return response

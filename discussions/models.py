@@ -3,22 +3,29 @@ from django.contrib.auth.models import User
 import re
 
 CATEGORY_CHOICES = [
-    ('Technology', 'Technology'),
-    ('Sports', 'Sports'),
-    ('Science', 'Science'),
-    ('History', 'History'),
-    ('Politics', 'Politics'),
-    ('Entertainment', 'Entertainment'),
-    ('Health', 'Health'),
-    ('Business', 'Business'),
-    ('Gadgets', 'Gadgets'),
-    ('Vehicles', 'Vehicles'),
-    ('Education', 'Education'),
-    ('Travel', 'Travel'),
-    ('Food', 'Food'),
-    ('Investment', 'Investment'),
     ('Astrology', 'Astrology'),
+    ('Beauty', 'Beauty'),
+    ('Business', 'Business'),
+    ('Education', 'Education'),
+    ('Entertainment', 'Entertainment'),
+    ('Fashion', 'Fashion'),
+    ('Food', 'Food'),
+    ('Gadgets', 'Gadgets'),
+    ('Health', 'Health'),
+    ('History', 'History'),
+    ('Investment', 'Investment'),
+    ('Medicenes', 'Medicenes'),
+    ('Music', 'Music'),
+    ('Painting', 'Painting'),
+    ('Photography', 'Photography'),
+    ('Politics', 'Politics'),
+    ('Relationships', 'Relationships'),
+    ('Science', 'Science'),
     ('Spirituality', 'Spirituality'),
+    ('Sports', 'Sports'),
+    ('Technology', 'Technology'),
+    ('Travel', 'Travel'),
+    ('Vehicles', 'Vehicles'),
     ('Others', 'Others'),
 ]
 
@@ -231,6 +238,8 @@ class Notification(models.Model):
     NOTIFICATION_TYPES = [
         ('post_comment', 'New Comment on Followed Post'),
         ('post_activity', 'Active Conversation on Followed Post'),
+        ('moderation_alert', 'Moderator Alert'),
+        ('moderation_warning', 'Moderation Warning'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
@@ -299,3 +308,33 @@ class DebateMessageEditHistory(models.Model):
 
     class Meta:
         ordering = ['-edited_at']
+
+
+class DebateMessageReport(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('dismissed', 'Dismissed'),
+        ('actioned', 'Actioned'),
+    ]
+
+    debate = models.ForeignKey(Debate, on_delete=models.CASCADE, related_name='message_reports')
+    message = models.ForeignKey(DebateMessage, on_delete=models.CASCADE, related_name='reports')
+    reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reported_debate_messages')
+    reported_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='debate_message_reports_against')
+    reason = models.CharField(max_length=40, default='abusive_language')
+    details = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_debate_message_reports')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    resolution_note = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Report #{self.id} on message {self.message_id} ({self.status})"
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['message', 'reporter'], name='unique_debate_message_report_per_reporter'),
+        ]

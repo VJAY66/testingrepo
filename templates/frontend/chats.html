@@ -1,0 +1,44 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Chats - Discussion Hub{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-3xl">
+    <div class="mb-5 flex items-center justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-foreground">Active Conversations</h1>
+            <p class="text-sm text-muted-foreground">All ongoing chats where you can participate.</p>
+        </div>
+        <a href="{% url 'index' %}" class="inline-flex items-center rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground hover:border-primary hover:text-primary transition-colors">Back</a>
+    </div>
+
+    {% if chats %}
+    <div class="space-y-3">
+        {% for chat in chats %}
+        <a href="{% url 'debate_chat' chat.id %}" class="block rounded-2xl border border-border bg-card/70 p-4 shadow-sm transition-all hover:border-primary/50 hover:shadow-md">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                    <div class="mb-1 flex items-center gap-2">
+                        <p class="truncate text-sm font-bold text-foreground">@{{ chat.opponent }}</p>
+                        <span class="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">Active</span>
+                    </div>
+                    <p class="truncate text-sm text-muted-foreground">{{ chat.title }}</p>
+                    {% if chat.last_message %}
+                    <p class="mt-1 truncate text-xs text-muted-foreground">{% if chat.last_message_sender == user.username %}You: {% endif %}{{ chat.last_message }}</p>
+                    {% else %}
+                    <p class="mt-1 truncate text-xs text-muted-foreground">No messages yet</p>
+                    {% endif %}
+                </div>
+                <div class="shrink-0 text-xs text-muted-foreground">{{ chat.last_message_time|default:'' }}</div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="rounded-2xl border border-dashed border-border bg-card/50 p-8 text-center">
+        <p class="text-base font-semibold text-foreground">No active conversations right now.</p>
+        <p class="mt-1 text-sm text-muted-foreground">Accept a debate request to start chatting.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

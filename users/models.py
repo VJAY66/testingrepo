@@ -5,12 +5,20 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     username = models.CharField(max_length=30, unique=True)
     avatar_url = models.URLField(null=True, blank=True)
+    profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
     last_seen = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.username
+
+    @property
+    def get_picture_url(self):
+        """Return the best available picture URL: uploaded file first, then external URL."""
+        if self.profile_picture:
+            return self.profile_picture.url
+        return self.avatar_url or ''
 
     @property
     def followers_count(self):

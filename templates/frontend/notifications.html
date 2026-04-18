@@ -656,7 +656,7 @@
         </div>
     </section>
 
-    {% if post_notifications or debates %}
+    {% if post_notifications or debates or moderation_reports %}
         {% if post_notifications %}
         <section class="nf-section nf-reveal" style="--nf-delay: 120ms;">
             <div class="nf-section-head">
@@ -695,6 +695,46 @@
                         </svg>
                         Unfollow Post
                     </button>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        {% if is_configured_moderator and moderation_reports %}
+        <section class="nf-section nf-reveal" style="--nf-delay: 150ms;">
+            <div class="nf-section-head">
+                <div>
+                    <div class="nf-section-title"><span>🛡️</span><span>Moderation Queue</span></div>
+                    <p class="nf-section-caption">Private queue for reported abusive debate messages.</p>
+                </div>
+            </div>
+            <div class="nf-stream">
+                {% for report in moderation_reports %}
+                <article class="nf-debate-card nf-reveal" id="moderation-report-{{ report.id }}">
+                    <div class="p-5 space-y-3">
+                        <div class="flex flex-wrap items-center gap-2 text-xs">
+                            <span class="nf-chip">Reported {{ report.created_at|date:"M j, Y g:i A" }}</span>
+                            <span class="nf-chip">Reporter: {{ report.reporter.username }}</span>
+                            <span class="nf-chip">Accused: {{ report.reported_user.username }}</span>
+                            <span class="nf-chip">Total reports: {{ report.total_reports }}</span>
+                            <span class="nf-chip">Pending: {{ report.pending_reports }}</span>
+                            <span class="nf-chip">Actioned: {{ report.actioned_reports }}</span>
+                            <span class="nf-chip">Dismissed: {{ report.dismissed_reports }}</span>
+                        </div>
+                        <p class="text-sm text-muted-foreground">
+                            Debate: <a href="{% url 'discussion' report.debate.post.id %}" class="nf-link">{{ report.debate.post.title|truncatechars:90 }}</a>
+                        </p>
+                        <div class="rounded-xl border border-border bg-background/70 px-3 py-2 text-sm text-foreground">
+                            "{{ report.message_preview|truncatechars:220 }}"
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" class="nf-button-danger" onclick="moderateDebateMessageReport('{{ report.id }}', 'delete_warn', this)">Delete + Warn</button>
+                            <button type="button" class="nf-button-danger" onclick="moderateDebateMessageReport('{{ report.id }}', 'delete_user', this)">Delete User</button>
+                            <button type="button" class="nf-button-ghost" onclick="moderateDebateMessageReport('{{ report.id }}', 'dismiss', this)">Dismiss</button>
+                            <a href="{% url 'debate_chat' report.debate.id %}" class="nf-button-soft">Open Chat</a>
+                        </div>
+                    </div>
                 </article>
                 {% endfor %}
             </div>
@@ -865,6 +905,84 @@ function getCSRFToken() {
     }
 
     return '';
+}
+
+function moderateDebateMessageReport(reportId, action, triggerBtn) {
+    const csrfToken = getCSRFToken();
+    const isDelete = action === 'delete_warn';
+    const isDeleteUser = action === 'delete_user';
+    let warningMessage = '';
+    const confirmText = isDelete
+        ? 'Delete this message and send warning to the user?'
+        : (isDeleteUser
+            ? 'Delete this user account from the website? This action is permanent.'
+            : 'Dismiss this report?');
+
+    if (!confirm(confirmText)) {
+        return;
+    }
+
+    if (isDelete) {
+        const defaultWarning = 'Moderator warning: Your message was removed for abusive content. If we get two more reports, your account will be deleted from this website.';
+        const custom = prompt('Enter warning message to send to user:', defaultWarning);
+        if (custom === null) {
+            return;
+        }
+        warningMessage = String(custom || '').trim() || defaultWarning;
+    }
+
+    let confirmPhrase = '';
+    if (isDeleteUser) {
+        const typed = prompt('Type DELETE to confirm permanent account deletion:', '');
+        if (typed === null) {
+            return;
+        }
+        confirmPhrase = String(typed || '').trim();
+        if (confirmPhrase.toUpperCase() !== 'DELETE') {
+            if (typeof window.showToast === 'function') {
+                window.showToast('Deletion cancelled. You must type DELETE exactly.', 'error');
+            }
+            return;
+        }
+    }
+
+    if (triggerBtn) {
+        triggerBtn.disabled = true;
+    }
+
+    fetch(`/moderation/debate-message-reports/${encodeURIComponent(reportId)}/review/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: `action=${encodeURIComponent(action)}${isDelete ? `&warning_message=${encodeURIComponent(warningMessage)}` : ''}${isDeleteUser ? `&confirm_phrase=${encodeURIComponent(confirmPhrase)}` : ''}`,
+    })
+    .then(async (response) => {
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data || !data.success) {
+            throw new Error((data && data.error) || 'Unable to review report.');
+        }
+        return data;
+    })
+    .then((data) => {
+        if (typeof window.showToast === 'function') {
+            window.showToast(data.message || 'Report reviewed.', 'success');
+        }
+        const card = document.getElementById(`moderation-report-${reportId}`);
+        if (card) {
+            card.remove();
+        }
+    })
+    .catch((error) => {
+        if (typeof window.showToast === 'function') {
+            window.showToast(error.message || 'Unable to review report.', 'error');
+        }
+        if (triggerBtn) {
+            triggerBtn.disabled = false;
+        }
+    });
 }
 
 function openDebateChat(debateId, title, opponent, yesSupp, noSupp, userIsActive = true, canEndChat = false, debateStatus = 'accepted', canPost = true, canRejoin = false, isViewOnly = false, canModerate = false) {

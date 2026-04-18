@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
+from django.utils import timezone
 from users.models import Profile, Follow
 from users.security import is_login_rate_limited, record_login_attempt
 from users.throttles import LoginRateThrottle
@@ -39,6 +40,13 @@ class UserViewSet(viewsets.ModelViewSet):
         user = authenticate(username=username, password=password)
         if user:
             record_login_attempt(request, username, successful=True, source='api')
+            Profile.objects.update_or_create(
+                user=user,
+                defaults={
+                    'username': user.username,
+                    'last_seen': timezone.now(),
+                },
+            )
             Token.objects.filter(user=user).delete()
             token = Token.objects.create(user=user)
             return Response({

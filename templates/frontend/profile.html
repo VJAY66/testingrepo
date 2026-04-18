@@ -20,6 +20,18 @@
     background: hsl(var(--primary) / 0.1);
     box-shadow: 0 1px 6px hsl(var(--primary) / 0.15);
 }
+.profile-stat-trigger {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+.profile-stat-trigger:hover {
+    background: hsl(var(--secondary) / 0.65);
+}
+.profile-stat-trigger.active {
+    background: hsl(var(--primary) / 0.10);
+}
 #profile-confirm-modal {
     display: none;
     position: fixed;
@@ -54,6 +66,105 @@
     from { opacity: 0; transform: scale(0.88); }
     to   { opacity: 1; transform: scale(1); }
 }
+
+/* Profile picture upload styling */
+.profile-pic-container {
+    position: relative;
+    display: inline-block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+@media (min-width: 640px) {
+    .profile-pic-container {
+        margin-left: 0;
+    }
+}
+
+#profile-pic-display {
+    transition: filter 0.3s ease, transform 0.3s ease, opacity 0.4s ease;
+    will-change: filter, transform, opacity;
+}
+
+.profile-pic-container:hover #profile-pic-display {
+    filter: brightness(0.8) drop-shadow(0 0 12px rgba(0, 0, 0, 0.2));
+    transform: scale(1.02);
+}
+
+#profile-pic-upload-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    transition: opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+}
+
+.profile-pic-container:hover #profile-pic-upload-overlay {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+#profile-pic-upload-btn {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.85));
+    color: hsl(var(--primary-foreground));
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 9999px;
+    padding: 0.875rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+    scale: 0.85;
+    opacity: 0;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.profile-pic-container:hover #profile-pic-upload-btn {
+    scale: 1;
+    opacity: 1;
+}
+
+#profile-pic-upload-btn:hover:not(.uploading) {
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.95), hsl(var(--primary) / 0.8));
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+}
+
+#profile-pic-upload-btn:active:not(.uploading) {
+    transform: translateY(0);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+#profile-pic-upload-btn.uploading {
+    pointer-events: none;
+    opacity: 1;
+}
+
+.spinner {
+    display: inline-block;
+    width: 1.2rem;
+    height: 1.2rem;
+    border: 2.5px solid rgba(255, 255, 255, 0.25);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 </style>
 
 <div class="max-w-5xl mx-auto space-y-6">
@@ -65,14 +176,26 @@
             <div class="flex flex-col sm:grid sm:grid-cols-[auto_1fr] sm:items-center gap-5 sm:gap-6">
 
                 <!-- Avatar -->
-                <div class="mx-auto sm:mx-0">
-                    {% if avatar_url %}
-                    <img src="{{ avatar_url }}" alt="{{ user.username }}" class="h-24 w-24 sm:h-28 sm:w-28 rounded-full object-cover border-4 border-white/80 shadow-lg ring-4 ring-primary/15" loading="lazy">
-                    {% else %}
-                    <div class="h-24 w-24 sm:h-28 sm:w-28 rounded-full bg-gradient-to-br from-cyan-500 via-teal-500 to-amber-500 text-white flex items-center justify-center text-3xl font-extrabold shadow-lg ring-4 ring-primary/15">
-                        {{ user.username|first|upper }}
+                <div class="profile-pic-container">
+                    <div class="profile-pic-wrapper">
+                        {% if profile_picture_url %}
+                        <img id="profile-pic-display" src="{{ profile_picture_url }}" alt="{{ user.username }}" class="h-24 w-24 sm:h-28 sm:w-28 rounded-full object-cover border-4 border-white/80 shadow-lg ring-4 ring-primary/15" loading="lazy">
+                        {% elif avatar_url %}
+                        <img id="profile-pic-display" src="{{ avatar_url }}" alt="{{ user.username }}" class="h-24 w-24 sm:h-28 sm:w-28 rounded-full object-cover border-4 border-white/80 shadow-lg ring-4 ring-primary/15" loading="lazy">
+                        {% else %}
+                        <div id="profile-pic-display" class="h-24 w-24 sm:h-28 sm:w-28 rounded-full bg-gradient-to-br from-cyan-500 via-teal-500 to-amber-500 text-white flex items-center justify-center text-3xl font-extrabold shadow-lg ring-4 ring-primary/15">
+                            {{ user.username|first|upper }}
+                        </div>
+                        {% endif %}
+                        <div id="profile-pic-upload-overlay">
+                            <button type="button" id="profile-pic-upload-btn" class="uploading-false" title="Upload profile picture">
+                                <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
-                    {% endif %}
+                    <input type="file" id="profile-pic-input" accept="image/jpeg,image/png,image/gif,image/webp" style="display: none;">
                 </div>
 
                 <!-- Info -->
@@ -96,18 +219,14 @@
                             <p class="text-lg sm:text-2xl font-black leading-none text-foreground">{{ user_reposts.count }}</p>
                             <p class="text-[9px] sm:text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Reposts</p>
                         </div>
-                        <div class="flex flex-1 flex-col items-center gap-0.5 px-3 sm:px-5 py-3">
+                        <button type="button" id="profile-stat-followers" onclick="switchProfileTab('followers')" class="profile-stat-trigger flex flex-1 flex-col items-center gap-0.5 px-3 sm:px-5 py-3" aria-label="Open followers">
                             <p id="followers-count-main" class="text-lg sm:text-2xl font-black leading-none text-foreground">{{ followers_count }}</p>
                             <p class="text-[9px] sm:text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Followers</p>
-                        </div>
-                        <div class="flex flex-1 flex-col items-center gap-0.5 px-3 sm:px-5 py-3">
+                        </button>
+                        <button type="button" id="profile-stat-following" onclick="switchProfileTab('following')" class="profile-stat-trigger flex flex-1 flex-col items-center gap-0.5 px-3 sm:px-5 py-3" aria-label="Open following">
                             <p id="following-count-main" class="text-lg sm:text-2xl font-black leading-none text-foreground">{{ following_count }}</p>
                             <p class="text-[9px] sm:text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Following</p>
-                        </div>
-                        <div class="flex flex-1 flex-col items-center gap-0.5 px-3 sm:px-5 py-3">
-                            <p class="text-lg sm:text-2xl font-black leading-none text-foreground">{{ user_saved.count }}</p>
-                            <p class="text-[9px] sm:text-[10px] uppercase tracking-[0.1em] text-muted-foreground">Saved</p>
-                        </div>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -128,23 +247,11 @@
             <span>Reposts</span>
             <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_reposts.count }}</span>
         </button>
-        <button type="button" id="tab-btn-followers" onclick="switchProfileTab('followers')"
+        <button type="button" id="tab-btn-debates" onclick="switchProfileTab('debates')"
             class="profile-tab-btn flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-2 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200">
-            <svg class="w-3.5 h-3.5 shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/></svg>
-            <span>Followers</span>
-            <span id="followers-count-tab" class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ followers_count }}</span>
-        </button>
-        <button type="button" id="tab-btn-following" onclick="switchProfileTab('following')"
-            class="profile-tab-btn flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-2 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200">
-            <svg class="w-3.5 h-3.5 shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-            <span>Following</span>
-            <span id="following-count-tab" class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ following_count }}</span>
-        </button>
-        <button type="button" id="tab-btn-saved" onclick="switchProfileTab('saved')"
-            class="profile-tab-btn flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-2 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200">
-            <svg class="w-3.5 h-3.5 shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
-            <span>Saved</span>
-            <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_saved.count }}</span>
+            <svg class="w-3.5 h-3.5 shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-4.879-4.879L9.88 9.88m0 0L5 5m4.88 4.88L5 14.758m4.88-4.878L14.758 5M9.88 9.88L19 19"/></svg>
+            <span>Debates</span>
+            <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_debate_participations.count }}</span>
         </button>
     </div>
 
@@ -228,6 +335,46 @@
         {% endif %}
     </section>
 
+    <!-- Tab: Debates Participated -->
+    <section id="tab-debates" class="hidden">
+        {% if user_debate_participations %}
+        <div class="grid gap-4 sm:gap-5">
+            {% for participation in user_debate_participations %}
+            <article class="group rounded-2xl border border-border/70 bg-card p-5 sm:p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
+                <div class="flex items-start justify-between gap-3 mb-2">
+                    <h3 class="text-base sm:text-lg font-bold tracking-tight text-foreground leading-snug">
+                        <a href="{% url 'discussion' participation.debate.post.id %}" class="hover:text-primary transition-colors">{{ participation.debate.post.title }}</a>
+                    </h3>
+                    <span class="shrink-0 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold {% if participation.side == 'yes' %}bg-emerald-500/15 text-emerald-700 dark:text-emerald-300{% else %}bg-rose-500/15 text-rose-700 dark:text-rose-300{% endif %}">
+                        {{ participation.get_side_display }} Side
+                    </span>
+                </div>
+
+                <div class="mb-3 text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
+                    <span>Host: {{ participation.debate.initiator.username }}</span>
+                    <span>Opponent: {{ participation.debate.target.username }}</span>
+                    <span>Joined: {{ participation.joined_at|date:"M j, Y g:i A" }}</span>
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] sm:text-xs font-semibold {% if participation.debate.status == 'accepted' %}bg-cyan-500/15 text-cyan-700 dark:text-cyan-300{% elif participation.debate.status == 'completed' %}bg-amber-500/15 text-amber-700 dark:text-amber-300{% elif participation.debate.status == 'pending' %}bg-slate-500/15 text-slate-700 dark:text-slate-300{% else %}bg-rose-500/15 text-rose-700 dark:text-rose-300{% endif %}">
+                        {{ participation.debate.status|title }}
+                    </span>
+                    <a href="{% url 'debate_chat' participation.debate.id %}?return_to={{ request.get_full_path|urlencode }}" class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold bg-gradient-to-r from-cyan-500 via-teal-500 to-amber-500 bg-clip-text text-transparent hover:opacity-80 transition-opacity">
+                        <svg class="w-3.5 h-3.5 text-teal-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16h6m2 5l-3.493-3.493A9.956 9.956 0 0112 18c-4.97 0-9-3.582-9-8s4.03-8 9-8 9 3.582 9 8a7.96 7.96 0 01-1.507 4.507L21 21z"/></svg>
+                        Open Debate
+                    </a>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-2xl border border-dashed border-border bg-card/70 p-10 text-center">
+            <p class="text-muted-foreground">No debate participations yet.</p>
+        </div>
+        {% endif %}
+    </section>
+
     <!-- Tab: Followers -->
     <section id="tab-followers" class="hidden">
         {% if followers_list %}
@@ -280,41 +427,7 @@
         {% endif %}
     </section>
 
-    <!-- Tab: Saved -->
-    <section id="tab-saved" class="hidden">
-        {% if user_saved %}
-        <div class="grid gap-4 sm:gap-5">
-            {% for action in user_saved %}
-            <article class="group rounded-2xl border border-border/70 bg-card p-5 sm:p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
-                <div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
-                    <svg class="w-3.5 h-3.5 text-primary/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
-                    <span>Saved &middot; {{ action.created_at|date:"M j, Y" }}</span>
-                </div>
-                <div class="flex items-start justify-between gap-3 mb-2">
-                    <h3 class="text-base sm:text-lg font-bold tracking-tight text-foreground leading-snug">
-                        <a href="{% url 'discussion' action.post.id %}" class="hover:text-primary transition-colors">{{ action.post.title }}</a>
-                    </h3>
-                    <span class="shrink-0 px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground text-[10px] sm:text-xs font-semibold">{{ action.post.category }}</span>
-                </div>
-                {% if action.post.content %}
-                <p class="text-sm text-muted-foreground mb-3 leading-relaxed">{{ action.post.content|truncatechars:190 }}</p>
-                {% endif %}
-                <div class="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>by <a href="{% url 'user_profile' action.post.user.username %}" class="font-semibold hover:text-primary transition-colors">{{ action.post.user.username }}</a></span>
-                    <button onclick="unsavePost('{{ action.post.id }}', this)" class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold bg-gradient-to-r from-cyan-500 via-teal-500 to-amber-500 bg-clip-text text-transparent hover:opacity-80 transition-opacity">
-                        <svg class="w-3.5 h-3.5 text-teal-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
-                        Unsave
-                    </button>
-                </div>
-            </article>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="rounded-2xl border border-dashed border-border bg-card/70 p-10 text-center">
-            <p class="text-muted-foreground">No saved posts yet.</p>
-        </div>
-        {% endif %}
-    </section>
+
 
 </div>
 
@@ -339,8 +452,14 @@ function deletePost(postId, btn) {
 }
 
 function removeRepost(originalPostId, btn) {
-    if (!confirm('Remove this repost?')) return;
     var article = btn.closest('article');
+    showConfirm('Remove Repost', 'This repost will be removed from your profile list.', 'Remove').then(function(ok) {
+        if (!ok) return;
+        _doRemoveRepost(originalPostId, article);
+    });
+}
+
+function _doRemoveRepost(originalPostId, article) {
     fetch('/posts/' + originalPostId + '/remove-repost/', {
         method: 'POST',
         headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json'}
@@ -352,7 +471,7 @@ function removeRepost(originalPostId, btn) {
             article.style.opacity = '0';
             setTimeout(function(){ article.remove(); }, 300);
         } else {
-            alert(d.error || 'Could not remove repost.');
+            showConfirm('Error', d.error || 'Could not remove repost.', 'OK');
         }
     });
 }
@@ -362,25 +481,6 @@ function getCookie(name) {
     return v ? v[2] : null;
 }
 
-function unsavePost(postId, btn) {
-    if (!confirm('Remove from saved?')) return;
-    var article = btn.closest('article');
-    fetch('/posts/' + postId + '/action/', {
-        method: 'POST',
-        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'action=save'
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-        if (d.success) {
-            article.style.transition = 'opacity 0.3s';
-            article.style.opacity = '0';
-            setTimeout(function(){ article.remove(); }, 300);
-        } else {
-            alert(d.error || 'Could not unsave post.');
-        }
-    });
-}
 
 function updateFollowersCount(nextCount) {
     var main = document.getElementById('followers-count-main');
@@ -469,18 +569,28 @@ function _doUnfollow(username, card) {
 }
 
 function switchProfileTab(name) {
-    ['posts', 'reposts', 'followers', 'following', 'saved'].forEach(function(t) {
+    ['posts', 'reposts', 'debates', 'followers', 'following'].forEach(function(t) {
         var sec = document.getElementById('tab-' + t);
         var btn = document.getElementById('tab-btn-' + t);
-        if (!sec || !btn) return;
+        if (sec) {
+            if (t === name) {
+                sec.classList.remove('hidden');
+            } else {
+                sec.classList.add('hidden');
+            }
+        }
+        if (!btn) return;
         if (t === name) {
-            sec.classList.remove('hidden');
             btn.classList.add('active');
         } else {
-            sec.classList.add('hidden');
             btn.classList.remove('active');
         }
     });
+
+    var followersStat = document.getElementById('profile-stat-followers');
+    var followingStat = document.getElementById('profile-stat-following');
+    if (followersStat) followersStat.classList.toggle('active', name === 'followers');
+    if (followingStat) followingStat.classList.toggle('active', name === 'following');
 }
 (function() {
     if (!window.history || !window.history.pushState) return;
@@ -512,8 +622,333 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('profile-confirm-backdrop').addEventListener('click', function() { _closeConfirm(false); });
     document.getElementById('profile-confirm-cancel').addEventListener('click', function() { _closeConfirm(false); });
     document.getElementById('profile-confirm-ok').addEventListener('click', function() { _closeConfirm(true); });
+
+    // Profile picture upload and crop handler
+    const uploadBtn = document.getElementById('profile-pic-upload-btn');
+    const fileInput = document.getElementById('profile-pic-input');
+    const picDisplay = document.getElementById('profile-pic-display');
+    
+    // Crop modal elements
+    const cropModal = document.getElementById('profile-crop-modal');
+    const cropBackdrop = document.getElementById('profile-crop-backdrop');
+    const cropImage = document.getElementById('crop-image');
+    const cropCloseBtn = document.getElementById('profile-crop-close-btn');
+    const cropCancelBtn = document.getElementById('profile-crop-cancel-btn');
+    const cropApplyBtn = document.getElementById('profile-crop-apply-btn');
+    
+    let cropper = null;
+
+    function closeCropModal() {
+        cropModal.classList.remove('show');
+        if (cropper) {
+            cropper.destroy();
+            cropper = null;
+        }
+        cropImage.src = '';
+    }
+
+    function uploadCroppedImage(canvas) {
+        uploadBtn.classList.add('uploading');
+        const originalContent = uploadBtn.innerHTML;
+        uploadBtn.innerHTML = '<span class="spinner"></span>';
+
+        // Convert canvas to blob
+        canvas.toBlob((blob) => {
+            const formData = new FormData();
+            formData.append('profile_picture', blob, 'cropped_profile.png');
+
+            fetch('{% url "upload_profile_picture" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                uploadBtn.classList.remove('uploading');
+                uploadBtn.innerHTML = originalContent;
+
+                if (data.success) {
+                    showToast('Profile picture updated successfully!', 'success');
+                    closeCropModal();
+                    if (picDisplay && data.profile_picture_url) {
+                        picDisplay.style.opacity = '0.7';
+                        setTimeout(() => {
+                            picDisplay.src = data.profile_picture_url;
+                            picDisplay.onload = function() {
+                                picDisplay.style.opacity = '1';
+                            };
+                        }, 300);
+                    }
+                    fileInput.value = '';
+                } else {
+                    showToast(data.error || 'Failed to upload picture', 'error');
+                }
+            })
+            .catch(error => {
+                uploadBtn.classList.remove('uploading');
+                uploadBtn.innerHTML = originalContent;
+                showToast('Network error. Please try again.', 'error');
+            });
+        }, 'image/png', 0.95);
+    }
+
+    if (uploadBtn && fileInput) {
+        uploadBtn.addEventListener('click', function() {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Validate file size (5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                showToast('File size exceeds 5MB', 'error');
+                fileInput.value = '';
+                return;
+            }
+
+            // Validate file type
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            if (!allowedTypes.includes(file.type)) {
+                showToast('Invalid file type. Only JPEG, PNG, GIF, and WebP allowed', 'error');
+                fileInput.value = '';
+                return;
+            }
+
+            // Read file and show crop modal
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                cropImage.src = e.target.result;
+                cropModal.classList.add('show');
+
+                // Initialize Cropper.js
+                setTimeout(() => {
+                    if (cropper) {
+                        cropper.destroy();
+                    }
+                    cropper = new Cropper(cropImage, {
+                        aspectRatio: 1,
+                        viewMode: 1,
+                        autoCropArea: 0.8,
+                        responsive: true,
+                        restore: true,
+                        guides: true,
+                        center: true,
+                        highlight: true,
+                        cropBoxMovable: true,
+                        cropBoxResizable: true,
+                        toggleDragModeOnDblclick: true,
+                    });
+                }, 100);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Crop modal event handlers
+        cropCloseBtn.addEventListener('click', closeCropModal);
+        cropBackdrop.addEventListener('click', closeCropModal);
+        cropCancelBtn.addEventListener('click', closeCropModal);
+
+        cropApplyBtn.addEventListener('click', function() {
+            if (!cropper) return;
+            const canvas = cropper.getCroppedCanvas({
+                maxWidth: 4096,
+                maxHeight: 4096,
+                fillColor: '#fff',
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: 'high',
+            });
+            uploadCroppedImage(canvas);
+        });
+    }
 });
 </script>
+
+<!-- Crop Modal Styles -->
+<style>
+#profile-crop-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+#profile-crop-modal.show {
+    display: flex;
+}
+
+#profile-crop-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+#profile-crop-box {
+    position: relative;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 1.5rem;
+    padding: 0;
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
+    animation: modalPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalPop {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+#profile-crop-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid hsl(var(--border));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#profile-crop-header h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+    margin: 0;
+}
+
+#profile-crop-close-btn {
+    background: none;
+    border: none;
+    color: hsl(var(--muted-foreground));
+    cursor: pointer;
+    font-size: 1.5rem;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+#profile-crop-close-btn:hover {
+    color: hsl(var(--foreground));
+}
+
+#profile-crop-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+#crop-image {
+    max-width: 100%;
+    height: auto;
+}
+
+#profile-crop-footer {
+    border-top: 1px solid hsl(var(--border));
+    padding: 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.crop-btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.crop-btn-cancel {
+    background: hsl(var(--secondary) / 0.6);
+    color: hsl(var(--foreground));
+    border: 1px solid hsl(var(--border));
+}
+
+.crop-btn-cancel:hover {
+    background: hsl(var(--secondary));
+}
+
+.crop-btn-apply {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.85));
+    color: hsl(var(--primary-foreground));
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.crop-btn-apply:hover {
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.95), hsl(var(--primary) / 0.8));
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
+}
+
+.crop-btn-apply:active {
+    transform: translateY(0);
+}
+
+.crop-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Cropper.js custom styling */
+.cropper-container {
+    font-family: inherit;
+}
+
+.cropper-canvas,
+.cropper-crop-box,
+.cropper-modal {
+    font-family: inherit;
+}
+
+.cropper-point.point-circle {
+    width: 8px;
+    height: 8px;
+    border-color: hsl(var(--primary));
+}
+
+.cropper-line,
+.cropper-box {
+    border-color: hsl(var(--primary));
+}
+
+.cropper-face {
+    background-color: hsl(var(--primary) / 0.3);
+}
+</style>
+
+<!-- Image Crop Modal -->
+<div id="profile-crop-modal" role="dialog" aria-modal="true">
+    <div id="profile-crop-backdrop"></div>
+    <div id="profile-crop-box">
+        <div id="profile-crop-header">
+            <h2>Crop Profile Picture</h2>
+            <button id="profile-crop-close-btn" type="button" title="Close">&times;</button>
+        </div>
+        <div id="profile-crop-content">
+            <img id="crop-image" src="" alt="Image to crop" style="max-width: 100%;">
+        </div>
+        <div id="profile-crop-footer">
+            <button id="profile-crop-cancel-btn" type="button" class="crop-btn crop-btn-cancel">Cancel</button>
+            <button id="profile-crop-apply-btn" type="button" class="crop-btn crop-btn-apply">Apply Crop</button>
+        </div>
+    </div>
+</div>
 
 <!-- Custom confirm modal -->
 <div id="profile-confirm-modal" role="dialog" aria-modal="true">

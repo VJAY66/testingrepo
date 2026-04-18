@@ -9,7 +9,18 @@ class ProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at']
 
 class UserSerializer(serializers.ModelSerializer):
+    email = serializers.SerializerMethodField()
     profile = ProfileSerializer(read_only=True)
+
+    def get_email(self, obj):
+        request = self.context.get('request') if hasattr(self, 'context') else None
+        if request is None:
+            # Backward-compatible fallback for internal serializer usage without context.
+            return obj.email
+        viewer = getattr(request, 'user', None)
+        if viewer and viewer.is_authenticated and (viewer.id == obj.id or viewer.is_staff or viewer.is_superuser):
+            return obj.email
+        return ''
     
     class Meta:
         model = User

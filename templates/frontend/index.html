@@ -1,6 +1,6 @@
 {% extends 'frontend/base.html' %}
 
-{% block title %}Home - Discussion Hub{% endblock %}
+{% block title %}{% if is_suggested_page %}Suggested For You - Discussion Hub{% else %}Home - Discussion Hub{% endif %}{% endblock %}
 
 {% block content %}
 <style>
@@ -272,7 +272,7 @@
 
     .hero-title {
         font-size: clamp(2rem, 5vw, 3.2rem);
-        line-height: 1.05;
+        line-height: 1.2;
         font-weight: 700;
         letter-spacing: -0.02em;
         margin-bottom: 14px;
@@ -549,14 +549,51 @@
         display: none;
     }
 
-    .like-animation {
-        animation: likePulse 0.6s ease-in-out;
+    .feed-star-like svg {
+        transform-origin: 50% 46%;
     }
 
-    @keyframes likePulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.3); }
-        100% { transform: scale(1); }
+    @keyframes starHoverTwinkle {
+        0%,
+        100% {
+            transform: scale(1) rotate(0deg);
+            filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0));
+        }
+        45% {
+            transform: scale(1.1) rotate(-7deg);
+            filter: drop-shadow(0 0 10px rgba(250, 204, 21, 0.45));
+        }
+        75% {
+            transform: scale(1.06) rotate(5deg);
+            filter: drop-shadow(0 0 8px rgba(253, 224, 71, 0.35));
+        }
+    }
+
+    @keyframes starLikePop {
+        0% {
+            transform: scale(0.86) rotate(-14deg);
+        }
+        48% {
+            transform: scale(1.22) rotate(10deg);
+        }
+        100% {
+            transform: scale(1) rotate(0deg);
+        }
+    }
+
+    .feed-star-like:hover svg {
+        animation: starHoverTwinkle 820ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .feed-star-like.like-pop svg {
+        animation: starLikePop 460ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .feed-star-like:hover svg,
+        .feed-star-like.like-pop svg {
+            animation: none !important;
+        }
     }
 </style>
 <div class="home-fullbleed ag-stage galaxy-stage space-y-8">
@@ -574,7 +611,7 @@
     <div class="ag-orb ag-orb-2"></div>
     <div class="ag-orb ag-orb-3"></div>
 
-    {% if active_tab != 'suggested' %}
+    {% if not is_suggested_page %}
     <!-- Hero Section -->
     <div class="text-center py-11 px-4 sm:px-8 glass-panel hero-glow rounded-[2rem] sm:rounded-[2.2rem]">
         <h1 class="hero-title text-foreground">
@@ -584,7 +621,7 @@
                 <span class="hero-kinetic-word">Discover.</span>
             </span>
         </h1>
-        <p class="mx-auto mt-4 mb-7 max-w-2xl rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-base sm:text-lg font-semibold tracking-[0.01em] text-foreground shadow-sm">
+        <p class="mx-auto mt-8 mb-7 max-w-2xl rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3 text-base sm:text-lg font-semibold tracking-[0.01em] text-foreground shadow-sm">
             Ask a question, choose your side, and debate with the world
         </p>
         <form action="{% url 'search' %}" method="get" class="search-shell">
@@ -606,9 +643,9 @@
                class="hero-action-btn hero-action-outline">
                 Ask Question
             </a>
-            <a href="#trending-discussions"
+            <a href="{% url 'suggested' %}" target="_blank" rel="noopener noreferrer"
                class="hero-action-btn hero-action-solid">
-                Trending Discussions
+                Suggested for You
             </a>
         </div>
     </div>
@@ -678,15 +715,16 @@
     };
     </script>
     {% endif %}
-
     <!-- Posts Tabs -->
     <div id="posts-section">
+        {% if not is_suggested_page %}
         <div class="section-head">
             <h2 class="section-title text-foreground">
                 {% if active_tab == 'suggested' %}Suggested for You{% else %}Trending Discussions{% endif %}
             </h2>
             <span class="section-chip">Live Pulse</span>
         </div>
+        {% endif %}
 
         <div class="posts-container">
             <div class="space-y-4">
@@ -729,9 +767,9 @@
 
                             {% if user.is_authenticated %}
                                 <div class="mt-3 flex items-center sm:gap-6 gap-3">
-                                    <button type="button" data-action="like" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-like {% if post.is_liked %}active text-red-500 shadow-md shadow-red-500/20 bg-red-50/50 dark:bg-red-950/30{% else %}text-muted-foreground hover:text-red-500{% endif %} hover:bg-red-50 dark:hover:bg-red-950/20 hover:shadow-md overflow-hidden">
-                                        <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_liked %}fill-current scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                                    <button type="button" data-action="like" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-like feed-star-like {% if post.is_liked %}active text-amber-500 shadow-md shadow-amber-500/20 bg-amber-50/60 dark:bg-amber-950/30{% else %}text-muted-foreground hover:text-amber-500{% endif %} hover:bg-amber-50/70 dark:hover:bg-amber-950/20 hover:shadow-md overflow-hidden">
+                                        <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_liked %}fill-current scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="{% if post.is_liked %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L4.22 13.45 12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                                         </svg>
                                         <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.like_count|default:0 }}</span>
                                     </button>
@@ -745,7 +783,7 @@
                                         <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.repost_count|default:0 }}</span>
                                     </button>
                                     <button type="button" data-action="save" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-save {% if post.is_saved %}active text-primary shadow-md shadow-primary/20 bg-primary/5{% else %}text-muted-foreground hover:text-primary{% endif %} hover:bg-primary/10 hover:shadow-md overflow-hidden">
-                                        <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_saved %}fill-current scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_saved %}fill-current scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="{% if post.is_saved %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2">
                                             <path d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/>
                                         </svg>
                                         <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.save_count|default:0 }}</span>
@@ -768,11 +806,9 @@
                                 </div>
                             {% else %}
                             <div class="mt-3 flex items-center sm:gap-6 gap-3">
-                                <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 action-btn-enhanced action-btn-like text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 hover:shadow-md overflow-hidden cursor-pointer">
-                                    <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-sm relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M12 2L14 8L20 6L16 12L20 18L14 16L12 22L10 16L4 18L8 12L4 6L10 8L12 2Z"/>
-                                        <circle cx="12" cy="12" r="1.5" class="fill-current"/>
-                                        <circle cx="12" cy="12" r="0.5" class="fill-white"/>
+                                <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 action-btn-enhanced action-btn-like feed-star-like text-muted-foreground hover:text-amber-500 hover:bg-amber-50/70 dark:hover:bg-amber-950/20 hover:shadow-md overflow-hidden cursor-pointer">
+                                    <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-sm relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L4.22 13.45 12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                                     </svg>
                                     <span class="sm:text-sm text-xs font-medium relative z-10">{{ post.like_count|default:0 }}</span>
                                 </button>
@@ -818,18 +854,42 @@
                 {% empty %}
                 <div class="text-center py-12">
                     {% if active_tab == 'suggested' %}
-                    <p class="text-muted-foreground">No suggestions available yet.</p>
+                    <p class="text-muted-foreground">No suggested posts available yet.</p>
                     {% else %}
-                    <p class="text-muted-foreground">No discussions yet. Be the first to start one!</p>
+                    <p class="text-muted-foreground">No trending discussions yet.</p>
                     {% endif %}
                 </div>
                 {% endfor %}
             </div>
+
+            {% if not is_suggested_page and page_obj and page_obj.paginator.num_pages > 1 %}
+            <div class="mt-6 flex items-center justify-center gap-2 sm:gap-3">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}#posts-section" class="inline-flex items-center justify-center rounded-full border border-border bg-card px-3 py-1.5 text-xs sm:text-sm font-semibold text-foreground hover:border-primary hover:text-primary">
+                    Previous
+                </a>
+                {% else %}
+                <span class="inline-flex items-center justify-center rounded-full border border-border/60 bg-card/60 px-3 py-1.5 text-xs sm:text-sm font-semibold text-muted-foreground">Previous</span>
+                {% endif %}
+
+                <span class="inline-flex items-center justify-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs sm:text-sm font-semibold text-primary">
+                    Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+                </span>
+
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}#posts-section" class="inline-flex items-center justify-center rounded-full border border-border bg-card px-3 py-1.5 text-xs sm:text-sm font-semibold text-foreground hover:border-primary hover:text-primary">
+                    Next
+                </a>
+                {% else %}
+                <span class="inline-flex items-center justify-center rounded-full border border-border/60 bg-card/60 px-3 py-1.5 text-xs sm:text-sm font-semibold text-muted-foreground">Next</span>
+                {% endif %}
+            </div>
+            {% endif %}
     </div>
 </div>
 
 <!-- Create Post Modal -->
-{% if user.is_authenticated %}
+{% if user.is_authenticated and not is_suggested_page %}
 <div id="create-post-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-card p-6 rounded-lg w-full max-w-md mx-4">
         <h3 class="text-lg font-semibold mb-4">Create New Discussion</h3>
@@ -951,38 +1011,6 @@
 let currentShareUrl = '';
 let currentShareTitle = 'Discussion Hub';
 
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-function addPostActionDelegates() {
-    document.body.addEventListener('click', function(event) {
-        const button = event.target.closest('button[data-action]');
-        if (!button) return;
-
-        const postCard = button.closest('[data-post-id]');
-        if (!postCard) return;
-
-        const action = button.dataset.action;
-        const postId = postCard.dataset.postId;
-        if (!action || !postId) return;
-
-        event.preventDefault();
-        handlePostAction(postId, action);
-    });
-}
-
 function setVoteCardProgress(card, yesValue, noValue) {
     const yesBar = card.querySelector('[data-vote-bar="yes"]');
     const noBar = card.querySelector('[data-vote-bar="no"]');
@@ -1060,141 +1088,8 @@ function initVoteAnimations() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    addPostActionDelegates();
     initVoteAnimations();
 });
-
-function handlePostAction(postId, action) {
-    fetch(`/posts/${encodeURIComponent(postId)}/action/`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-CSRFToken': getCookie('csrftoken'),
-        },
-        body: `action=${encodeURIComponent(action)}`,
-    })
-    .then(async response => {
-        const text = await response.text();
-        try {
-            return JSON.parse(text);
-        } catch (error) {
-            throw new Error('login_required');
-        }
-    })
-    .then(data => {
-        if (!data.success) {
-            alert(data.error || 'Unable to perform action.');
-            return;
-        }
-
-        // Update button states and counts
-        updatePostActionUI(postId, action, data.status, data.counts);
-
-        // Add like animation if liked
-        if (action === 'like' && data.status === 'added') {
-            const postCard = document.querySelector(`[data-post-id="${postId}"]`);
-            const likeButton = postCard.querySelector('button[data-action="like"]');
-            if (likeButton) {
-                likeButton.classList.add('like-animation');
-                setTimeout(() => likeButton.classList.remove('like-animation'), 600);
-            }
-        }
-
-        const message = {
-            added: 'Saved!',
-            removed: action === 'repost' ? 'Repost removed.' : 'Removed!',
-            reposted: 'Post reposted. You can view it in your profile posts.',
-            already_reposted: 'Repost removed.',
-        }[data.status] || 'Action completed.';
-
-        // Show toast notification instead of alert
-        showToast(message, data.status === 'error' ? 'error' : 'success');
-
-        if (action === 'repost' && data.status === 'reposted') {
-            showToast('Post reposted successfully!');
-        }
-    })
-    .catch((error) => {
-        if (error.message === 'login_required') {
-            showToast('Please login to use post actions.', 'error');
-        } else {
-            showToast('Network error. Please try again.', 'error');
-        }
-    });
-}
-
-function updatePostActionUI(postId, action, status, counts) {
-    const postCard = document.querySelector(`[data-post-id="${postId}"]`);
-    if (!postCard) return;
-
-    // Update button states and counts using stable data-action selectors
-    const likeButton = postCard.querySelector('button[data-action="like"]');
-    const repostButton = postCard.querySelector('button[data-action="repost"]');
-    const saveButton = postCard.querySelector('button[data-action="save"]');
-
-    if (likeButton && counts) {
-        const likeSpan = likeButton.querySelector('span');
-        if (likeSpan) likeSpan.textContent = counts.like || 0;
-
-        if (status === 'added' && action === 'like') {
-            likeButton.classList.remove('text-muted-foreground');
-            likeButton.classList.add('text-red-500');
-        } else if (status === 'removed' && action === 'like') {
-            likeButton.classList.remove('text-red-500');
-            likeButton.classList.add('text-muted-foreground');
-        }
-    }
-
-    if (repostButton && counts) {
-        const repostSpan = repostButton.querySelector('span');
-        if (repostSpan) {
-            repostSpan.textContent = counts.repost || 0;
-        }
-
-        if (status === 'added' && action === 'repost') {
-            repostButton.classList.remove('text-muted-foreground');
-            repostButton.classList.add('text-green-500', 'shadow-md', 'shadow-green-500/20', 'bg-green-50/50');
-        } else if ((status === 'removed' || status === 'already_reposted') && action === 'repost') {
-            repostButton.classList.remove('text-green-500', 'shadow-md', 'shadow-green-500/20', 'bg-green-50/50');
-            repostButton.classList.add('text-muted-foreground');
-        }
-    }
-
-    if (saveButton && counts) {
-        const saveSpan = saveButton.querySelector('span');
-        if (saveSpan) saveSpan.textContent = counts.save || 0;
-
-        if (status === 'added' && action === 'save') {
-            saveButton.classList.remove('text-muted-foreground');
-            saveButton.classList.add('text-primary');
-        } else if (status === 'removed' && action === 'save') {
-            saveButton.classList.remove('text-primary');
-            saveButton.classList.add('text-muted-foreground');
-        }
-    }
-
-
-}
-
-function showToast(message, type = 'success') {
-    const toastRoot = document.getElementById('toast-root');
-    if (!toastRoot) return;
-
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.innerHTML = `
-        <div class="flex items-center gap-2">
-            <span>${message}</span>
-        </div>
-    `;
-
-    toastRoot.appendChild(toast);
-
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-        toast.remove();
-    }, 3000);
-}
 
 function openSharePanel(triggerButton) {
     const postCard = triggerButton.closest('[data-post-id]');
