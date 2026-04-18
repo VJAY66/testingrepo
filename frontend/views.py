@@ -1,18 +1,14 @@
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.conf import settings
 from django.contrib.auth.models import User
 from users.models import Profile
-from users.serializers import UserSerializer, UserRegistrationSerializer, ProfileSerializer
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, authenticate, logout
 from django.contrib import messages
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from django.core.cache import cache
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.db.models import Q, F, Count, IntegerField, ExpressionWrapper
 from django.db import DataError
 from django.utils import timezone
@@ -23,10 +19,35 @@ import uuid
 
 from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory
 from users.models import Follow
+from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
 
 
 _EMOJI_TOKEN_RE = re.compile(r'__EMJ__([0-9A-F]{5,6})__')
+
+
+def _public_rate_limit_key(request, scope):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        ip = request.META.get('REMOTE_ADDR', 'unknown')
+    return f'public_rate_limit:{scope}:{ip}'
+
+
+def _is_public_rate_limited(request, scope, limit, window_seconds):
+    key = _public_rate_limit_key(request, scope)
+    current = cache.get(key)
+    if current is None:
+        cache.set(key, 1, window_seconds)
+        return False
+    if current >= limit:
+        return True
+    try:
+        cache.incr(key)
+    except ValueError:
+        cache.set(key, current + 1, window_seconds)
+    return False
 
 
 def _manual_editor_username():
@@ -39,6 +60,18 @@ def _manual_editor_password():
 
 def _manual_editor_email():
     return (getattr(settings, 'MANUAL_EDITOR_EMAIL', '') or '').strip()
+
+
+def _safe_next_url(request, next_url):
+    if not next_url:
+        return ''
+    if url_has_allowed_host_and_scheme(
+        url=next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return next_url
+    return ''
 
 
 def _ensure_manual_editor_user():
@@ -284,6 +317,26 @@ def get_frontend_categories():
     return categories
 
 
+def _remove_repost_copy_for_user(user, original_post):
+    """Delete one repost copy for a user that mirrors the original post."""
+    repost_copy = (
+        Post.objects.filter(
+            user=user,
+            title=original_post.title,
+            content=original_post.content,
+            category=original_post.category,
+            hashtags=original_post.hashtags,
+        )
+        .exclude(id=original_post.id)
+        .order_by('-created_at')
+        .first()
+    )
+    if repost_copy:
+        repost_copy.delete()
+        return True
+    return False
+
+
 @login_required
 @require_POST
 def post_action(request, post_id):
@@ -320,13 +373,16 @@ def post_action(request, post_id):
 
     if action == 'repost':
         if existing_action:
+            existing_action.delete()
+            _remove_repost_copy_for_user(request.user, post)
+
             like_count = PostAction.objects.filter(post=post, action='like').count()
             save_count = PostAction.objects.filter(post=post, action='save').count()
             repost_count = PostAction.objects.filter(post=post, action='repost').count()
             return JsonResponse({
                 'success': True,
                 'action': action,
-                'status': 'already_reposted',
+                'status': 'removed',
                 'counts': {
                     'like': like_count,
                     'save': save_count,
@@ -696,6 +752,9 @@ def search(request):
 
 def quick_search(request):
     """Lightweight JSON search used by the navbar search overlay."""
+    if _is_public_rate_limited(request, scope='quick_search', limit=60, window_seconds=60):
+        return JsonResponse({'success': False, 'error': 'Too many requests. Please try again shortly.'}, status=429)
+
     query = request.GET.get('q', '').strip()
     if not query:
         return JsonResponse({'success': True, 'results': []})
@@ -720,6 +779,9 @@ def quick_search(request):
 
 def search_users(request):
     """Lightweight JSON user search used by the navbar search overlay."""
+    if _is_public_rate_limited(request, scope='search_users', limit=60, window_seconds=60):
+        return JsonResponse({'success': False, 'error': 'Too many requests. Please try again shortly.'}, status=429)
+
     query = request.GET.get('q', '').strip()
     if not query:
         return JsonResponse({'success': True, 'users': []})
@@ -765,6 +827,9 @@ def hashtag_search(request):
 
 def hashtag_suggestions(request):
     """Return hashtag suggestions while user types."""
+    if _is_public_rate_limited(request, scope='hashtag_suggestions', limit=90, window_seconds=60):
+        return JsonResponse({'success': False, 'error': 'Too many requests. Please try again shortly.'}, status=429)
+
     raw_query = request.GET.get('q', '').strip()
     parsed = Post.parse_hashtags(raw_query, max_tags=1)
     query = parsed[0] if parsed else raw_query.lower().lstrip('#').strip()
@@ -941,30 +1006,38 @@ def notification_count(request):
 
 def login_view(request):
     """Login page"""
-    next_url = request.POST.get('next') or request.GET.get('next') or ''
+    raw_next = request.POST.get('next') or request.GET.get('next') or ''
+    next_url = _safe_next_url(request, raw_next)
 
     if request.method == 'POST':
-        username = request.POST.get('username')
+        username = (request.POST.get('username') or '').strip()
         password = request.POST.get('password')
+
+        if is_login_rate_limited(request, username, source='web'):
+            messages.error(request, 'Too many login attempts. Please try again in a few minutes.')
+            return render(request, 'frontend/login.html', {'next': next_url})
 
         if username == _manual_editor_username() and _manual_editor_password():
             _ensure_manual_editor_user()
 
         user = authenticate(request, username=username, password=password)
         if user is not None:
+            record_login_attempt(request, username, successful=True, source='web')
             login(request, user)
             messages.success(request, 'Welcome back!')
             if next_url:
                 return redirect(next_url)
             return redirect('index')
         else:
+            record_login_attempt(request, username, successful=False, source='web')
             messages.error(request, 'Invalid credentials')
 
     return render(request, 'frontend/login.html', {'next': next_url})
 
 def register_view(request):
     """Registration page"""
-    next_url = request.POST.get('next') or request.GET.get('next') or ''
+    raw_next = request.POST.get('next') or request.GET.get('next') or ''
+    next_url = _safe_next_url(request, raw_next)
 
     if request.method == 'POST':
         username = request.POST.get('username')
@@ -978,28 +1051,28 @@ def register_view(request):
 
         if password != confirm_password:
             messages.error(request, 'Passwords do not match')
-            return render(request, 'frontend/register.html')
+            return render(request, 'frontend/register.html', {'next': next_url})
 
         # Password validation
         if len(password) < 8:
             messages.error(request, 'Password must be at least 8 characters')
-            return render(request, 'frontend/register.html')
+            return render(request, 'frontend/register.html', {'next': next_url})
 
         if not any(char.isupper() for char in password):
             messages.error(request, 'Password must contain an uppercase letter')
-            return render(request, 'frontend/register.html')
+            return render(request, 'frontend/register.html', {'next': next_url})
 
         if not any(char.islower() for char in password):
             messages.error(request, 'Password must contain a lowercase letter')
-            return render(request, 'frontend/register.html')
+            return render(request, 'frontend/register.html', {'next': next_url})
 
         if not any(char.isdigit() for char in password):
             messages.error(request, 'Password must contain a number')
-            return render(request, 'frontend/register.html')
+            return render(request, 'frontend/register.html', {'next': next_url})
 
         if not any(char in '!@#$%^&*(),.?":{}|<>' for char in password):
             messages.error(request, 'Password must contain a special character')
-            return render(request, 'frontend/register.html')
+            return render(request, 'frontend/register.html', {'next': next_url})
 
         try:
             user = User.objects.create_user(
@@ -1133,13 +1206,7 @@ def remove_repost(request, post_id):
         return JsonResponse({'success': False, 'error': 'Repost not found.'}, status=404)
     if not _can_manage_created_today(request.user, action.created_at):
         return JsonResponse({'success': False, 'error': 'This account can only remove reposts created today.'}, status=403)
-    # Delete the duplicated post copy (same user, title, content, category)
-    Post.objects.filter(
-        user=request.user,
-        title=original.title,
-        content=original.content,
-        category=original.category,
-    ).exclude(id=original.id).delete()
+    _remove_repost_copy_for_user(request.user, original)
     action.delete()
     return JsonResponse({'success': True})
 

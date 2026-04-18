@@ -1,6 +1,5 @@
 from django.db import models
 from django.contrib.auth.models import User
-from django.utils import timezone
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
@@ -42,3 +41,26 @@ class Follow(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['follower', 'following'], name='unique_follow_pair'),
         ]
+
+
+class LoginAttempt(models.Model):
+    SOURCE_WEB = 'web'
+    SOURCE_API = 'api'
+    SOURCE_CHOICES = [
+        (SOURCE_WEB, 'Web'),
+        (SOURCE_API, 'API'),
+    ]
+
+    username = models.CharField(max_length=150, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True, db_index=True)
+    user_agent = models.CharField(max_length=255, blank=True)
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=SOURCE_WEB, db_index=True)
+    successful = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    def __str__(self):
+        outcome = 'ok' if self.successful else 'fail'
+        return f"{self.username} [{self.source}] {outcome}"
+
+    class Meta:
+        ordering = ['-created_at']

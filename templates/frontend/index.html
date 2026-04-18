@@ -758,10 +758,11 @@
                                             <path d="M8.59 13.51L15.42 17.49"></path>
                                             <path d="M15.41 6.51L8.59 10.49"></path>
                                         </svg>
-                                        <span class="sm:text-sm text-xs font-medium relative z-10">Share</span>
+                                        <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Share</span>
                                     </button>
-                                    <a href="{% url 'discussion' post.id %}" class="group inline-flex items-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full border border-primary/35 bg-primary/12 text-primary shadow-sm shadow-primary/20 transition-all duration-300 hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/35 focus:outline-none focus:ring-2 focus:ring-primary/35">
-                                        <span class="sm:text-sm text-xs font-medium">Open discussion</span>
+                                    <a href="{% url 'discussion' post.id %}" class="ml-auto group inline-flex items-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full border border-primary/35 bg-primary/12 text-primary shadow-sm shadow-primary/20 transition-all duration-300 hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/35 focus:outline-none focus:ring-2 focus:ring-primary/35 whitespace-nowrap">
+                                        <span class="sm:hidden text-xs font-medium">Open</span>
+                                        <span class="hidden sm:inline sm:text-sm font-medium">Open discussion</span>
                                         <span class="sm:text-sm text-xs">→</span>
                                     </a>
                                 </div>
@@ -801,10 +802,11 @@
                                         <path d="M8.59 13.51L15.42 17.49"></path>
                                         <path d="M15.41 6.51L8.59 10.49"></path>
                                     </svg>
-                                    <span class="sm:text-sm text-xs font-medium relative z-10">Share</span>
+                                    <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Share</span>
                                 </button>
-                                <a href="{% url 'discussion' post.id %}" class="group inline-flex items-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full border border-primary/35 bg-primary/12 text-primary shadow-sm shadow-primary/20 transition-all duration-300 hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/35 focus:outline-none focus:ring-2 focus:ring-primary/35">
-                                    <span class="sm:text-sm text-xs font-medium">Open discussion</span>
+                                <a href="{% url 'discussion' post.id %}" class="ml-auto group inline-flex items-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full border border-primary/35 bg-primary/12 text-primary shadow-sm shadow-primary/20 transition-all duration-300 hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/35 focus:outline-none focus:ring-2 focus:ring-primary/35 whitespace-nowrap">
+                                    <span class="sm:hidden text-xs font-medium">Open</span>
+                                    <span class="hidden sm:inline sm:text-sm font-medium">Open discussion</span>
                                     <span class="sm:text-sm text-xs">→</span>
                                 </a>
                             </div>
@@ -1100,7 +1102,7 @@ function handlePostAction(postId, action) {
 
         const message = {
             added: 'Saved!',
-            removed: 'Removed!',
+            removed: action === 'repost' ? 'Repost removed.' : 'Removed!',
             reposted: 'Post reposted. You can view it in your profile posts.',
             already_reposted: 'Repost removed.',
         }[data.status] || 'Action completed.';
@@ -1146,11 +1148,7 @@ function updatePostActionUI(postId, action, status, counts) {
     if (repostButton && counts) {
         const repostSpan = repostButton.querySelector('span');
         if (repostSpan) {
-            let newCount = counts.repost || 0;
-            if (status === 'already_reposted' && action === 'repost') {
-                newCount = Math.max(0, newCount - 1); // Decrement for un-repost
-            }
-            repostSpan.textContent = newCount;
+            repostSpan.textContent = counts.repost || 0;
         }
 
         if (status === 'added' && action === 'repost') {

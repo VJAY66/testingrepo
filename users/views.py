@@ -2,8 +2,11 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from users.models import Profile, Follow
+from users.security import is_login_rate_limited, record_login_attempt
+from users.throttles import LoginRateThrottle
 from users.serializers import UserSerializer, UserRegistrationSerializer, ProfileSerializer
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -24,20 +27,25 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = UserSerializer(user)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny], throttle_classes=[LoginRateThrottle])
     def login(self, request):
         from django.contrib.auth import authenticate
-        username = request.data.get('username')
+        username = (request.data.get('username') or '').strip()
         password = request.data.get('password')
+
+        if is_login_rate_limited(request, username, source='api'):
+            return Response({'error': 'Too many login attempts. Please try again shortly.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
         
         user = authenticate(username=username, password=password)
         if user:
-            from rest_framework.authtoken.models import Token
-            token, created = Token.objects.get_or_create(user=user)
+            record_login_attempt(request, username, successful=True, source='api')
+            Token.objects.filter(user=user).delete()
+            token = Token.objects.create(user=user)
             return Response({
                 'user': UserSerializer(user).data,
                 'token': token.key
             })
+        record_login_attempt(request, username, successful=False, source='api')
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
