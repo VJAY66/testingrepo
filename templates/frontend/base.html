@@ -215,6 +215,37 @@
             transition: transform 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
         }
 
+        .nav-icon-pill svg {
+            width: 1.25rem;
+            height: 1.25rem;
+            flex-shrink: 0;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .nav-profile-avatar {
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 999px;
+            object-fit: cover;
+            border: 1px solid hsl(var(--border));
+            display: block;
+        }
+
+        .nav-profile-avatar-fallback {
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 999px;
+            border: 1px solid hsl(var(--border));
+            background: hsl(var(--muted));
+            color: hsl(var(--muted-foreground));
+            font-size: 0.65rem;
+            font-weight: 700;
+            align-items: center;
+            justify-content: center;
+        }
+
         .nav-icon-pill:hover {
             transform: translateY(-1px) scale(1.03);
             border-color: hsl(var(--primary));
@@ -968,10 +999,15 @@
             box-shadow: 0 0 0 3px rgba(255,255,255,0.10), 0 2px 8px rgba(0,0,0,0.20);
         }
         .chat-fp-header-info { flex: 1; min-width: 0; }
+        .chat-fp-header-info.clickable { cursor: pointer; }
         .chat-fp-htitle {
             font-family: 'Playfair Display', Georgia, serif;
             font-size: 14.2px; font-weight: 700; color: inherit; letter-spacing: 0.012em;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;
+        }
+        .chat-fp-header-info.clickable .chat-fp-htitle:hover {
+            text-decoration: underline;
+            text-underline-offset: 3px;
         }
         .chat-fp-hmeta { font-size: 10.8px; opacity: 0.8; margin-top: 2px; letter-spacing: 0.015em; }
         .chat-fp-hacts { display: flex; gap: 4px; }
@@ -1005,6 +1041,7 @@
             display: flex; flex-direction: column; gap: 8px;
             background: linear-gradient(180deg, hsl(var(--card) / 0.9), hsl(var(--background) / 0.84));
             position: relative;
+            scrollbar-gutter: stable;
         }
         .chat-fp-msgs::-webkit-scrollbar { width: 3px; }
         .chat-fp-msgs::-webkit-scrollbar-track { background: transparent; }
@@ -1061,7 +1098,7 @@
                     border-radius: 99px; padding: 2px 10px; max-width: 92%; text-align: center;
                     border: 1px solid hsl(var(--border)/0.5);
                 }
-        .chat-fp-row { display: flex; align-items: flex-end; gap: 4px; max-width: 100%; width: 100%; }
+        .chat-fp-row { display: flex; align-items: flex-end; gap: 6px; max-width: 100%; width: 100%; }
         .chat-fp-msg.own .chat-fp-row { flex-direction: row-reverse; }
         .chat-fp-msg.own .chat-fp-row { justify-content: flex-start; }
         .chat-fp-msg.other .chat-fp-row { justify-content: flex-start; }
@@ -1077,10 +1114,9 @@
             font-size: 10px; font-weight: 700; border: 1px solid transparent;
         }
 
-        .chat-fp-msg.own .chat-fp-msg-avatar,
-        .chat-fp-msg.own .chat-fp-msg-avatar-fallback { display: none; }
-
-        .chat-fp-bubble { max-width: 94%; padding: 10px 14px; font-size: 13.5px; line-height: 1.62; letter-spacing: 0.004em; word-break: break-word; }
+        .chat-fp-bubble { position: relative; flex: 0 1 auto; min-width: 0; padding: 10px 14px; font-size: 13.5px; line-height: 1.62; letter-spacing: 0.004em; word-break: break-word; z-index: 0; }
+        .chat-fp-msg.other .chat-fp-bubble { max-width: calc(100% - 82px); }
+        .chat-fp-msg.own .chat-fp-bubble { max-width: calc(100% - 34px); }
         .chat-fp-msg.own .chat-fp-bubble {
             border: 1px solid transparent;
             background:
@@ -1107,7 +1143,58 @@
             gap: 8px;
             margin-bottom: 2px;
         }
-        .chat-fp-sender { display: block; font-size: 10px; font-weight: 700; opacity: 0.76; }
+        .chat-fp-msg.other .chat-fp-meta {
+            padding-right: 28px;
+        }
+        .chat-fp-sender { display: inline-block; font-size: 10px; font-weight: 700; opacity: 0.76; }
+        .chat-fp-msg-side-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 8px;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            border-radius: 999px;
+            padding: 1px 5px;
+            line-height: 1;
+            border: 1px solid transparent;
+            vertical-align: middle;
+        }
+        .chat-fp-msg-side-badge--yes {
+            background: rgba(34, 197, 94, 0.15);
+            color: #16a34a;
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+        .chat-fp-msg-side-badge--no {
+            background: rgba(239, 68, 68, 0.13);
+            color: #dc2626;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+        html[data-theme="dark"] .chat-fp-msg-side-badge--yes { color: #4ade80; background: rgba(34,197,94,0.18); }
+        html[data-theme="dark"] .chat-fp-msg-side-badge--no  { color: #f87171; background: rgba(239,68,68,0.18); }
+        .chat-fp-msg-side-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 8px;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            border-radius: 999px;
+            padding: 1px 5px;
+            line-height: 1;
+            border: 1px solid transparent;
+            vertical-align: middle;
+        }
+        .chat-fp-msg-side-badge--yes {
+            background: rgba(34, 197, 94, 0.15);
+            color: #16a34a;
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+        .chat-fp-msg-side-badge--no {
+            background: rgba(239, 68, 68, 0.13);
+            color: #dc2626;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+        html[data-theme="dark"] .chat-fp-msg-side-badge--yes { color: #4ade80; background: rgba(34,197,94,0.18); }
+        html[data-theme="dark"] .chat-fp-msg-side-badge--no  { color: #f87171; background: rgba(239,68,68,0.18); }
         .chat-fp-time-inline {
             font-size: 9px;
             opacity: 0.62;
@@ -1144,6 +1231,8 @@
             border: none; background: transparent; color: hsl(var(--muted-foreground));
             width: 18px; height: 18px; border-radius: 999px; cursor: pointer; flex-shrink: 0;
             display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1px;
+            position: relative;
+            z-index: 1;
         }
         .chat-fp-reply-btn:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
 
@@ -1174,7 +1263,9 @@
         }
 
         .chat-fp-msg-menu-wrap {
-            position: relative;
+            position: absolute;
+            top: 8px;
+            right: 8px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -1216,7 +1307,7 @@
             background: hsl(var(--card));
             box-shadow: 0 14px 32px -20px rgba(15, 23, 42, 0.65);
             padding: 6px;
-            z-index: 40;
+            z-index: 10050;
             pointer-events: auto;
         }
 
@@ -1258,6 +1349,33 @@
             cursor: not-allowed;
         }
 
+        .chat-fp-reactions {
+            margin-top: 6px;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .chat-fp-reaction-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border: 1px solid hsl(var(--border));
+            background: hsl(var(--background) / 0.9);
+            color: hsl(var(--muted-foreground));
+            border-radius: 999px;
+            padding: 1px 8px;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .chat-fp-reaction-chip.active {
+            color: hsl(var(--foreground));
+            border-color: hsl(var(--primary) / 0.55);
+            background: hsl(var(--primary) / 0.14);
+        }
+
         .chat-fp-sup {
             display: flex; gap: 7px; align-items: center;
             padding: 7px 12px;
@@ -1266,6 +1384,10 @@
             backdrop-filter: blur(6px);
         }
         .chat-fp-caution {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
             padding: 7px 12px;
             font-size: 10px;
             line-height: 1.45;
@@ -1273,6 +1395,18 @@
             background: linear-gradient(90deg, hsl(var(--primary) / 0.07), hsl(var(--primary) / 0.03));
             border-top: 1px solid hsl(var(--border) / 0.85);
             letter-spacing: 0.01em;
+        }
+        .chat-fp-caution button {
+            border: 1px solid hsl(var(--primary) / 0.35);
+            background: hsl(var(--background) / 0.92);
+            color: hsl(var(--foreground));
+            border-radius: 999px;
+            padding: 4px 9px;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
+            cursor: pointer;
+            white-space: nowrap;
         }
         .chat-fp-participants-view {
             display: none;
@@ -1329,17 +1463,23 @@
             font-weight: 700;
         }
         .chat-fp-member-text {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
             min-width: 0;
+            flex: 1;
+        }
+        .chat-fp-member-chips {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
         }
         .chat-fp-member-name {
-            font-size: 10px;
+            font-size: 11px;
             font-weight: 700;
             color: hsl(var(--foreground));
             line-height: 1.1;
-            max-width: 88px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -2036,13 +2176,20 @@
             filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.4));
         }
 
+        .action-btn-like svg {
+            transition: fill 0.25s ease, transform 0.25s ease;
+        }
+
         .action-btn-like.active svg {
             filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.58));
+            stroke: none;
+        }
+
+        .action-btn-like.like-pop svg {
+            animation: like-heart-pop 420ms cubic-bezier(0.2, 0.9, 0.25, 1);
         }
 
         .action-btn-like.active {
-            background-image: var(--float-gradient) !important;
-            color: hsl(var(--primary-foreground)) !important;
             border-color: transparent !important;
             box-shadow: 0 12px 24px -14px hsl(var(--primary) / 0.7) !important;
         }
@@ -2243,9 +2390,14 @@
                         </div>
                         <div class="user-menu-wrap">
                             <a id="user-menu-toggle" href="{% url 'profile' %}" class="nav-icon-pill" aria-label="My Profile" title="My Profile" data-tooltip="My Profile" aria-expanded="false">
+                                {% if current_user_avatar %}
+                                <img src="{{ current_user_avatar }}" alt="{{ user.username }}" class="nav-profile-avatar" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                                <span class="nav-profile-avatar-fallback" style="display:none">{{ user.username|first|upper }}</span>
+                                {% else %}
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                                 </svg>
+                                {% endif %}
                             </a>
                             <div id="user-menu-panel" class="user-menu-panel hidden">
                                 <div class="px-2 py-1">
@@ -2291,9 +2443,14 @@
                         </a>
                         <div class="user-menu-wrap">
                             <button type="button" id="mobile-user-menu-toggle" class="nav-icon-pill" aria-label="Profile" aria-expanded="false">
+                                {% if current_user_avatar %}
+                                <img src="{{ current_user_avatar }}" alt="{{ user.username }}" class="nav-profile-avatar" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                                <span class="nav-profile-avatar-fallback" style="display:none">{{ user.username|first|upper }}</span>
+                                {% else %}
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                                 </svg>
+                                {% endif %}
                             </button>
                             <div id="mobile-user-menu-panel" class="user-menu-panel nav-mobile-user-menu-panel hidden">
                                 <div class="px-2 py-1">
@@ -2381,7 +2538,71 @@
             </div>
         {% endif %}
 
-        {% block content %}{% endblock %}
+        <div class="flex gap-6 items-start">
+            {% if user.is_authenticated and request.resolver_match.url_name != 'chats' %}
+            <!-- Left sidebar — visible only on lg+ -->
+            <aside class="hidden lg:flex flex-col gap-3 w-56 shrink-0 sticky top-24 self-start">
+                <!-- Interests widget -->
+                <div class="rounded-2xl border border-border/70 bg-card/80 shadow-sm overflow-hidden">
+                    <div class="flex items-center justify-between px-4 pt-4 pb-2">
+                        <span class="text-xs font-bold uppercase tracking-widest text-muted-foreground">Your Interests</span>
+                        <a href="{% url 'interests_onboarding' %}?force=1"
+                           title="Edit interests"
+                           class="flex items-center gap-0.5 text-[10px] font-semibold text-muted-foreground hover:text-primary transition-colors rounded-full px-2 py-0.5 hover:bg-primary/8 border border-transparent hover:border-primary/25">
+                            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                            Edit
+                        </a>
+                    </div>
+                    {% with cats=request.user.profile.interested_categories %}
+                    {% if cats %}
+                    <div class="px-3 pb-4 flex flex-wrap gap-1.5">
+                        {% for cat in cats %}
+                        <a href="{% url 'category' cat|urlencode %}"
+                           class="inline-flex items-center rounded-full border border-primary/20 bg-primary/8 px-2.5 py-1 text-[10px] font-semibold text-primary hover:bg-primary/15 hover:border-primary/40 transition-colors">
+                            {{ cat }}
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="px-4 pb-4">
+                        <p class="text-[11px] text-muted-foreground mb-2 leading-relaxed">No interests set yet. Pick topics to personalise your feed.</p>
+                        <a href="{% url 'interests_onboarding' %}"
+                           class="inline-flex items-center gap-1 rounded-full border border-dashed border-primary/50 bg-primary/5 px-3 py-1.5 text-[11px] font-bold text-primary hover:bg-primary/10 transition-colors w-full justify-center">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                            Set interests
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+
+                <!-- Quick nav links -->
+                <nav class="rounded-2xl border border-border/70 bg-card/80 shadow-sm px-2 py-3 flex flex-col gap-0.5">
+                    <a href="{% url 'index' %}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors {% if request.resolver_match.url_name == 'index' %}bg-primary/8 text-primary{% endif %}">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                        Home
+                    </a>
+                    <a href="{% url 'suggested' %}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors {% if request.resolver_match.url_name == 'suggested' %}bg-primary/8 text-primary{% endif %}">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l14 9-14 9V3z"/></svg>
+                        Suggested
+                    </a>
+                    <a href="{% url 'profile' %}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors {% if request.resolver_match.url_name == 'profile' %}bg-primary/8 text-primary{% endif %}">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        Profile
+                    </a>
+                    <a href="{% url 'notifications' %}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors {% if request.resolver_match.url_name == 'notifications' %}bg-primary/8 text-primary{% endif %}">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                        Notifications
+                    </a>
+                </nav>
+            </aside>
+            {% endif %}
+
+            <!-- Page content -->
+            <div class="flex-1 min-w-0">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
     </main>
 
     <!-- Footer -->
@@ -2776,8 +2997,8 @@
                     likeButton.classList.remove('text-muted-foreground');
                     likeButton.classList.add('active', 'text-amber-500', 'shadow-md', 'shadow-amber-500/20', 'bg-amber-50/60', 'dark:bg-amber-950/30');
                     if (likeSvg) {
-                        likeSvg.style.fill = 'currentColor';
-                        likeSvg.classList.add('fill-current');
+                        likeSvg.style.fill = 'url(#dh-like-gradient)';
+                        likeSvg.classList.remove('fill-current');
                     }
                 } else if (status === 'removed' && action === 'like') {
                     likeButton.classList.remove('active', 'text-amber-500', 'shadow-md', 'shadow-amber-500/20', 'bg-amber-50/60', 'dark:bg-amber-950/30');
@@ -2965,7 +3186,7 @@
             let notificationsPollInFlight = false;
 
             function refreshNotificationCount() {
-                if (notificationsPollInFlight || document.hidden) {
+                if (notificationsPollInFlight) {
                     return;
                 }
 
@@ -3264,6 +3485,24 @@
             const d = document.createElement('div'); d.textContent = String(s || ''); return d.innerHTML;
         }
 
+        function cautionStorageKey(debateId) {
+            return 'dhChatCautionAccepted:' + String(debateId);
+        }
+
+        function isCautionAccepted(debateId) {
+            try {
+                return localStorage.getItem(cautionStorageKey(debateId)) === '1';
+            } catch {
+                return false;
+            }
+        }
+
+        function syncCaution(debateId) {
+            const cautionEl = document.getElementById('cfp-caution-' + String(debateId));
+            if (!cautionEl) return;
+            cautionEl.classList.toggle('hidden', isCautionAccepted(debateId));
+        }
+
         function renderMsgContent(content) {
             const s = String(content || '');
             // Render GIF/image URLs as images
@@ -3271,6 +3510,20 @@
                 return `<img src="${esc(s.trim())}" alt="GIF" style="max-width:180px;max-height:120px;border-radius:8px;display:block;margin-top:2px;" loading="lazy">`;
             }
             return esc(s);
+        }
+
+        function renderReactionSummaryHtml(likesCount, dislikesCount, userReaction) {
+            const likes = Number(likesCount || 0);
+            const dislikes = Number(dislikesCount || 0);
+            const reaction = String(userReaction || '');
+            if (likes <= 0 && dislikes <= 0) return '';
+            const likeChip = likes > 0
+                ? `<span class="chat-fp-reaction-chip ${reaction === 'like' ? 'active' : ''}">👍 ${likes}</span>`
+                : '';
+            const dislikeChip = dislikes > 0
+                ? `<span class="chat-fp-reaction-chip ${reaction === 'dislike' ? 'active' : ''}">👎 ${dislikes}</span>`
+                : '';
+            return `<div class="chat-fp-reactions">${likeChip}${dislikeChip}</div>`;
         }
 
         function senderVariant(sender) {
@@ -3462,15 +3715,22 @@
             }
         }
 
+        function renderHeaderAvatar(debate) {
+            const opponent = esc((debate && debate.opponent) || 'User');
+            const initial = opponent.charAt(0).toUpperCase() || '?';
+            const avatarUrl = (debate && debate.opponent_avatar) || '';
+            if (avatarUrl) {
+                return `<img src="${esc(avatarUrl)}" alt="${opponent}" class="chat-fp-avatar" loading="lazy">`;
+            }
+            return `<div class="chat-fp-avatar">${initial}</div>`;
+        }
+
         function buildHTML(id, db) {
-            const ini = esc(db.opponent).charAt(0).toUpperCase();
-                        const avatar = db.opponent_avatar
-                                ? `<img src="${esc(db.opponent_avatar)}" alt="${esc(db.opponent)}" class="chat-fp-avatar" loading="lazy">`
-                                : `<div class="chat-fp-avatar">${ini}</div>`;
+            const avatar = renderHeaderAvatar(db);
             return `
                             <div class="chat-fp-header" data-chat-header="${id}">
-                                ${avatar}
-                                <div class="chat-fp-header-info" data-chat-title="${id}">
+                                <div id="cfp-avatar-${id}">${avatar}</div>
+                                <div class="chat-fp-header-info ${db.post_id ? 'clickable' : ''}" data-chat-title="${id}" onclick="ChatManager.openPost('${id}', event)">
                                                                         <p class="chat-fp-htitle" title="${esc(db.title)}">${esc(db.title)}</p>
                                     <p class="chat-fp-hmeta" id="cfp-meta-${id}">${db.current_controller_name ? `Controller: ${esc(db.current_controller_name)}${db.current_controller_side ? ' (' + esc(String(db.current_controller_side).toUpperCase()) + ')' : ''}` : `vs @${esc(db.opponent)}`}</p>
                 </div>
@@ -3493,7 +3753,10 @@
                                         <span class="fp-badge fp-badge-n" id="cfp-no-limit-${id}">✗ No ${db.no_supporters}</span>
                                                                             <div class="chat-fp-sup-actions" id="cfp-actions-${id}"></div>
                                     </div>
-                                                                    <div class="chat-fp-caution">Please do not insult others, maintain respect and collaborate effectively.</div>
+                                                                        <div class="chat-fp-caution" id="cfp-caution-${id}">
+                                                                            <span>Please do not insult others, maintain respect and collaborate effectively.</span>
+                                                                            <button type="button" onclick="ChatManager.acceptCaution('${id}')">I Understand</button>
+                                                                        </div>
                                                                     <div class="chat-fp-replying" id="cfp-reply-${id}">
                                                                             <div class="chat-fp-replying-meta">
                                                                                     <p class="chat-fp-replying-to" id="cfp-reply-to-${id}"></p>
@@ -3581,6 +3844,13 @@
                     : `vs @${debate.opponent || ''}`;
             }
 
+            const avatarWrap = document.getElementById('cfp-avatar-' + id);
+            if (avatarWrap) {
+                avatarWrap.innerHTML = renderHeaderAvatar(debate);
+            }
+
+            syncCaution(id);
+
         }
 
         function renderParticipants(id, participants) {
@@ -3614,20 +3884,22 @@
                 let removeBtn = '';
                 if (isPending) {
                     removeBtn = `<span class="inline-flex items-center gap-1">
-                        <button type="button" class="chat-fp-act-btn danger" onclick="ChatManager.confirmBlock('${id}', '${userIdStr}', '${safeUsername}')">Confirm</button>
+                        <button type="button" class="chat-fp-act-btn danger" onclick="ChatManager.confirmBlock('${id}', '${userIdStr}', '${safeUsername}')">Confirm remove</button>
                         <button type="button" class="chat-fp-act-btn" onclick="ChatManager.cancelBlock('${id}')">Cancel</button>
                     </span>`;
                 } else if (canBlock) {
-                    removeBtn = `<button type="button" class="chat-fp-act-btn danger" onclick="ChatManager.prepareBlock('${id}', '${userIdStr}')">Block</button>`;
+                    removeBtn = `<button type="button" class="chat-fp-act-btn danger" onclick="ChatManager.prepareBlock('${id}', '${userIdStr}')">Remove</button>`;
                 }
 
                 return `<div class="chat-fp-member">
                     ${avatar}
                     <span class="chat-fp-member-text">
                         <span class="chat-fp-member-name" title="${username}">${username}</span>
-                        <span class="chat-fp-member-side ${side}">${side.toUpperCase()}</span>
-                        <span title="${presenceTitle}" class="chat-fp-member-presence ${onlineClass}">${onlineLabel}</span>
-                        <span class="chat-fp-member-state">${stateLabel}</span>
+                        <span class="chat-fp-member-chips">
+                            <span class="chat-fp-member-side ${side}">${side.toUpperCase()}</span>
+                            <span title="${presenceTitle}" class="chat-fp-member-presence ${onlineClass}">${onlineLabel}</span>
+                            <span class="chat-fp-member-state">${stateLabel}</span>
+                        </span>
                     </span>
                     ${removeBtn}
                 </div>`;
@@ -3677,6 +3949,12 @@
             }
             if (typeof payload.current_controller_side === 'string') {
                 panel.debate.current_controller_side = payload.current_controller_side;
+            }
+            if (typeof payload.opponent === 'string') {
+                panel.debate.opponent = payload.opponent;
+            }
+            if (typeof payload.opponent_avatar === 'string') {
+                panel.debate.opponent_avatar = payload.opponent_avatar;
             }
             if (typeof payload.can_moderate_chat === 'boolean') {
                 panel.debate.can_moderate_chat = payload.can_moderate_chat;
@@ -3850,34 +4128,82 @@
                         const replyQuote = msg.reply_to
                             ? `<div class="chat-fp-reply-quote"><span class="chat-fp-reply-quote-name">${esc(msg.reply_to.sender)}</span><span class="chat-fp-reply-quote-text">${esc(msg.reply_to.content)}</span></div>`
                             : '';
+                        const reactionSummary = renderReactionSummaryHtml(msg.likes_count, msg.dislikes_count, msg.user_reaction);
+                        const likeAction = msg.is_own
+                            ? `<button type="button" class="chat-fp-msg-menu-item" disabled title="You cannot react to your own message">Like</button>`
+                            : `<button type="button" class="chat-fp-msg-menu-item" data-chat-action="like">Like</button>`;
+                        const dislikeAction = msg.is_own
+                            ? `<button type="button" class="chat-fp-msg-menu-item" disabled title="You cannot react to your own message">Dislike</button>`
+                            : `<button type="button" class="chat-fp-msg-menu-item" data-chat-action="dislike">Dislike</button>`;
                         const reportAction = msg.is_own
-                            ? `<button type="button" class="chat-fp-msg-menu-item danger" onclick="ChatManager.reportOwnMessage(event)">Report</button>`
-                            : `<button type="button" class="chat-fp-msg-menu-item danger" onclick="ChatManager.reportMessage('${id}', ${Number(msg.id)}, event)">Report</button>`;
-                        const reportQuickAction = msg.is_own
-                            ? `<button type="button" class="chat-fp-report-btn" title="You cannot report your own message" onclick="ChatManager.reportOwnMessage(event)"><span>⚑</span><span>Report</span></button>`
-                            : `<button type="button" class="chat-fp-report-btn" title="Report message" onclick="ChatManager.reportMessage('${id}', ${Number(msg.id)}, event)"><span>⚑</span><span>Report</span></button>`;
+                            ? `<button type="button" class="chat-fp-msg-menu-item danger" data-chat-action="report-own">Report</button>`
+                            : `<button type="button" class="chat-fp-msg-menu-item danger" data-chat-action="report">Report</button>`;
+                        const messageMenu = msg.is_own
+                            ? ''
+                            : `<div class="chat-fp-msg-menu-wrap">
+                                <button type="button" class="chat-fp-msg-menu-toggle" title="Message options" aria-label="Message options">⋮</button>
+                                <div id="cfp-msg-menu-${id}-${Number(msg.id)}" class="chat-fp-msg-menu hidden">
+                                    ${likeAction}
+                                    ${dislikeAction}
+                                    ${reportAction}
+                                </div>
+                            </div>`;
                         div.innerHTML = `<div class="chat-fp-row">
                             ${avatar}
                             <div class="chat-fp-bubble">
                                 <div class="chat-fp-meta">
                                     <span class="chat-fp-sender">${esc(msg.sender)}</span>
+                                    ${msg.sender_side ? `<span class="chat-fp-msg-side-badge chat-fp-msg-side-badge--${esc(String(msg.sender_side).toLowerCase())}">${esc(String(msg.sender_side).toUpperCase())}</span>` : ''}
                                     <span class="chat-fp-time-inline">${esc(msg.created_time || msg.created_at || '')}</span>
                                 </div>
+                                ${messageMenu}
                                 ${replyQuote}
                                 <p>${renderMsgContent(msg.content)}</p>
+                                ${reactionSummary}
                             </div>
-                            <button type="button" class="chat-fp-reply-btn" title="Reply" onclick="ChatManager.reply('${id}', ${Number(msg.id)})">↩</button>
-                            ${reportQuickAction}
-                            <div class="chat-fp-msg-menu-wrap">
-                                <button type="button" class="chat-fp-msg-menu-toggle" title="Message options" aria-label="Message options" onclick="ChatManager.toggleMessageMenu('${id}', ${Number(msg.id)}, event, this)">⋮</button>
-                                <div id="cfp-msg-menu-${id}-${Number(msg.id)}" class="chat-fp-msg-menu hidden">
-                                    ${reportAction}
-                                </div>
-                            </div>
+                            <button type="button" class="chat-fp-reply-btn" title="Reply">↩</button>
                         </div>`;
+            const replyButton = div.querySelector('.chat-fp-reply-btn');
+            if (replyButton) {
+                replyButton.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    ChatManager.reply(id, Number(msg.id));
+                });
+            }
+
+            const menuToggle = div.querySelector('.chat-fp-msg-menu-toggle');
+            if (menuToggle) {
+                menuToggle.addEventListener('click', function(event) {
+                    ChatManager.toggleMessageMenu(id, Number(msg.id), event, menuToggle);
+                });
+            }
+
+            div.querySelectorAll('.chat-fp-msg-menu-item[data-chat-action]').forEach(function(button) {
+                const action = button.dataset.chatAction;
+                button.addEventListener('click', function(event) {
+                    if (action === 'like' || action === 'dislike') {
+                        ChatManager.reactMessage(id, Number(msg.id), action, event);
+                        return;
+                    }
+                    if (action === 'report') {
+                        ChatManager.reportMessage(id, Number(msg.id), event);
+                        return;
+                    }
+                    if (action === 'report-own') {
+                        ChatManager.reportOwnMessage(event);
+                    }
+                });
+            });
             box.appendChild(div);
             box.scrollTop = box.scrollHeight;
             updateStickyDate(id);
+        }
+
+        function mountMessageMenu(menu) {
+            if (!menu || menu.dataset.portalMounted === '1') return;
+            document.body.appendChild(menu);
+            menu.dataset.portalMounted = '1';
         }
 
         function closeAllMessageMenus() {
@@ -3886,6 +4212,20 @@
                 menu.style.left = '0px';
                 menu.style.top = '0px';
             });
+        }
+
+        function updateMessageReactionUI(debateId, messageId, likesCount, dislikesCount, userReaction) {
+            const box = document.getElementById('cfp-msgs-' + String(debateId));
+            if (!box) return;
+            const row = box.querySelector('#cfpm-' + Number(messageId));
+            if (!row) return;
+            const bubble = row.querySelector('.chat-fp-bubble');
+            if (!bubble) return;
+            const existing = bubble.querySelector('.chat-fp-reactions');
+            if (existing) existing.remove();
+            const html = renderReactionSummaryHtml(likesCount, dislikesCount, userReaction);
+            if (!html) return;
+            bubble.insertAdjacentHTML('beforeend', html);
         }
 
                 function setReplyUI(id, msg) {
@@ -3936,9 +4276,7 @@
                 applyServerState(id, d);
                 if (d.debate_status && d.debate_status !== 'accepted') {
                     stopPoll(id);
-                    window.showToast('This conversation has ended.', 'info');
-                    setTimeout(() => ChatManager.close(id), 500);
-                    return;
+                    window.showToast('This conversation has ended. You can still view messages.', 'info');
                 }
                 const box = document.getElementById('cfp-msgs-' + id);
                 if (!box) return;
@@ -4128,6 +4466,31 @@
                 renderAll();
             },
 
+            async openPost(debateId, event) {
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                const id = String(debateId);
+                const panel = panels.get(id);
+                const postId = panel && panel.debate ? panel.debate.post_id : null;
+                if (postId) {
+                    window.location.href = '/discussion/' + encodeURIComponent(String(postId)) + '/';
+                    return;
+                }
+                try {
+                    const r = await fetch('/debates/' + id + '/info/');
+                    const d = await r.json();
+                    if (d && d.success && d.debate && d.debate.post_id) {
+                        if (panel) {
+                            panel.debate.post_id = String(d.debate.post_id);
+                            save();
+                        }
+                        window.location.href = '/discussion/' + encodeURIComponent(String(d.debate.post_id)) + '/';
+                    }
+                } catch {}
+            },
+
             toggleMin(debateId) {
                 toggleMinState(debateId);
             },
@@ -4150,6 +4513,14 @@
                 setReplyUI(id, null);
             },
 
+            acceptCaution(debateId) {
+                const id = String(debateId);
+                try {
+                    localStorage.setItem(cautionStorageKey(id), '1');
+                } catch {}
+                syncCaution(id);
+            },
+
             toggleMessageMenu(debateId, messageId, event, toggleEl) {
                 if (event) {
                     event.preventDefault();
@@ -4162,6 +4533,7 @@
                 const wasHidden = targetMenu.classList.contains('hidden');
                 closeAllMessageMenus();
                 if (!wasHidden) return;
+                mountMessageMenu(targetMenu);
                 targetMenu.classList.remove('hidden');
 
                 if (!buttonEl) return;
@@ -4190,6 +4562,18 @@
                     event.stopPropagation();
                 }
                 closeAllMessageMenus();
+                const reportReason = window.prompt(
+                    'Please explain clearly what is wrong with this message:',
+                    ''
+                );
+                if (reportReason === null) {
+                    return;
+                }
+                const normalizedReason = String(reportReason || '').trim();
+                if (normalizedReason.length < 10) {
+                    window.showToast('Please provide a clear reason (at least 10 characters).', 'error');
+                    return;
+                }
                 try {
                     const r = await fetch(`/debates/${encodeURIComponent(String(debateId))}/messages/${encodeURIComponent(String(messageId))}/report/`, {
                         method: 'POST',
@@ -4198,7 +4582,7 @@
                             'X-CSRFToken': csrf(),
                             'X-Requested-With': 'XMLHttpRequest',
                         },
-                        body: 'details=' + encodeURIComponent('Reported from desktop chat menu'),
+                        body: 'details=' + encodeURIComponent(normalizedReason),
                     });
                     const d = await r.json().catch(() => null);
                     if (!r.ok || !d || !d.success) {
@@ -4208,6 +4592,45 @@
                     window.showToast(d.message || 'Message reported to moderators.', 'success');
                 } catch {
                     window.showToast('Unable to report this message.', 'error');
+                }
+            },
+
+            async reactMessage(debateId, messageId, reactionType, event) {
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                closeAllMessageMenus();
+                try {
+                    const r = await fetch(`/debates/${encodeURIComponent(String(debateId))}/messages/${encodeURIComponent(String(messageId))}/react/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': csrf(),
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: `reaction_type=${encodeURIComponent(reactionType)}`,
+                    });
+                    const d = await r.json().catch(() => null);
+                    if (!r.ok || !d || !d.success) {
+                        window.showToast((d && d.error) || 'Unable to react to this message.', 'error');
+                        return;
+                    }
+                    updateMessageReactionUI(debateId, messageId, d.likes_count, d.dislikes_count, d.user_reaction);
+                    const index = messageIndex.get(String(debateId));
+                    if (index && index.has(Number(messageId))) {
+                        const existing = index.get(Number(messageId));
+                        index.set(Number(messageId), {
+                            ...existing,
+                            likes_count: Number(d.likes_count || 0),
+                            dislikes_count: Number(d.dislikes_count || 0),
+                            user_reaction: d.user_reaction || null,
+                        });
+                    }
+                    const reactionEmoji = reactionType === 'like' ? '👍' : '👎';
+                    window.showToast(`${reactionEmoji} ${reactionType === 'like' ? 'Liked' : 'Disliked'} message.`, 'success');
+                } catch {
+                    window.showToast('Unable to react to this message.', 'error');
                 }
             },
 
@@ -4373,11 +4796,16 @@
             restore() {
                 loadClosed();
                 const stored = load();
+                const autoChats = readAutoChats();
+                const autoById = new Map(autoChats.map((chat) => [String(chat.id), chat]));
                 for (const item of stored) {
                     const id = String(item.debate.id);
                     if (closedPanels.has(id)) continue;
                     const participantsMode = !!item.participantsMode;
-                    panels.set(id, { debate: item.debate, minimized: !!item.minimized, participantsMode });
+                    const mergedDebate = autoById.has(id)
+                        ? { ...item.debate, ...autoById.get(id) }
+                        : item.debate;
+                    panels.set(id, { debate: mergedDebate, minimized: !!item.minimized, participantsMode });
                     participantsViewState.set(id, participantsMode);
                 }
 
@@ -4396,8 +4824,13 @@
             }
         };
     })();
+    window.ChatManager = ChatManager;
 
-    document.addEventListener('DOMContentLoaded', () => ChatManager.restore());
+    document.addEventListener('DOMContentLoaded', () => {
+        // The dedicated /chats/ workspace manages conversation rendering itself.
+        if (window.location.pathname.startsWith('/chats/')) return;
+        ChatManager.restore();
+    });
 
     {% if user.is_authenticated %}
     // Mark presence offline when the tab is being closed/unloaded.
@@ -4569,6 +5002,14 @@
 
         return {
             init() {
+                const desktopChatsToggle = document.getElementById('nav-chat-toggle');
+                if (desktopChatsToggle) {
+                    desktopChatsToggle.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        window.location.href = '/chats/';
+                    });
+                }
+
                 const uiPairs = [
                     {
                         toggle: document.getElementById('nav-chat-toggle'),
@@ -4578,9 +5019,16 @@
                         toggle: document.getElementById('mobile-menu-chat-toggle'),
                         panel: document.getElementById('mobile-menu-chat-panel'),
                     },
-                ].filter(pair => pair.toggle && pair.panel);
+                ].filter(pair => pair.toggle && pair.panel && pair.toggle.id !== 'nav-chat-toggle');
 
-                if (!uiPairs.length) return;
+                if (!uiPairs.length) {
+                    fetchChats();
+                    pollTimer = setInterval(fetchChats, 15000);
+                    document.addEventListener('visibilitychange', () => {
+                        if (!document.hidden) fetchChats();
+                    });
+                    return;
+                }
 
                 function syncOpenState() {
                     isOpen = uiPairs.some(pair => !pair.panel.classList.contains('hidden'));
@@ -4646,8 +5094,7 @@
                     window.location.href = '/debates/' + encodeURIComponent(id) + '/chat/';
                     return;
                 }
-
-                if (typeof ChatManager !== 'undefined') ChatManager.open(id);
+                window.location.href = '/chats/?chat=' + encodeURIComponent(id);
             },
 
             refresh() { fetchChats(); },
@@ -4659,7 +5106,7 @@
     })();
 
     document.addEventListener('click', function(event) {
-        if (event.target.closest('.chat-fp-msg-menu-wrap')) {
+        if (event.target.closest('.chat-fp-msg-menu-wrap') || event.target.closest('.chat-fp-msg-menu')) {
             return;
         }
         if (typeof ChatManager !== 'undefined' && typeof ChatManager.closeMessageMenus === 'function') {

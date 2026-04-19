@@ -173,6 +173,9 @@ DAILY_POST_LIMIT = int(os.getenv('DAILY_POST_LIMIT', '50'))
 
 # OpenAI Configuration
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '').strip()
+ENABLE_CONTENT_MODERATION = False
+ABUSIVE_MODERATION_SCORE_THRESHOLD = float(os.getenv('ABUSIVE_MODERATION_SCORE_THRESHOLD', '0.75'))
+MODERATION_FAIL_CLOSED = _env_bool('MODERATION_FAIL_CLOSED', default=False)
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = _split_env_list('CORS_ALLOWED_ORIGINS', '')
@@ -210,4 +213,4 @@ MANUAL_EDITOR_EMAIL = os.getenv('MANUAL_EDITOR_EMAIL', '').strip()
 
 # Backend-only moderator accounts for chat abuse reports.
 # Example: MODERATOR_USERNAMES=alice,bob,charlie
-MODERATOR_USERNAMES = _split_env_list('MODERATOR_USERNAMES', 'seshu.seshu')
+MODERATOR_USERNAMES = _split_env_list('MODERATOR_USERNAMES', 'seshu')

@@ -280,7 +280,7 @@ html {
 }
 
 .mc-msg:hover {
-  transform: translateX(2px);
+  transform: none;
   filter: brightness(1.04);
 }
 

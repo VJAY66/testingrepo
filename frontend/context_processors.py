@@ -5,7 +5,7 @@ from discussions.models import Debate, DebateParticipant, Notification
 
 def _safe_profile_avatar(user):
     try:
-        return user.profile.avatar_url or ''
+        return user.profile.get_picture_url or ''
     except Exception:
         return ''
 
@@ -15,6 +15,7 @@ def notification_counts(request):
         return {
             "pending_notifications_count": 0,
             "active_chat_debates": [],
+            "current_user_avatar": "",
         }
 
     pending_notifications_count = Debate.objects.filter(
@@ -55,6 +56,7 @@ def notification_counts(request):
         opponent = debate.target if request.user.id == debate.initiator_id else debate.initiator
         active_chat_debates.append({
             'id': str(debate.id),
+            'post_id': str(debate.post_id),
             'title': debate.post.title,
             'opponent': opponent.username,
             'opponent_avatar': _safe_profile_avatar(opponent),
@@ -71,4 +73,5 @@ def notification_counts(request):
     return {
         "pending_notifications_count": pending_notifications_count,
         "active_chat_debates": active_chat_debates,
+        "current_user_avatar": _safe_profile_avatar(request.user),
     }

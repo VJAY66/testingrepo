@@ -32,14 +32,9 @@ class PostViewSet(viewsets.ModelViewSet):
         combined_text = f"{title} {content}".strip()
         
         if combined_text and check_content_moderation(combined_text):
-            # Create notification for abusive content
-            Notification.objects.create(
-                user=self.request.user,
-                post=None,  # Will be set after post creation, but since we're not creating it, keep None
-                notification_type='moderation_warning',
-                message='Your post was removed due to containing abusive language. Please follow community guidelines.'
-            )
-            raise ValidationError({'detail': 'Your post contains abusive language and has been removed.'})
+            raise ValidationError({'detail': 'Your post contains abusive language and cannot be posted.'})
+
+        serializer.save(user=self.request.user, id=str(uuid.uuid4()))
 
     def perform_update(self, serializer):
         # Check content moderation for updates
@@ -48,15 +43,7 @@ class PostViewSet(viewsets.ModelViewSet):
         combined_text = f"{title} {content}".strip()
         
         if combined_text and check_content_moderation(combined_text):
-            # Create notification for abusive content
-            post = self.get_object()
-            Notification.objects.create(
-                user=self.request.user,
-                post=post,
-                notification_type='moderation_warning',
-                message='Your post edit was rejected due to containing abusive language. Please follow community guidelines.'
-            )
-            raise ValidationError({'detail': 'Your post edit contains abusive language and has been rejected.'})
+            raise ValidationError({'detail': 'Your post edit contains abusive language and cannot be saved.'})
         
         serializer.save(user=self.request.user)
 
@@ -112,14 +99,7 @@ class CommentViewSet(viewsets.ModelViewSet):
         # Check content moderation
         content = serializer.validated_data.get('content', '').strip()
         if content and check_content_moderation(content):
-            # Create notification for abusive content
-            Notification.objects.create(
-                user=self.request.user,
-                post=post,
-                notification_type='moderation_warning',
-                message='Your comment was removed due to containing abusive language. Please follow community guidelines.'
-            )
-            raise ValidationError({'detail': 'Your comment contains abusive language and has been removed.'})
+            raise ValidationError({'detail': 'Your comment contains abusive language and cannot be posted.'})
         
         serializer.save(user=self.request.user, id=str(uuid.uuid4()))
 

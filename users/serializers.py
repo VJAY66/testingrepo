@@ -3,6 +3,11 @@ from django.contrib.auth.models import User
 from users.models import Profile
 
 class ProfileSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+
+    def get_avatar_url(self, obj):
+        return obj.get_picture_url
+
     class Meta:
         model = Profile
         fields = ['id', 'username', 'avatar_url', 'created_at']

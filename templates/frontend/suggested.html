@@ -419,6 +419,13 @@
                             </a>
                         </h3>
                         <div class="flex items-center gap-2 mb-2">
+                            <a href="{% url 'user_profile' post.user.username %}" class="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border bg-background/70">
+                                {% if post.author_avatar %}
+                                <img src="{{ post.author_avatar }}" alt="{{ post.user.username }}" class="h-8 w-8 object-cover" loading="lazy">
+                                {% else %}
+                                <span class="text-xs font-semibold text-muted-foreground">{{ post.user.username|slice:":1"|upper }}</span>
+                                {% endif %}
+                            </a>
                             <span class="text-sm text-muted-foreground">by</span>
                             <a href="{% url 'user_profile' post.user.username %}" class="text-sm font-medium text-primary hover:text-primary/80">
                                 @{{ post.user.username }}
@@ -445,7 +452,13 @@
                         {% if user.is_authenticated %}
                             <div class="mt-3 flex items-center sm:gap-6 gap-3">
                                 <button type="button" data-action="like" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-like feed-star-like {% if post.is_liked %}active text-amber-500 shadow-md shadow-amber-500/20 bg-amber-50/60 dark:bg-amber-950/30{% else %}text-muted-foreground hover:text-amber-500{% endif %} hover:bg-amber-50/70 dark:hover:bg-amber-950/20 hover:shadow-md overflow-hidden">
-                                    <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_liked %}fill-current scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="{% if post.is_liked %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_liked %}scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="{% if post.is_liked %}url(#dh-like-gradient){% else %}none{% endif %}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <defs>
+                                            <linearGradient id="dh-like-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                <stop offset="0%" stop-color="hsl(var(--primary))"/>
+                                                <stop offset="100%" stop-color="hsl(var(--accent))"/>
+                                            </linearGradient>
+                                        </defs>
                                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L4.22 13.45 12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                                     </svg>
                                     <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.like_count|default:0 }}</span>

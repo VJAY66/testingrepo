@@ -209,6 +209,26 @@
                     </div>
                     <p class="mt-1 text-sm text-muted-foreground break-all">{{ user.email }}</p>
 
+                    {% with cats=request.user.profile.interested_categories %}
+                    {% if cats %}
+                    <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                        {% for cat in cats|slice:":5" %}
+                        <span class="inline-flex items-center rounded-full border border-primary/25 bg-primary/8 px-2.5 py-0.5 text-[10px] font-semibold text-primary">{{ cat }}</span>
+                        {% endfor %}
+                        {% if cats|length > 5 %}<span class="text-[10px] text-muted-foreground">+{{ cats|length|add:"-5" }} more</span>{% endif %}
+                        <a href="{% url 'interests_onboarding' %}?force=1" class="inline-flex items-center gap-0.5 rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors">
+                            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                            Edit
+                        </a>
+                    </div>
+                    {% else %}
+                    <a href="{% url 'interests_onboarding' %}" class="mt-2 inline-flex items-center gap-1 rounded-full border border-dashed border-primary/40 bg-primary/5 px-3 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10 transition-colors">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                        Set your interests
+                    </a>
+                    {% endif %}
+                    {% endwith %}
+
                     <!-- Stat bar -->
                     <div class="mt-5 flex w-full sm:w-auto divide-x divide-border/60 rounded-2xl border border-border/70 bg-background/80 overflow-hidden shadow-sm">
                         <div class="flex flex-1 flex-col items-center gap-0.5 px-3 sm:px-5 py-3">
@@ -252,6 +272,18 @@
             <svg class="w-3.5 h-3.5 shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-4.879-4.879L9.88 9.88m0 0L5 5m4.88 4.88L5 14.758m4.88-4.878L14.758 5M9.88 9.88L19 19"/></svg>
             <span>Debates</span>
             <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_debate_participations.count }}</span>
+        </button>
+        <button type="button" id="tab-btn-saved" onclick="switchProfileTab('saved')"
+            class="profile-tab-btn flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-2 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200">
+            <svg class="w-3.5 h-3.5 shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/></svg>
+            <span>Saved</span>
+            <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_saved.count }}</span>
+        </button>
+        <button type="button" id="tab-btn-followed" onclick="switchProfileTab('followed')"
+            class="profile-tab-btn flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-2 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200">
+            <svg class="w-3.5 h-3.5 shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"/></svg>
+            <span>On Watch</span>
+            <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_followed_posts.count }}</span>
         </button>
     </div>
 
@@ -338,9 +370,24 @@
     <!-- Tab: Debates Participated -->
     <section id="tab-debates" class="hidden">
         {% if user_debate_participations %}
-        <div class="grid gap-4 sm:gap-5">
+        <div class="mb-3 sm:mb-4">
+            <div class="relative">
+                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.35-5.15a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z"/></svg>
+                </span>
+                <input id="debates-search-input" type="text" placeholder="Search your debates by title, host, opponent, side, or status..."
+                    class="w-full rounded-xl border border-border bg-card px-10 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+            </div>
+        </div>
+
+        <div id="debates-grid" class="grid gap-4 sm:gap-5">
             {% for participation in user_debate_participations %}
-            <article class="group rounded-2xl border border-border/70 bg-card p-5 sm:p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
+            <article class="group profile-debate-card rounded-2xl border border-border/70 bg-card p-5 sm:p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
+                data-debate-title="{{ participation.debate.post.title|lower|escape }}"
+                data-debate-host="{{ participation.debate.initiator.username|lower|escape }}"
+                data-debate-opponent="{{ participation.debate.target.username|lower|escape }}"
+                data-debate-side="{{ participation.get_side_display|lower|escape }}"
+                data-debate-status="{{ participation.debate.status|lower|escape }}">
                 <div class="flex items-start justify-between gap-3 mb-2">
                     <h3 class="text-base sm:text-lg font-bold tracking-tight text-foreground leading-snug">
                         <a href="{% url 'discussion' participation.debate.post.id %}" class="hover:text-primary transition-colors">{{ participation.debate.post.title }}</a>
@@ -368,9 +415,126 @@
             </article>
             {% endfor %}
         </div>
+        <div id="debates-no-results" class="hidden rounded-2xl border border-dashed border-border bg-card/70 p-10 text-center mt-3">
+            <p class="text-muted-foreground">No debates matched your search.</p>
+        </div>
         {% else %}
         <div class="rounded-2xl border border-dashed border-border bg-card/70 p-10 text-center">
             <p class="text-muted-foreground">No debate participations yet.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- Tab: Saved Posts -->
+    <section id="tab-saved" class="hidden">
+        {% if user_saved %}
+        <div class="grid gap-4 sm:gap-5">
+            {% for action in user_saved %}
+            <article class="group relative rounded-2xl border border-border/70 bg-card overflow-hidden shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:border-primary/30">
+                <!-- accent stripe -->
+                <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary via-teal-500 to-accent rounded-l-2xl"></div>
+                <div class="pl-5 pr-5 pt-5 pb-4">
+                    <div class="flex items-start justify-between gap-3 mb-2">
+                        <h3 class="text-base sm:text-lg font-bold tracking-tight text-foreground leading-snug flex-1">
+                            <a href="{% url 'discussion' action.post.id %}" class="hover:text-primary transition-colors">{{ action.post.title }}</a>
+                        </h3>
+                        <span class="shrink-0 px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground text-[10px] sm:text-xs font-semibold">{{ action.post.category }}</span>
+                    </div>
+                    {% if action.post.content %}
+                    <p class="text-sm text-muted-foreground mb-3 leading-relaxed line-clamp-2">{{ action.post.content|truncatechars:160 }}</p>
+                    {% endif %}
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                            {% with pic=action.post.user.profile.get_picture_url %}
+                            {% if pic %}
+                            <img src="{{ pic }}" alt="{{ action.post.user.username }}" class="h-5 w-5 rounded-full object-cover border border-border">
+                            {% else %}
+                            <span class="h-5 w-5 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 text-white flex items-center justify-center text-[9px] font-bold shrink-0">{{ action.post.user.username|first|upper }}</span>
+                            {% endif %}
+                            {% endwith %}
+                            <a href="{% url 'user_profile' action.post.user.username %}" class="font-semibold hover:text-primary transition-colors">{{ action.post.user.username }}</a>
+                            <span class="text-border">·</span>
+                            <span>{{ action.post.created_at|date:"M j, Y" }}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <svg class="w-3 h-3 text-primary/50" fill="currentColor" viewBox="0 0 24 24"><path d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/></svg>
+                                Saved {{ action.created_at|date:"M j" }}
+                            </span>
+                            <a href="{% url 'discussion' action.post.id %}" class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-cyan-500 via-teal-500 to-amber-500 bg-clip-text text-transparent border border-teal-500/30 hover:border-teal-500/60 hover:bg-teal-50/40 dark:hover:bg-teal-950/20 transition-colors">
+                                Open
+                                <svg class="w-3 h-3 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-2xl border border-dashed border-border bg-card/70 p-12 text-center">
+            <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <svg class="h-6 w-6 text-primary/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/></svg>
+            </div>
+            <p class="font-semibold text-foreground mb-1">No saved posts yet</p>
+            <p class="text-sm text-muted-foreground">Bookmark posts with the save icon to find them here.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- Tab: On Watch Posts -->
+    <section id="tab-followed" class="hidden">
+        {% if user_followed_posts %}
+        <div class="grid gap-4 sm:gap-5">
+            {% for pf in user_followed_posts %}
+            <article class="group relative rounded-2xl border border-border/70 bg-card overflow-hidden shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:border-teal-500/30">
+                <!-- accent stripe -->
+                <div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-teal-400 via-cyan-500 to-indigo-500 rounded-l-2xl"></div>
+                <div class="pl-5 pr-5 pt-5 pb-4">
+                    <div class="flex items-start justify-between gap-3 mb-2">
+                        <h3 class="text-base sm:text-lg font-bold tracking-tight text-foreground leading-snug flex-1">
+                            <a href="{% url 'discussion' pf.post.id %}" class="hover:text-primary transition-colors">{{ pf.post.title }}</a>
+                        </h3>
+                        <span class="shrink-0 px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground text-[10px] sm:text-xs font-semibold">{{ pf.post.category }}</span>
+                    </div>
+                    {% if pf.post.content %}
+                    <p class="text-sm text-muted-foreground mb-3 leading-relaxed line-clamp-2">{{ pf.post.content|truncatechars:160 }}</p>
+                    {% endif %}
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                            {% with pic=pf.post.user.profile.get_picture_url %}
+                            {% if pic %}
+                            <img src="{{ pic }}" alt="{{ pf.post.user.username }}" class="h-5 w-5 rounded-full object-cover border border-border">
+                            {% else %}
+                            <span class="h-5 w-5 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 text-white flex items-center justify-center text-[9px] font-bold shrink-0">{{ pf.post.user.username|first|upper }}</span>
+                            {% endif %}
+                            {% endwith %}
+                            <a href="{% url 'user_profile' pf.post.user.username %}" class="font-semibold hover:text-primary transition-colors">{{ pf.post.user.username }}</a>
+                            <span class="text-border">·</span>
+                            <span>{{ pf.post.created_at|date:"M j, Y" }}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <svg class="w-3 h-3 text-teal-500/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"/></svg>
+                                Following since {{ pf.created_at|date:"M j" }}
+                            </span>
+                            <a href="{% url 'discussion' pf.post.id %}" class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-teal-500 via-cyan-500 to-indigo-500 bg-clip-text text-transparent border border-cyan-500/30 hover:border-cyan-500/60 hover:bg-cyan-50/40 dark:hover:bg-cyan-950/20 transition-colors">
+                                Open
+                                <svg class="w-3 h-3 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-2xl border border-dashed border-border bg-card/70 p-12 text-center">
+            <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-teal-500/10">
+                <svg class="h-6 w-6 text-teal-500/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"/></svg>
+            </div>
+            <p class="font-semibold text-foreground mb-1">Nothing on watch yet</p>
+            <p class="text-sm text-muted-foreground">Click "Follow Post" on any discussion to add it here.</p>
         </div>
         {% endif %}
     </section>
@@ -569,7 +733,7 @@ function _doUnfollow(username, card) {
 }
 
 function switchProfileTab(name) {
-    ['posts', 'reposts', 'debates', 'followers', 'following'].forEach(function(t) {
+    ['posts', 'reposts', 'debates', 'saved', 'followed', 'followers', 'following'].forEach(function(t) {
         var sec = document.getElementById('tab-' + t);
         var btn = document.getElementById('tab-btn-' + t);
         if (sec) {
@@ -672,14 +836,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.success) {
                     showToast('Profile picture updated successfully!', 'success');
                     closeCropModal();
-                    if (picDisplay && data.profile_picture_url) {
-                        picDisplay.style.opacity = '0.7';
-                        setTimeout(() => {
-                            picDisplay.src = data.profile_picture_url;
-                            picDisplay.onload = function() {
-                                picDisplay.style.opacity = '1';
-                            };
-                        }, 300);
+                    if (data.profile_picture_url) {
+                        // Update the profile display image
+                        if (picDisplay) {
+                            picDisplay.style.opacity = '0.7';
+                            setTimeout(() => {
+                                picDisplay.src = data.profile_picture_url;
+                                picDisplay.onload = function() {
+                                    picDisplay.style.opacity = '1';
+                                };
+                            }, 300);
+                        }
+                        // Update all navbar avatars (desktop + mobile)
+                        document.querySelectorAll('.nav-profile-avatar').forEach(function(navImg) {
+                            navImg.src = data.profile_picture_url;
+                        });
+                        // Replace any human-icon SVG in nav-icon-pill with an img
+                        document.querySelectorAll('#user-menu-toggle, #mobile-user-menu-toggle').forEach(function(btn) {
+                            const svg = btn.querySelector('svg');
+                            if (svg) {
+                                const img = document.createElement('img');
+                                img.src = data.profile_picture_url;
+                                img.alt = '{{ user.username }}';
+                                img.className = 'nav-profile-avatar';
+                                svg.replaceWith(img);
+                            }
+                        });
                     }
                     fileInput.value = '';
                 } else {
@@ -763,6 +945,38 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             uploadCroppedImage(canvas);
         });
+    }
+
+    // Debates tab search filter
+    const debatesSearchInput = document.getElementById('debates-search-input');
+    const debatesNoResults = document.getElementById('debates-no-results');
+    const debateCards = Array.from(document.querySelectorAll('.profile-debate-card'));
+
+    function applyDebateSearchFilter() {
+        if (!debatesSearchInput || !debateCards.length) return;
+        const q = debatesSearchInput.value.trim().toLowerCase();
+        let visible = 0;
+
+        debateCards.forEach(function(card) {
+            const haystack = [
+                card.dataset.debateTitle || '',
+                card.dataset.debateHost || '',
+                card.dataset.debateOpponent || '',
+                card.dataset.debateSide || '',
+                card.dataset.debateStatus || ''
+            ].join(' ');
+            const match = !q || haystack.indexOf(q) !== -1;
+            card.classList.toggle('hidden', !match);
+            if (match) visible += 1;
+        });
+
+        if (debatesNoResults) {
+            debatesNoResults.classList.toggle('hidden', visible > 0 || !q);
+        }
+    }
+
+    if (debatesSearchInput) {
+        debatesSearchInput.addEventListener('input', applyDebateSearchFilter);
     }
 });
 </script>

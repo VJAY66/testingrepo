@@ -3,6 +3,136 @@
 {% block title %}{{ profile_user.username }} - Discussion Hub{% endblock %}
 
 {% block content %}
+<style>
+.rp-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 7800;
+    background: rgba(2, 6, 23, 0.52);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.rp-modal-backdrop.show {
+    display: flex;
+}
+.rp-modal {
+    width: min(560px, 100%);
+    border-radius: 24px;
+    border: 1px solid hsl(var(--border));
+    background:
+        radial-gradient(650px 240px at 100% 0%, hsl(var(--primary) / 0.12), transparent 58%),
+        linear-gradient(165deg, hsl(var(--card) / 0.98), hsl(var(--background) / 0.98));
+    box-shadow: 0 26px 70px -26px rgba(2, 6, 23, 0.6);
+    overflow: hidden;
+}
+.rp-modal-head {
+    padding: 1rem 1.1rem 0.65rem;
+    border-bottom: 1px solid hsl(var(--border) / 0.6);
+}
+.rp-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 1rem;
+    font-weight: 800;
+    color: hsl(var(--foreground));
+}
+.rp-modal-title-badge {
+    display: inline-flex;
+    width: 1.65rem;
+    height: 1.65rem;
+    border-radius: 999px;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(244, 63, 94, 0.2), rgba(239, 68, 68, 0.16));
+}
+.rp-modal-copy {
+    margin-top: 0.45rem;
+    font-size: 0.84rem;
+    color: hsl(var(--muted-foreground));
+    line-height: 1.55;
+}
+.rp-modal-body {
+    padding: 1rem 1.1rem 1.05rem;
+}
+.rp-field {
+    width: 100%;
+    border-radius: 14px;
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--background));
+    padding: 0.8rem 0.85rem;
+    font-size: 0.92rem;
+    color: hsl(var(--foreground));
+    min-height: 120px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.rp-field:focus {
+    border-color: hsl(var(--primary) / 0.6);
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.16);
+}
+.rp-field.rp-invalid {
+    border-color: rgb(220 38 38);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
+}
+.rp-hint {
+    margin-top: 0.42rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.6rem;
+    font-size: 0.74rem;
+    color: hsl(var(--muted-foreground));
+}
+.rp-error {
+    margin-top: 0.45rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgb(220 38 38);
+    min-height: 1rem;
+}
+.rp-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.55rem;
+    padding: 0.3rem 1.1rem 1.05rem;
+}
+.rp-btn {
+    border-radius: 999px;
+    padding: 0.55rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    transition: all 180ms ease;
+}
+.rp-btn-cancel {
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--muted-foreground));
+    background: hsl(var(--background));
+}
+.rp-btn-cancel:hover {
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--foreground) / 0.25);
+}
+.rp-btn-submit {
+    border: none;
+    color: hsl(var(--primary-foreground));
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+    box-shadow: 0 8px 22px -10px hsl(var(--primary) / 0.7);
+}
+.rp-btn-submit:hover:not(:disabled) {
+    filter: brightness(0.97);
+    transform: translateY(-1px);
+}
+.rp-btn-submit:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+</style>
+
 <div class="max-w-5xl mx-auto space-y-8">
     <section class="relative overflow-hidden rounded-3xl border border-border/70 bg-card/95 shadow-[0_12px_45px_rgba(0,0,0,0.10)]">
         <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.15),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(244,114,182,0.12),transparent_45%)] pointer-events-none"></div>
@@ -40,11 +170,15 @@
                     </div>
 
                     {% if user.is_authenticated and not is_own_profile %}
-                    <div class="mt-4">
+                    <div class="mt-4 flex items-center gap-2 justify-center sm:justify-start">
                         <button id="follow-btn" type="button" onclick="toggleFollow('{{ profile_user.username }}')"
                                 class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition
                                 {% if is_following %}bg-gray-500 text-white hover:bg-gray-600{% else %}bg-primary text-primary-foreground hover:bg-primary/90{% endif %}">
                             {% if is_following %}Unfollow{% else %}Follow{% endif %}
+                        </button>
+                        <button id="report-profile-btn" type="button" onclick="openReportProfileModal('{{ profile_user.username|escapejs }}')"
+                                class="inline-flex items-center rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
+                            Report Profile
                         </button>
                     </div>
                     {% endif %}
@@ -84,6 +218,32 @@
         </div>
         {% endif %}
     </section>
+</div>
+
+<div id="rp-modal-backdrop" class="rp-modal-backdrop" aria-hidden="true">
+    <div class="rp-modal" role="dialog" aria-modal="true" aria-labelledby="rp-modal-title">
+        <div class="rp-modal-head">
+            <h3 id="rp-modal-title" class="rp-modal-title">
+                <span class="rp-modal-title-badge">🚩</span>
+                Report Profile
+            </h3>
+            <p class="rp-modal-copy">
+                Help us review this account by describing the issue clearly. Your reason is required (minimum 10 characters).
+            </p>
+        </div>
+        <div class="rp-modal-body">
+            <textarea id="rp-details" class="rp-field" placeholder="Example: User is repeatedly sending abusive messages in debate chat..." maxlength="700"></textarea>
+            <div class="rp-hint">
+                <span>Be specific so moderators can act faster.</span>
+                <span id="rp-count">0 / 700</span>
+            </div>
+            <p id="rp-error" class="rp-error"></p>
+        </div>
+        <div class="rp-modal-actions">
+            <button type="button" class="rp-btn rp-btn-cancel" onclick="closeReportProfileModal()">Cancel</button>
+            <button id="rp-submit" type="button" class="rp-btn rp-btn-submit" onclick="submitProfileReport()">Submit Report</button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -133,5 +293,130 @@ function toggleFollow(username) {
         alert('An error occurred. Please try again.');
     });
 }
+
+let reportTargetUsername = '';
+
+function openReportProfileModal(username) {
+    reportTargetUsername = username;
+    const modal = document.getElementById('rp-modal-backdrop');
+    const detailsEl = document.getElementById('rp-details');
+    const errorEl = document.getElementById('rp-error');
+    const countEl = document.getElementById('rp-count');
+    if (!modal || !detailsEl || !errorEl || !countEl) {
+        return;
+    }
+    detailsEl.value = '';
+    detailsEl.classList.remove('rp-invalid');
+    errorEl.textContent = '';
+    countEl.textContent = '0 / 700';
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => detailsEl.focus(), 30);
+}
+
+function closeReportProfileModal() {
+    const modal = document.getElementById('rp-modal-backdrop');
+    if (!modal) {
+        return;
+    }
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+}
+
+function submitProfileReport() {
+    const btn = document.getElementById('report-profile-btn');
+    const submitBtn = document.getElementById('rp-submit');
+    const detailsEl = document.getElementById('rp-details');
+    const errorEl = document.getElementById('rp-error');
+
+    if (!detailsEl || !errorEl || !submitBtn || !reportTargetUsername) {
+        return;
+    }
+
+    const cleanedDetails = String(detailsEl.value || '').trim();
+    if (cleanedDetails.length < 10) {
+        detailsEl.classList.add('rp-invalid');
+        errorEl.textContent = 'Please provide a clear reason with at least 10 characters.';
+        return;
+    }
+
+    detailsEl.classList.remove('rp-invalid');
+    errorEl.textContent = '';
+
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Reporting...';
+    }
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
+
+    fetch(`/user/${encodeURIComponent(reportTargetUsername)}/report/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': getCookie('csrftoken') || '',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: `details=${encodeURIComponent(cleanedDetails)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data || !data.success) {
+            const msg = (data && data.error) || 'Unable to report this profile.';
+            errorEl.textContent = msg;
+            detailsEl.classList.add('rp-invalid');
+            return;
+        }
+        closeReportProfileModal();
+        const okMsg = data.message || 'Profile reported. Moderators have been notified.';
+        if (typeof window.showToast === 'function') {
+            window.showToast(okMsg, 'success');
+        } else {
+            alert(okMsg);
+        }
+    })
+    .catch(() => {
+        errorEl.textContent = 'Unable to report this profile right now. Please try again.';
+        detailsEl.classList.add('rp-invalid');
+    })
+    .finally(() => {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Report Profile';
+        }
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Report';
+    });
+}
+
+(function initReportProfileModal() {
+    const modal = document.getElementById('rp-modal-backdrop');
+    const detailsEl = document.getElementById('rp-details');
+    const countEl = document.getElementById('rp-count');
+    const errorEl = document.getElementById('rp-error');
+    if (!modal || !detailsEl || !countEl || !errorEl) {
+        return;
+    }
+
+    detailsEl.addEventListener('input', function () {
+        countEl.textContent = `${detailsEl.value.length} / 700`;
+        if (detailsEl.value.trim().length >= 10) {
+            detailsEl.classList.remove('rp-invalid');
+            errorEl.textContent = '';
+        }
+    });
+
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal) {
+            closeReportProfileModal();
+        }
+    });
+
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && modal.classList.contains('show')) {
+            closeReportProfileModal();
+        }
+    });
+})();
 </script>
 {% endblock %}

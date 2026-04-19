@@ -1,0 +1,272 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Pick Your Interests — Discussion Hub{% endblock %}
+
+{% block content %}
+<style>
+    .ob-wrap {
+        min-height: calc(100vh - 80px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1rem 3rem;
+    }
+
+    .ob-card {
+        width: 100%;
+        max-width: 660px;
+        background: hsl(var(--card));
+        border: 1px solid hsl(var(--border) / 0.6);
+        border-radius: 1.75rem;
+        box-shadow: 0 24px 60px -16px rgba(0,0,0,0.12), 0 0 0 1px hsl(var(--border)/0.15);
+        overflow: hidden;
+    }
+
+    .ob-header {
+        padding: 2.25rem 2.25rem 1.5rem;
+        background: linear-gradient(135deg,
+            hsl(var(--primary)/0.07) 0%,
+            hsl(var(--background)) 60%
+        );
+        border-bottom: 1px solid hsl(var(--border)/0.4);
+    }
+
+    .ob-body {
+        padding: 1.75rem 2.25rem 2.25rem;
+    }
+
+    .ob-categories-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 0.6rem;
+        margin-bottom: 1.75rem;
+    }
+
+    @media (max-width: 480px) {
+        .ob-header, .ob-body { padding-left: 1.25rem; padding-right: 1.25rem; }
+        .ob-categories-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0.5rem; }
+    }
+
+    .ob-cat-label {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        cursor: pointer;
+        padding: 0.55rem 0.75rem;
+        border-radius: 0.875rem;
+        border: 1.5px solid hsl(var(--border)/0.6);
+        background: hsl(var(--background));
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: hsl(var(--muted-foreground));
+        text-align: center;
+        transition: all 0.18s ease;
+        user-select: none;
+        -webkit-user-select: none;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .ob-cat-label:hover {
+        border-color: hsl(var(--primary)/0.5);
+        color: hsl(var(--primary));
+        background: hsl(var(--primary)/0.05);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px hsl(var(--primary)/0.12);
+    }
+
+    .ob-cat-label input[type="checkbox"] {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .ob-cat-label.selected {
+        border-color: hsl(var(--primary));
+        background: linear-gradient(135deg, hsl(var(--primary)/0.14), hsl(var(--primary)/0.06));
+        color: hsl(var(--primary));
+        box-shadow: 0 0 0 2px hsl(var(--primary)/0.18), 0 4px 12px hsl(var(--primary)/0.15);
+        transform: translateY(-1px);
+    }
+
+    .ob-cat-label .ob-check {
+        display: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        background: hsl(var(--primary));
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .ob-cat-label.selected .ob-check {
+        display: flex;
+    }
+
+    .ob-submit-btn {
+        width: 100%;
+        padding: 0.85rem 1.5rem;
+        border-radius: 999px;
+        font-size: 0.95rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+        color: hsl(var(--primary-foreground));
+        border: none;
+        cursor: pointer;
+        transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 8px 22px -8px hsl(var(--primary)/0.55);
+    }
+
+    .ob-submit-btn:hover:not(:disabled) {
+        opacity: 0.92;
+        transform: translateY(-1px);
+        box-shadow: 0 12px 28px -8px hsl(var(--primary)/0.65);
+    }
+
+    .ob-submit-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+
+    .ob-skip-link {
+        display: block;
+        text-align: center;
+        margin-top: 0.9rem;
+        font-size: 0.8rem;
+        color: hsl(var(--muted-foreground));
+        text-decoration: none;
+        transition: color 0.15s;
+    }
+
+    .ob-skip-link:hover { color: hsl(var(--foreground)); }
+
+    .ob-count-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        background: hsl(var(--primary)/0.15);
+        color: hsl(var(--primary));
+        font-size: 0.72rem;
+        font-weight: 800;
+        padding: 0 5px;
+        transition: background 0.2s;
+    }
+
+    .ob-count-badge.has-selection {
+        background: hsl(var(--primary));
+        color: hsl(var(--primary-foreground));
+    }
+
+    /* progress bar */
+    .ob-progress-bar {
+        height: 3px;
+        border-radius: 999px;
+        background: hsl(var(--border)/0.4);
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+    }
+
+    .ob-progress-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(to right, hsl(var(--primary)), hsl(var(--accent)));
+        transition: width 0.3s ease;
+        width: 0%;
+    }
+</style>
+
+<div class="ob-wrap">
+    <div class="ob-card">
+        <div class="ob-header">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent shadow-md">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Step 2 of 2</p>
+                    <h1 class="text-xl sm:text-2xl font-extrabold text-foreground leading-tight">What are you into?</h1>
+                </div>
+            </div>
+            <p class="text-sm text-muted-foreground leading-relaxed">
+                Pick the topics you care about. We'll personalise your <strong class="text-foreground">Suggested for You</strong> feed based on your choices.
+            </p>
+        </div>
+
+        <div class="ob-body">
+            <!-- progress bar -->
+            <div class="ob-progress-bar">
+                <div class="ob-progress-fill" id="ob-progress"></div>
+            </div>
+
+            <div class="flex items-center justify-between mb-3">
+                <p class="text-xs font-semibold text-muted-foreground">Choose at least 3 categories</p>
+                <span class="ob-count-badge" id="ob-count">0</span>
+            </div>
+
+            <form method="post" id="ob-form">
+                {% csrf_token %}
+                <div class="ob-categories-grid">
+                    {% for cat in all_categories %}
+                    <label class="ob-cat-label {% if cat in selected_categories %}selected{% endif %}" data-cat="{{ cat }}">
+                        <input type="checkbox" name="categories" value="{{ cat }}" {% if cat in selected_categories %}checked{% endif %}>
+                        <span class="ob-check">
+                            <svg width="8" height="8" viewBox="0 0 10 8" fill="none">
+                                <path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </span>
+                        <span>{{ cat }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+
+                <button type="submit" class="ob-submit-btn" id="ob-submit" disabled>
+                    Continue to Feed
+                </button>
+            </form>
+
+            <a href="{% url 'suggested' %}" class="ob-skip-link">Skip for now — I'll set this later</a>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var labels = document.querySelectorAll('.ob-cat-label');
+    var countBadge = document.getElementById('ob-count');
+    var submitBtn = document.getElementById('ob-submit');
+    var progressBar = document.getElementById('ob-progress');
+    var total = labels.length;
+    var MIN_REQUIRED = 3;
+
+    function updateUI() {
+        var checked = document.querySelectorAll('.ob-cat-label input:checked').length;
+        countBadge.textContent = checked;
+        countBadge.classList.toggle('has-selection', checked >= MIN_REQUIRED);
+        submitBtn.disabled = checked < MIN_REQUIRED;
+        var pct = Math.min(100, Math.round((checked / Math.max(total, 1)) * 100));
+        progressBar.style.width = pct + '%';
+    }
+
+    labels.forEach(function(label) {
+        var checkbox = label.querySelector('input[type="checkbox"]');
+        // Only use the change event. The browser natively toggles the checkbox
+        // when the label is clicked, so no manual toggle is needed here.
+        checkbox.addEventListener('change', function() {
+            label.classList.toggle('selected', checkbox.checked);
+            updateUI();
+        });
+    });
+
+    // Init
+    updateUI();
+})();
+</script>
+{% endblock %}

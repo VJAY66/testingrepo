@@ -9,7 +9,13 @@
 {# ── Desktop: open floating panel and redirect away ───────── #}
 <script>
 (function() {
-    if (window.innerWidth >= 768) {
+    const isEmbedded = window.self !== window.top;
+    if (isEmbedded) {
+      document.addEventListener('DOMContentLoaded', function() {
+        document.body.classList.add('mc-embed');
+      });
+    }
+    if (window.innerWidth >= 768 && !isEmbedded) {
     const activeParticipantsNode = document.getElementById('dh-debate-active-participants');
     let activeParticipants = [];
     if (activeParticipantsNode) {
@@ -45,8 +51,12 @@
 
 {# ── Mobile: full-screen Messenger-style chat ─────────────── #}
 <style>
-  @media (min-width: 768px) { #mc-shell, #mc-chathead { display: none !important; } }
-  @media (max-width: 767px) {
+  @media (min-width: 768px) { body:not(.mc-embed) #mc-shell, body:not(.mc-embed) #mc-chathead { display: none !important; } }
+  @media all {
+    html,
+    body {
+      height: 100%;
+    }
     @keyframes mcSheetIn {
       from { opacity: 0; transform: translateY(20px) scale(0.985); }
       to { opacity: 1; transform: translateY(0) scale(1); }
@@ -62,6 +72,14 @@
     }
     body.mc-open > main {
       padding-bottom: calc(100dvh - 120px) !important;
+    }
+    body.mc-embed.mc-open > main {
+      padding-bottom: 0 !important;
+    }
+    body.mc-embed {
+      overflow: hidden;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
     }
 
     #mc-shell {
@@ -86,6 +104,20 @@
       overflow: hidden;
       animation: mcSheetIn 420ms cubic-bezier(0.2, 0.9, 0.35, 1) both;
     }
+    body.mc-embed #mc-shell {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      height: 100dvh;
+      border-radius: 0;
+      border-left: 0;
+      border-right: 0;
+      border-bottom: 0;
+      animation: none;
+      box-shadow: none;
+    }
     #mc-shell::before {
       content: "";
       position: absolute;
@@ -105,6 +137,31 @@
       background: rgba(255,255,255,0.18);
       pointer-events: none;
       animation: mcAmbientDrift 6s ease-in-out infinite;
+    }
+    body.mc-embed #mc-shell::after {
+      display: none;
+    }
+
+    /* ── Embed: hide outer nav, footer, sidebar, flash messages, main padding ── */
+    body.mc-embed .nav-shell,
+    body.mc-embed footer,
+    body.mc-embed aside,
+    body.mc-embed #flash-messages,
+    body.mc-embed #mobile-menu-drawer {
+      display: none !important;
+    }
+    body.mc-embed main {
+      max-width: 100% !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+    body.mc-embed {
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+    body.mc-embed #mc-min-btn,
+    body.mc-embed #mc-close-btn {
+      display: none !important;
     }
     #mc-shell.mc-hidden {
       transform: translateY(100%) scale(0.95); opacity: 0; pointer-events: none;
@@ -168,6 +225,14 @@
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       max-width: 100%;
       line-height: 1.2;
+    }
+    #mc-opp-name a {
+      color: inherit;
+      text-decoration: none;
+    }
+    #mc-opp-name a:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
     }
     #mc-sub {
       display: flex;
@@ -353,6 +418,10 @@
       color: #166534;
     }
     #mc-caution {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
       padding: 9px 16px;
       font-size: 10px;
       line-height: 1.5;
@@ -362,6 +431,19 @@
       border-top: 1px solid hsl(var(--primary) / 0.12);
       font-weight: 600;
       letter-spacing: 0.015em;
+    }
+    #mc-caution-accept {
+      border: 1px solid hsl(var(--primary) / 0.35);
+      background: hsl(var(--background) / 0.9);
+      color: hsl(var(--foreground));
+      border-radius: 999px;
+      padding: 6px 11px;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     #mc-chat-presence {
       display: none;
@@ -543,6 +625,7 @@
     /* ── Messages ── */
     #mc-msgs {
       flex: 1; overflow-y: auto; padding: 14px 10px 8px;
+      min-height: 0;
       display: flex; flex-direction: column; gap: 10px;
       -webkit-overflow-scrolling: touch;
       scroll-behavior: smooth;
@@ -624,6 +707,11 @@
       display: flex; flex-direction: column; max-width: 100%; width: 100%; 
       animation: mcMsgIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
       overflow: visible;
+      will-change: auto;
+    }
+    .mc-msg:hover,
+    .mc-msg:focus-within {
+      transform: none !important;
     }
     .mc-msg.own { align-self: flex-end; align-items: flex-end; }
     .mc-msg.other { align-self: flex-start; align-items: flex-start; }
@@ -647,18 +735,49 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
-    .mc-msg.own .mc-msg-avatar,
-    .mc-msg.own .mc-msg-avatar-fallback { display: none; }
-
     .mc-msg-main { max-width: 90%; }
 
     .mc-bubble {
       padding: 11px 15px; font-size: 13.5px; line-height: 1.55;
       word-break: break-word; position: relative;
     }
+    .mc-bubble img {
+      display: block;
+      max-width: min(100%, 260px);
+      width: auto;
+      height: auto;
+      border-radius: 12px;
+    }
     .mc-edited-label {
       display: block; font-size: 10px; opacity: 0.55; font-style: italic;
       padding: 0 2px; margin-top: 2px;
+    }
+    .mc-reactions-summary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      padding: 0 2px;
+    }
+    .mc-reaction-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border-radius: 999px;
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--background) / 0.72);
+      color: hsl(var(--muted-foreground));
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+    }
+    .mc-reaction-chip.active {
+      border-color: hsl(var(--primary) / 0.4);
+      color: hsl(var(--foreground));
+      background: hsl(var(--primary) / 0.14);
+    }
+    .mc-reaction-chip.hidden {
+      display: none;
     }
     .mc-edit-btn {
       display: none; background: none; border: none; cursor: pointer;
@@ -693,18 +812,65 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.2); 
     }
     .mc-sender {
-      font-size: 11px; font-weight: 700; opacity: 0.75; margin-bottom: 4px;
+      font-size: 11px; font-weight: 700; margin-bottom: 4px;
       padding: 0 2px;
       letter-spacing: 0.01em;
     }
+    /* Username color palette — light theme */
+    .mc-sender[data-ucolor="0"] { color: #2563eb; }
+    .mc-sender[data-ucolor="1"] { color: #7c3aed; }
+    .mc-sender[data-ucolor="2"] { color: #0891b2; }
+    .mc-sender[data-ucolor="3"] { color: #059669; }
+    .mc-sender[data-ucolor="4"] { color: #d97706; }
+    .mc-sender[data-ucolor="5"] { color: #dc2626; }
+    .mc-sender[data-ucolor="6"] { color: #db2777; }
+    .mc-sender[data-ucolor="7"] { color: #0284c7; }
+    /* Dark theme overrides */
+    html[data-theme="dark"] .mc-sender[data-ucolor="0"] { color: #60a5fa; }
+    html[data-theme="dark"] .mc-sender[data-ucolor="1"] { color: #a78bfa; }
+    html[data-theme="dark"] .mc-sender[data-ucolor="2"] { color: #22d3ee; }
+    html[data-theme="dark"] .mc-sender[data-ucolor="3"] { color: #34d399; }
+    html[data-theme="dark"] .mc-sender[data-ucolor="4"] { color: #fbbf24; }
+    html[data-theme="dark"] .mc-sender[data-ucolor="5"] { color: #f87171; }
+    html[data-theme="dark"] .mc-sender[data-ucolor="6"] { color: #f472b6; }
+    html[data-theme="dark"] .mc-sender[data-ucolor="7"] { color: #38bdf8; }
     .mc-meta {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 8px;
+      justify-content: flex-start;
+      gap: 5px;
       margin-bottom: 4px;
       padding: 0 2px;
+      flex-wrap: nowrap;
+      overflow: hidden;
     }
+    .mc-meta .mc-time-inline {
+      margin-left: auto;
+    }
+    .mc-msg-side-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+      border: 1px solid;
+    }
+    .mc-msg-side-badge--yes {
+      color: #16a34a;
+      background: rgba(34,197,94,0.12);
+      border-color: rgba(34,197,94,0.35);
+    }
+    .mc-msg-side-badge--no {
+      color: #dc2626;
+      background: rgba(239,68,68,0.11);
+      border-color: rgba(239,68,68,0.30);
+    }
+    html[data-theme="dark"] .mc-msg-side-badge--yes { color: #4ade80; }
+    html[data-theme="dark"] .mc-msg-side-badge--no  { color: #f87171; }
     .mc-time-inline {
       font-size: 10px;
       opacity: 0.5;
@@ -752,6 +918,10 @@
     }
     .mc-msg-menu-toggle:active {
       transform: scale(0.9);
+    }
+    .mc-msg:hover .mc-msg-menu-toggle:not(:active) {
+      transform: none;
+    }
     }
     .mc-msg-menu-toggle:hover {
       color: hsl(var(--foreground));
@@ -813,50 +983,158 @@
       font-weight: 700;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       cursor: pointer;
+      flex-shrink: 0;
+      margin-left: auto;
     }
     .mc-remove-btn:active {
       transform: scale(0.92);
       background: rgba(239, 68, 68, 0.2);
     }
+
+    /* ── Remove participant modal ── */
+    #mc-remove-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    #mc-remove-modal.show {
+      display: flex;
+      animation: mcRemodeIn 0.22s ease both;
+    }
+    @keyframes mcRemodeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .mc-remove-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(3px);
+    }
+    .mc-remove-modal-sheet {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 480px;
+      background: hsl(var(--card));
+      border-top-left-radius: 22px;
+      border-top-right-radius: 22px;
+      padding: 12px 20px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      border-top: 1px solid hsl(var(--border));
+      box-shadow: 0 -12px 48px rgba(0,0,0,0.22);
+      animation: mcSheetUp 0.28s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+    }
+    @keyframes mcSheetUp {
+      from { transform: translateY(60px); opacity: 0.6; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .mc-remove-modal-drag-bar {
+      width: 36px;
+      height: 4px;
+      background: hsl(var(--border));
+      border-radius: 2px;
+      margin-bottom: 4px;
+    }
+    .mc-remove-modal-icon {
+      font-size: 34px;
+      line-height: 1;
+    }
+    .mc-remove-modal-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: hsl(var(--foreground));
+      margin: 0;
+      text-align: center;
+    }
+    .mc-remove-modal-desc {
+      font-size: 13px;
+      color: hsl(var(--muted-foreground));
+      text-align: center;
+      line-height: 1.55;
+      margin: 0;
+    }
+    .mc-remove-modal-desc strong {
+      color: hsl(var(--foreground));
+      font-weight: 700;
+    }
+    .mc-remove-modal-actions {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      margin-top: 4px;
+    }
+    .mc-remove-modal-btn {
+      flex: 1;
+      border-radius: 12px;
+      padding: 11px 0;
+      font-size: 13px;
+      font-weight: 700;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    .mc-remove-modal-btn.cancel {
+      background: hsl(var(--secondary));
+      border-color: hsl(var(--border));
+      color: hsl(var(--foreground));
+    }
+    .mc-remove-modal-btn.cancel:active {
+      opacity: 0.75;
+    }
+    .mc-remove-modal-btn.confirm {
+      background: #dc2626;
+      border-color: #dc2626;
+      color: #ffffff;
+    }
+    .mc-remove-modal-btn.confirm:active {
+      filter: brightness(0.9);
+    }
     #mc-members {
       display: none;
-      gap: 10px;
-      overflow-x: auto;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+      max-height: 44vh;
       padding: 10px 12px;
-      background: linear-gradient(90deg, hsl(var(--card)), hsl(var(--card) / 0.95));
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      -webkit-overflow-scrolling: touch;
+      background: linear-gradient(180deg, hsl(var(--card)), hsl(var(--card) / 0.95));
+      border-bottom: 1px solid hsl(var(--border) / 0.7);
     }
     #mc-members.show {
       display: flex;
     }
-    #mc-members::-webkit-scrollbar { height: 4px; }
+    #mc-members::-webkit-scrollbar { width: 3px; }
     #mc-members::-webkit-scrollbar-track { background: transparent; }
     #mc-members::-webkit-scrollbar-thumb {
-      background: rgba(255,255,255,0.1);
+      background: hsl(var(--border));
       border-radius: 2px;
     }
     .mc-member {
-      flex: 0 0 auto;
-      display: inline-flex;
+      display: flex;
       align-items: center;
-      gap: 8px;
-      border: 1.5px solid hsl(var(--border));
-      background: hsl(var(--muted) / 0.4);
-      border-radius: 24px;
-      padding: 6px 8px 6px 6px;
-      max-width: 78vw;
+      gap: 10px;
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--background) / 0.72);
+      border-radius: 14px;
+      padding: 9px 10px;
+      width: 100%;
       backdrop-filter: blur(8px);
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      animation: memberSlide 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      transition: background 0.18s ease, border-color 0.18s ease;
+      animation: memberSlide 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
     }
     @keyframes memberSlide {
-      from { opacity: 0; transform: translateX(-8px); }
-      to { opacity: 1; transform: translateX(0); }
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     .mc-member:hover {
-      background: hsl(var(--muted) / 0.7);
-      border-color: hsl(var(--primary) / 0.4);
+      background: hsl(var(--muted) / 0.55);
+      border-color: hsl(var(--primary) / 0.35);
     }
     .mc-member-avatar,
     .mc-member-avatar-fallback {
@@ -923,7 +1201,8 @@
       color: hsl(var(--foreground));
       background: hsl(var(--secondary));
     }
-    .mc-member-text { min-width: 0; display: inline-flex; align-items: center; }
+    .mc-member-text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+    .mc-member-chips { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
     .mc-member-name {
       display: inline-block;
       font-size: 10px;
@@ -1137,7 +1416,7 @@
       <div id="mc-online-dot"></div>
     </div>
     <div id="mc-header-info">
-      <p id="mc-opp-name">{{ debate.post.title }}</p>
+      <p id="mc-opp-name"><a href="{% url 'discussion' debate.post.id %}" title="Open original discussion">{{ debate.post.title }}</a></p>
       <p id="mc-sub"><span id="mc-peer-name">{% if user == debate.initiator %}{{ debate.target.username }}{% else %}{{ debate.initiator.username }}{% endif %}</span><span>•</span><span id="mc-controller-text">{% if current_controller_name %}Controller: {{ current_controller_name }}{% if current_controller_side %} ({{ current_controller_side|upper }}){% endif %}{% else %}Controller: None{% endif %}</span></p>
     </div>
     <div id="mc-hacts">
@@ -1163,18 +1442,32 @@
     <span id="mc-topic">{{ debate.post.title|truncatechars:36 }}</span>
   </div>
 
-  <div id="mc-caution">Please do not insult others, maintain respect and collaborate effectively.</div>
-
-  <div id="mc-chat-presence">
-    <div id="mc-chat-presence-label">Other chats stay available while you debate.</div>
-    <button type="button" id="mc-chat-presence-toggle" onclick="mcToggleOtherChats()">Chats</button>
+  <div id="mc-caution">
+    <span>Please do not insult others, maintain respect and collaborate effectively.</span>
+    <button type="button" id="mc-caution-accept">I Understand</button>
   </div>
-
-  <div id="mc-other-chats"></div>
 
   <div id="mc-top-actions"></div>
 
   <div id="mc-members"></div>
+
+  <!-- Remove participant confirmation modal -->
+  <div id="mc-remove-modal" role="dialog" aria-modal="true" aria-labelledby="mc-remove-modal-title">
+    <div class="mc-remove-modal-backdrop" onclick="mcCloseRemoveModal()"></div>
+    <div class="mc-remove-modal-sheet">
+      <div class="mc-remove-modal-drag-bar"></div>
+      <div class="mc-remove-modal-icon">🚫</div>
+      <h2 class="mc-remove-modal-title" id="mc-remove-modal-title">Remove Participant</h2>
+      <p class="mc-remove-modal-desc">
+        Remove <strong id="mc-remove-modal-name"></strong> from this conversation?
+        They will not be able to rejoin or send further requests.
+      </p>
+      <div class="mc-remove-modal-actions">
+        <button type="button" class="mc-remove-modal-btn cancel" onclick="mcCloseRemoveModal()">Cancel</button>
+        <button type="button" class="mc-remove-modal-btn confirm" id="mc-remove-modal-confirm">Yes, Remove</button>
+      </div>
+    </div>
+  </div>
 
   <div id="mc-msgs">
     <div id="mc-sticky-date" class="mc-sticky-date"></div>
@@ -1192,9 +1485,12 @@
           {% else %}
           <div class="mc-msg-avatar-fallback">{{ message.sender_initial }}</div>
           {% endif %}
-          <div>
+          <div class="mc-msg-main">
             <div class="mc-meta">
               <p class="mc-sender">{{ message.sender }}</p>
+              {% if message.sender_side %}
+              <span class="mc-msg-side-badge mc-msg-side-badge--{{ message.sender_side }}">{{ message.sender_side|upper }}</span>
+              {% endif %}
               <p class="mc-time-inline">{{ message.created_time }}</p>
             </div>
             {% if message.reply_to %}
@@ -1205,6 +1501,14 @@
             {% endif %}
             <div class="mc-bubble">{{ message.content }}</div>
             {% if message.is_edited %}<span class="mc-edited-label">edited</span>{% endif %}
+            <div class="mc-reactions-summary" data-msg-reactions="{{ message.id }}">
+              <span class="mc-reaction-chip {% if message.user_reaction == 'like' %}active{% endif %} {% if not message.likes_count %}hidden{% endif %}" data-reaction-chip="like">
+                <span>👍</span><span data-reaction-count="like">{{ message.likes_count }}</span>
+              </span>
+              <span class="mc-reaction-chip {% if message.user_reaction == 'dislike' %}active{% endif %} {% if not message.dislikes_count %}hidden{% endif %}" data-reaction-chip="dislike">
+                <span>👎</span><span data-reaction-count="dislike">{{ message.dislikes_count }}</span>
+              </span>
+            </div>
             {% if message.is_own and not message.is_system %}<button class="mc-edit-btn" data-msg-id="{{ message.id }}" aria-label="Edit message">✎</button>{% endif %}
           </div>
         </div>
@@ -1241,7 +1545,8 @@
 {# ── Mobile chat JS ── #}
 <script>
 (function() {
-  if (window.innerWidth >= 768) return;   // desktop uses ChatManager
+  const isEmbedded = window.self !== window.top;
+  if (window.innerWidth >= 768 && !isEmbedded) return;   // desktop uses ChatManager (unless inside iframe)
 
   const mobileDebateId = '{{ debate.id }}';
   const mobilePostId = '{{ debate.post.id }}';
@@ -1283,13 +1588,11 @@
   const form      = document.getElementById('mc-form');
   const unreadDot = document.getElementById('mc-unread-dot');
   const stickyDateChip = document.getElementById('mc-sticky-date');
+  const cautionBar = document.getElementById('mc-caution');
+  const cautionAcceptBtn = document.getElementById('mc-caution-accept');
   const replyWrap = document.getElementById('mc-replying');
   const replyToEl = document.getElementById('mc-reply-to');
   const replyTxtEl = document.getElementById('mc-reply-text');
-  const presenceBar = document.getElementById('mc-chat-presence');
-  const presenceLabel = document.getElementById('mc-chat-presence-label');
-  const presenceToggle = document.getElementById('mc-chat-presence-toggle');
-  const otherChatsBox = document.getElementById('mc-other-chats');
   const menuBtn = document.getElementById('mc-menu-btn');
   const overflowMenu = document.getElementById('mc-overflow-menu');
   const topActions = document.getElementById('mc-top-actions');
@@ -1312,10 +1615,8 @@
   let noSupporters = {{ debate.no_supporters }};
   let lastDateLabel = '';
   let participantsExpanded = false;
-  let otherChatsExpanded = false;
   let actionMenuOpen = false;
-  let mobileChatList = [];
-  let chatsPresenceTimer = null;
+  const cautionStorageKey = 'dhChatCautionAccepted:' + String(mobileDebateId);
   let activeParticipants = (() => {
     const node = document.getElementById('dh-debate-active-participants');
     if (!node) return [];
@@ -1330,97 +1631,33 @@
   let pollTimer = null;
   let typingTimeouts = new Map();
 
-  function getLastReadChats() {
+  function hasAcceptedCaution() {
     try {
-      return JSON.parse(localStorage.getItem('dhChatLastRead') || '{}');
+      return localStorage.getItem(cautionStorageKey) === '1';
     } catch {
-      return {};
+      return false;
     }
   }
 
-  function countUnreadChat(chat) {
-    const lastRead = getLastReadChats();
-    const stored = Number(lastRead[String(chat.id)] || 0);
-    const latest = Number(chat.last_message_id || 0);
-    return latest > stored ? 1 : 0;
-  }
-
-  function updateOtherChatsVisibility() {
-    if (otherChatsBox) {
-      otherChatsBox.classList.toggle('show', otherChatsExpanded && mobileChatList.length > 0);
-    }
-  }
-
-  function updatePresenceSummary() {
-    if (!presenceBar || !presenceLabel || !presenceToggle) return;
-    const count = mobileChatList.length;
-    const unread = mobileChatList.reduce((acc, chat) => acc + countUnreadChat(chat), 0);
-    presenceBar.classList.toggle('show', count > 0);
-    if (!count) {
-      otherChatsExpanded = false;
-      updateOtherChatsVisibility();
-      return;
-    }
-    presenceLabel.textContent = count === 1 ? '1 other chat is active right now.' : `${count} other chats are active right now.`;
-    presenceToggle.textContent = unread > 0 ? `Chats (${unread})` : `Chats (${count})`;
-    presenceToggle.classList.toggle('has-unread', unread > 0);
-    updateOtherChatsVisibility();
-  }
-
-  function renderOtherChats() {
-    if (!otherChatsBox) return;
-    if (!mobileChatList.length) {
-      otherChatsBox.innerHTML = '';
-      updatePresenceSummary();
-      return;
-    }
-
-    otherChatsBox.innerHTML = mobileChatList.map(chat => {
-      const unread = countUnreadChat(chat);
-      const avatar = chat.opponent_avatar
-        ? `<img src="${esc(chat.opponent_avatar)}" alt="${esc(chat.opponent)}" class="mc-other-chat-avatar" loading="lazy">`
-        : `<span class="mc-other-chat-avatar-fallback">${esc((chat.opponent || '?').charAt(0).toUpperCase())}</span>`;
-      const preview = chat.last_message
-        ? `${chat.last_message_sender === '{{ user.username }}' ? 'You: ' : ''}${chat.last_message}`
-        : 'No messages yet';
-      const unreadBadge = unread > 0 ? `<span class="mc-other-chat-unread">${unread > 9 ? '9+' : unread}</span>` : '';
-      return `<button type="button" class="mc-other-chat-item" onclick="mcOpenOtherChat('${esc(String(chat.id))}')">`
-        + `${avatar}`
-        + `<span class="mc-other-chat-copy"><span class="mc-other-chat-name">@${esc(chat.opponent || 'Chat')}</span><span class="mc-other-chat-title">${esc(chat.title || 'Conversation')}</span><span class="mc-other-chat-preview">${esc(preview)}</span></span>`
-        + `<span class="mc-other-chat-meta"><span class="mc-other-chat-time">${esc(chat.last_message_time || '')}</span>${unreadBadge}</span>`
-        + `</button>`;
-    }).join('');
-
-    updatePresenceSummary();
-  }
-
-  function refreshOtherChats() {
-    fetch('/chats/list/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (!d || !d.success || !Array.isArray(d.chats)) return;
-        mobileChatList = d.chats.filter(chat => String(chat.id) !== String(mobileDebateId));
-        renderOtherChats();
-      })
-      .catch(() => {});
-  }
-
-  window.mcToggleOtherChats = function() {
-    otherChatsExpanded = !otherChatsExpanded;
-    updateOtherChatsVisibility();
-  };
-
-  window.mcOpenOtherChat = function(debateId) {
+  function setAcceptedCaution() {
     try {
-      const lastRead = getLastReadChats();
-      const target = mobileChatList.find(chat => String(chat.id) === String(debateId));
-      if (target) {
-        lastRead[String(debateId)] = Number(target.last_message_id || 0);
-        localStorage.setItem('dhChatLastRead', JSON.stringify(lastRead));
-      }
+      localStorage.setItem(cautionStorageKey, '1');
     } catch {}
-    window.location.href = '/debates/' + encodeURIComponent(String(debateId)) + '/chat/';
-  };
+  }
+
+  function syncCautionBanner() {
+    if (!cautionBar) return;
+    cautionBar.style.display = hasAcceptedCaution() ? 'none' : 'flex';
+  }
+
+  if (cautionAcceptBtn) {
+    cautionAcceptBtn.addEventListener('click', function() {
+      setAcceptedCaution();
+      syncCautionBanner();
+    });
+  }
+
+  syncCautionBanner();
 
   function showTypingIndicator(username) {
     const existing = document.getElementById('mc-typing-' + username);
@@ -1604,9 +1841,9 @@
         ? `<img src="${esc(member.avatar_url)}" alt="${esc(member.username)}" class="mc-member-avatar" loading="lazy">`
         : `<span class="mc-member-avatar-fallback">${esc((member.username || '?').charAt(0).toUpperCase())}</span>`;
       const removeAction = member.can_remove
-        ? `<button type="button" class="mc-remove-btn" onclick="mcRemoveParticipant('${esc(member.id)}', '${esc(member.username)}')">Remove</button>`
+        ? `<button type="button" class="mc-remove-btn" onclick="mcShowRemoveConfirm('${esc(member.id)}', '${esc(member.username)}')" aria-label="Remove ${esc(member.username)}">Remove</button>`
         : '';
-      return `<div class="mc-member">${avatar}<span class="mc-member-text"><span class="mc-member-name">${esc(member.username)}</span><span class="mc-member-side ${sideClass}">${esc(String(member.side || '').toUpperCase())}</span><span title="${presenceTitle}" class="mc-member-presence ${onlineClass}">${onlineLabel}</span></span>${removeAction}</div>`;
+      return `<div class="mc-member">${avatar}<span class="mc-member-text"><span class="mc-member-name">${esc(member.username)}</span><span class="mc-member-chips"><span class="mc-member-side ${sideClass}">${esc(String(member.side || '').toUpperCase())}</span><span title="${presenceTitle}" class="mc-member-presence ${onlineClass}">${onlineLabel}</span></span></span>${removeAction}</div>`;
     }).join('');
     if (membersBtn) {
       membersBtn.title = `Participants (${activeParticipants.length})`;
@@ -1665,11 +1902,31 @@
     }).catch(() => window.showToast('Unable to remove participant.', 'error'));
   }
 
-  window.mcRemoveParticipant = function(userId, username) {
+  window.mcShowRemoveConfirm = function(userId, username) {
     if (!canModerate) return;
-    if (!window.confirm(`Remove ${username} from this conversation? They will not be able to rejoin or send requests to you again.`)) {
+    const modal = document.getElementById('mc-remove-modal');
+    const nameEl = document.getElementById('mc-remove-modal-name');
+    const confirmBtn = document.getElementById('mc-remove-modal-confirm');
+    if (!modal || !nameEl || !confirmBtn) {
+      // Fallback: just remove directly
+      removeParticipant(userId, username);
       return;
     }
+    nameEl.textContent = username;
+    confirmBtn.onclick = () => {
+      mcCloseRemoveModal();
+      removeParticipant(userId, username);
+    };
+    modal.classList.add('show');
+  };
+
+  window.mcCloseRemoveModal = function() {
+    const modal = document.getElementById('mc-remove-modal');
+    if (modal) modal.classList.remove('show');
+  };
+
+  window.mcRemoveParticipant = function(userId, username) {
+    if (!canModerate) return;
     removeParticipant(userId, username);
   };
 
@@ -1952,20 +2209,33 @@
     const replyQuote = m.reply_to
       ? `<div class="mc-reply-quote"><span class="mc-reply-quote-name">${esc(m.reply_to.sender)}</span><span class="mc-reply-quote-text">${esc(m.reply_to.content)}</span></div>`
       : '';
+    const likeAction = m.is_own
+      ? `<button type="button" class="mc-msg-menu-item" disabled title="You cannot react to your own message">Like</button>`
+      : `<button type="button" class="mc-msg-menu-item" onclick="window.mcReactMessageFromMenu(${Number(m.id)}, 'like', event)">Like</button>`;
+    const dislikeAction = m.is_own
+      ? `<button type="button" class="mc-msg-menu-item" disabled title="You cannot react to your own message">Dislike</button>`
+      : `<button type="button" class="mc-msg-menu-item" onclick="window.mcReactMessageFromMenu(${Number(m.id)}, 'dislike', event)">Dislike</button>`;
     const reportAction = m.is_own
       ? `<button type="button" class="mc-msg-menu-item danger" onclick="window.mcReportOwnMessage(event)">Report</button>`
       : `<button type="button" class="mc-msg-menu-item danger" onclick="window.mcReportMessageFromMenu(${Number(m.id)}, event)">Report</button>`;
+    const likesCount = Number(m.likes_count || 0);
+    const dislikesCount = Number(m.dislikes_count || 0);
+    const userReaction = String(m.user_reaction || '');
     div.innerHTML = `<div class="mc-row">`
       + `${avatar}`
-      + `<div class="mc-msg-main"><div class="mc-meta"><p class="mc-sender">${esc(m.sender)}</p><p class="mc-time-inline">${esc(m.created_time || m.created_at || '')}</p></div>`
+      + `<div class="mc-msg-main"><div class="mc-meta"><p class="mc-sender">${esc(m.sender)}</p>${m.sender_side ? `<span class="mc-msg-side-badge mc-msg-side-badge--${esc(String(m.sender_side).toLowerCase())}">${esc(String(m.sender_side).toUpperCase())}</span>` : ''}<p class="mc-time-inline">${esc(m.created_time || m.created_at || '')}</p></div>`
       + `${replyQuote}`
       + `<div class="mc-bubble">${esc(m.content)}</div>`
       + (m.is_edited ? `<span class="mc-edited-label">edited</span>` : '')
+      + `<div class="mc-reactions-summary" data-msg-reactions="${Number(m.id)}">`
+      + `<span class="mc-reaction-chip ${userReaction === 'like' ? 'active' : ''} ${likesCount > 0 ? '' : 'hidden'}" data-reaction-chip="like"><span>👍</span><span data-reaction-count="like">${likesCount}</span></span>`
+      + `<span class="mc-reaction-chip ${userReaction === 'dislike' ? 'active' : ''} ${dislikesCount > 0 ? '' : 'hidden'}" data-reaction-chip="dislike"><span>👎</span><span data-reaction-count="dislike">${dislikesCount}</span></span>`
+      + `</div>`
       + (m.is_own && !m.is_system ? `<button class="mc-edit-btn" data-msg-id="${m.id}" aria-label="Edit message">✎</button>` : '')
       + `</div>`
       + `<div class="mc-msg-menu-wrap">`
       + `<button type="button" class="mc-msg-menu-toggle" title="Message options" aria-label="Message options" onclick="window.mcToggleMessageMenu(${Number(m.id)}, event)">⋮</button>`
-      + `<div id="mc-msg-menu-${Number(m.id)}" class="mc-msg-menu hidden">${reportAction}</div>`
+      + `<div id="mc-msg-menu-${Number(m.id)}" class="mc-msg-menu hidden">${likeAction}${dislikeAction}${reportAction}</div>`
       + `</div></div>`;
     msgs.appendChild(div);
     wireSwipe(div, m.id);
@@ -2042,6 +2312,7 @@
           }
 
           d.messages.forEach(addMsg);
+          d.messages.forEach(updateReactionSummaryUI);
           updateStickyDate();
           return;
         }
@@ -2058,6 +2329,7 @@
   }
 
   window.mcMinimize = function() {
+    if (isEmbedded) return;
     markCurrentChatRead();
     try {
       sessionStorage.setItem('dhMobileMinimizedDebateId', mobileDebateId);
@@ -2107,6 +2379,7 @@
     };
 
   window.mcClose = function() {
+    if (isEmbedded) return;
     markCurrentChatRead();
     try {
       sessionStorage.setItem('dhMobileMinimizedDebateId', mobileDebateId);
@@ -2237,8 +2510,6 @@
   updateSupporterBadges();
   updateControllerLabel();
   renderMembers();
-  refreshOtherChats();
-  chatsPresenceTimer = setInterval(refreshOtherChats, 15000);
   updateStickyDate();
   msgs.addEventListener('scroll', updateStickyDate, { passive: true });
 
@@ -2345,6 +2616,15 @@
     }
     closeAllMcMessageMenus();
     handleReportMessage(msgId, null, 'menu click');
+  };
+
+  window.mcReactMessageFromMenu = function(msgId, reactionType, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    closeAllMcMessageMenus();
+    handleReaction(msgId, reactionType, null);
   };
 
   window.mcReportOwnMessage = function(event) {
@@ -2520,14 +2800,49 @@
     });
   }
 
+  function updateReactionSummaryUI(messageData) {
+    const msgId = Number(messageData && messageData.id);
+    if (!msgId) return;
+
+    const host = document.querySelector(`[data-msg-reactions="${msgId}"]`);
+    if (!host) return;
+
+    const likesCount = Number(messageData.likes_count || 0);
+    const dislikesCount = Number(messageData.dislikes_count || 0);
+    const userReaction = String(messageData.user_reaction || '');
+
+    const likeChip = host.querySelector('[data-reaction-chip="like"]');
+    const dislikeChip = host.querySelector('[data-reaction-chip="dislike"]');
+    const likeCountNode = host.querySelector('[data-reaction-count="like"]');
+    const dislikeCountNode = host.querySelector('[data-reaction-count="dislike"]');
+
+    if (likeCountNode) likeCountNode.textContent = String(likesCount);
+    if (dislikeCountNode) dislikeCountNode.textContent = String(dislikesCount);
+
+    if (likeChip) {
+      likeChip.classList.toggle('hidden', likesCount <= 0);
+      likeChip.classList.toggle('active', userReaction === 'like');
+    }
+    if (dislikeChip) {
+      dislikeChip.classList.toggle('hidden', dislikesCount <= 0);
+      dislikeChip.classList.toggle('active', userReaction === 'dislike');
+    }
+
+    const existing = msgIndex.get(msgId) || { id: msgId };
+    msgIndex.set(msgId, {
+      ...existing,
+      likes_count: likesCount,
+      dislikes_count: dislikesCount,
+      user_reaction: userReaction,
+    });
+  }
+
   function handleReaction(msgId, type, overlay) {
-    overlay.style.animation = 'fadeOut 0.2s ease forwards';
-    setTimeout(() => overlay.remove(), 200);
+    if (overlay) {
+      overlay.style.animation = 'fadeOut 0.2s ease forwards';
+      setTimeout(() => overlay.remove(), 200);
+    }
 
-    const reactionEmoji = type === 'like' ? '👍' : '👎';
-    window.showToast(`${reactionEmoji} ${type === 'like' ? 'Liked' : 'Disliked'} the message!`, 'success', 2000);
-
-    // Optional: Send reaction to backend
     fetch(`/debates/{{ debate.id }}/messages/${msgId}/react/`, {
       method: 'POST',
       headers: {
@@ -2536,8 +2851,23 @@
       },
       body: `reaction_type=${encodeURIComponent(type)}`
     })
+    .then(r => r.json())
+    .then(data => {
+      if (!data || !data.success) {
+        window.showToast(data?.error || 'Unable to react to this message.', 'error');
+        return;
+      }
+      updateReactionSummaryUI({
+        id: Number(msgId),
+        likes_count: Number(data.likes_count || 0),
+        dislikes_count: Number(data.dislikes_count || 0),
+        user_reaction: String(data.user_reaction || type),
+      });
+      const reactionEmoji = type === 'like' ? '👍' : '👎';
+      window.showToast(`${reactionEmoji} ${type === 'like' ? 'Liked' : 'Disliked'} the message!`, 'success', 2000);
+    })
     .catch(() => {
-      // Silently fail - reaction is already shown locally
+      window.showToast('Unable to react to this message.', 'error');
     });
 
     activeReactionMsg = null;
@@ -2549,13 +2879,28 @@
       setTimeout(() => overlay.remove(), 200);
     }
 
+    const reportReason = window.prompt(
+      'Please explain clearly what is wrong with this message:',
+      ''
+    );
+    if (reportReason === null) {
+      activeReactionMsg = null;
+      return;
+    }
+    const normalizedReason = String(reportReason || '').trim();
+    if (normalizedReason.length < 10) {
+      window.showToast('Please provide a clear reason (at least 10 characters).', 'error');
+      activeReactionMsg = null;
+      return;
+    }
+
     fetch(`/debates/{{ debate.id }}/messages/${msgId}/report/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'X-CSRFToken': csrf()
       },
-      body: 'details=' + encodeURIComponent(source ? `Reported from ${source}` : 'Reported from mobile long-press')
+      body: 'details=' + encodeURIComponent(normalizedReason)
     })
     .then(r => r.json())
     .then(data => {

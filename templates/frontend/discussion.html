@@ -5,12 +5,18 @@
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-8">
     <!-- Post Content -->
-    <div class="bg-card border border-border rounded-2xl px-6 pt-6 pb-3" data-post-id="{{ post.id }}">
+    <div class="bg-card border border-border rounded-2xl px-6 pt-6 pb-3" data-post-id="{{ post.id }}" data-share-url="{% url 'discussion' post.id %}">
         <div class="flex items-start justify-between mb-4">
             <div class="flex items-center space-x-2">
+                <a href="{% url 'user_profile' post.user.username %}" class="flex-shrink-0">
+                {% if post.author_avatar %}
+                <img src="{{ post.author_avatar }}" alt="{{ post.user.username }}" class="w-8 h-8 rounded-full object-cover border border-border" loading="lazy">
+                {% else %}
                 <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-medium">
                     {{ post.user.username|first|upper }}
                 </div>
+                {% endif %}
+                </a>
                 <div>
                     <p class="font-medium text-foreground">{{ post.user.username }}</p>
                     <p class="text-sm text-muted-foreground">{{ post.created_at|date:"M j, Y g:i A" }}</p>
@@ -114,7 +120,13 @@
         {% if user.is_authenticated %}
         <div class="mb-1 flex items-center sm:gap-6 gap-3">
             <button type="button" data-action="like" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-like {% if post.is_liked %}active text-amber-500 shadow-md shadow-amber-500/20 bg-amber-50/60 dark:bg-amber-950/30{% else %}text-muted-foreground hover:text-amber-500{% endif %} hover:bg-amber-50/70 dark:hover:bg-amber-950/20 hover:shadow-md overflow-hidden">
-                <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_liked %}fill-current scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="{% if post.is_liked %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2">
+                <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_liked %}scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="{% if post.is_liked %}url(#dh-like-gradient){% else %}none{% endif %}" stroke="currentColor" stroke-width="2">
+                    <defs>
+                        <linearGradient id="dh-like-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="hsl(var(--primary))"/>
+                            <stop offset="100%" stop-color="hsl(var(--accent))"/>
+                        </linearGradient>
+                    </defs>
                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                 </svg>
                 <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.like_count|default:0 }}</span>
@@ -168,7 +180,7 @@
                 </svg>
                 <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.save_count|default:0 }}</span>
             </button>
-            <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 action-btn-enhanced text-muted-foreground hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/20 hover:shadow-md overflow-hidden cursor-pointer">
+            <button type="button" onclick="openSharePanel(this)" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 action-btn-enhanced text-muted-foreground hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/20 hover:shadow-md overflow-hidden cursor-pointer">
                 <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="18" cy="5" r="3"></circle>
                     <circle cx="6" cy="12" r="3"></circle>
@@ -186,6 +198,35 @@
             <p class="text-green-800 dark:text-green-200 font-medium">✅ Post submitted successfully!</p>
         </div>
         {% endif %}
+    </div>
+
+    <div id="share-post-modal" class="hidden fixed inset-0 z-[7600] items-center justify-center bg-black/45 px-4">
+        <div class="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
+            <div class="mb-4 flex items-center justify-between">
+                <h3 class="text-base font-semibold text-foreground">Share Discussion</h3>
+                <button type="button" onclick="closeSharePanel()" class="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Close share panel">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 6L6 18"></path>
+                        <path d="M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <p id="share-post-title" class="mb-3 text-sm text-muted-foreground"></p>
+
+            <div class="mb-4 flex items-center gap-2">
+                <input id="share-url-input" type="text" readonly class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground" />
+                <button type="button" onclick="copyShareUrl()" class="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90">Copy</button>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2.5 sm:grid-cols-5 sm:gap-3">
+                <button type="button" onclick="shareToPlatform('facebook')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300/60 hover:bg-card/80 hover:text-foreground" aria-label="Share to Facebook" title="Facebook">Facebook</button>
+                <button type="button" onclick="shareToPlatform('whatsapp')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300/60 hover:bg-card/80 hover:text-foreground" aria-label="Share to WhatsApp" title="WhatsApp">WhatsApp</button>
+                <button type="button" onclick="shareToPlatform('gmail')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-300/60 hover:bg-card/80 hover:text-foreground" aria-label="Share via Gmail" title="Gmail">Gmail</button>
+                <button type="button" onclick="shareToPlatform('instagram')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-fuchsia-300/60 hover:bg-card/80 hover:text-foreground" aria-label="Share to Instagram" title="Instagram">Instagram</button>
+                <button type="button" onclick="shareToPlatform('x')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300/70 hover:bg-card/80 hover:text-foreground" aria-label="Share to X" title="X">X</button>
+            </div>
+        </div>
     </div>
 
     <!-- Comments Section -->
@@ -339,6 +380,8 @@
                                 {% endif %}
                                 {% if comment.debate_action_mode == 'view' and comment.debate_chat_url %}
                                 <a href="{{ comment.debate_chat_url }}" class="inline-flex items-center rounded-full bg-blue-500 px-2 py-1 text-[9px] text-white hover:bg-blue-600">{{ comment.debate_action_label }}</a>
+                                {% elif comment.debate_action_mode == 'blocked' %}
+                                <button type="button" onclick="showInlineActionPopup(this, 'You were removed from this comment debate and cannot start it again.', 'error')" class="rounded-full bg-slate-400 px-2 py-1 text-[9px] text-white cursor-not-allowed opacity-80" aria-disabled="true" title="You were removed from this comment debate and cannot start it again.">{{ comment.debate_action_label }}</button>
                                 {% else %}
                                 <button onclick="startDebate('{{ comment.id }}', this)" class="rounded-full bg-blue-500 px-2 py-1 text-[9px] text-white hover:bg-blue-600">{{ comment.debate_action_label }}</button>
                                 {% endif %}
@@ -415,6 +458,8 @@
                                 {% endif %}
                                 {% if comment.debate_action_mode == 'view' and comment.debate_chat_url %}
                                 <a href="{{ comment.debate_chat_url }}" class="inline-flex items-center rounded-full bg-blue-500 px-2 py-1 text-[9px] text-white hover:bg-blue-600">{{ comment.debate_action_label }}</a>
+                                {% elif comment.debate_action_mode == 'blocked' %}
+                                <button type="button" onclick="showInlineActionPopup(this, 'You were removed from this comment debate and cannot start it again.', 'error')" class="rounded-full bg-slate-400 px-2 py-1 text-[9px] text-white cursor-not-allowed opacity-80" aria-disabled="true" title="You were removed from this comment debate and cannot start it again.">{{ comment.debate_action_label }}</button>
                                 {% else %}
                                 <button onclick="startDebate('{{ comment.id }}', this)" class="rounded-full bg-blue-500 px-2 py-1 text-[9px] text-white hover:bg-blue-600">{{ comment.debate_action_label }}</button>
                                 {% endif %}
@@ -464,6 +509,92 @@ function getCSRFToken() {
 
     return '';
 }
+
+let currentShareUrl = '';
+let currentShareTitle = 'Discussion';
+
+function openSharePanel(triggerButton) {
+    const postCard = triggerButton.closest('[data-post-id]');
+    if (!postCard) return;
+
+    const sharePath = postCard.dataset.shareUrl || window.location.pathname;
+    const titleEl = document.getElementById('post-title-display');
+    const title = titleEl ? titleEl.textContent.trim() : 'Discussion';
+
+    currentShareUrl = new URL(sharePath, window.location.origin).toString();
+    currentShareTitle = title;
+
+    const modal = document.getElementById('share-post-modal');
+    const input = document.getElementById('share-url-input');
+    const titleText = document.getElementById('share-post-title');
+    if (!modal || !input || !titleText) return;
+
+    input.value = currentShareUrl;
+    titleText.textContent = title;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeSharePanel() {
+    const modal = document.getElementById('share-post-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+async function copyShareUrl() {
+    if (!currentShareUrl) return;
+
+    try {
+        await navigator.clipboard.writeText(currentShareUrl);
+        window.showToast('Share URL copied.', 'success');
+    } catch (error) {
+        const input = document.getElementById('share-url-input');
+        if (!input) return;
+        input.focus();
+        input.select();
+        document.execCommand('copy');
+        window.showToast('Share URL copied.', 'success');
+    }
+}
+
+function shareToPlatform(platform) {
+    if (!currentShareUrl) return;
+
+    const encodedUrl = encodeURIComponent(currentShareUrl);
+    const encodedText = encodeURIComponent(`${currentShareTitle} ${currentShareUrl}`);
+    let targetUrl = '';
+
+    if (platform === 'facebook') {
+        targetUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
+    } else if (platform === 'whatsapp') {
+        targetUrl = `https://wa.me/?text=${encodedText}`;
+    } else if (platform === 'gmail') {
+        const subject = encodeURIComponent(`Discussion: ${currentShareTitle}`);
+        targetUrl = `https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${encodedText}`;
+    } else if (platform === 'x') {
+        targetUrl = `https://twitter.com/intent/tweet?text=${encodedText}`;
+    } else if (platform === 'instagram') {
+        copyShareUrl();
+        targetUrl = 'https://www.instagram.com/';
+        window.showToast('URL copied. Paste it in Instagram.', 'success');
+    }
+
+    if (!targetUrl) return;
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
+}
+
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('share-post-modal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    if (event.target === modal) closeSharePanel();
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeSharePanel();
+    }
+});
 
 function togglePostFollow(postId) {
     const btn = document.getElementById('follow-post-btn');

@@ -38,6 +38,9 @@ class Post(models.Model):
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
     hashtags = models.TextField(blank=True, default='', help_text='Comma-separated hashtags')
     is_edited = models.BooleanField(default=False)
+    is_deleted_by_moderation = models.BooleanField(default=False, help_text='Automatically deleted by moderation')
+    is_flagged = models.BooleanField(default=False, help_text='Flagged by moderation system')
+    moderation_reason = models.TextField(blank=True, default='', help_text='Reason for moderation action')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -83,6 +86,9 @@ class Comment(models.Model):
     likes = models.IntegerField(default=0)
     dislikes = models.IntegerField(default=0)
     is_edited = models.BooleanField(default=False)
+    is_deleted_by_moderation = models.BooleanField(default=False, help_text='Automatically deleted by moderation')
+    is_flagged = models.BooleanField(default=False, help_text='Flagged by moderation system')
+    moderation_reason = models.TextField(blank=True, default='', help_text='Reason for moderation action')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -240,6 +246,10 @@ class Notification(models.Model):
         ('post_activity', 'Active Conversation on Followed Post'),
         ('moderation_alert', 'Moderator Alert'),
         ('moderation_warning', 'Moderation Warning'),
+        ('author_comment', 'New Comment on Your Post'),
+        ('author_debate', 'New Debate on Your Post'),
+        ('author_repost', 'Your Post was Reposted'),
+        ('author_save', 'Your Post was Saved'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
@@ -247,6 +257,7 @@ class Notification(models.Model):
     notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES)
     message = models.TextField()
     is_read = models.BooleanField(default=False)
+    count = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -264,6 +275,9 @@ class DebateMessage(models.Model):
     content = models.TextField()
     is_system = models.BooleanField(default=False)
     is_edited = models.BooleanField(default=False)
+    is_deleted_by_moderation = models.BooleanField(default=False, help_text='Automatically deleted by moderation')
+    is_flagged = models.BooleanField(default=False, help_text='Flagged by moderation system')
+    moderation_reason = models.TextField(blank=True, default='', help_text='Reason for moderation action')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -271,6 +285,28 @@ class DebateMessage(models.Model):
 
     class Meta:
         ordering = ['created_at']
+
+
+class DebateMessageReaction(models.Model):
+    REACTION_CHOICES = [
+        ('like', 'Like'),
+        ('dislike', 'Dislike'),
+    ]
+
+    message = models.ForeignKey(DebateMessage, on_delete=models.CASCADE, related_name='reactions')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='debate_message_reactions')
+    reaction = models.CharField(max_length=10, choices=REACTION_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username} {self.reaction} on debate message {self.message_id}"
+
+    class Meta:
+        ordering = ['-updated_at']
+        constraints = [
+            models.UniqueConstraint(fields=['message', 'user'], name='unique_debate_message_reaction_per_user'),
+        ]
 
 
 class PostEditHistory(models.Model):
@@ -337,4 +373,29 @@ class DebateMessageReport(models.Model):
         ordering = ['-created_at']
         constraints = [
             models.UniqueConstraint(fields=['message', 'reporter'], name='unique_debate_message_report_per_reporter'),
+        ]
+
+
+class ProfileReport(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('reviewed', 'Reviewed'),
+        ('dismissed', 'Dismissed'),
+    ]
+
+    reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='profile_reports_submitted')
+    reported_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='profile_reports_received')
+    reason = models.CharField(max_length=40, default='profile_concern')
+    details = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Profile report #{self.id} on {self.reported_user.username} ({self.status})"
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['reporter', 'reported_user'], name='unique_profile_report_per_reporter'),
         ]

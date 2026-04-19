@@ -6,6 +6,7 @@ class Profile(models.Model):
     username = models.CharField(max_length=30, unique=True)
     avatar_url = models.URLField(null=True, blank=True)
     profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
+    interested_categories = models.JSONField(default=list, blank=True)
     last_seen = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

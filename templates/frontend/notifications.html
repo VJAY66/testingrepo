@@ -177,6 +177,53 @@
         display: grid;
         gap: 1rem;
     }
+    .nf-moderation-tabs {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border: 1px solid hsl(var(--border));
+        border-radius: 999px;
+        padding: 0.25rem;
+        background: hsl(var(--background) / 0.7);
+        margin-bottom: 0.5rem;
+        width: fit-content;
+    }
+    .nf-moderation-tab {
+        border: 1px solid transparent;
+        background: transparent;
+        color: hsl(var(--muted-foreground));
+        border-radius: 999px;
+        padding: 0.38rem 0.72rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
+    }
+    .nf-moderation-tab:hover {
+        color: hsl(var(--foreground));
+        border-color: hsl(var(--border));
+    }
+    .nf-moderation-tab.is-active {
+        background: linear-gradient(135deg, hsl(var(--primary) / 0.16), hsl(var(--accent) / 0.14));
+        border-color: hsl(var(--primary) / 0.35);
+        color: hsl(var(--foreground));
+    }
+    .nf-tab-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: hsl(var(--primary) / 0.14);
+        color: hsl(var(--primary));
+        font-size: 0.66rem;
+        font-weight: 800;
+        padding: 0 5px;
+    }
     .nf-post-card,
     .nf-debate-card {
         position: relative;
@@ -656,7 +703,20 @@
         </div>
     </section>
 
-    {% if post_notifications or debates or moderation_reports %}
+    {% if post_notifications or debates or moderation_reports or profile_reports %}
+        {% if is_configured_moderator and moderation_reports and profile_reports %}
+        <div class="nf-moderation-tabs nf-reveal" style="--nf-delay: 140ms;" id="moderation-tabs">
+            <button type="button" class="nf-moderation-tab is-active" data-target="debate-report-queue">
+                Debate Reports
+                <span class="nf-tab-count">{{ moderation_reports|length }}</span>
+            </button>
+            <button type="button" class="nf-moderation-tab" data-target="profile-report-queue">
+                Profile Reports
+                <span class="nf-tab-count">{{ profile_reports|length }}</span>
+            </button>
+        </div>
+        {% endif %}
+
         {% if post_notifications %}
         <section class="nf-section nf-reveal" style="--nf-delay: 120ms;">
             <div class="nf-section-head">
@@ -667,24 +727,58 @@
             </div>
             <div class="nf-stream">
                 {% for notif in post_notifications %}
-                <article class="nf-post-card nf-reveal" id="post-notif-{{ notif.id }}" data-post-id="{{ notif.post.id }}">
+                {% if notif.notification_type == 'author_comment' or notif.notification_type == 'post_comment' or notif.notification_type == 'author_debate' or notif.notification_type == 'post_activity' %}
+                    {% with notif_url=notif.post.id|stringformat:"s" anchor="#discussion-comments-section" %}
+                    {% url 'discussion' notif.post.id as base_url %}
+                    <article class="nf-post-card nf-reveal" id="post-notif-{{ notif.id }}" data-post-id="{{ notif.post.id }}"
+                        style="cursor:pointer;"
+                        onclick="if(!event.target.closest('button,a')){window.location.href='{% url 'discussion' notif.post.id %}#discussion-comments-section';}">
+                    {% endwith %}
+                {% else %}
+                    <article class="nf-post-card nf-reveal" id="post-notif-{{ notif.id }}" data-post-id="{{ notif.post.id }}"
+                        style="cursor:pointer;"
+                        onclick="if(!event.target.closest('button,a')){window.location.href='{% url 'discussion' notif.post.id %}';}">
+                {% endif %}
                     <div class="nf-post-main">
                         <div class="nf-post-row">
-                            <span class="nf-post-icon">🔔</span>
+                            <span class="nf-post-icon">
+                                {% if notif.notification_type == 'author_comment' or notif.notification_type == 'post_comment' %}💬
+                                {% elif notif.notification_type == 'author_debate' or notif.notification_type == 'post_activity' %}⚔️
+                                {% elif notif.notification_type == 'author_repost' %}🔁
+                                {% elif notif.notification_type == 'author_save' %}🔖
+                                {% else %}🔔{% endif %}
+                            </span>
                             <div class="min-w-0">
                                 <div class="flex items-center gap-2">
-                                    {% if not notif.is_read %}
-                                    <span class="nf-dot"></span>
+                                    {% if not notif.is_read %}<span class="nf-dot"></span>{% endif %}
+                                    {% if notif.count > 1 %}
+                                    <span class="inline-flex items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold px-1.5 py-0.5 leading-none">×{{ notif.count }}</span>
                                     {% endif %}
                                     <p class="nf-post-message">{{ notif.message }}</p>
                                 </div>
                                 <div class="nf-post-meta">
+                                    {% if notif.notification_type == 'author_comment' or notif.notification_type == 'post_comment' or notif.notification_type == 'author_debate' or notif.notification_type == 'post_activity' %}
+                                    <a href="{% url 'discussion' notif.post.id %}#discussion-comments-section" class="nf-link">{{ notif.post.title|truncatechars:72 }}</a>
+                                    {% else %}
                                     <a href="{% url 'discussion' notif.post.id %}" class="nf-link">{{ notif.post.title|truncatechars:72 }}</a>
+                                    {% endif %}
                                     <span>{{ notif.created_at|date:"M j, Y g:i A" }}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    {% if notif.notification_type == 'author_comment' or notif.notification_type == 'author_debate' or notif.notification_type == 'author_repost' or notif.notification_type == 'author_save' %}
+                    <button
+                        type="button"
+                        class="nf-button-ghost"
+                        onclick="dismissAuthorNotif('{{ notif.id }}', this)"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Dismiss
+                    </button>
+                    {% else %}
                     <button
                         type="button"
                         class="nf-button-ghost"
@@ -695,6 +789,7 @@
                         </svg>
                         Unfollow Post
                     </button>
+                    {% endif %}
                 </article>
                 {% endfor %}
             </div>
@@ -702,10 +797,10 @@
         {% endif %}
 
         {% if is_configured_moderator and moderation_reports %}
-        <section class="nf-section nf-reveal" style="--nf-delay: 150ms;">
+        <section id="debate-report-queue" class="nf-section nf-reveal" style="--nf-delay: 150ms;">
             <div class="nf-section-head">
                 <div>
-                    <div class="nf-section-title"><span>🛡️</span><span>Moderation Queue</span></div>
+                    <div class="nf-section-title"><span>🛡️</span><span>Debate Message Queue</span></div>
                     <p class="nf-section-caption">Private queue for reported abusive debate messages.</p>
                 </div>
             </div>
@@ -733,6 +828,46 @@
                             <button type="button" class="nf-button-danger" onclick="moderateDebateMessageReport('{{ report.id }}', 'delete_user', this)">Delete User</button>
                             <button type="button" class="nf-button-ghost" onclick="moderateDebateMessageReport('{{ report.id }}', 'dismiss', this)">Dismiss</button>
                             <a href="{% url 'debate_chat' report.debate.id %}" class="nf-button-soft">Open Chat</a>
+                        </div>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        {% if is_configured_moderator and profile_reports %}
+        <section id="profile-report-queue" class="nf-section nf-reveal hidden" style="--nf-delay: 165ms;">
+            <div class="nf-section-head">
+                <div>
+                    <div class="nf-section-title"><span>🚩</span><span>Profile Report Queue</span></div>
+                    <p class="nf-section-caption">Private queue for reported user profiles.</p>
+                </div>
+            </div>
+            <div class="nf-stream">
+                {% for report in profile_reports %}
+                <article class="nf-debate-card nf-reveal" id="profile-report-{{ report.id }}">
+                    <div class="p-5 space-y-3">
+                        <div class="flex flex-wrap items-center gap-2 text-xs">
+                            <span class="nf-chip">Reported {{ report.created_at|date:"M j, Y g:i A" }}</span>
+                            <span class="nf-chip">Reporter: {{ report.reporter.username }}</span>
+                            <span class="nf-chip">Accused: {{ report.reported_user.username }}</span>
+                            <span class="nf-chip">Total reports: {{ report.total_reports }}</span>
+                            <span class="nf-chip">Pending: {{ report.pending_reports }}</span>
+                            <span class="nf-chip">Reviewed: {{ report.reviewed_reports }}</span>
+                            <span class="nf-chip">Dismissed: {{ report.dismissed_reports }}</span>
+                        </div>
+                        <p class="text-sm text-muted-foreground">
+                            Profile: <a href="{% url 'user_profile' report.reported_user.username %}" class="nf-link">{{ report.reported_user.username }}</a>
+                        </p>
+                        <div class="rounded-xl border border-border bg-background/70 px-3 py-2 text-sm text-foreground">
+                            "{{ report.details|default:'No details provided.'|truncatechars:260 }}"
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" class="nf-button-danger" onclick="moderateProfileReport('{{ report.id }}', 'warn', this)">Warn User</button>
+                            <button type="button" class="nf-button-danger" onclick="moderateProfileReport('{{ report.id }}', 'delete_user', this)">Delete User</button>
+                            <button type="button" class="nf-button-ghost" onclick="moderateProfileReport('{{ report.id }}', 'dismiss', this)">Dismiss</button>
+                            <a href="{% url 'user_profile' report.reported_user.username %}" class="nf-button-soft">Open Profile</a>
                         </div>
                     </div>
                 </article>
@@ -799,14 +934,14 @@
                                     <button type="submit" class="nf-button-danger">Reject</button>
                                 </form>
                             </div>
-                            {% elif debate.status == 'accepted' %}
+                            {% elif debate.status == 'accepted' or debate.status == 'completed' %}
                             <div class="nf-debate-actions">
-                                {% if debate.user_can_post or debate.user_is_view_only %}
+                                {% if debate.user_can_view_chat %}
                                 <button
                                     onclick="openDebateChat('{{ debate.id }}', '{{ debate.post.title|escapejs }}', '{% if user == debate.initiator %}{{ debate.target.username|escapejs }}{% else %}{{ debate.initiator.username|escapejs }}{% endif %}', {{ debate.yes_supporters }}, {{ debate.no_supporters }}, {% if debate.user_is_active_participant %}true{% else %}false{% endif %}, {% if debate.user_can_end %}true{% else %}false{% endif %}, '{{ debate.status }}', {% if debate.user_can_post %}true{% else %}false{% endif %}, {% if debate.user_can_rejoin %}true{% else %}false{% endif %}, {% if debate.user_is_view_only %}true{% else %}false{% endif %}, {% if debate.user_can_moderate %}true{% else %}false{% endif %})"
                                     class="nf-button"
                                 >
-                                    {% if debate.user_is_view_only %}View Conversation{% else %}Open Chat{% endif %}
+                                    {% if debate.status == 'completed' or debate.user_is_view_only %}View Conversation{% else %}Open Chat{% endif %}
                                 </button>
                                 {% endif %}
                             </div>
@@ -923,7 +1058,7 @@ function moderateDebateMessageReport(reportId, action, triggerBtn) {
     }
 
     if (isDelete) {
-        const defaultWarning = 'Moderator warning: Your message was removed for abusive content. If we get two more reports, your account will be deleted from this website.';
+        const defaultWarning = 'Your message was removed after being reported by other users. Please keep discussions respectful and follow our community guidelines. Continued violations may lead to account restrictions or permanent removal.';
         const custom = prompt('Enter warning message to send to user:', defaultWarning);
         if (custom === null) {
             return;
@@ -984,6 +1119,120 @@ function moderateDebateMessageReport(reportId, action, triggerBtn) {
         }
     });
 }
+
+function moderateProfileReport(reportId, action, triggerBtn) {
+    const csrfToken = getCSRFToken();
+    const isWarn = action === 'warn';
+    const isDeleteUser = action === 'delete_user';
+    let warningMessage = '';
+
+    const confirmText = isWarn
+        ? 'Send warning to this user and mark profile report reviewed?'
+        : (isDeleteUser
+            ? 'Delete this user account from the website? This action is permanent.'
+            : 'Dismiss this profile report?');
+
+    if (!confirm(confirmText)) {
+        return;
+    }
+
+    if (isWarn) {
+        const defaultWarning = 'Your profile was reported and reviewed by moderators. Please follow community guidelines. Continued violations may lead to restrictions.';
+        const custom = prompt('Enter warning message to send to user:', defaultWarning);
+        if (custom === null) {
+            return;
+        }
+        warningMessage = String(custom || '').trim() || defaultWarning;
+    }
+
+    let confirmPhrase = '';
+    if (isDeleteUser) {
+        const typed = prompt('Type DELETE to confirm permanent account deletion:', '');
+        if (typed === null) {
+            return;
+        }
+        confirmPhrase = String(typed || '').trim();
+        if (confirmPhrase.toUpperCase() !== 'DELETE') {
+            if (typeof window.showToast === 'function') {
+                window.showToast('Deletion cancelled. You must type DELETE exactly.', 'error');
+            }
+            return;
+        }
+    }
+
+    if (triggerBtn) {
+        triggerBtn.disabled = true;
+    }
+
+    fetch(`/moderation/profile-reports/${encodeURIComponent(reportId)}/review/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: `action=${encodeURIComponent(action)}${isWarn ? `&warning_message=${encodeURIComponent(warningMessage)}` : ''}${isDeleteUser ? `&confirm_phrase=${encodeURIComponent(confirmPhrase)}` : ''}`,
+    })
+    .then(async (response) => {
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data || !data.success) {
+            throw new Error((data && data.error) || 'Unable to review profile report.');
+        }
+        return data;
+    })
+    .then((data) => {
+        if (typeof window.showToast === 'function') {
+            window.showToast(data.message || 'Profile report reviewed.', 'success');
+        }
+        const card = document.getElementById(`profile-report-${reportId}`);
+        if (card) {
+            card.remove();
+        }
+    })
+    .catch((error) => {
+        if (typeof window.showToast === 'function') {
+            window.showToast(error.message || 'Unable to review profile report.', 'error');
+        }
+        if (triggerBtn) {
+            triggerBtn.disabled = false;
+        }
+    });
+}
+
+(function initModerationTabs() {
+    const tabsWrap = document.getElementById('moderation-tabs');
+    if (!tabsWrap) {
+        return;
+    }
+    const tabs = Array.from(tabsWrap.querySelectorAll('.nf-moderation-tab'));
+    const sections = {
+        'debate-report-queue': document.getElementById('debate-report-queue'),
+        'profile-report-queue': document.getElementById('profile-report-queue'),
+    };
+
+    function activate(targetId) {
+        Object.keys(sections).forEach((id) => {
+            const section = sections[id];
+            if (!section) return;
+            section.classList.toggle('hidden', id !== targetId);
+        });
+        tabs.forEach((tab) => {
+            tab.classList.toggle('is-active', tab.dataset.target === targetId);
+        });
+    }
+
+    tabs.forEach((tab) => {
+        tab.addEventListener('click', () => activate(tab.dataset.target));
+    });
+
+    const debateHasCards = !!(sections['debate-report-queue'] && sections['debate-report-queue'].querySelector('[id^="moderation-report-"]'));
+    const profileHasCards = !!(sections['profile-report-queue'] && sections['profile-report-queue'].querySelector('[id^="profile-report-"]'));
+    if (!debateHasCards && profileHasCards) {
+        activate('profile-report-queue');
+    } else {
+        activate('debate-report-queue');
+    }
+})();
 
 function openDebateChat(debateId, title, opponent, yesSupp, noSupp, userIsActive = true, canEndChat = false, debateStatus = 'accepted', canPost = true, canRejoin = false, isViewOnly = false, canModerate = false) {
     if (window.innerWidth >= 768) {
@@ -1237,6 +1486,31 @@ async function unfollowPostFromNotif(postId, postTitle, btn) {
         btn.disabled = false;
         btn.textContent = 'Unfollow post';
         window.showToast && window.showToast('Network error — try again.', 'error');
+    }
+}
+
+async function dismissAuthorNotif(notifId, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Dismissing…';
+    try {
+        const resp = await fetch('/notifications/dismiss/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '',
+            },
+            body: JSON.stringify({ notification_id: notifId }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+            document.getElementById('post-notif-' + notifId)?.remove();
+        } else {
+            btn.disabled = false;
+            btn.textContent = 'Dismiss';
+        }
+    } catch {
+        btn.disabled = false;
+        btn.textContent = 'Dismiss';
     }
 }
 </script>

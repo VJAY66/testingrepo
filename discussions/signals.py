@@ -1,6 +1,94 @@
 ﻿from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 from .models import Comment, Notification, PostFollow
+
+# ---------------------------------------------------------------------------
+# Author notification helpers
+# ---------------------------------------------------------------------------
+
+_AUTHOR_FIRST_MESSAGES = {
+    'author_comment': lambda actor: f'{actor.username} commented on your post.',
+    'author_debate':  lambda actor: f'{actor.username} started a debate on your post.',
+    'author_repost':  lambda actor: f'{actor.username} reposted your post.',
+    'author_save':    lambda actor: f'{actor.username} saved your post.',
+}
+
+_AUTHOR_BATCH_LABELS = {
+    'author_comment': 'new comments on your post',
+    'author_debate':  'new debates started on your post',
+    'author_repost':  'people reposted your post',
+    'author_save':    'people saved your post',
+}
+
+
+def _batch_window_seconds(first_notif_time):
+    """Return the aggregation window (seconds) based on age of first notification."""
+    age = (timezone.now() - first_notif_time).total_seconds()
+    if age < 86400:       # Day 1  — hourly
+        return 3600
+    elif age < 172800:    # Day 2  — every 5 hours
+        return 18000
+    else:                 # Day 3+ — every 12 hours
+        return 43200
+
+
+def notify_post_author(post, notification_type, actor_user):
+    """
+    Notify the post author about activity on their post with progressive batching:
+      - 1st event ever        → immediate individual notification
+      - Day 1 after first     → aggregate, max 1 notification per hour
+      - Day 2                 → aggregate, max 1 notification per 5 hours
+      - Day 3+                → aggregate, max 1 notification per 12 hours
+    """
+    if post.user_id == actor_user.id:
+        return  # Never notify about own actions
+
+    existing_qs = Notification.objects.filter(
+        user=post.user,
+        post=post,
+        notification_type=notification_type,
+    ).order_by('created_at')
+
+    first_notif = existing_qs.first()
+
+    if first_notif is None:
+        # Very first event — notify immediately
+        Notification.objects.create(
+            user=post.user,
+            post=post,
+            notification_type=notification_type,
+            message=_AUTHOR_FIRST_MESSAGES[notification_type](actor_user),
+            count=1,
+        )
+        return
+
+    batch_window = _batch_window_seconds(first_notif.created_at)
+    last_notif = existing_qs.last()
+    time_since_last = (timezone.now() - last_notif.created_at).total_seconds()
+
+    if time_since_last >= batch_window:
+        # Batch window expired — start a fresh notification
+        Notification.objects.create(
+            user=post.user,
+            post=post,
+            notification_type=notification_type,
+            message=_AUTHOR_FIRST_MESSAGES[notification_type](actor_user),
+            count=1,
+        )
+    else:
+        # Still within the window — increment the existing batch counter
+        new_count = last_notif.count + 1
+        label = _AUTHOR_BATCH_LABELS[notification_type]
+        last_notif.count = new_count
+        last_notif.message = f'{new_count} {label}.'
+        last_notif.is_read = False  # Surface it again
+        last_notif.save(update_fields=['count', 'message', 'is_read'])
+
+
+# ---------------------------------------------------------------------------
+# Signals
+# ---------------------------------------------------------------------------
 
 @receiver(post_save, sender=Comment)
 def notify_post_followers(sender, instance, created, **kwargs):
@@ -8,16 +96,19 @@ def notify_post_followers(sender, instance, created, **kwargs):
         return
 
     post = instance.post
+
+    # 1. Notify the post author about the new comment
+    notify_post_author(post, 'author_comment', instance.user)
+
+    # 2. Notify followers (existing every-5-comments logic)
     followers = PostFollow.objects.filter(post=post).exclude(user=instance.user).select_related('user')
 
     for follow in followers:
-        # Count comments made since this user followed the post
         comments_since_follow = Comment.objects.filter(
             post=post,
             created_at__gte=follow.created_at
         ).count()
 
-        # Notify for every 5 comments since the user followed
         if comments_since_follow > 0 and comments_since_follow % 5 == 0:
             Notification.objects.create(
                 user=follow.user,
