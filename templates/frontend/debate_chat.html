@@ -816,24 +816,22 @@
       padding: 0 2px;
       letter-spacing: 0.01em;
     }
-    /* Username color palette — light theme */
-    .mc-sender[data-ucolor="0"] { color: #2563eb; }
-    .mc-sender[data-ucolor="1"] { color: #7c3aed; }
-    .mc-sender[data-ucolor="2"] { color: #0891b2; }
-    .mc-sender[data-ucolor="3"] { color: #059669; }
-    .mc-sender[data-ucolor="4"] { color: #d97706; }
-    .mc-sender[data-ucolor="5"] { color: #dc2626; }
-    .mc-sender[data-ucolor="6"] { color: #db2777; }
-    .mc-sender[data-ucolor="7"] { color: #0284c7; }
-    /* Dark theme overrides */
-    html[data-theme="dark"] .mc-sender[data-ucolor="0"] { color: #60a5fa; }
-    html[data-theme="dark"] .mc-sender[data-ucolor="1"] { color: #a78bfa; }
-    html[data-theme="dark"] .mc-sender[data-ucolor="2"] { color: #22d3ee; }
-    html[data-theme="dark"] .mc-sender[data-ucolor="3"] { color: #34d399; }
-    html[data-theme="dark"] .mc-sender[data-ucolor="4"] { color: #fbbf24; }
-    html[data-theme="dark"] .mc-sender[data-ucolor="5"] { color: #f87171; }
-    html[data-theme="dark"] .mc-sender[data-ucolor="6"] { color: #f472b6; }
-    html[data-theme="dark"] .mc-sender[data-ucolor="7"] { color: #38bdf8; }
+    .mc-msg.sender-v1 .mc-sender { color: #1d4ed8; }
+    .mc-msg.sender-v2 .mc-sender { color: #7c2d12; }
+    .mc-msg.sender-v3 .mc-sender { color: #115e59; }
+    .mc-msg.sender-v4 .mc-sender { color: #6d28d9; }
+    .mc-msg.sender-v5 .mc-sender { color: #be185d; }
+    .mc-msg.sender-v6 .mc-sender { color: #065f46; }
+    .mc-msg.sender-v7 .mc-sender { color: #92400e; }
+    .mc-msg.sender-v8 .mc-sender { color: #9f1239; }
+    html[data-theme="dark"] .mc-msg.sender-v1 .mc-sender { color: #93c5fd; }
+    html[data-theme="dark"] .mc-msg.sender-v2 .mc-sender { color: #fdba74; }
+    html[data-theme="dark"] .mc-msg.sender-v3 .mc-sender { color: #67e8f9; }
+    html[data-theme="dark"] .mc-msg.sender-v4 .mc-sender { color: #c4b5fd; }
+    html[data-theme="dark"] .mc-msg.sender-v5 .mc-sender { color: #f9a8d4; }
+    html[data-theme="dark"] .mc-msg.sender-v6 .mc-sender { color: #86efac; }
+    html[data-theme="dark"] .mc-msg.sender-v7 .mc-sender { color: #fde68a; }
+    html[data-theme="dark"] .mc-msg.sender-v8 .mc-sender { color: #fda4af; }
     .mc-meta {
       display: flex;
       align-items: center;
@@ -2121,7 +2119,7 @@
     const value = String(sender || 'x');
     let hash = 0;
     for (let i = 0; i < value.length; i++) hash = ((hash << 5) - hash) + value.charCodeAt(i);
-    const idx = (Math.abs(hash) % 4) + 1;
+    const idx = (Math.abs(hash) % 8) + 1;
     return 'sender-v' + idx;
   }
 

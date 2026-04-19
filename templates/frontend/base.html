@@ -1146,7 +1146,25 @@
         .chat-fp-msg.other .chat-fp-meta {
             padding-right: 28px;
         }
-        .chat-fp-sender { display: inline-block; font-size: 10px; font-weight: 700; opacity: 0.76; }
+        .chat-fp-sender { display: inline-block; font-size: 10px; font-weight: 700; opacity: 0.92; }
+        .chat-fp-msg.sender-v1 .chat-fp-sender { color: #1d4ed8; }
+        .chat-fp-msg.sender-v2 .chat-fp-sender { color: #7c2d12; }
+        .chat-fp-msg.sender-v3 .chat-fp-sender { color: #115e59; }
+        .chat-fp-msg.sender-v4 .chat-fp-sender { color: #6d28d9; }
+        .chat-fp-msg.sender-v5 .chat-fp-sender { color: #be185d; }
+        .chat-fp-msg.sender-v6 .chat-fp-sender { color: #065f46; }
+        .chat-fp-msg.sender-v7 .chat-fp-sender { color: #92400e; }
+        .chat-fp-msg.sender-v8 .chat-fp-sender { color: #9f1239; }
+        html[data-theme="dark"] .chat-fp-msg.sender-v1 .chat-fp-sender { color: #93c5fd; }
+        html[data-theme="dark"] .chat-fp-msg.sender-v2 .chat-fp-sender { color: #fdba74; }
+        html[data-theme="dark"] .chat-fp-msg.sender-v3 .chat-fp-sender { color: #67e8f9; }
+        html[data-theme="dark"] .chat-fp-msg.sender-v4 .chat-fp-sender { color: #c4b5fd; }
+        html[data-theme="dark"] .chat-fp-msg.sender-v5 .chat-fp-sender { color: #f9a8d4; }
+        html[data-theme="dark"] .chat-fp-msg.sender-v6 .chat-fp-sender { color: #86efac; }
+        html[data-theme="dark"] .chat-fp-msg.sender-v7 .chat-fp-sender { color: #fde68a; }
+        html[data-theme="dark"] .chat-fp-msg.sender-v8 .chat-fp-sender { color: #fda4af; }
+        .chat-fp-msg:hover,
+        .chat-fp-msg:focus-within { transform: none !important; }
         .chat-fp-msg-side-badge {
             display: inline-flex;
             align-items: center;
@@ -3497,7 +3515,7 @@
             const value = String(sender || 'x');
             let hash = 0;
             for (let i = 0; i < value.length; i++) hash = ((hash << 5) - hash) + value.charCodeAt(i);
-            const idx = (Math.abs(hash) % 4) + 1;
+            const idx = (Math.abs(hash) % 8) + 1;
             return 'sender-v' + idx;
         }
 
