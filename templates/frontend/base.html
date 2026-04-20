@@ -2335,8 +2335,23 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 </head>
-<body class="bg-background text-foreground min-h-screen">
+<body class="bg-background text-foreground min-h-screen {% if request.resolver_match.url_name == 'index' %}home-bg{% endif %}">
     <div id="toast-root" aria-live="polite" aria-atomic="true"></div>
+    {% if request.resolver_match.url_name == 'index' %}
+    <!-- Full-page galaxy background layer -->
+    <div class="galaxy-layer" aria-hidden="true" style="position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;">
+        <div class="galaxy-nebula"></div>
+        <div class="galaxy-stars"></div>
+        <div class="planet planet-a"></div>
+        <div class="planet-ring planet-ring-a"></div>
+        <div class="planet planet-b"></div>
+        <div class="planet-ring planet-ring-b"></div>
+        <div class="planet planet-c"></div>
+        <div class="ag-orb ag-orb-1"></div>
+        <div class="ag-orb ag-orb-2"></div>
+        <div class="ag-orb ag-orb-3"></div>
+    </div>
+    {% endif %}
     <!-- Navigation -->
     <nav class="nav-shell bg-card border-b border-border">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
@@ -2557,31 +2572,9 @@
             </div>
         {% endif %}
 
+
         <div class="flex gap-6 items-start">
-            {% if user.is_authenticated and request.resolver_match.url_name != 'chats' and request.resolver_match.url_name != 'index' %}
-            <!-- Left sidebar — visible only on lg+ -->
-            <aside class="hidden lg:flex flex-col gap-3 w-56 shrink-0 sticky top-24 self-start">
-                <!-- Quick nav links -->
-                <nav class="rounded-2xl border border-border/70 bg-card/80 shadow-sm px-2 py-3 flex flex-col gap-0.5">
-                    <a href="{% url 'index' %}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors {% if request.resolver_match.url_name == 'index' %}bg-primary/8 text-primary{% endif %}">
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                        Home
-                    </a>
-                    <a href="{% url 'suggested' %}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors {% if request.resolver_match.url_name == 'suggested' %}bg-primary/8 text-primary{% endif %}">
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3l14 9-14 9V3z"/></svg>
-                        Suggested
-                    </a>
-                    <a href="{% url 'profile' %}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors {% if request.resolver_match.url_name == 'profile' %}bg-primary/8 text-primary{% endif %}">
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                        Profile
-                    </a>
-                    <a href="{% url 'notifications' %}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors {% if request.resolver_match.url_name == 'notifications' %}bg-primary/8 text-primary{% endif %}">
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-                        Notifications
-                    </a>
-                </nav>
-            </aside>
-            {% endif %}
+            <!-- Left sidebar removed as per request -->
 
             <!-- Page content -->
             <div class="flex-1 min-w-0">

@@ -25,7 +25,6 @@
 }
 .ch-shell {
     position: relative;
-    isolation: isolate;
     height: calc(100dvh - 64px);
     border: 1px solid hsl(var(--border) / 0.85);
     border-radius: 1.35rem;
@@ -390,10 +389,9 @@
 main:has(.ch-page) {
     padding-top: 0;
     padding-bottom: 0;
-    overflow: hidden;
 }
 body:has(.ch-page) {
-    overflow: hidden;
+    overflow: auto !important;
 }
 </style>
 
@@ -412,10 +410,11 @@ body:has(.ch-page) {
                 </div>
                 <div id="ch-desktop-list" class="ch-list">
                     {% for chat in chats %}
-                    <button type="button" class="ch-item {% if chat.id|stringformat:'s' == selected_chat_id %}active{% endif %}"
+                    <button type="button" class="ch-item"
                         data-chat-id="{{ chat.id }}"
                         data-last-id="{{ chat.last_message_id|default:0 }}"
                         data-filter="{{ chat.opponent|lower }} {{ chat.title|lower }} {{ chat.last_message|default:''|lower }}"
+                        data-chat-url="{% url 'debate_chat' chat.id %}?return_to={% url 'chats' %}?chat={{ chat.id }}"
                         onclick="openDesktopChat('{{ chat.id }}', this)">
                         {% if chat.opponent_avatar %}
                         <img src="{{ chat.opponent_avatar }}" alt="{{ chat.opponent }}" class="ch-avatar" loading="lazy">
@@ -430,7 +429,7 @@ body:has(.ch-page) {
                                     <span class="ch-unread-badge hidden" data-unread-badge>1</span>
                                 </span>
                             </span>
-                            <span class="ch-topic" data-chat-topic>{{ chat.title }}</span>
+                            <span class="ch-topic" data-chat-topic">{{ chat.title }}</span>
                             <span class="ch-preview" data-chat-preview>{% if chat.last_message_sender == user.username %}You: {% endif %}{{ chat.last_message|default:'No messages yet' }}</span>
                         </span>
                     </button>
@@ -480,7 +479,7 @@ body:has(.ch-page) {
                                 <span class="ch-unread-badge hidden" data-unread-badge>1</span>
                             </span>
                         </span>
-                        <span class="ch-topic" data-chat-topic>{{ chat.title }}</span>
+                        <span class="ch-topic" data-chat-topic">{{ chat.title }}</span>
                         <span class="ch-preview" data-chat-preview>{% if chat.last_message_sender == user.username %}You: {% endif %}{{ chat.last_message|default:'No messages yet' }}</span>
                     </span>
                 </a>
@@ -506,76 +505,8 @@ body:has(.ch-page) {
     </div>
 </div>
 
-{% if chats %}
 <script>
-const CH_LAST_READ_KEY = 'dhChatLastRead';
-
-function loadLastReadMap() {
-    try {
-        return JSON.parse(localStorage.getItem(CH_LAST_READ_KEY) || '{}');
-    } catch {
-        return {};
-    }
-}
-
-function saveLastReadMap(map) {
-    try {
-        localStorage.setItem(CH_LAST_READ_KEY, JSON.stringify(map));
-    } catch {}
-}
-
-function markChatRead(chatId, lastId) {
-    const id = String(chatId || '');
-    if (!id) return;
-    const map = loadLastReadMap();
-    map[id] = Number(lastId || 0);
-    saveLastReadMap(map);
-    refreshUnreadBadges();
-}
-
-function refreshUnreadBadges() {
-    const map = loadLastReadMap();
-    document.querySelectorAll('[data-chat-id][data-last-id]').forEach(function(row) {
-        const id = String(row.getAttribute('data-chat-id') || '');
-        const lastId = Number(row.getAttribute('data-last-id') || 0);
-        const stored = Number(map[id] || 0);
-        const badge = row.querySelector('[data-unread-badge]');
-        if (!badge) return;
-        const unread = lastId > stored;
-        badge.classList.toggle('hidden', !unread);
-    });
-}
-
-function markChatReadFromRow(el) {
-    const row = el && el.closest ? el.closest('[data-chat-id][data-last-id]') : null;
-    if (!row) return;
-    markChatRead(row.getAttribute('data-chat-id'), row.getAttribute('data-last-id'));
-}
-
-function escHtml(value) {
-    const div = document.createElement('div');
-    div.textContent = String(value || '');
-    return div.textContent;
-}
-
-function openDesktopChat(chatId, triggerEl) {
-    const frame = document.getElementById('ch-conv-frame');
-    const placeholder = document.getElementById('ch-conv-placeholder');
-    if (!frame) return;
-    frame.src = '/debates/' + encodeURIComponent(String(chatId)) + '/chat/?return_to=/chats/%3Fchat%3D' + encodeURIComponent(String(chatId));
-    if (placeholder) placeholder.classList.add('hidden');
-    document.querySelectorAll('#ch-desktop-list .ch-item').forEach(function(item) {
-        item.classList.remove('active');
-    });
-    if (triggerEl) triggerEl.classList.add('active');
-    if (triggerEl) {
-        markChatRead(chatId, triggerEl.getAttribute('data-last-id'));
-    }
-    if (window.history && window.history.replaceState) {
-        window.history.replaceState({}, '', '/chats/?chat=' + encodeURIComponent(String(chatId)));
-    }
-}
-
+// Make bindChatSearch globally available
 function bindChatSearch(inputId, listSelector) {
     const input = document.getElementById(inputId);
     const list = document.querySelector(listSelector);
@@ -586,71 +517,49 @@ function bindChatSearch(inputId, listSelector) {
         items.forEach(function(item) {
             const haystack = String(item.getAttribute('data-filter') || '');
             const ok = !q || haystack.indexOf(q) !== -1;
-            item.classList.toggle('hidden', !ok);
-        });
-    });
-}
-
-function animateChatRowsOnce(listSelector) {
-    const list = document.querySelector(listSelector);
-    if (!list || list.classList.contains('animate')) return;
-    const rows = Array.from(list.querySelectorAll('.ch-item'));
-    if (!rows.length) return;
-    rows.forEach(function(row, index) {
-        const delay = Math.min(index * 42, 420);
-        row.style.setProperty('--ch-delay', delay + 'ms');
-    });
-    list.classList.add('animate');
-}
-
-async function refreshChatRowsFromServer() {
-    try {
-        const response = await fetch('/chats/list/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-        if (!response.ok) return;
-        const data = await response.json();
-        if (!data || !data.success || !Array.isArray(data.chats)) return;
-
-        const chatMap = new Map(data.chats.map(function(chat) { return [String(chat.id), chat]; }));
-        document.querySelectorAll('[data-chat-id]').forEach(function(row) {
-            const id = String(row.getAttribute('data-chat-id') || '');
-            const chat = chatMap.get(id);
-            if (!chat) return;
-            row.setAttribute('data-last-id', String(chat.last_message_id || 0));
-
-            const timeEl = row.querySelector('[data-chat-time]');
-            const topicEl = row.querySelector('[data-chat-topic]');
-            const previewEl = row.querySelector('[data-chat-preview]');
-
-            if (timeEl) timeEl.textContent = escHtml(chat.last_message_time || '');
-            if (topicEl) topicEl.textContent = escHtml(chat.title || '');
-            if (previewEl) {
-                const prefix = chat.last_message_sender === '{{ user.username }}' ? 'You: ' : '';
-                previewEl.textContent = prefix + escHtml(chat.last_message || 'No messages yet');
+            // For desktop chat list (button), use display property for filtering
+            if (item.tagName === 'BUTTON') {
+                item.style.display = ok ? '' : 'none'; // Reset to default (flex from CSS)
+            } else {
+                item.classList.toggle('hidden', !ok);
+            }
+            if (!ok) {
+                item.classList.remove('active');
             }
         });
-
-        refreshUnreadBadges();
-    } catch {}
+    });
 }
 
-bindChatSearch('ch-desktop-search', '#ch-desktop-list');
-bindChatSearch('ch-mobile-search', '#ch-mobile-list');
-animateChatRowsOnce('#ch-desktop-list');
-
-document.querySelectorAll('#ch-mobile-list a[data-chat-id]').forEach(function(link) {
-    link.addEventListener('click', function() {
-        markChatReadFromRow(link);
-    });
+document.addEventListener('DOMContentLoaded', function() {
+  bindChatSearch('ch-desktop-search', '#ch-desktop-list');
+  bindChatSearch('ch-mobile-search', '#ch-mobile-list');
 });
 
-const activeDesktopRow = document.querySelector('#ch-desktop-list .ch-item.active[data-chat-id]');
-if (activeDesktopRow) {
-    markChatRead(activeDesktopRow.getAttribute('data-chat-id'), activeDesktopRow.getAttribute('data-last-id'));
+// Ensure only one chat is active and open correct conversation
+function openDesktopChat(chatId, btn) {
+    // Remove active class from all chat items
+    document.querySelectorAll('.ch-item.active').forEach(function(item) {
+        item.classList.remove('active');
+    });
+    // Add active class to clicked chat
+    btn.classList.add('active');
+    // Open the chat in the iframe using the correct URL
+    var frame = document.getElementById('ch-conv-frame');
+    if (frame) {
+        var url = btn.getAttribute('data-chat-url');
+        frame.src = url;
+    }
+    // Hide placeholder
+    var placeholder = document.getElementById('ch-conv-placeholder');
+    if (placeholder) {
+        placeholder.classList.add('hidden');
+    }
+    // Hide unread badge for this chat
+    var unread = btn.querySelector('[data-unread-badge]');
+    if (unread) {
+        unread.classList.add('hidden');
+    }
 }
-
-refreshUnreadBadges();
-refreshChatRowsFromServer();
-setInterval(refreshChatRowsFromServer, 15000);
 </script>
-{% endif %}
+
 {% endblock %}
