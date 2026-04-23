@@ -1395,7 +1395,7 @@
         }
 
         .chat-fp-sup {
-            display: flex; gap: 7px; align-items: center;
+            display: flex; gap: 7px; align-items: center; justify-content: center;
             padding: 7px 12px;
             background: linear-gradient(90deg, hsl(var(--card) / 0.97), hsl(var(--card) / 0.84));
             border-top: 1px solid hsl(var(--border) / 0.9);
@@ -1439,6 +1439,7 @@
         .chat-fp-participants-list {
             display: flex;
             flex-direction: column;
+            align-items: center;
             gap: 8px;
             padding: 10px;
             overflow-y: auto;
@@ -1453,12 +1454,14 @@
         .chat-fp-member {
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 6px;
             border: 1px solid hsl(var(--border) / 0.9);
             background: linear-gradient(135deg, hsl(var(--card) / 0.95), hsl(var(--background) / 0.85));
             border-radius: 12px;
             padding: 8px;
             max-width: 100%;
+            width: 100%;
         }
         .chat-fp-member-avatar,
         .chat-fp-member-avatar-fallback {
