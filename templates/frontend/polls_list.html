@@ -1,0 +1,179 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Polls — Discussion Hub{% endblock %}
+
+{% block content %}
+<style>
+.poll-list-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 1.2rem;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.poll-list-card:hover {
+    border-color: hsl(var(--primary) / 0.4);
+    box-shadow: 0 8px 32px -12px hsl(var(--primary) / 0.2);
+}
+.mini-bar-track {
+    height: 0.45rem;
+    border-radius: 999px;
+    background: hsl(var(--muted));
+    overflow: hidden;
+}
+.mini-bar-a { height: 100%; background: hsl(142 71% 45%); border-radius: 999px; }
+.mini-bar-b { height: 100%; background: hsl(346 77% 50%); border-radius: 999px; }
+.cat-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: border-color 150ms, background 150ms, color 150ms;
+}
+.cat-pill.active {
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    border-color: hsl(var(--primary));
+}
+.cat-pill:not(.active) {
+    background: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
+    border-color: hsl(var(--border));
+}
+.cat-pill:not(.active):hover {
+    border-color: hsl(var(--primary) / 0.5);
+    color: hsl(var(--primary));
+}
+</style>
+
+<div class="max-w-3xl mx-auto px-4 py-6 sm:py-10 space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+            <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-100 text-2xl dark:bg-blue-900/40">📊</span>
+            <div>
+                <h1 class="text-xl font-bold text-foreground">Polls</h1>
+                <p class="text-sm text-muted-foreground">Vote and see what the community thinks.</p>
+            </div>
+        </div>
+        {% if user.is_authenticated %}
+        <a href="{% url 'create_poll' %}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            New Poll
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Category filter pills -->
+    <div class="flex flex-wrap gap-2">
+        <a href="{% url 'polls_list' %}" class="cat-pill {% if not active_category %}active{% endif %}">All</a>
+        {% for cat in categories %}
+        <a href="{% url 'polls_list' %}?category={{ cat.name }}" class="cat-pill {% if active_category == cat.name %}active{% endif %}">{{ cat.name }}</a>
+        {% endfor %}
+    </div>
+
+    <!-- Poll cards -->
+    {% if polls_data %}
+    <div class="space-y-4">
+        {% for pd in polls_data %}
+        <a href="{% url 'poll_detail' pd.poll.id %}" class="poll-list-card block p-5 no-underline group">
+            <!-- Top row: author + category -->
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">
+                        {{ pd.poll.user.username|first|upper }}
+                    </div>
+                    <span class="text-xs font-semibold text-muted-foreground">{{ pd.poll.user.username }}</span>
+                    <span class="text-xs text-muted-foreground/60">· {{ pd.poll.created_at|date:"M j" }}</span>
+                </div>
+                <span class="px-2.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full text-xs font-bold uppercase tracking-wide">{{ pd.poll.category }}</span>
+            </div>
+
+            <!-- Title -->
+            <h2 class="text-base font-bold text-foreground mb-3 group-hover:text-primary transition-colors leading-snug">{{ pd.poll.title }}</h2>
+
+            <!-- Options with mini result bars -->
+            <div class="space-y-2">
+                {% for od in pd.option_data %}
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <div class="flex items-center gap-2">
+                            <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full {% if forloop.first %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50{% else %}bg-rose-100 text-rose-700 dark:bg-rose-900/50{% endif %} text-[10px] font-bold">{% if forloop.first %}A{% else %}B{% endif %}</span>
+                            <span class="text-sm text-foreground font-medium truncate max-w-[200px] sm:max-w-[280px]">{{ od.option.text }}</span>
+                        </div>
+                        <span class="text-xs font-bold {% if forloop.first %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %} ml-2 flex-shrink-0">
+                            {% if pd.user_vote %}{{ od.percentage }}%{% else %}–{% endif %}
+                        </span>
+                    </div>
+                    {% if pd.user_vote %}
+                    <div class="mini-bar-track">
+                        <div class="{% if forloop.first %}mini-bar-a{% else %}mini-bar-b{% endif %}" style="width: {{ od.percentage }}%"></div>
+                    </div>
+                    {% else %}
+                    <div class="mini-bar-track">
+                        <div class="{% if forloop.first %}mini-bar-a{% else %}mini-bar-b{% endif %} opacity-30" style="width: 50%"></div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Footer: vote count + voted indicator -->
+            <div class="flex items-center gap-3 mt-3 pt-3 border-t border-border/40 text-xs text-muted-foreground">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span>{{ pd.total_votes }} vote{{ pd.total_votes|pluralize }}</span>
+                {% if pd.user_vote %}
+                <span class="ml-auto inline-flex items-center gap-1 text-primary font-semibold">
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
+                    Voted
+                </span>
+                {% else %}
+                <span class="ml-auto text-primary/70 font-medium">Vote →</span>
+                {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div class="flex items-center justify-center gap-2 pt-2">
+        {% if page_obj.has_previous %}
+        <a href="?{% if active_category %}category={{ active_category }}&{% endif %}page={{ page_obj.previous_page_number }}"
+           class="inline-flex items-center gap-1 px-4 py-2 rounded-full border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Prev
+        </a>
+        {% endif %}
+        <span class="text-sm text-muted-foreground">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?{% if active_category %}category={{ active_category }}&{% endif %}page={{ page_obj.next_page_number }}"
+           class="inline-flex items-center gap-1 px-4 py-2 rounded-full border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 transition">
+            Next
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- Empty state -->
+    <div class="flex flex-col items-center justify-center py-20 text-center space-y-4">
+        <span class="text-5xl">📊</span>
+        <h2 class="text-lg font-bold text-foreground">No polls yet{% if active_category %} in {{ active_category }}{% endif %}</h2>
+        <p class="text-sm text-muted-foreground max-w-xs">Be the first to create a poll and get the community voting!</p>
+        {% if user.is_authenticated %}
+        <a href="{% url 'create_poll' %}" class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition mt-2">
+            Create a Poll
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

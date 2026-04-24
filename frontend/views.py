@@ -20,7 +20,7 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction
 from discussions.signals import notify_post_author
 from users.models import Follow
 from users.security import is_login_rate_limited, record_login_attempt
@@ -3215,3 +3215,274 @@ def remove_debate_participant(request, debate_id):
         'success': True,
         'message': f'{participation.user.username} was removed from participation and can now only view this conversation.'
     })
+
+# ─── Poll Views ────────────────────────────────────────────────────────────────
+
+def polls_list(request):
+    """Show paginated list of all active polls."""
+    category_filter = request.GET.get('category', '').strip()
+    polls_qs = Poll.objects.filter(is_deleted_by_moderation=False)
+    if category_filter:
+        polls_qs = polls_qs.filter(category=category_filter)
+
+    paginator = Paginator(polls_qs, 20)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    polls_data = []
+    for poll in page_obj:
+        opts = list(poll.options.all())
+        total = poll.votes.count()
+        user_vote = None
+        if request.user.is_authenticated:
+            try:
+                user_vote = PollVote.objects.get(poll=poll, user=request.user)
+            except PollVote.DoesNotExist:
+                pass
+        opt_data = []
+        for opt in opts:
+            cnt = opt.votes.count()
+            pct = round(cnt / total * 100, 1) if total > 0 else 0
+            opt_data.append({'option': opt, 'vote_count': cnt, 'percentage': pct})
+        polls_data.append({
+            'poll': poll,
+            'options': opts,
+            'option_data': opt_data,
+            'total_votes': total,
+            'user_vote': user_vote,
+        })
+
+    categories = [{'name': c[0]} for c in CATEGORY_CHOICES]
+    return render(request, 'frontend/polls_list.html', {
+        'polls_data': polls_data,
+        'page_obj': page_obj,
+        'categories': categories,
+        'active_category': category_filter,
+    })
+
+
+def create_poll(request):
+    """Poll creation page."""
+    if not request.user.is_authenticated:
+        from django.urls import reverse
+        return redirect(f"{reverse('login')}?next={request.path}")
+
+    categories = [{'name': c[0]} for c in CATEGORY_CHOICES]
+
+    if request.method == 'POST':
+        title = request.POST.get('title', '').strip()
+        option1 = request.POST.get('option1', '').strip()
+        option2 = request.POST.get('option2', '').strip()
+        category = request.POST.get('category', '').strip()
+        hashtags_raw = request.POST.get('hashtags', '').strip()
+        description = request.POST.get('description', '').strip()
+
+        errors = {}
+        if not title:
+            errors['title'] = 'Question is required.'
+        if not option1:
+            errors['option1'] = 'Option 1 is required.'
+        if not option2:
+            errors['option2'] = 'Option 2 is required.'
+        if option1 and option2 and option1.lower() == option2.lower():
+            errors['option2'] = 'Options must be different.'
+        if not category:
+            errors['category'] = 'Category is required.'
+
+        if not errors:
+            combined = f"{title} {option1} {option2} {description}".strip()
+            if check_content_moderation(combined):
+                errors['title'] = 'Your poll contains inappropriate content.'
+
+        if errors:
+            return render(request, 'frontend/create_poll.html', {
+                'categories': categories,
+                'errors': errors,
+                'form_data': request.POST,
+            })
+
+        poll = Poll.objects.create(
+            id=str(uuid.uuid4()),
+            user=request.user,
+            title=title,
+            description=description,
+            category=category,
+            hashtags=','.join(Post.parse_hashtags(hashtags_raw)),
+        )
+        PollOption.objects.create(poll=poll, text=option1, order=0)
+        PollOption.objects.create(poll=poll, text=option2, order=1)
+
+        return redirect('poll_detail', poll_id=poll.id)
+
+    return render(request, 'frontend/create_poll.html', {'categories': categories})
+
+
+def poll_detail(request, poll_id):
+    """Poll detail page with vote chart and side comments."""
+    poll = get_object_or_404(Poll, id=poll_id, is_deleted_by_moderation=False)
+    options = list(poll.options.all())
+    total_votes = poll.votes.count()
+
+    user_vote = None
+    if request.user.is_authenticated:
+        try:
+            user_vote = PollVote.objects.get(poll=poll, user=request.user)
+        except PollVote.DoesNotExist:
+            pass
+
+    option_data = []
+    for opt in options:
+        cnt = opt.votes.count()
+        pct = round(cnt / total_votes * 100, 1) if total_votes > 0 else 0
+        comments = opt.comments.filter(is_deleted_by_moderation=False).select_related('user')
+        # Attach user reaction to each comment
+        comments_with_reaction = []
+        for c in comments:
+            user_reaction = None
+            if request.user.is_authenticated:
+                try:
+                    r = PollCommentReaction.objects.get(comment=c, user=request.user)
+                    user_reaction = r.reaction
+                except PollCommentReaction.DoesNotExist:
+                    pass
+            comments_with_reaction.append({'comment': c, 'user_reaction': user_reaction})
+        option_data.append({
+            'option': opt,
+            'vote_count': cnt,
+            'percentage': pct,
+            'comments': comments_with_reaction,
+        })
+
+    return render(request, 'frontend/poll.html', {
+        'poll': poll,
+        'options': options,
+        'option_data': option_data,
+        'total_votes': total_votes,
+        'user_vote': user_vote,
+        'voted_option_id': str(user_vote.option_id) if user_vote else None,
+    })
+
+
+@require_POST
+def poll_vote(request, poll_id):
+    """AJAX endpoint — cast or change a poll vote."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    poll = get_object_or_404(Poll, id=poll_id, is_deleted_by_moderation=False)
+
+    try:
+        data = json.loads(request.body)
+        option_id = int(data.get('option_id', 0))
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    try:
+        option = PollOption.objects.get(id=option_id, poll=poll)
+    except PollOption.DoesNotExist:
+        return JsonResponse({'error': 'Invalid option'}, status=400)
+
+    if PollVote.objects.filter(poll=poll, user=request.user).exists():
+        return JsonResponse({'error': 'You have already voted on this poll.'}, status=400)
+
+    PollVote.objects.create(user=request.user, poll=poll, option=option)
+
+    total = poll.votes.count()
+    options_out = []
+    for opt in poll.options.all():
+        cnt = opt.votes.count()
+        pct = round(cnt / total * 100, 1) if total > 0 else 0
+        options_out.append({'id': opt.id, 'text': opt.text, 'vote_count': cnt, 'percentage': pct})
+
+    return JsonResponse({'success': True, 'voted_option_id': option.id, 'total_votes': total, 'options': options_out})
+
+
+@require_POST
+def create_poll_comment(request, poll_id):
+    """AJAX endpoint — post a side comment on a poll."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    poll = get_object_or_404(Poll, id=poll_id, is_deleted_by_moderation=False)
+
+    try:
+        data = json.loads(request.body)
+        option_id = int(data.get('option_id', 0))
+        content = (data.get('content') or '').strip()
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    try:
+        user_vote = PollVote.objects.get(poll=poll, user=request.user)
+    except PollVote.DoesNotExist:
+        return JsonResponse({'error': 'You must vote before commenting.'}, status=400)
+
+    if user_vote.option_id != option_id:
+        return JsonResponse({'error': 'You can only comment on the side you voted for.'}, status=403)
+
+    if PollComment.objects.filter(poll=poll, user=request.user).exists():
+        return JsonResponse({'error': 'You can only comment once per poll.'}, status=400)
+
+    try:
+        option = PollOption.objects.get(id=option_id, poll=poll)
+    except PollOption.DoesNotExist:
+        return JsonResponse({'error': 'Invalid option.'}, status=400)
+
+    if not content:
+        return JsonResponse({'error': 'Comment cannot be empty.'}, status=400)
+
+    if check_content_moderation(content):
+        return JsonResponse({'error': 'Your comment contains inappropriate content.'}, status=400)
+
+    comment = PollComment.objects.create(
+        id=str(uuid.uuid4()),
+        poll=poll,
+        user=request.user,
+        option=option,
+        content=content,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'comment': {
+            'id': comment.id,
+            'content': comment.content,
+            'username': request.user.username,
+            'likes': 0,
+            'dislikes': 0,
+            'created_at': comment.created_at.strftime('%b %d, %Y'),
+        },
+    })
+
+
+@require_POST
+def like_poll_comment(request):
+    """Toggle like/dislike on a poll comment."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        data = json.loads(request.body)
+        comment_id = data.get('comment_id')
+        reaction_type = data.get('reaction', 'like')
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    comment = get_object_or_404(PollComment, id=comment_id)
+
+    if comment.user_id == request.user.id:
+        return JsonResponse({'error': 'Cannot react to your own comment.'}, status=403)
+
+    reaction, created = PollCommentReaction.objects.get_or_create(
+        comment=comment, user=request.user, defaults={'reaction': reaction_type}
+    )
+    if not created and reaction.reaction != reaction_type:
+        reaction.reaction = reaction_type
+        reaction.save(update_fields=['reaction', 'updated_at'])
+
+    likes = PollCommentReaction.objects.filter(comment=comment, reaction='like').count()
+    dislikes = PollCommentReaction.objects.filter(comment=comment, reaction='dislike').count()
+    comment.likes = likes
+    comment.dislikes = dislikes
+    comment.save(update_fields=['likes', 'dislikes', 'updated_at'])
+
+    return JsonResponse({'success': True, 'likes': likes, 'dislikes': dislikes})

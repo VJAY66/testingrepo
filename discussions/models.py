@@ -376,6 +376,97 @@ class DebateMessageReport(models.Model):
         ]
 
 
+class Poll(models.Model):
+    id = models.CharField(max_length=36, primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='polls')
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default='')
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
+    hashtags = models.TextField(blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    is_deleted_by_moderation = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def get_hashtags_list(self):
+        if not self.hashtags:
+            return []
+        return [t.strip().lstrip('#') for t in self.hashtags.split(',') if t.strip()]
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        ordering = ['-created_at']
+
+
+class PollOption(models.Model):
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name='options')
+    text = models.CharField(max_length=150)
+    order = models.PositiveSmallIntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.poll.title} — {self.text}"
+
+    class Meta:
+        ordering = ['order']
+
+
+class PollVote(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='poll_votes')
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name='votes')
+    option = models.ForeignKey(PollOption, on_delete=models.CASCADE, related_name='votes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} voted '{self.option.text}' on {self.poll.title}"
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'poll'], name='unique_poll_vote_per_user'),
+        ]
+
+
+class PollComment(models.Model):
+    id = models.CharField(max_length=36, primary_key=True)
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name='comments')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='poll_comments')
+    option = models.ForeignKey(PollOption, on_delete=models.CASCADE, related_name='comments')
+    content = models.TextField(blank=True)
+    likes = models.IntegerField(default=0)
+    dislikes = models.IntegerField(default=0)
+    is_edited = models.BooleanField(default=False)
+    is_deleted_by_moderation = models.BooleanField(default=False)
+    is_flagged = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"PollComment on {self.poll.title} — {self.option.text}"
+
+    class Meta:
+        ordering = ['created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['poll', 'user'], name='unique_poll_comment_per_user'),
+        ]
+
+
+class PollCommentReaction(models.Model):
+    REACTION_CHOICES = [('like', 'Like'), ('dislike', 'Dislike')]
+    comment = models.ForeignKey(PollComment, on_delete=models.CASCADE, related_name='reactions')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='poll_comment_reactions')
+    reaction = models.CharField(max_length=10, choices=REACTION_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        constraints = [
+            models.UniqueConstraint(fields=['comment', 'user'], name='unique_poll_comment_reaction'),
+        ]
+
+
 class ProfileReport(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),

@@ -57,4 +57,11 @@ urlpatterns = [
     path('debates/<str:debate_id>/increase-limits/', views.increase_debate_limits, name='increase_debate_limits'),
     path('debates/<str:debate_id>/end/', views.end_debate, name='end_debate'),
     path('debates/<str:debate_id>/remove-participant/', views.remove_debate_participant, name='remove_debate_participant'),
+    # Polls
+    path('polls/', views.polls_list, name='polls_list'),
+    path('polls/create/', views.create_poll, name='create_poll'),
+    path('polls/<str:poll_id>/', views.poll_detail, name='poll_detail'),
+    path('polls/<str:poll_id>/vote/', views.poll_vote, name='poll_vote'),
+    path('polls/<str:poll_id>/comment/', views.create_poll_comment, name='create_poll_comment'),
+    path('polls/comment/react/', views.like_poll_comment, name='like_poll_comment'),
 ]

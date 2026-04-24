@@ -1,0 +1,424 @@
+{% extends 'frontend/base.html' %}
+{% block title %}{{ poll.title }} — Discussion Hub{% endblock %}
+
+{% block content %}
+<style>
+.poll-card {
+    background: linear-gradient(152deg, hsl(var(--card) / 0.92), hsl(var(--card) / 0.72));
+    backdrop-filter: blur(18px);
+    box-shadow: 0 28px 72px -40px rgba(15,23,42,0.6), inset 0 1px 0 rgba(255,255,255,0.18);
+    border-radius: 1.5rem;
+    border: 1px solid hsl(var(--border) / 0.4);
+}
+.vote-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 1.1rem 1.25rem;
+    border-radius: 1rem;
+    border: 2px solid hsl(var(--border));
+    background: hsl(var(--background) / 0.5);
+    cursor: pointer;
+    transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+    text-align: left;
+    font-size: 1rem;
+    font-weight: 600;
+    color: hsl(var(--foreground));
+}
+.vote-btn:hover { transform: translateY(-1px); }
+.vote-btn-a:hover { border-color: hsl(142 71% 45%); background: hsl(142 71% 45% / 0.08); }
+.vote-btn-b:hover { border-color: hsl(346 77% 50%); background: hsl(346 77% 50% / 0.08); }
+.vote-btn-a.voted { border-color: hsl(142 71% 45%); background: hsl(142 71% 45% / 0.12); }
+.vote-btn-b.voted { border-color: hsl(346 77% 50%); background: hsl(346 77% 50% / 0.12); }
+.result-bar-track {
+    height: 0.55rem;
+    border-radius: 999px;
+    background: hsl(var(--muted));
+    overflow: hidden;
+    flex: 1;
+}
+.result-bar-a { height: 100%; background: hsl(142 71% 45%); border-radius: 999px; transition: width 600ms ease; }
+.result-bar-b { height: 100%; background: hsl(346 77% 50%); border-radius: 999px; transition: width 600ms ease; }
+.comment-card {
+    padding: 0.9rem 1rem;
+    border-radius: 0.9rem;
+    border: 1px solid hsl(var(--border) / 0.6);
+    background: hsl(var(--background) / 0.4);
+}
+.comment-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: 0.9rem;
+    border: 1.5px solid hsl(var(--border));
+    background: hsl(var(--background) / 0.72);
+    color: hsl(var(--foreground));
+    font-size: 0.9rem;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.comment-input:focus {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+}
+/* Donut chart */
+.donut-ring { transition: stroke-dasharray 600ms ease; }
+</style>
+
+<div class="max-w-3xl mx-auto px-4 py-6 sm:py-10 space-y-6">
+
+    <!-- Back link -->
+    <a href="{% url 'polls_list' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        Back to polls
+    </a>
+
+    <!-- Poll card -->
+    <div class="poll-card p-6 sm:p-8" id="poll-card" data-poll-id="{{ poll.id }}">
+
+        <!-- Header -->
+        <div class="flex items-start justify-between gap-3 mb-5">
+            <div class="flex items-center gap-2.5">
+                <a href="{% url 'user_profile' poll.user.username %}">
+                    <div class="w-9 h-9 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm flex-shrink-0">
+                        {{ poll.user.username|first|upper }}
+                    </div>
+                </a>
+                <div>
+                    <a href="{% url 'user_profile' poll.user.username %}" class="font-semibold text-foreground hover:text-primary transition-colors">{{ poll.user.username }}</a>
+                    <p class="text-xs text-muted-foreground">{{ poll.created_at|date:"M j, Y" }}</p>
+                </div>
+            </div>
+            <span class="shrink-0 px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full text-xs font-bold uppercase tracking-wide">{{ poll.category }}</span>
+        </div>
+
+        <!-- Title -->
+        <h1 class="text-xl sm:text-2xl font-bold text-foreground mb-2 leading-snug">{{ poll.title }}</h1>
+        {% if poll.description %}
+        <p class="text-sm text-muted-foreground mb-4 leading-relaxed">{{ poll.description }}</p>
+        {% endif %}
+
+        <!-- Hashtags -->
+        {% if poll.hashtags %}
+        <div class="mb-5 flex flex-wrap gap-1.5">
+            {% for tag in poll.get_hashtags_list %}
+            <a href="{% url 'hashtag_search' %}?tag={{ tag }}" class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-gradient-to-r from-cyan-500/20 via-teal-500/20 to-amber-500/20 border border-cyan-500/30 hover:border-cyan-500/60 text-cyan-600 dark:text-cyan-400 text-xs font-medium transition">#{{ tag }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Voting section -->
+        <div id="vote-section">
+        {% if not user.is_authenticated %}
+        <!-- Not logged in: show options greyed, prompt to login -->
+        <div class="space-y-3 mb-4">
+            {% for od in option_data %}
+            <div class="vote-btn {% if forloop.first %}vote-btn-a{% else %}vote-btn-b{% endif %} opacity-60 cursor-default select-none">
+                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full {% if forloop.first %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50{% else %}bg-rose-100 text-rose-700 dark:bg-rose-900/50{% endif %} text-sm font-bold">{% if forloop.first %}A{% else %}B{% endif %}</span>
+                <span>{{ od.option.text }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        <p class="text-center text-sm text-muted-foreground"><a href="{% url 'login' %}?next={{ request.path }}" class="text-primary font-semibold hover:underline">Log in</a> to vote.</p>
+
+        {% elif voted_option_id %}
+        <!-- Already voted: show results -->
+        <div class="space-y-3 mb-5" id="results-section">
+            {% for od in option_data %}
+            {% with is_chosen=forloop.first %}
+            <div class="flex items-center gap-3">
+                <button class="vote-btn {% if forloop.first %}vote-btn-a{% else %}vote-btn-b{% endif %} {% if od.option.id|stringformat:'s' == voted_option_id %}voted{% endif %} flex-1 pointer-events-none" data-option-id="{{ od.option.id }}">
+                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full {% if forloop.first %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50{% else %}bg-rose-100 text-rose-700 dark:bg-rose-900/50{% endif %} text-sm font-bold">{% if forloop.first %}A{% else %}B{% endif %}</span>
+                    <span class="flex-1">{{ od.option.text }}</span>
+                    {% if od.option.id|stringformat:'s' == voted_option_id %}
+                    <svg class="w-4 h-4 {% if forloop.first %}text-emerald-500{% else %}text-rose-500{% endif %} shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>
+                    {% endif %}
+                </button>
+            </div>
+            <!-- Result bar -->
+            <div class="flex items-center gap-2 px-1 -mt-1">
+                <div class="result-bar-track">
+                    <div class="{% if forloop.first %}result-bar-a{% else %}result-bar-b{% endif %}" id="bar-{{ od.option.id }}" style="width: {{ od.percentage }}%"></div>
+                </div>
+                <span class="text-xs font-bold text-muted-foreground w-12 text-right" id="pct-{{ od.option.id }}">{{ od.percentage }}%</span>
+                <span class="text-xs text-muted-foreground w-8 text-right" id="cnt-{{ od.option.id }}">{{ od.vote_count }}</span>
+            </div>
+            {% endwith %}
+            {% endfor %}
+        </div>
+        <p class="text-center text-xs text-muted-foreground mb-1" id="total-votes-label"><span id="total-votes-count">{{ total_votes }}</span> vote{{ total_votes|pluralize }} so far</p>
+
+        {% else %}
+        <!-- Not voted yet: show clickable buttons -->
+        <div class="space-y-3 mb-4" id="vote-buttons">
+            {% for od in option_data %}
+            <button type="button"
+                    class="vote-btn {% if forloop.first %}vote-btn-a{% else %}vote-btn-b{% endif %}"
+                    onclick="castVote('{{ poll.id }}', {{ od.option.id }})"
+                    data-option-id="{{ od.option.id }}">
+                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full {% if forloop.first %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50{% else %}bg-rose-100 text-rose-700 dark:bg-rose-900/50{% endif %} text-sm font-bold">{% if forloop.first %}A{% else %}B{% endif %}</span>
+                <span>{{ od.option.text }}</span>
+            </button>
+            {% endfor %}
+        </div>
+        <p class="text-center text-xs text-muted-foreground">Click an option to cast your vote</p>
+        {% endif %}
+        </div>
+
+        <!-- Donut chart (shown after voting) -->
+        {% if voted_option_id or not user.is_authenticated %}
+        {% with od0=option_data.0 od1=option_data.1 %}
+        <div class="flex items-center justify-center gap-8 mt-6 pt-5 border-t border-border/40">
+            <!-- SVG Donut -->
+            <div class="relative flex-shrink-0">
+                <svg width="110" height="110" viewBox="0 0 110 110" id="donut-chart">
+                    <!-- Background ring -->
+                    <circle cx="55" cy="55" r="40" fill="none" stroke="hsl(var(--muted))" stroke-width="14"/>
+                    <!-- Option A arc (emerald) -->
+                    <circle cx="55" cy="55" r="40" fill="none"
+                            stroke="hsl(142 71% 45%)"
+                            stroke-width="14"
+                            stroke-dasharray="{{ od0.percentage|floatformat:1 }} {{ od1.percentage|floatformat:1 }}"
+                            stroke-dashoffset="0"
+                            stroke-linecap="butt"
+                            transform="rotate(-90 55 55)"
+                            id="donut-arc-a"
+                            class="donut-ring"
+                            pathLength="100"/>
+                    <!-- Option B arc (rose) -->
+                    <circle cx="55" cy="55" r="40" fill="none"
+                            stroke="hsl(346 77% 50%)"
+                            stroke-width="14"
+                            stroke-dasharray="{{ od1.percentage|floatformat:1 }} {{ od0.percentage|floatformat:1 }}"
+                            stroke-dashoffset="-{{ od0.percentage|floatformat:1 }}"
+                            stroke-linecap="butt"
+                            transform="rotate(-90 55 55)"
+                            id="donut-arc-b"
+                            class="donut-ring"
+                            pathLength="100"/>
+                    <!-- Centre label -->
+                    <text x="55" y="51" text-anchor="middle" class="fill-foreground" style="font-size:13px;font-weight:700;fill:hsl(var(--foreground))">{{ total_votes }}</text>
+                    <text x="55" y="63" text-anchor="middle" style="font-size:8px;fill:hsl(var(--muted-foreground))">votes</text>
+                </svg>
+            </div>
+            <!-- Legend -->
+            <div class="space-y-2 text-sm">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-sm bg-emerald-500 flex-shrink-0"></span>
+                    <span class="text-foreground font-medium truncate max-w-[160px]">{{ od0.option.text }}</span>
+                    <span class="ml-auto pl-3 font-bold text-emerald-600 dark:text-emerald-400" id="legend-pct-a">{{ od0.percentage }}%</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-sm bg-rose-500 flex-shrink-0"></span>
+                    <span class="text-foreground font-medium truncate max-w-[160px]">{{ od1.option.text }}</span>
+                    <span class="ml-auto pl-3 font-bold text-rose-600 dark:text-rose-400" id="legend-pct-b">{{ od1.percentage }}%</span>
+                </div>
+            </div>
+        </div>
+        {% endwith %}
+        {% endif %}
+
+    </div><!-- /poll-card -->
+
+    <!-- Comments section: two columns -->
+    {% if voted_option_id %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="comments-grid">
+        {% for od in option_data %}
+        <div class="poll-card p-5" id="side-{{ od.option.id }}">
+            <!-- Side header -->
+            <div class="flex items-center gap-2 mb-4">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full {% if forloop.first %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50{% else %}bg-rose-100 text-rose-700 dark:bg-rose-900/50{% endif %} text-xs font-bold">{% if forloop.first %}A{% else %}B{% endif %}</span>
+                <h2 class="font-bold text-sm text-foreground truncate">{{ od.option.text }}</h2>
+                <span class="ml-auto text-xs text-muted-foreground">{{ od.comments|length }} comment{{ od.comments|length|pluralize }}</span>
+            </div>
+
+            <!-- Comment submission (only on user's chosen side, and only if not commented yet) -->
+            {% if od.option.id|stringformat:'s' == voted_option_id %}
+            {% with has_commented=False %}
+            {% for cw in od.comments %}{% if cw.comment.user == user %}{% with has_commented=True %}{% endwith %}{% endif %}{% endfor %}
+            <div id="comment-form-{{ od.option.id }}" class="mb-4">
+                <div id="comment-form-inner-{{ od.option.id }}">
+                    <textarea id="comment-text-{{ od.option.id }}"
+                              class="comment-input mb-2" rows="2"
+                              placeholder="Why did you choose this? Share your thoughts…"
+                              maxlength="500"></textarea>
+                    <div class="flex items-center justify-between">
+                        <span id="comment-error-{{ od.option.id }}" class="text-xs text-destructive hidden"></span>
+                        <button type="button"
+                                onclick="submitPollComment('{{ poll.id }}', {{ od.option.id }})"
+                                class="ml-auto inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition">
+                            Post
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endwith %}
+            {% endif %}
+
+            <!-- Existing comments -->
+            <div class="space-y-3" id="comments-list-{{ od.option.id }}">
+                {% for cw in od.comments %}
+                <div class="comment-card" id="comment-{{ cw.comment.id }}">
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <div class="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">
+                            {{ cw.comment.user.username|first|upper }}
+                        </div>
+                        <span class="text-xs font-semibold text-foreground">{{ cw.comment.user.username }}</span>
+                        <span class="ml-auto text-[10px] text-muted-foreground">{{ cw.comment.created_at|date:"M j" }}</span>
+                    </div>
+                    <p class="text-sm text-foreground leading-relaxed mb-2">{{ cw.comment.content }}</p>
+                    <!-- Reactions -->
+                    <div class="flex items-center gap-3">
+                        {% if user.is_authenticated and cw.comment.user != user %}
+                        <button type="button"
+                                onclick="reactPollComment('{{ cw.comment.id }}', 'like')"
+                                class="inline-flex items-center gap-1 text-xs font-semibold transition
+                                {% if cw.user_reaction == 'like' %}text-primary{% else %}text-muted-foreground hover:text-primary{% endif %}"
+                                id="like-btn-{{ cw.comment.id }}">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
+                            <span id="like-count-{{ cw.comment.id }}">{{ cw.comment.likes }}</span>
+                        </button>
+                        <button type="button"
+                                onclick="reactPollComment('{{ cw.comment.id }}', 'dislike')"
+                                class="inline-flex items-center gap-1 text-xs font-semibold transition
+                                {% if cw.user_reaction == 'dislike' %}text-destructive{% else %}text-muted-foreground hover:text-destructive{% endif %}"
+                                id="dislike-btn-{{ cw.comment.id }}">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"/></svg>
+                            <span id="dislike-count-{{ cw.comment.id }}">{{ cw.comment.dislikes }}</span>
+                        </button>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
+                            {{ cw.comment.likes }}
+                        </span>
+                        <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"/></svg>
+                            {{ cw.comment.dislikes }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-xs text-muted-foreground text-center py-4" id="empty-{{ od.option.id }}">No comments yet on this side.</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% elif user.is_authenticated %}
+    <p class="text-center text-sm text-muted-foreground">Vote to unlock the comment sections.</p>
+    {% endif %}
+
+</div><!-- /container -->
+
+<script>
+const POLL_ID = '{{ poll.id }}';
+const CSRF_TOKEN = '{{ csrf_token }}';
+
+function castVote(pollId, optionId) {
+    fetch(`/polls/${pollId}/vote/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ option_id: optionId }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'Vote failed.');
+        }
+    })
+    .catch(() => alert('Network error. Please try again.'));
+}
+
+function submitPollComment(pollId, optionId) {
+    const textarea = document.getElementById(`comment-text-${optionId}`);
+    const errorEl = document.getElementById(`comment-error-${optionId}`);
+    const content = textarea ? textarea.value.trim() : '';
+    if (!content) {
+        showCommentError(optionId, 'Please write something first.');
+        return;
+    }
+    errorEl && errorEl.classList.add('hidden');
+
+    fetch(`/polls/${pollId}/comment/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ option_id: optionId, content }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const c = data.comment;
+            const list = document.getElementById(`comments-list-${optionId}`);
+            const empty = document.getElementById(`empty-${optionId}`);
+            if (empty) empty.remove();
+            const el = document.createElement('div');
+            el.className = 'comment-card';
+            el.id = `comment-${c.id}`;
+            el.innerHTML = `
+                <div class="flex items-center gap-2 mb-1.5">
+                    <div class="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">${c.username[0].toUpperCase()}</div>
+                    <span class="text-xs font-semibold text-foreground">${c.username}</span>
+                    <span class="ml-auto text-[10px] text-muted-foreground">${c.created_at}</span>
+                </div>
+                <p class="text-sm text-foreground leading-relaxed mb-2">${escapeHtml(c.content)}</p>
+                <div class="flex items-center gap-3">
+                    <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
+                        0
+                    </span>
+                </div>`;
+            list.appendChild(el);
+            const formInner = document.getElementById(`comment-form-inner-${optionId}`);
+            if (formInner) {
+                formInner.innerHTML = '<p class="text-xs text-muted-foreground py-1">Your comment has been posted.</p>';
+            }
+        } else {
+            showCommentError(optionId, data.error || 'Failed to post comment.');
+        }
+    })
+    .catch(() => showCommentError(optionId, 'Network error. Please try again.'));
+}
+
+function showCommentError(optionId, msg) {
+    const el = document.getElementById(`comment-error-${optionId}`);
+    if (el) { el.textContent = msg; el.classList.remove('hidden'); }
+}
+
+function reactPollComment(commentId, reaction) {
+    fetch('/polls/comment/react/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ comment_id: commentId, reaction }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const lc = document.getElementById(`like-count-${commentId}`);
+            const dc = document.getElementById(`dislike-count-${commentId}`);
+            if (lc) lc.textContent = data.likes;
+            if (dc) dc.textContent = data.dislikes;
+            const lb = document.getElementById(`like-btn-${commentId}`);
+            const db = document.getElementById(`dislike-btn-${commentId}`);
+            if (lb && db) {
+                if (reaction === 'like') {
+                    lb.classList.add('text-primary'); lb.classList.remove('text-muted-foreground','hover:text-primary');
+                    db.classList.remove('text-destructive'); db.classList.add('text-muted-foreground','hover:text-destructive');
+                } else {
+                    db.classList.add('text-destructive'); db.classList.remove('text-muted-foreground','hover:text-destructive');
+                    lb.classList.remove('text-primary'); lb.classList.add('text-muted-foreground','hover:text-primary');
+                }
+            }
+        }
+    });
+}
+
+function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+{% endblock %}

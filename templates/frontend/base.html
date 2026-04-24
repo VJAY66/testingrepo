@@ -2365,11 +2365,52 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
                         </svg>
                     </button>
-                    <div class="nav-brand flex items-center">
-                        <a href="{% url 'index' %}" class="text-xl font-bold text-primary">
+                    <div class="nav-brand flex items-center" style="position:relative;">
+                        <button type="button" id="nav-hub-toggle" onclick="toggleHubMenu()" class="flex items-center gap-1 text-xl font-bold text-primary hover:text-primary/80 transition-colors focus:outline-none" aria-haspopup="true" aria-expanded="false">
                             Discussion Hub
-                        </a>
+                            <svg id="nav-hub-chevron" class="w-4 h-4 mt-0.5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div id="nav-hub-menu" class="hidden absolute left-0 top-full mt-2 w-52 rounded-2xl border border-border bg-card shadow-xl shadow-black/10 z-[200] overflow-hidden" style="backdrop-filter:blur(16px);">
+                            <div class="p-1.5 space-y-0.5">
+                                <a href="{% url 'index' %}" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors">
+                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-base dark:bg-emerald-900/40">🗳️</span>
+                                    Yes / No Questions
+                                </a>
+                                <a href="{% url 'polls_list' %}" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors">
+                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-base dark:bg-blue-900/40">📊</span>
+                                    Polls
+                                </a>
+                                <div class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-muted-foreground opacity-60 cursor-not-allowed">
+                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-base dark:bg-violet-900/40">💬</span>
+                                    Questions <span class="ml-auto text-[10px] font-bold tracking-wide uppercase text-violet-500">Soon</span>
+                                </div>
+                                <div class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-muted-foreground opacity-60 cursor-not-allowed">
+                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-base dark:bg-amber-900/40">⭐</span>
+                                    Reviews <span class="ml-auto text-[10px] font-bold tracking-wide uppercase text-amber-500">Soon</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                    <script>
+                    function toggleHubMenu() {
+                        const menu = document.getElementById('nav-hub-menu');
+                        const chevron = document.getElementById('nav-hub-chevron');
+                        const btn = document.getElementById('nav-hub-toggle');
+                        const isHidden = menu.classList.contains('hidden');
+                        menu.classList.toggle('hidden', !isHidden);
+                        chevron.style.transform = isHidden ? 'rotate(180deg)' : '';
+                        btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+                    }
+                    document.addEventListener('click', function(e) {
+                        const menu = document.getElementById('nav-hub-menu');
+                        const btn = document.getElementById('nav-hub-toggle');
+                        if (menu && btn && !btn.contains(e.target) && !menu.contains(e.target)) {
+                            menu.classList.add('hidden');
+                            document.getElementById('nav-hub-chevron').style.transform = '';
+                            btn.setAttribute('aria-expanded', 'false');
+                        }
+                    });
+                    </script>
                     {% if user.is_authenticated %}
                     <div class="nav-quick-links">
                         {% if request.resolver_match.url_name != 'index' %}
