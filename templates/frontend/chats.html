@@ -416,11 +416,14 @@ body:has(.ch-page) {
                         data-filter="{{ chat.opponent|lower }} {{ chat.title|lower }} {{ chat.last_message|default:''|lower }}"
                         data-chat-url="{% url 'debate_chat' chat.id %}?return_to={% url 'chats' %}?chat={{ chat.id }}"
                         onclick="openDesktopChat('{{ chat.id }}', this)">
+                        <span style="position:relative;flex-shrink:0;display:inline-flex;">
                         {% if chat.opponent_avatar %}
                         <img src="{{ chat.opponent_avatar }}" alt="{{ chat.opponent }}" class="ch-avatar" loading="lazy">
                         {% else %}
                         <span class="ch-avatar-fallback">{{ chat.opponent|slice:':1'|upper }}</span>
                         {% endif %}
+                        {% if chat.opponent_is_online %}<span style="position:absolute;bottom:1px;right:1px;width:9px;height:9px;border-radius:50%;background:#22c55e;border:2px solid hsl(var(--card));"></span>{% endif %}
+                        </span>
                         <span class="ch-meta">
                             <span class="ch-name-line">
                                 <span class="ch-name">@{{ chat.opponent }}</span>
@@ -533,6 +536,13 @@ function bindChatSearch(inputId, listSelector) {
 document.addEventListener('DOMContentLoaded', function() {
   bindChatSearch('ch-desktop-search', '#ch-desktop-list');
   bindChatSearch('ch-mobile-search', '#ch-mobile-list');
+
+  // Mark the initially-selected chat as read when the page loads
+  {% if selected_chat_id %}
+  if (window.ChatListManager && typeof ChatListManager.markChatRead === 'function') {
+      ChatListManager.markChatRead('{{ selected_chat_id }}');
+  }
+  {% endif %}
 });
 
 // Ensure only one chat is active and open correct conversation
@@ -554,10 +564,13 @@ function openDesktopChat(chatId, btn) {
     if (placeholder) {
         placeholder.classList.add('hidden');
     }
-    // Hide unread badge for this chat
+    // Hide unread badge for this chat and mark it read in localStorage
     var unread = btn.querySelector('[data-unread-badge]');
     if (unread) {
         unread.classList.add('hidden');
+    }
+    if (window.ChatListManager && typeof ChatListManager.markChatRead === 'function') {
+        ChatListManager.markChatRead(chatId);
     }
 }
 </script>

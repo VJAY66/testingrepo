@@ -1661,12 +1661,15 @@ def _build_chat_payload_for_user(user, only_active=False):
         except Exception:
             opp_avatar = ''
 
+        opp_is_online = _is_user_online(opponent)
+
         chats.append({
             'id': str(debate.id),
             'post_id': str(debate.post_id) if debate.post_id else '',
             'title': debate.context_title,
             'opponent': opponent.username,
             'opponent_avatar': opp_avatar,
+            'opponent_is_online': opp_is_online,
             'is_active': p.is_active,
             'last_message': _decode_chat_content_from_storage(last_msg.content)[:100] if last_msg else None,
             'last_message_sender': last_msg.sender.username if last_msg else None,

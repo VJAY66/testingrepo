@@ -2315,6 +2315,7 @@
           d.messages.forEach(addMsg);
           d.messages.forEach(updateReactionSummaryUI);
           updateStickyDate();
+          if (isEmbedded && d.messages.length) markCurrentChatRead();
           return;
         }
         if (d.error === 'Access denied') {
@@ -2506,6 +2507,8 @@
   }
 
   scrollBottom();
+  // When embedded in the chats iframe, mark as read immediately on load.
+  if (isEmbedded) markCurrentChatRead();
   updateComposerState();
   refreshActionButtons();
   updateSupporterBadges();
