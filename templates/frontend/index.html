@@ -6,445 +6,29 @@
 <style>
     html { scroll-behavior: smooth; }
 
-    .home-fullbleed {
-        width: 100%;
-        margin-left: 0;
-        margin-right: 0;
-        padding-left: 0;
-        padding-right: 0;
-        padding-bottom: 1.75rem;
+    /* ── Sticky filter bar ── */
+    .home-filter-bar {
+        position: sticky;
+        top: 56px;
+        z-index: 90;
+        background: hsl(var(--background) / 0.82);
+        backdrop-filter: blur(20px) saturate(160%);
+        -webkit-backdrop-filter: blur(20px) saturate(160%);
+        border-bottom: 1px solid hsl(var(--border) / 0.5);
     }
+    .hfb-inner { display:flex; align-items:center; gap:8px; overflow-x:auto; scrollbar-width:none; padding: 10px 16px; }
+    .hfb-inner::-webkit-scrollbar { display:none; }
+    .hfb-pill { flex-shrink:0; display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; border:1px solid hsl(var(--border)); background:hsl(var(--card)/0.6); color:hsl(var(--muted-foreground)); transition:all 0.18s ease; text-decoration:none; }
+    .hfb-pill:hover { background:hsl(var(--background)); border-color:hsl(var(--primary)/0.55); color:hsl(var(--foreground)); transform:translateY(-1px); box-shadow:0 4px 14px -6px hsl(var(--primary)/0.22); }
+    .hfb-pill.hfb-active { background-image:var(--float-gradient); background-color:transparent!important; border-color:transparent; color:hsl(var(--primary-foreground)); box-shadow:0 4px 18px -6px hsl(var(--primary)/0.52); }
+    .hfb-pill.hfb-active:hover { transform:translateY(-1px); }
 
-    .galaxy-stage {
-        --planet-a: rgba(34, 211, 238, 0.18);
-        --planet-b: rgba(20, 184, 166, 0.16);
-        --planet-c: rgba(245, 158, 11, 0.15);
-        --ring: rgba(148, 163, 184, 0.22);
-        --star: rgba(15, 23, 42, 0.18);
-        --nebula-1: rgba(255, 255, 255, 0.32);
-        --nebula-2: rgba(56, 189, 248, 0.14);
-    }
-
-    html[data-theme="dark"] .galaxy-stage,
-    html.dark .galaxy-stage {
-        --planet-a: rgba(56, 189, 248, 0.22);
-        --planet-b: rgba(45, 212, 191, 0.2);
-        --planet-c: rgba(251, 191, 36, 0.18);
-        --ring: rgba(148, 163, 184, 0.28);
-        --star: rgba(241, 245, 249, 0.2);
-        --nebula-1: rgba(255, 255, 255, 0.1);
-        --nebula-2: rgba(45, 212, 191, 0.1);
-    }
-
-    .ag-stage {
-        position: relative;
-        isolation: isolate;
-        overflow: hidden;
-    }
-
-    .ag-stage::before {
-        content: "";
-        position: absolute;
-        inset: -15% -10% auto -10%;
-        height: 74%;
-        background:
-            radial-gradient(circle at 18% 24%, rgba(255,255,255,0.22), transparent 38%),
-            radial-gradient(circle at 82% 18%, rgba(45,212,191,0.12), transparent 34%),
-            radial-gradient(circle at 52% -2%, rgba(245,158,11,0.10), transparent 30%);
-        z-index: -2;
-        pointer-events: none;
-    }
-
-    .ag-stage::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background-image:
-            linear-gradient(to right, rgba(148,163,184,0.06) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(148,163,184,0.05) 1px, transparent 1px);
-        background-size: 28px 28px;
-        mask-image: radial-gradient(circle at 50% 20%, black 38%, transparent 80%);
-        opacity: 0.45;
-        z-index: -1;
-        pointer-events: none;
-    }
-
-    .galaxy-layer {
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        z-index: -1;
-        overflow: hidden;
-    }
-
-    .galaxy-nebula {
-        position: absolute;
-        inset: -8% -10% auto -10%;
-        height: 78%;
-        background:
-            radial-gradient(circle at 20% 24%, var(--nebula-1), transparent 36%),
-            radial-gradient(circle at 78% 20%, var(--nebula-2), transparent 34%),
-            radial-gradient(circle at 56% 4%, rgba(251, 191, 36, 0.07), transparent 30%);
-        filter: blur(2px);
-        opacity: 0.9;
-    }
-
-    .galaxy-stars,
-    .galaxy-stars::before,
-    .galaxy-stars::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background-image: radial-gradient(circle, var(--star) 1px, transparent 1.5px);
-        background-size: 26px 26px;
-        opacity: 0.28;
-    }
-
-    .galaxy-stars::before {
-        transform: translate3d(-8px, 10px, 0) scale(1.05);
-        opacity: 0.2;
-        background-size: 34px 34px;
-    }
-
-    .galaxy-stars::after {
-        transform: translate3d(10px, -6px, 0) scale(0.95);
-        opacity: 0.14;
-        background-size: 18px 18px;
-    }
-
-    .planet {
-        position: absolute;
-        border-radius: 999px;
-        pointer-events: none;
-        box-shadow: inset -8px -10px 20px rgba(15, 23, 42, 0.12), inset 6px 8px 12px rgba(255, 255, 255, 0.18);
-        filter: saturate(110%);
-    }
-
-    .planet-a {
-        width: 138px;
-        height: 138px;
-        top: 7%;
-        left: 5%;
-        background: radial-gradient(circle at 34% 30%, rgba(255,255,255,0.5), var(--planet-a) 58%, transparent 100%);
-    }
-
-    .planet-b {
-        width: 112px;
-        height: 112px;
-        top: 19%;
-        right: 8%;
-        background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.42), var(--planet-b) 60%, transparent 100%);
-    }
-
-    .planet-c {
-        width: 92px;
-        height: 92px;
-        bottom: 12%;
-        left: 18%;
-        background: radial-gradient(circle at 35% 32%, rgba(255,255,255,0.36), var(--planet-c) 62%, transparent 100%);
-    }
-
-    .planet-ring {
-        position: absolute;
-        border-radius: 999px;
-        border: 1px solid var(--ring);
-        pointer-events: none;
-        opacity: 0.65;
-    }
-
-    .planet-ring-a {
-        width: 178px;
-        height: 62px;
-        top: 11%;
-        left: 1.6%;
-        transform: rotate(-18deg);
-    }
-
-    .planet-ring-b {
-        width: 146px;
-        height: 50px;
-        top: 23%;
-        right: 4.7%;
-        transform: rotate(14deg);
-    }
-
-    @keyframes planetDriftA {
-        0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-        50% { transform: translate3d(10px, -12px, 0) scale(1.03); }
-    }
-
-    @keyframes planetDriftB {
-        0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-        50% { transform: translate3d(-12px, 9px, 0) scale(0.97); }
-    }
-
-    @keyframes planetDriftC {
-        0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-        50% { transform: translate3d(8px, -8px, 0) scale(1.02); }
-    }
-
-    @keyframes ringTiltA {
-        0%, 100% { transform: rotate(-16deg) translate3d(0,0,0); }
-        50% { transform: rotate(-12deg) translate3d(4px,-3px,0); }
-    }
-
-    @keyframes ringTiltB {
-        0%, 100% { transform: rotate(14deg) translate3d(0,0,0); }
-        50% { transform: rotate(18deg) translate3d(-3px,2px,0); }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .planet,
-        .planet-ring,
-        .ag-orb,
-        .hero-glow::after {
-            animation: none !important;
-        }
-    }
-
-    .ag-orb {
-        position: absolute;
-        border-radius: 999px;
-        filter: blur(0.5px);
-        pointer-events: none;
-        z-index: -1;
-    }
-
-    .ag-orb-1 {
-        width: 240px;
-        height: 240px;
-        top: -42px;
-        left: -58px;
-        background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.36), rgba(34,211,238,0.12) 52%, transparent 74%);
-    }
-
-    .ag-orb-2 {
-        width: 210px;
-        height: 210px;
-        top: 26%;
-        right: -48px;
-        background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.28), rgba(245,158,11,0.13) 58%, transparent 78%);
-        animation-delay: 1.6s;
-    }
-
-    .ag-orb-3 {
-        width: 170px;
-        height: 170px;
-        bottom: 8%;
-        left: 18%;
-        background: radial-gradient(circle at 38% 38%, rgba(255,255,255,0.28), rgba(45,212,191,0.16) 55%, transparent 76%);
-        animation-delay: 3s;
-    }
-
-    @keyframes agDrift {
-        0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-        35% { transform: translate3d(0, -10px, 0) scale(1.02); }
-        70% { transform: translate3d(0, 8px, 0) scale(0.98); }
-    }
-
+    /* ── Post cards ── */
     .glass-panel {
-        background:
-            linear-gradient(152deg, hsl(var(--card) / 0.84), hsl(var(--card) / 0.58)),
-            radial-gradient(circle at 8% 10%, rgba(255,255,255,0.34), transparent 30%);
-        box-shadow:
-            0 24px 64px -44px rgba(15, 23, 42, 0.78),
-            inset 0 1px 0 rgba(255,255,255,0.18);
-        backdrop-filter: blur(16px) saturate(130%);
-        -webkit-backdrop-filter: blur(16px) saturate(130%);
-    }
-
-    .hero-glow {
-        box-shadow:
-            0 26px 70px -48px hsl(var(--primary) / 0.72),
-            0 10px 28px -20px rgba(245,158,11,0.52);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .hero-glow::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.16) 30%, transparent 60%);
-        opacity: 0;
-        pointer-events: none;
-    }
-
-    .hero-title {
-        font-size: clamp(2rem, 5vw, 3.2rem);
-        line-height: 1.2;
-        font-weight: 700;
-        letter-spacing: -0.02em;
-        margin-bottom: 14px;
-    }
-
-    .hero-kinetic-line {
-        display: inline-flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 0.35em;
-    }
-
-    .hero-kinetic-word {
-        display: inline-block;
-        opacity: 0;
-        transform: translateY(12px);
-        animation: heroWordRise 0.65s ease forwards;
-    }
-
-    .hero-kinetic-word:nth-child(1) { animation-delay: 0.05s; }
-    .hero-kinetic-word:nth-child(2) { animation-delay: 0.2s; }
-    .hero-kinetic-word:nth-child(3) { animation-delay: 0.35s; }
-
-    @keyframes heroWordRise {
-        from {
-            opacity: 0;
-            transform: translateY(12px);
-            filter: blur(3px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-            filter: blur(0);
-        }
-    }
-
-    .hero-title-accent {
-        background-image: var(--float-gradient);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
-    }
-
-    .hero-sub {
-        font-size: clamp(1rem, 2.2vw, 1.16rem);
-        max-width: 44rem;
-        margin: 0 auto 1.9rem;
-        color: hsl(var(--muted-foreground));
-        text-wrap: balance;
-    }
-
-    .search-shell {
-        max-width: 46rem;
-        margin: 0 auto;
-        padding: 8px;
-        border-radius: 999px;
-        background: hsl(var(--background) / 0.62);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.22);
-    }
-
-    .search-input-premium {
-        letter-spacing: 0.01em;
-        backdrop-filter: blur(4px);
-        -webkit-backdrop-filter: blur(4px);
-    }
-
-    html[data-theme="light"] .search-input-premium,
-    html:not([data-theme]) .search-input-premium {
-        border-width: 2px;
-    }
-
-    .hero-actions {
-        margin-top: 1.2rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.6rem;
-        flex-wrap: wrap;
-    }
-
-    .hero-action-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        border-radius: 999px;
-        padding: 0.72rem 1.12rem;
-        font-size: 13px;
-        font-weight: 700;
-        letter-spacing: 0.01em;
-        transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
-    }
-
-    .hero-action-btn:hover { transform: translateY(-1px); }
-
-    .hero-action-outline {
-        color: hsl(var(--foreground));
-        background: hsl(var(--background) / 0.56);
-        box-shadow: inset 0 0 0 1px hsl(var(--border) / 0.45);
-    }
-
-    .hero-action-outline:hover {
-        box-shadow: 0 12px 24px -18px rgba(15, 23, 42, 0.48);
-        box-shadow: 0 12px 24px -18px rgba(15, 23, 42, 0.48), inset 0 0 0 1px hsl(var(--primary) / 0.45);
-    }
-
-    .hero-action-solid {
-        color: hsl(var(--primary-foreground));
-        background-image: var(--float-gradient);
-        box-shadow: 0 14px 28px -18px hsl(var(--primary) / 0.72);
-    }
-
-    .hero-action-solid:hover {
-        box-shadow: 0 18px 32px -18px hsl(var(--primary) / 0.9);
-    }
-
-    .cat-card {
-        padding: 0.62rem 0.58rem;
-        border-radius: 0.92rem;
-        background: linear-gradient(148deg, hsl(var(--card) / 0.84), hsl(var(--card) / 0.62));
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        box-shadow: inset 0 0 0 1px hsl(var(--border) / 0.32);
-        transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 220ms ease;
-    }
-
-    .cat-card:hover {
-        transform: translateY(-2px) scale(1.015);
-        box-shadow: 0 18px 30px -24px hsl(var(--primary) / 0.52), inset 0 0 0 1px hsl(var(--primary) / 0.36);
-        background: linear-gradient(148deg, hsl(var(--card) / 0.9), hsl(var(--card) / 0.68));
-    }
-
-    .cat-card .cat-label { opacity: 0.93; transition: opacity 180ms ease; }
-    .cat-card:hover .cat-label { opacity: 1; }
-
-    .cat-icon {
-        width: 1.84rem;
-        height: 1.84rem;
-        border-radius: 999px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.96rem;
-        background: hsl(var(--background) / 0.8);
-        border: 1px solid hsl(var(--border) / 0.8);
-        margin-bottom: 0.34rem;
-    }
-
-    .section-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 0.95rem;
-    }
-
-    .section-title {
-        font-size: 1.45rem;
-        line-height: 1.2;
-        font-weight: 700;
-        letter-spacing: -0.015em;
-    }
-
-    .section-chip {
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        padding: 6px 10px;
-        border-radius: 999px;
-        color: hsl(var(--muted-foreground));
-        background: hsl(var(--background) / 0.54);
-        box-shadow: inset 0 0 0 1px hsl(var(--border) / 0.45);
+        background: hsl(var(--card));
+        border: 1px solid hsl(var(--border) / 0.7);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
     }
 
     .trend-card {
@@ -455,24 +39,19 @@
         display: flex;
         gap: 12px;
         align-items: flex-start;
-        box-shadow: inset 0 0 0 1px hsl(var(--border) / 0.28);
     }
-
     .trend-card::before {
         content: "";
         position: absolute;
         inset: 0;
-        background: linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.06) 32%, transparent 67%);
+        background: linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.05) 32%, transparent 67%);
         opacity: 0;
         transform: translateX(-32%);
         transition: opacity 230ms ease, transform 310ms ease;
         pointer-events: none;
     }
-
-    .trend-card:hover::before {
-        opacity: 1;
-        transform: translateX(16%);
-    }
+    .trend-card:hover::before { opacity: 1; transform: translateX(16%); }
+    .trend-card:hover { border-color: hsl(var(--primary) / 0.3); box-shadow: 0 6px 28px -12px hsl(var(--primary) / 0.15); }
 
     .trend-side {
         width: 4px;
@@ -482,195 +61,47 @@
         background: linear-gradient(to bottom, hsl(var(--primary)), #14b8a6, hsl(var(--accent)));
         opacity: 0.86;
     }
+    .trend-title { font-size: 1.05rem; line-height: 1.35; font-weight: 700; }
+    .trend-meta { display:flex; align-items:center; gap:10px; flex-wrap:wrap; color:hsl(var(--muted-foreground)); font-size:12px; }
+    .trend-pill { border-radius:999px; border:1px solid hsl(var(--border)); background:hsl(var(--background)/0.64); padding:4px 9px; font-weight:600; }
 
-    .trend-open {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        margin-top: 4px;
-        font-size: 12px;
-        font-weight: 700;
-        color: hsl(var(--primary));
-        transition: gap 180ms ease, opacity 180ms ease;
-        opacity: 0.88;
-    }
-
-    .trend-card:hover .trend-open { gap: 9px; opacity: 1; }
-
-    .trend-title {
-        font-size: 1.08rem;
-        line-height: 1.35;
-        font-weight: 700;
-    }
-
-    .trend-meta {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
-        color: hsl(var(--muted-foreground));
-        font-size: 12px;
-    }
-
-    .trend-pill {
-        border-radius: 999px;
-        border: 1px solid hsl(var(--border));
-        background: hsl(var(--background) / 0.64);
-        padding: 4px 9px;
-        font-weight: 600;
-    }
-
-    .cta-panel {
-        border-radius: 1.2rem;
-        padding: 1.35rem;
-    }
-
-    .tab-button {
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: 0;
-        transition: opacity 0.2s ease;
-    }
-
-    .tab-button.active .section-title {
-        color: hsl(var(--primary));
-    }
-
-    .tab-button:not(.active) {
-        opacity: 0.6;
-    }
-
-    .posts-container {
-        display: block;
-    }
-
-    .posts-container.hidden {
-        display: none;
-    }
-
-    .feed-star-like svg {
-        transform-origin: 50% 46%;
-    }
-
+    .feed-star-like svg { transform-origin: 50% 46%; }
     @keyframes starHoverTwinkle {
-        0%,
-        100% {
-            transform: scale(1) rotate(0deg);
-            filter: drop-shadow(0 0 0 rgba(250, 204, 21, 0));
-        }
-        45% {
-            transform: scale(1.1) rotate(-7deg);
-            filter: drop-shadow(0 0 10px rgba(250, 204, 21, 0.45));
-        }
-        75% {
-            transform: scale(1.06) rotate(5deg);
-            filter: drop-shadow(0 0 8px rgba(253, 224, 71, 0.35));
-        }
+        0%,100% { transform:scale(1) rotate(0deg); filter:drop-shadow(0 0 0 rgba(250,204,21,0)); }
+        45% { transform:scale(1.1) rotate(-7deg); filter:drop-shadow(0 0 10px rgba(250,204,21,0.45)); }
+        75% { transform:scale(1.06) rotate(5deg); filter:drop-shadow(0 0 8px rgba(253,224,71,0.35)); }
     }
-
     @keyframes starLikePop {
-        0% {
-            transform: scale(0.86) rotate(-14deg);
-        }
-        48% {
-            transform: scale(1.22) rotate(10deg);
-        }
-        100% {
-            transform: scale(1) rotate(0deg);
-        }
+        0% { transform:scale(0.86) rotate(-14deg); }
+        48% { transform:scale(1.22) rotate(10deg); }
+        100% { transform:scale(1) rotate(0deg); }
     }
-
-    .feed-star-like:hover svg {
-        animation: starHoverTwinkle 820ms cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    .feed-star-like.like-pop svg {
-        animation: starLikePop 460ms cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .feed-star-like:hover svg,
-        .feed-star-like.like-pop svg {
-            animation: none !important;
-        }
-    }
-
-    /* ── Category Filter Bar ───────────────────────── */
-    .category-filter-bar::-webkit-scrollbar { display: none; }
-
-    .category-filter-pill--idle {
-        background: hsl(var(--card) / 0.72);
-        border-color: hsl(var(--border));
-        color: hsl(var(--muted-foreground));
-        backdrop-filter: blur(8px);
-    }
-    .category-filter-pill--idle:hover {
-        background: hsl(var(--background));
-        border-color: hsl(var(--primary) / 0.55);
-        color: hsl(var(--foreground));
-        transform: translateY(-1px);
-        box-shadow: 0 4px 14px -6px hsl(var(--primary) / 0.25);
-    }
-    .category-filter-pill--active {
-        background-image: var(--float-gradient);
-        background-color: transparent !important;
-        border-color: transparent;
-        color: hsl(var(--primary-foreground));
-        box-shadow: 0 4px 18px -6px hsl(var(--primary) / 0.55);
-    }
-    .category-filter-pill--active:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 6px 22px -6px hsl(var(--primary) / 0.65);
+    .feed-star-like:hover svg { animation: starHoverTwinkle 820ms cubic-bezier(0.22,1,0.36,1); }
+    .feed-star-like.like-pop svg { animation: starLikePop 460ms cubic-bezier(0.22,1,0.36,1); }
+    @media (prefers-reduced-motion:reduce) {
+        .feed-star-like:hover svg, .feed-star-like.like-pop svg { animation:none!important; }
     }
 </style>
-<div class="home-fullbleed space-y-8" style="position:relative;z-index:1;">
 
-    {% if not is_suggested_page %}
-    <!-- Hero Section -->
-    <div class="text-center pt-7 pb-4 px-4">
-        <h1 class="text-2xl sm:text-3xl font-bold leading-tight mb-1">
-            <span class="float-gradient-text">{% if active_category %}{{ active_category }} Questions{% else %}Latest Yes/No Questions{% endif %}</span>
-        </h1>
-        <p class="text-sm text-muted-foreground">
-            Pick a side. Start a debate. See where the world stands.
-        </p>
-    </div>
-
-    <!-- Category Filter Bar -->
-    <div class="relative">
-        <div class="category-filter-bar flex items-center gap-2 overflow-x-auto pb-2 px-1" style="scrollbar-width:none;-ms-overflow-style:none;">
-            <a href="{% url 'index' %}"
-               class="category-filter-pill flex-shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold border transition-all duration-200 whitespace-nowrap {% if not active_category %}category-filter-pill--active{% else %}category-filter-pill--idle{% endif %}">
-                <span>✨</span> All
-            </a>
+<!-- Sticky Category Filter Bar -->
+{% if not is_suggested_page %}
+<div class="home-filter-bar">
+    <div class="relative max-w-5xl mx-auto">
+        <div class="hfb-inner">
+            <a href="{% url 'index' %}" class="hfb-pill {% if not active_category %}hfb-active{% endif %}"><span>✨</span> All</a>
             {% for cat in categories %}
-            <a href="?category={{ cat.name|urlencode }}"
-               class="category-filter-pill flex-shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold border transition-all duration-200 whitespace-nowrap {% if active_category == cat.name %}category-filter-pill--active{% else %}category-filter-pill--idle{% endif %}">
-                <span>{{ cat.icon }}</span> {{ cat.name }}
-            </a>
+            <a href="?category={{ cat.name|urlencode }}" class="hfb-pill {% if active_category == cat.name %}hfb-active{% endif %}"><span>{{ cat.icon }}</span> {{ cat.name }}</a>
             {% endfor %}
         </div>
-        <!-- fade edges -->
-        <div class="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent"></div>
-        <div class="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"></div>
+        <div style="pointer-events:none;position:absolute;inset-y:0;left:0;width:20px;background:linear-gradient(to right,hsl(var(--background)/0.9),transparent);"></div>
+        <div style="pointer-events:none;position:absolute;inset-y:0;right:0;width:20px;background:linear-gradient(to left,hsl(var(--background)/0.9),transparent);"></div>
     </div>
-    {% endif %}
+</div>
+{% endif %}
 
-    <!-- Posts Section -->
-    <div id="posts-section">
-        {% if not is_suggested_page %}
-        <div class="section-head">
-            <h2 class="section-title text-foreground">
-                {% if active_category %}{{ active_category }}{% elif active_tab == 'suggested' %}Suggested for You{% else %}Latest Yes/No Discussions{% endif %}
-            </h2>
-            <span class="section-chip">{% if active_category %}Filtered{% else %}Live Pulse{% endif %}</span>
-        </div>
-        {% endif %}
-
-        <div class="posts-container">
-            <div class="space-y-4">
-                {% for post in posts %}
+<div style="max-width:48rem;margin:0 auto;padding:1.5rem 1rem 2rem;" id="posts-section">
+        <div class="space-y-4">
+            {% for post in posts %}
                 {% if post.id %}
                 <div class="glass-panel trend-card transition hover:shadow-lg hover:shadow-primary/10" data-post-id="{{ post.id }}" data-share-url="{% url 'discussion' post.id %}">
                     <div class="trend-side"></div>
@@ -814,11 +245,11 @@
                     <p class="text-muted-foreground">No trending discussions yet.</p>
                     {% endif %}
                 </div>
-                {% endfor %}
-            </div>
+            {% endfor %}
+        </div>
 
-            {% if not is_suggested_page and page_obj and page_obj.paginator.num_pages > 1 %}
-            <div class="mt-6 flex items-center justify-center gap-2 sm:gap-3">
+        {% if not is_suggested_page and page_obj and page_obj.paginator.num_pages > 1 %}
+        <div class="mt-6 flex items-center justify-center gap-2 sm:gap-3">
                 {% if page_obj.has_previous %}
                 <a href="?{% if active_category %}category={{ active_category|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}#posts-section" class="inline-flex items-center justify-center rounded-full border border-border bg-card px-3 py-1.5 text-xs sm:text-sm font-semibold text-foreground hover:border-primary hover:text-primary">
                     Previous
@@ -838,9 +269,8 @@
                 {% else %}
                 <span class="inline-flex items-center justify-center rounded-full border border-border/60 bg-card/60 px-3 py-1.5 text-xs sm:text-sm font-semibold text-muted-foreground">Next</span>
                 {% endif %}
-            </div>
-            {% endif %}
-    </div>
+        </div>
+        {% endif %}
 </div>
 
 <!-- Create Post Modal -->
