@@ -1082,6 +1082,11 @@ def profile(request):
     followers_qs = request.user.follower_links.select_related('follower__profile').order_by('-created_at')
     following_qs = request.user.following_links.select_related('following__profile').order_by('-created_at')
 
+    user_reviews = Review.objects.filter(user=request.user, is_deleted_by_moderation=False).order_by('-created_at')
+    user_questions = Question.objects.filter(user=request.user, is_deleted_by_moderation=False).order_by('-created_at')
+    user_polls = Poll.objects.filter(user=request.user).order_by('-created_at')
+    user_answers = Answer.objects.filter(user=request.user, is_deleted_by_moderation=False).select_related('question').order_by('-created_at')
+
     def _card(u):
         p = getattr(u, 'profile', None)
         return {'username': u.username, 'avatar_url': p.get_picture_url if p else ''}
@@ -1092,6 +1097,10 @@ def profile(request):
         'user_debate_participations': user_debate_participations,
         'user_saved': user_saved,
         'user_followed_posts': user_followed_posts,
+        'user_reviews': user_reviews,
+        'user_questions': user_questions,
+        'user_polls': user_polls,
+        'user_answers': user_answers,
         'avatar_url': avatar_url,
         'profile_picture_url': profile_picture_url,
         'is_online': is_online,
@@ -1166,9 +1175,16 @@ def user_profile(request, username):
     if request.user.is_authenticated:
         is_following = Follow.objects.filter(follower=request.user, following=profile_user).exists()
 
+    user_reviews = Review.objects.filter(user=profile_user, is_deleted_by_moderation=False).order_by('-created_at')
+    user_questions = Question.objects.filter(user=profile_user, is_deleted_by_moderation=False).order_by('-created_at')
+    user_polls = Poll.objects.filter(user=profile_user).order_by('-created_at')
+
     context = {
         'profile_user': profile_user,
         'user_posts': user_posts,
+        'user_reviews': user_reviews,
+        'user_questions': user_questions,
+        'user_polls': user_polls,
         'avatar_url': avatar_url,
         'is_online': is_online,
         'presence_label': presence_label,
@@ -1233,18 +1249,52 @@ def report_user_profile(request, username):
     return JsonResponse({'success': True, 'message': 'Profile reported. Moderators have been notified.'})
 
 def search(request):
-    """Search page"""
-    query = request.GET.get('q', '')
-    results = []
+    query = request.GET.get('q', '').strip()
+    active_tab = request.GET.get('tab', 'posts')
+
+    post_results = []
+    review_results = []
+    question_results = []
+    poll_results = []
 
     if query:
-        results = Post.objects.filter(
+        post_results = list(Post.objects.filter(
             Q(title__icontains=query) | Q(content__icontains=query)
-        ).order_by('-created_at')
+        ).order_by('-created_at')[:50])
+
+        review_results = list(Review.objects.filter(
+            is_deleted_by_moderation=False
+        ).filter(
+            Q(subject__icontains=query) | Q(content__icontains=query)
+        ).order_by('-created_at')[:50])
+
+        question_results = list(Question.objects.filter(
+            is_deleted_by_moderation=False
+        ).filter(
+            Q(title__icontains=query) | Q(content__icontains=query)
+        ).order_by('-created_at')[:50])
+
+        poll_results = list(Poll.objects.filter(
+            Q(title__icontains=query) | Q(description__icontains=query)
+        ).order_by('-created_at')[:50])
+
+    totals = {
+        'posts': len(post_results),
+        'reviews': len(review_results),
+        'questions': len(question_results),
+        'polls': len(poll_results),
+    }
+    total_all = sum(totals.values())
 
     context = {
         'query': query,
-        'results': results,
+        'active_tab': active_tab,
+        'post_results': post_results,
+        'review_results': review_results,
+        'question_results': question_results,
+        'poll_results': poll_results,
+        'totals': totals,
+        'total_all': total_all,
     }
     return render(request, 'frontend/search.html', context)
 
@@ -3924,3 +3974,45 @@ def like_review_comment(request):
     comment.save(update_fields=['likes', 'dislikes', 'updated_at'])
 
     return JsonResponse({'success': True, 'likes': likes, 'dislikes': dislikes})
+
+
+# ─── Leaderboard ─────────────────────────────────────────────────────────────
+
+def leaderboard(request):
+    from django.contrib.auth.models import User as AuthUser
+    from django.db.models import Sum, IntegerField
+    from django.db.models.functions import Coalesce
+
+    users = AuthUser.objects.annotate(
+        post_count=Count('posts', distinct=True),
+        review_count=Count('reviews', distinct=True, filter=Q(reviews__is_deleted_by_moderation=False)),
+        question_count=Count('questions', distinct=True, filter=Q(questions__is_deleted_by_moderation=False)),
+        answer_count_ann=Count('answers', distinct=True, filter=Q(answers__is_deleted_by_moderation=False)),
+        poll_count=Count('polls', distinct=True),
+    ).filter(
+        post_count__gt=0
+    ).order_by(
+        '-post_count', '-review_count', '-question_count', '-answer_count_ann', '-poll_count'
+    )[:50]
+
+    board = []
+    for rank, u in enumerate(users, start=1):
+        total = u.post_count + u.review_count + u.question_count + u.answer_count_ann + u.poll_count
+        p = getattr(u, 'profile', None)
+        board.append({
+            'rank': rank,
+            'username': u.username,
+            'avatar_url': p.get_picture_url if p else '',
+            'post_count': u.post_count,
+            'review_count': u.review_count,
+            'question_count': u.question_count,
+            'answer_count': u.answer_count_ann,
+            'poll_count': u.poll_count,
+            'total': total,
+        })
+
+    board.sort(key=lambda x: x['total'], reverse=True)
+    for i, entry in enumerate(board):
+        entry['rank'] = i + 1
+
+    return render(request, 'frontend/leaderboard.html', {'board': board})

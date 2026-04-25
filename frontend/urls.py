@@ -71,6 +71,8 @@ urlpatterns = [
     path('questions/answer/<str:answer_id>/best/', views.mark_best_answer, name='mark_best_answer'),
     path('questions/<str:question_id>/', views.question_detail, name='question_detail'),
     path('questions/<str:question_id>/answer/', views.post_answer, name='post_answer'),
+    # Leaderboard
+    path('leaderboard/', views.leaderboard, name='leaderboard'),
     # Reviews
     path('reviews/', views.reviews_list, name='reviews_list'),
     path('reviews/create/', views.create_review, name='create_review'),

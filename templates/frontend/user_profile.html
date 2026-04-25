@@ -187,12 +187,32 @@
         </div>
     </section>
 
-    <section id="user-posts">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl sm:text-2xl font-black tracking-tight text-foreground">{{ profile_user.username }}'s Posts</h2>
-            <span class="text-xs uppercase tracking-[0.14em] text-muted-foreground">Latest First</span>
-        </div>
+    <!-- Tab bar -->
+    <div class="flex gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 shadow-sm overflow-x-auto mb-6">
+        <button type="button" id="up-tab-btn-posts" onclick="switchUserTab('posts')"
+            class="up-tab-btn active flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200 text-primary bg-primary/10 shadow-sm">
+            <span>Posts</span>
+            <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_posts.count }}</span>
+        </button>
+        <button type="button" id="up-tab-btn-reviews" onclick="switchUserTab('reviews')"
+            class="up-tab-btn flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-secondary/60">
+            <span>Reviews</span>
+            <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_reviews.count }}</span>
+        </button>
+        <button type="button" id="up-tab-btn-questions" onclick="switchUserTab('questions')"
+            class="up-tab-btn flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-secondary/60">
+            <span>Questions</span>
+            <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_questions.count }}</span>
+        </button>
+        <button type="button" id="up-tab-btn-polls" onclick="switchUserTab('polls')"
+            class="up-tab-btn flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-secondary/60">
+            <span>Polls</span>
+            <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_polls.count }}</span>
+        </button>
+    </div>
 
+    <!-- Tab: Posts -->
+    <section id="up-tab-posts">
         {% if user_posts %}
         <div class="grid gap-4 sm:gap-5">
             {% for post in user_posts %}
@@ -205,7 +225,7 @@
                         <p class="text-sm text-muted-foreground mb-2">{{ post.content|truncatechars:150 }}</p>
                         <div class="flex items-center gap-4 text-xs text-muted-foreground">
                             <span>{{ post.created_at|date:"M j, Y" }}</span>
-                            <span>{{ post.category }}</span>
+                            <span class="px-2 py-0.5 bg-secondary rounded-full">{{ post.category }}</span>
                         </div>
                     </div>
                 </div>
@@ -213,8 +233,94 @@
             {% endfor %}
         </div>
         {% else %}
-        <div class="text-center py-12">
+        <div class="rounded-2xl border border-dashed border-border bg-card/70 p-10 text-center">
             <p class="text-muted-foreground">No posts yet.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- Tab: Reviews -->
+    <section id="up-tab-reviews" class="hidden">
+        {% if user_reviews %}
+        <div class="space-y-4">
+            {% for review in user_reviews %}
+            <article class="group rounded-2xl border border-border/70 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
+                <div class="flex items-start justify-between gap-3 mb-2">
+                    <h3 class="text-base font-bold text-foreground leading-snug flex-1">
+                        <a href="{% url 'review_detail' review.id %}" class="hover:text-primary transition-colors">{{ review.subject }}</a>
+                    </h3>
+                    <div class="flex items-center gap-0.5 flex-shrink-0">
+                        {% for i in "12345" %}
+                        <svg class="w-3.5 h-3.5 {% if forloop.counter <= review.rating %}text-amber-400{% else %}text-muted-foreground/30{% endif %}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        {% endfor %}
+                    </div>
+                </div>
+                <p class="text-sm text-muted-foreground line-clamp-2 mb-3">{{ review.content }}</p>
+                <div class="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span class="px-2 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full font-bold">{{ review.subject_type }}</span>
+                    <span>{{ review.created_at|date:"M j, Y" }}</span>
+                    <a href="{% url 'review_detail' review.id %}" class="ml-auto text-primary/70 font-medium hover:text-primary">View →</a>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-2xl border border-dashed border-border bg-card/70 p-10 text-center">
+            <p class="text-muted-foreground">No reviews yet.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- Tab: Questions -->
+    <section id="up-tab-questions" class="hidden">
+        {% if user_questions %}
+        <div class="space-y-4">
+            {% for q in user_questions %}
+            <article class="group rounded-2xl border border-border/70 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
+                <div class="flex items-start justify-between gap-3 mb-2">
+                    <h3 class="text-base font-bold text-foreground leading-snug flex-1">
+                        <a href="{% url 'question_detail' q.id %}" class="hover:text-primary transition-colors">{{ q.title }}</a>
+                    </h3>
+                    <span class="shrink-0 px-2.5 py-0.5 bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 rounded-full text-xs font-bold">{{ q.category }}</span>
+                </div>
+                <div class="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{{ q.answer_count }} answer{{ q.answer_count|pluralize }}</span>
+                    <span>{{ q.created_at|date:"M j, Y" }}</span>
+                    <a href="{% url 'question_detail' q.id %}" class="ml-auto text-primary/70 font-medium hover:text-primary">View →</a>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-2xl border border-dashed border-border bg-card/70 p-10 text-center">
+            <p class="text-muted-foreground">No questions asked yet.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- Tab: Polls -->
+    <section id="up-tab-polls" class="hidden">
+        {% if user_polls %}
+        <div class="space-y-4">
+            {% for poll in user_polls %}
+            <article class="group rounded-2xl border border-border/70 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
+                <div class="flex items-start justify-between gap-3 mb-2">
+                    <h3 class="text-base font-bold text-foreground leading-snug flex-1">
+                        <a href="{% url 'poll_detail' poll.id %}" class="hover:text-primary transition-colors">{{ poll.title }}</a>
+                    </h3>
+                    <span class="shrink-0 px-2.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full text-xs font-bold">{{ poll.category }}</span>
+                </div>
+                <div class="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{{ poll.total_votes }} vote{{ poll.total_votes|pluralize }}</span>
+                    <span>{{ poll.created_at|date:"M j, Y" }}</span>
+                    <a href="{% url 'poll_detail' poll.id %}" class="ml-auto text-primary/70 font-medium hover:text-primary">View →</a>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-2xl border border-dashed border-border bg-card/70 p-10 text-center">
+            <p class="text-muted-foreground">No polls created yet.</p>
         </div>
         {% endif %}
     </section>
@@ -418,5 +524,23 @@ function submitProfileReport() {
         }
     });
 })();
+
+function switchUserTab(name) {
+    const tabs = ['posts', 'reviews', 'questions', 'polls'];
+    tabs.forEach(function(t) {
+        const section = document.getElementById('up-tab-' + t);
+        const btn = document.getElementById('up-tab-btn-' + t);
+        if (!section || !btn) return;
+        if (t === name) {
+            section.classList.remove('hidden');
+            btn.classList.add('active', 'text-primary', 'bg-primary/10', 'shadow-sm');
+            btn.classList.remove('text-muted-foreground', 'hover:text-foreground', 'hover:bg-secondary/60');
+        } else {
+            section.classList.add('hidden');
+            btn.classList.remove('active', 'text-primary', 'bg-primary/10', 'shadow-sm');
+            btn.classList.add('text-muted-foreground', 'hover:text-foreground', 'hover:bg-secondary/60');
+        }
+    });
+}
 </script>
 {% endblock %}
