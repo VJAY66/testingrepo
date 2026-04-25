@@ -3449,11 +3449,10 @@ def polls_list(request):
             'user_vote': user_vote,
         })
 
-    categories = [{'name': c[0]} for c in CATEGORY_CHOICES]
     return render(request, 'frontend/polls_list.html', {
         'polls_data': polls_data,
         'page_obj': page_obj,
-        'categories': categories,
+        'categories': get_frontend_categories(),
         'active_category': category_filter,
     })
 
@@ -3797,11 +3796,10 @@ def questions_list(request):
     paginator = Paginator(qs, 20)
     page_obj = paginator.get_page(request.GET.get('page', 1))
 
-    categories = [{'name': c[0]} for c in CATEGORY_CHOICES]
     return render(request, 'frontend/questions_list.html', {
         'questions': page_obj,
         'page_obj': page_obj,
-        'categories': categories,
+        'categories': get_frontend_categories(),
         'active_category': category_filter,
     })
 
