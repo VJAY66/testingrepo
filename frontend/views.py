@@ -3383,8 +3383,9 @@ def poll_detail(request, poll_id):
     for opt in options:
         cnt = opt.votes.count()
         pct = round(cnt / total_votes * 100, 1) if total_votes > 0 else 0
-        comments = opt.comments.filter(is_deleted_by_moderation=False).select_related('user')
-        # Attach user reaction to each comment
+        comments = opt.comments.filter(is_deleted_by_moderation=False).select_related('user', 'user__profile')
+        now = timezone.now()
+        online_cutoff = now - timedelta(minutes=5)
         comments_with_reaction = []
         for c in comments:
             user_reaction = None
@@ -3394,7 +3395,20 @@ def poll_detail(request, poll_id):
                     user_reaction = r.reaction
                 except PollCommentReaction.DoesNotExist:
                     pass
-            comments_with_reaction.append({'comment': c, 'user_reaction': user_reaction})
+            try:
+                p = c.user.profile
+                last_seen = p.last_seen
+                avatar_url = p.get_picture_url
+            except Exception:
+                last_seen = None
+                avatar_url = None
+            comments_with_reaction.append({
+                'comment': c,
+                'user_reaction': user_reaction,
+                'is_online': bool(last_seen and last_seen >= online_cutoff),
+                'presence_label': _presence_label(last_seen, now=now),
+                'avatar_url': avatar_url,
+            })
         option_data.append({
             'option': opt,
             'vote_count': cnt,

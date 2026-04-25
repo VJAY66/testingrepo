@@ -224,91 +224,97 @@
 
     <!-- Comments section: two columns -->
     {% if voted_option_id %}
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="comments-grid">
+    <div class="grid grid-cols-2 gap-2 md:gap-3" id="comments-grid">
         {% for od in option_data %}
-        <div class="poll-card p-5" id="side-{{ od.option.id }}">
-            <!-- Side header -->
-            <div class="flex items-center gap-2 mb-4">
-                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full {% if forloop.first %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50{% else %}bg-rose-100 text-rose-700 dark:bg-rose-900/50{% endif %} text-xs font-bold">{% if forloop.first %}A{% else %}B{% endif %}</span>
-                <h2 class="font-bold text-sm text-foreground truncate">{{ od.option.text }}</h2>
-                <span class="ml-auto text-xs text-muted-foreground">{{ od.comments|length }} comment{{ od.comments|length|pluralize }}</span>
+        <div class="space-y-2 min-w-0">
+
+            <!-- Column header -->
+            <div class="mb-3 flex items-center justify-between rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900/40 px-3 py-2">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full {% if forloop.first %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50{% else %}bg-rose-100 text-rose-700 dark:bg-rose-900/50{% endif %} text-xs font-bold">{% if forloop.first %}A{% else %}B{% endif %}</span>
+                    <p class="text-sm font-semibold {% if forloop.first %}text-green-700 dark:text-green-300{% else %}text-red-700 dark:text-red-300{% endif %} truncate">{{ od.option.text }}</p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0 ml-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400">{{ od.vote_count }}</span>
+                    <span class="text-sm font-semibold {% if forloop.first %}text-green-600 dark:text-green-400{% else %}text-red-600 dark:text-red-400{% endif %}">{{ od.percentage|floatformat:0 }}%</span>
+                </div>
             </div>
 
-            <!-- Comment submission (only on user's chosen side, and only if not commented yet) -->
+            <!-- Comment form (only on user's chosen side) -->
             {% if od.option.id|stringformat:'s' == voted_option_id %}
-            {% with has_commented=False %}
-            {% for cw in od.comments %}{% if cw.comment.user == user %}{% with has_commented=True %}{% endwith %}{% endif %}{% endfor %}
-            <div id="comment-form-{{ od.option.id }}" class="mb-4">
-                <div id="comment-form-inner-{{ od.option.id }}">
+            <div id="comment-form-{{ od.option.id }}" class="mb-2">
+                <div id="comment-form-inner-{{ od.option.id }}" class="rounded-2xl border {% if forloop.first %}border-emerald-200/80 bg-gradient-to-br from-white via-emerald-50/70 to-green-50/60 dark:border-emerald-500/20 dark:from-slate-900/90 dark:via-slate-900/85 dark:to-emerald-950/55{% else %}border-rose-200/80 bg-gradient-to-br from-white via-rose-50/70 to-red-50/60 dark:border-rose-500/20 dark:from-slate-900/90 dark:via-slate-900/85 dark:to-rose-950/55{% endif %} p-4 shadow-sm">
                     <textarea id="comment-text-{{ od.option.id }}"
-                              class="comment-input mb-2" rows="2"
-                              placeholder="Why did you choose this? Share your thoughts…"
+                              class="w-full rounded-2xl border {% if forloop.first %}border-emerald-200/70 focus:border-emerald-400 focus:ring-emerald-500/20 dark:border-emerald-500/30{% else %}border-rose-200/70 focus:border-rose-400 focus:ring-rose-500/20 dark:border-rose-500/30{% endif %} bg-white/85 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:ring-2 dark:bg-slate-900/70 resize-none outline-none transition"
+                              rows="2"
+                              placeholder="Share why you chose {{ od.option.text }}…"
                               maxlength="500"></textarea>
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between mt-3">
                         <span id="comment-error-{{ od.option.id }}" class="text-xs text-destructive hidden"></span>
                         <button type="button"
                                 onclick="submitPollComment('{{ poll.id }}', {{ od.option.id }})"
-                                class="ml-auto inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition">
+                                class="ml-auto inline-flex items-center gap-1.5 px-5 py-2 rounded-full {% if forloop.first %}bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400{% else %}bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-400 hover:to-red-400{% endif %} text-white text-xs font-semibold shadow-sm transition">
                             Post
                         </button>
                     </div>
                 </div>
             </div>
-            {% endwith %}
             {% endif %}
 
-            <!-- Existing comments -->
-            <div class="space-y-3" id="comments-list-{{ od.option.id }}">
+            <!-- Comment list -->
+            <div class="space-y-2" id="comments-list-{{ od.option.id }}">
                 {% for cw in od.comments %}
-                <div class="comment-card" id="comment-{{ cw.comment.id }}">
-                    <div class="flex items-center gap-2 mb-1.5">
-                        <div class="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">
-                            {{ cw.comment.user.username|first|upper }}
+                <div class="border border-border rounded-2xl bg-card overflow-hidden shadow-sm" id="comment-{{ cw.comment.id }}">
+                    <div class="px-3 py-2">
+                        <p class="text-[13px] leading-5 font-medium text-foreground break-words">{{ cw.comment.content }}</p>
+                        <div class="mt-2 flex flex-wrap items-center gap-1.5 text-muted-foreground">
+                            {% if cw.avatar_url %}
+                            <img src="{{ cw.avatar_url }}" alt="{{ cw.comment.user.username }}" class="h-6 w-6 rounded-full object-cover border border-border flex-shrink-0" loading="lazy">
+                            {% else %}
+                            <div class="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-secondary text-secondary-foreground text-[10px] font-semibold">{{ cw.comment.user.username|first|upper }}</div>
+                            {% endif %}
+                            <a href="{% url 'user_profile' cw.comment.user.username %}" class="font-medium text-[12px] leading-5 truncate hover:text-primary transition-colors">{{ cw.comment.user.username }}</a>
+                            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold {% if cw.is_online %}bg-emerald-500/15 text-emerald-700 dark:text-emerald-300{% else %}bg-gray-500/15 text-gray-600 dark:text-gray-300{% endif %}">
+                                <span class="h-1.5 w-1.5 rounded-full {% if cw.is_online %}bg-emerald-500{% else %}bg-gray-400{% endif %}"></span>
+                                {% if cw.is_online %}Online{% else %}Offline{% endif %}
+                            </span>
+                            <span class="ml-auto text-[10px] text-muted-foreground">{{ cw.comment.created_at|date:"M j" }}</span>
                         </div>
-                        <span class="text-xs font-semibold text-foreground">{{ cw.comment.user.username }}</span>
-                        <span class="ml-auto text-[10px] text-muted-foreground">{{ cw.comment.created_at|date:"M j" }}</span>
-                    </div>
-                    <p class="text-sm text-foreground leading-relaxed mb-2">{{ cw.comment.content }}</p>
-                    <!-- Reactions -->
-                    <div class="flex items-center gap-3">
-                        {% if user.is_authenticated and cw.comment.user != user %}
-                        <button type="button"
-                                onclick="reactPollComment('{{ cw.comment.id }}', 'like')"
-                                class="inline-flex items-center gap-1 text-xs font-semibold transition
-                                {% if cw.user_reaction == 'like' %}text-primary{% else %}text-muted-foreground hover:text-primary{% endif %}"
-                                id="like-btn-{{ cw.comment.id }}">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
-                            <span id="like-count-{{ cw.comment.id }}">{{ cw.comment.likes }}</span>
-                        </button>
-                        <button type="button"
-                                onclick="reactPollComment('{{ cw.comment.id }}', 'dislike')"
-                                class="inline-flex items-center gap-1 text-xs font-semibold transition
-                                {% if cw.user_reaction == 'dislike' %}text-destructive{% else %}text-muted-foreground hover:text-destructive{% endif %}"
-                                id="dislike-btn-{{ cw.comment.id }}">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"/></svg>
-                            <span id="dislike-count-{{ cw.comment.id }}">{{ cw.comment.dislikes }}</span>
-                        </button>
-                        {% else %}
-                        <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
-                            {{ cw.comment.likes }}
-                        </span>
-                        <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"/></svg>
-                            {{ cw.comment.dislikes }}
-                        </span>
+                        {% if user.is_authenticated %}
+                        <div class="flex flex-wrap items-center gap-1.5 mt-1.5 pt-1.5 border-t border-border/60">
+                            {% if user != cw.comment.user %}
+                            <button onclick="reactPollComment('{{ cw.comment.id }}', 'like')"
+                                    id="like-btn-{{ cw.comment.id }}"
+                                    class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-2 py-1 hover:border-primary/40 hover:text-foreground transition {% if cw.user_reaction == 'like' %}text-primary border-primary/40{% else %}text-muted-foreground{% endif %}">
+                                👍 <span id="like-count-{{ cw.comment.id }}" class="ml-0.5">{{ cw.comment.likes }}</span>
+                            </button>
+                            <button onclick="reactPollComment('{{ cw.comment.id }}', 'dislike')"
+                                    id="dislike-btn-{{ cw.comment.id }}"
+                                    class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-2 py-1 hover:border-destructive/40 hover:text-destructive transition {% if cw.user_reaction == 'dislike' %}text-destructive border-destructive/40{% else %}text-muted-foreground{% endif %}">
+                                👎 <span id="dislike-count-{{ cw.comment.id }}" class="ml-0.5">{{ cw.comment.dislikes }}</span>
+                            </button>
+                            {% else %}
+                            <span class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-2 py-1 text-muted-foreground">👍 {{ cw.comment.likes }}</span>
+                            <span class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-2 py-1 text-muted-foreground">👎 {{ cw.comment.dislikes }}</span>
+                            {% endif %}
+                        </div>
                         {% endif %}
                     </div>
                 </div>
                 {% empty %}
-                <p class="text-xs text-muted-foreground text-center py-4" id="empty-{{ od.option.id }}">No comments yet on this side.</p>
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900/50 p-4 text-center text-sm text-gray-600 dark:text-gray-400" id="empty-{{ od.option.id }}">
+                    No arguments yet. Be the first!
+                </div>
                 {% endfor %}
             </div>
+
         </div>
         {% endfor %}
     </div>
     {% elif user.is_authenticated %}
-    <p class="text-center text-sm text-muted-foreground">Vote to unlock the comment sections.</p>
+    <div class="rounded-2xl border border-border bg-card p-5 text-center">
+        <p class="text-sm text-muted-foreground">Vote first to unlock the comment sections.</p>
+    </div>
     {% endif %}
 
 </div><!-- /container -->
@@ -357,25 +363,28 @@ function submitPollComment(pollId, optionId) {
             const empty = document.getElementById(`empty-${optionId}`);
             if (empty) empty.remove();
             const el = document.createElement('div');
-            el.className = 'comment-card';
+            el.className = 'border border-border rounded-2xl bg-card overflow-hidden shadow-sm';
             el.id = `comment-${c.id}`;
             el.innerHTML = `
-                <div class="flex items-center gap-2 mb-1.5">
-                    <div class="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">${c.username[0].toUpperCase()}</div>
-                    <span class="text-xs font-semibold text-foreground">${c.username}</span>
-                    <span class="ml-auto text-[10px] text-muted-foreground">${c.created_at}</span>
-                </div>
-                <p class="text-sm text-foreground leading-relaxed mb-2">${escapeHtml(c.content)}</p>
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
-                        0
-                    </span>
+                <div class="px-3 py-2">
+                    <p class="text-[13px] leading-5 font-medium text-foreground break-words">${escapeHtml(c.content)}</p>
+                    <div class="mt-2 flex flex-wrap items-center gap-1.5 text-muted-foreground">
+                        <div class="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-secondary text-secondary-foreground text-[10px] font-semibold">${escapeHtml(c.username[0].toUpperCase())}</div>
+                        <span class="font-medium text-[12px] leading-5 truncate">${escapeHtml(c.username)}</span>
+                        <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold bg-gray-500/15 text-gray-600 dark:text-gray-300">
+                            <span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>Offline
+                        </span>
+                        <span class="ml-auto text-[10px] text-muted-foreground">${c.created_at}</span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5 mt-1.5 pt-1.5 border-t border-border/60">
+                        <span class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-2 py-1 text-muted-foreground">👍 0</span>
+                        <span class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-2 py-1 text-muted-foreground">👎 0</span>
+                    </div>
                 </div>`;
             list.appendChild(el);
             const formInner = document.getElementById(`comment-form-inner-${optionId}`);
             if (formInner) {
-                formInner.innerHTML = '<p class="text-xs text-muted-foreground py-1">Your comment has been posted.</p>';
+                formInner.innerHTML = '<p class="text-xs text-muted-foreground py-2 text-center">Your comment has been posted.</p>';
             }
         } else {
             showCommentError(optionId, data.error || 'Failed to post comment.');
