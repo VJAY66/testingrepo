@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Discussion Hub{% endblock %}</title>
+    <title>{% block title %}PickASide{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -2367,7 +2367,7 @@
                     </button>
                     <div class="nav-brand flex items-center" style="position:relative;">
                         <button type="button" id="nav-hub-toggle" onclick="toggleHubMenu()" class="flex items-center gap-1 text-xl font-bold text-primary hover:text-primary/80 transition-colors focus:outline-none" aria-haspopup="true" aria-expanded="false">
-                            Discussion Hub
+                            PickASide
                             <svg id="nav-hub-chevron" class="w-4 h-4 mt-0.5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
                         </button>
                         <div id="nav-hub-menu" class="hidden absolute left-0 top-full mt-2 w-52 rounded-2xl border border-border bg-card shadow-xl shadow-black/10 z-[200] overflow-hidden" style="backdrop-filter:blur(16px);">
@@ -2434,6 +2434,10 @@
                         <span id="theme-label" class="theme-toggle-label">Light</span>
                     </button>
                     {% if user.is_authenticated %}
+                        <button type="button" onclick="openCreateModal()" class="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-sm shadow-primary/30 transition-all duration-200 hover:shadow-md hover:shadow-primary/40 hover:-translate-y-px focus:outline-none" aria-label="Create content">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 5v14M5 12h14"/></svg>
+                            Create
+                        </button>
                         <button type="button" id="nav-search-toggle" class="nav-icon-pill" aria-label="Search" title="Search" data-tooltip="Search" aria-expanded="false" data-nav-search-toggle>
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -2502,6 +2506,9 @@
                 <div class="nav-mobile-auth">
                     {% if user.is_authenticated %}
                     <div class="nav-mobile-icon-row">
+                        <button type="button" onclick="openCreateModal()" class="nav-icon-pill" aria-label="Create content" title="Create">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 5v14M5 12h14"/></svg>
+                        </button>
                         <button type="button" id="mobile-nav-search-toggle" class="nav-icon-pill" aria-label="Search" aria-expanded="false" data-nav-search-toggle>
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -5382,6 +5389,72 @@
         {% if user.is_authenticated %}
         ChatListManager.init();
         {% endif %}
+    });
+    </script>
+    {% endif %}
+
+    {% if user.is_authenticated %}
+    <!-- Create Content Modal -->
+    <div id="create-content-modal" class="hidden fixed inset-0 z-[8000] flex items-center justify-center px-4" role="dialog" aria-modal="true" aria-labelledby="create-modal-title">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeCreateModal()"></div>
+        <div class="relative w-full max-w-sm rounded-2xl border border-border bg-card shadow-2xl p-5" style="animation: createModalIn 0.22s cubic-bezier(.4,0,.2,1) both;">
+            <div class="flex items-center justify-between mb-4">
+                <h2 id="create-modal-title" class="text-base font-bold text-foreground">What would you like to create?</h2>
+                <button type="button" onclick="closeCreateModal()" class="w-7 h-7 rounded-full border border-border text-muted-foreground hover:border-primary hover:text-primary flex items-center justify-center transition-colors text-sm">&times;</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2.5">
+                <a href="{% url 'ask_question' %}" class="group flex flex-col items-center gap-2 rounded-xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50/80 to-teal-50/60 p-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-emerald-500/15 hover:border-emerald-300 dark:from-emerald-950/30 dark:to-teal-950/20 dark:border-emerald-700/40">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-2xl dark:bg-emerald-900/50">🗳️</span>
+                    <div>
+                        <p class="text-sm font-bold text-foreground">Yes / No</p>
+                        <p class="text-[11px] text-muted-foreground leading-snug mt-0.5">Ask the world to pick a side</p>
+                    </div>
+                </a>
+                <a href="{% url 'create_poll' %}" class="group flex flex-col items-center gap-2 rounded-xl border border-blue-200/70 bg-gradient-to-br from-blue-50/80 to-indigo-50/60 p-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-blue-500/15 hover:border-blue-300 dark:from-blue-950/30 dark:to-indigo-950/20 dark:border-blue-700/40">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-2xl dark:bg-blue-900/50">📊</span>
+                    <div>
+                        <p class="text-sm font-bold text-foreground">Poll</p>
+                        <p class="text-[11px] text-muted-foreground leading-snug mt-0.5">Multiple options, one winner</p>
+                    </div>
+                </a>
+                <a href="{% url 'ask_general_question' %}" class="group flex flex-col items-center gap-2 rounded-xl border border-violet-200/70 bg-gradient-to-br from-violet-50/80 to-purple-50/60 p-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-violet-500/15 hover:border-violet-300 dark:from-violet-950/30 dark:to-purple-950/20 dark:border-violet-700/40">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-2xl dark:bg-violet-900/50">💬</span>
+                    <div>
+                        <p class="text-sm font-bold text-foreground">Question</p>
+                        <p class="text-[11px] text-muted-foreground leading-snug mt-0.5">Community answers & upvotes</p>
+                    </div>
+                </a>
+                <a href="{% url 'create_review' %}" class="group flex flex-col items-center gap-2 rounded-xl border border-amber-200/70 bg-gradient-to-br from-amber-50/80 to-orange-50/60 p-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-amber-500/15 hover:border-amber-300 dark:from-amber-950/30 dark:to-orange-950/20 dark:border-amber-700/40">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-2xl dark:bg-amber-900/50">⭐</span>
+                    <div>
+                        <p class="text-sm font-bold text-foreground">Review</p>
+                        <p class="text-[11px] text-muted-foreground leading-snug mt-0.5">Share your verdict on anything</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+    <style>
+        @keyframes createModalIn {
+            from { opacity: 0; transform: scale(0.95) translateY(8px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+    </style>
+    <script>
+    function openCreateModal() {
+        const m = document.getElementById('create-content-modal');
+        if (!m) return;
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+    }
+    function closeCreateModal() {
+        const m = document.getElementById('create-content-modal');
+        if (!m) return;
+        m.classList.add('hidden');
+        m.classList.remove('flex');
+    }
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeCreateModal();
     });
     </script>
     {% endif %}
