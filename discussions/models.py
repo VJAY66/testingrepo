@@ -129,8 +129,10 @@ class Debate(models.Model):
     ]
     
     id = models.CharField(max_length=36, primary_key=True)
-    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='debates')
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='debates')
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='debates', null=True, blank=True)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='debates', null=True, blank=True)
+    poll_comment = models.ForeignKey('PollComment', on_delete=models.CASCADE, related_name='debates', null=True, blank=True)
+    poll = models.ForeignKey('Poll', on_delete=models.CASCADE, related_name='debates', null=True, blank=True)
     initiator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='initiated_debates')
     target = models.ForeignKey(User, on_delete=models.CASCADE, related_name='target_debates')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -140,6 +142,14 @@ class Debate(models.Model):
     end_controller_side = models.CharField(max_length=10, choices=Comment.VOTE_CHOICES, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def context_title(self):
+        if self.post_id:
+            return self.post.title
+        if self.poll_id:
+            return self.poll.title
+        return ''
 
     def __str__(self):
         return f"Debate between {self.initiator.username} and {self.target.username}"
@@ -253,7 +263,7 @@ class Notification(models.Model):
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='notifications')
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
     notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES)
     message = models.TextField()
     is_read = models.BooleanField(default=False)

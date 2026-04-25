@@ -190,6 +190,8 @@ def _opposite_side(side):
 
 
 def _debate_primary_sides(debate):
+    if debate.poll_comment_id:
+        return 'no', 'yes'  # initiator='no', target='yes' by convention for polls
     target_side = debate.comment.vote_type
     initiator_side = _opposite_side(target_side)
     return initiator_side, target_side
@@ -1583,6 +1585,7 @@ def _build_chat_payload_for_user(user, only_active=False):
 
     participations = participations.select_related(
         'debate__post',
+        'debate__poll',
         'debate__initiator',
         'debate__target',
     )
@@ -1603,8 +1606,8 @@ def _build_chat_payload_for_user(user, only_active=False):
 
         chats.append({
             'id': str(debate.id),
-            'post_id': str(debate.post_id),
-            'title': debate.post.title,
+            'post_id': str(debate.post_id) if debate.post_id else '',
+            'title': debate.context_title,
             'opponent': opponent.username,
             'opponent_avatar': opp_avatar,
             'is_active': p.is_active,
@@ -2133,10 +2136,142 @@ def like_comment(request):
     except Comment.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Comment not found'})
 
+def _handle_start_poll_debate(request, poll_comment_id):
+    """Start or join a debate on a poll comment."""
+    try:
+        poll_comment = PollComment.objects.select_related('poll', 'option', 'user').get(id=poll_comment_id)
+    except PollComment.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Comment not found.'}, status=404)
+
+    target_user = poll_comment.user
+    poll = poll_comment.poll
+
+    if request.user == target_user:
+        return JsonResponse({'success': False, 'error': 'Cannot debate with yourself.'})
+
+    if _is_blocked_by_comment_owner(target_user, request.user):
+        return JsonResponse({'success': False, 'error': 'You are not allowed to send debate requests to this commentor.'})
+
+    if DebateParticipant.objects.filter(
+        user=request.user,
+        is_banned=True,
+        debate__poll_comment=poll_comment,
+    ).exists():
+        return JsonResponse({'success': False, 'error': 'You were removed from this comment debate and cannot start it again.'})
+
+    try:
+        user_vote = PollVote.objects.get(poll=poll, user=request.user)
+    except PollVote.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Please vote on this poll first before starting a debate.'}, status=400)
+
+    if user_vote.option_id == poll_comment.option_id:
+        return JsonResponse({'success': False, 'error': 'You can only start a debate with someone who chose a different option.'}, status=400)
+
+    accepted_debate = Debate.objects.filter(
+        poll=poll,
+        target=target_user,
+        status='accepted',
+    ).order_by('-updated_at').first()
+
+    if accepted_debate:
+        _ensure_debate_core_participants(accepted_debate)
+        active_counts = {
+            item['side']: item['total']
+            for item in DebateParticipant.objects.filter(
+                debate=accepted_debate, is_active=True
+            ).values('side').annotate(total=Count('id'))
+        }
+        desired_side = 'no'
+        chosen_side = _pick_debate_side_for_user(
+            accepted_debate, desired_side, active_counts=active_counts, fallback_side='no'
+        )
+        yes_active = active_counts.get('yes', 0)
+        no_active = active_counts.get('no', 0)
+        conversation_full = (
+            accepted_debate.yes_supporters > 0 and accepted_debate.no_supporters > 0
+            and yes_active >= accepted_debate.yes_supporters
+            and no_active >= accepted_debate.no_supporters
+        )
+        participant = DebateParticipant.objects.filter(debate=accepted_debate, user=request.user).first()
+
+        if participant and participant.is_banned:
+            return JsonResponse({'success': False, 'error': 'The commentor removed you from this conversation.'})
+        if participant and participant.is_active:
+            return JsonResponse({'success': True, 'message': 'You are already in this conversation.', 'redirect_url': f'/debates/{accepted_debate.id}/chat/'})
+
+        if conversation_full:
+            if not participant:
+                DebateParticipant.objects.create(debate=accepted_debate, user=request.user, side=chosen_side, is_active=False)
+            return JsonResponse({'success': True, 'queued': True, 'message': 'Conversation is full. You can view the debate.', 'redirect_url': f'/debates/{accepted_debate.id}/chat/'})
+
+        if participant:
+            participant.is_active = True
+            participant.left_at = None
+            participant.save(update_fields=['is_active', 'left_at'])
+        else:
+            DebateParticipant.objects.create(debate=accepted_debate, user=request.user, side=chosen_side, is_active=True)
+
+        if not accepted_debate.end_controller_id:
+            _set_end_controller_with_fallback(accepted_debate, preferred_side=chosen_side)
+
+        return JsonResponse({'success': True, 'message': 'Joined debate!', 'redirect_url': f'/debates/{accepted_debate.id}/chat/'})
+
+    reusable_completed = Debate.objects.filter(
+        poll=poll,
+        target=target_user,
+        status='completed',
+    ).order_by('-updated_at').first()
+
+    if reusable_completed:
+        pending_for_target = Debate.objects.filter(target=target_user, status='pending').exclude(id=reusable_completed.id)
+        if pending_for_target.count() >= 10:
+            return JsonResponse({'success': False, 'queued': True, 'error': 'You are in queue. This user already has 10 pending requests.'})
+
+        reusable_completed.poll_comment = poll_comment
+        reusable_completed.initiator = request.user
+        reusable_completed.status = 'pending'
+        reusable_completed.end_controller = None
+        reusable_completed.end_controller_side = ''
+        reusable_completed.save(update_fields=['poll_comment', 'initiator', 'status', 'end_controller', 'end_controller_side', 'updated_at'])
+
+        DebateParticipant.objects.filter(debate=reusable_completed).exclude(
+            user_id__in=[reusable_completed.initiator_id, reusable_completed.target_id]
+        ).update(is_active=False, left_at=timezone.now())
+
+        DebateMessage.objects.create(
+            debate=reusable_completed,
+            sender=request.user,
+            content=f"{request.user.username} requested to restart the poll debate.",
+            is_system=True,
+        )
+        return JsonResponse({'success': True, 'message': 'Debate restart request sent!'})
+
+    existing = Debate.objects.filter(
+        poll_comment=poll_comment, initiator=request.user, target=target_user, status='pending'
+    ).exists()
+    if existing:
+        return JsonResponse({'success': False, 'error': 'Debate request already sent.'})
+
+    Debate.objects.create(
+        id=str(uuid.uuid4()),
+        poll_comment=poll_comment,
+        poll=poll,
+        initiator=request.user,
+        target=target_user,
+        status='pending',
+    )
+
+    return JsonResponse({'success': True, 'message': 'Debate request sent!'})
+
+
 @login_required
 @require_POST
 def start_debate(request):
     """Start a debate with another user"""
+    poll_comment_id = request.POST.get('poll_comment_id')
+    if poll_comment_id:
+        return _handle_start_poll_debate(request, poll_comment_id)
+
     comment_id = request.POST.get('comment_id')
 
     try:
@@ -2436,17 +2571,23 @@ def accept_debate(request, debate_id):
         if debate.yes_supporters > 0 or debate.no_supporters > 0:
             limits_source = (debate.yes_supporters, debate.no_supporters)
         else:
-            # Reuse limits from a previously accepted debate for the same target and post.
-            previous_accepted = Debate.objects.filter(
-                post=debate.post,
-                target=debate.target,
-                status='accepted'
-            ).exclude(id=debate.id).filter(
-                Q(yes_supporters__gt=0) | Q(no_supporters__gt=0)
-            ).order_by('-updated_at').first()
-
-            if previous_accepted:
-                limits_source = (previous_accepted.yes_supporters, previous_accepted.no_supporters)
+            # Reuse limits from a previously accepted debate for the same context.
+            if debate.post_id:
+                prev_filter = {'post': debate.post}
+            elif debate.poll_id:
+                prev_filter = {'poll': debate.poll}
+            else:
+                prev_filter = {}
+            if prev_filter:
+                previous_accepted = Debate.objects.filter(
+                    **prev_filter,
+                    target=debate.target,
+                    status='accepted'
+                ).exclude(id=debate.id).filter(
+                    Q(yes_supporters__gt=0) | Q(no_supporters__gt=0)
+                ).order_by('-updated_at').first()
+                if previous_accepted:
+                    limits_source = (previous_accepted.yes_supporters, previous_accepted.no_supporters)
 
         if yes_supporters_raw == '' and no_supporters_raw == '':
             if limits_source:
@@ -2476,7 +2617,8 @@ def accept_debate(request, debate_id):
 
         _ensure_debate_core_participants(debate)
         if not debate.end_controller_id:
-            _set_end_controller_with_fallback(debate, preferred_side=debate.comment.vote_type)
+            preferred = debate.comment.vote_type if debate.comment_id else 'yes'
+            _set_end_controller_with_fallback(debate, preferred_side=preferred)
 
         if not debate.messages.exists():
             DebateMessage.objects.create(
@@ -2485,8 +2627,9 @@ def accept_debate(request, debate_id):
                 content=f"Debate accepted. Suggested participants: Yes {yes_supporters}, No {no_supporters}."
             )
 
-        # Notify the post author that a debate started on their post
-        notify_post_author(debate.post, 'author_debate', debate.initiator)
+        # Notify the post author that a debate started on their post (only for post debates)
+        if debate.post_id:
+            notify_post_author(debate.post, 'author_debate', debate.initiator)
 
         return JsonResponse({
             'success': True,
@@ -2516,7 +2659,7 @@ def reject_debate(request, debate_id):
 def debate_chat(request, debate_id):
     """Two-person debate chat room"""
     debate = get_object_or_404(
-        Debate.objects.select_related('initiator', 'target', 'post'),
+        Debate.objects.select_related('initiator', 'target', 'post', 'poll'),
         id=debate_id
     )
 
@@ -2850,13 +2993,14 @@ def report_debate_message(request, debate_id, message_id):
 
     moderators = _moderator_users().exclude(id=request.user.id)
     preview = _decode_chat_content_from_storage(message.content)
+    debate_title = debate.context_title
     for moderator in moderators:
         Notification.objects.create(
             user=moderator,
-            post=debate.post,
+            post=debate.post if debate.post_id else None,
             notification_type='moderation_alert',
             message=(
-                f"Message report in debate '{debate.post.title}': "
+                f"Message report in debate '{debate_title}': "
                 f"{request.user.username} reported {message.sender.username}. "
                 f"Reason: {details[:180]}. "
                 f"Preview: {preview[:120]}"
@@ -2933,7 +3077,7 @@ def moderate_debate_message_report(request, report_id):
 
     Notification.objects.create(
         user=reported_user,
-        post=debate.post,
+        post=debate.post if debate.post_id else None,
         notification_type='moderation_warning',
         message=warning_message,
     )
@@ -3087,7 +3231,7 @@ def increase_debate_limits(request, debate_id):
 def debate_info(request, debate_id):
     """Return debate metadata as JSON for the floating chat manager"""
     debate = get_object_or_404(
-        Debate.objects.select_related('initiator', 'target', 'post'),
+        Debate.objects.select_related('initiator', 'target', 'post', 'poll'),
         id=debate_id
     )
     _ensure_debate_core_participants(debate)
@@ -3102,13 +3246,13 @@ def debate_info(request, debate_id):
         'success': True,
         'debate': {
             'id': str(debate.id),
-            'title': debate.post.title,
+            'title': debate.context_title,
             'opponent': opponent.username,
             'opponent_avatar': _safe_avatar_url(opponent),
             'active_participants': _active_participants_payload(debate, request.user),
             'yes_supporters': debate.yes_supporters,
             'no_supporters': debate.no_supporters,
-            'post_id': str(debate.post.id),
+            'post_id': str(debate.post_id) if debate.post_id else '',
             'user_is_active': can_post,
             'can_post': can_post,
             'can_rejoin': debate.status == 'accepted' and (not participation.is_active) and (not participation.is_banned),
@@ -3379,13 +3523,76 @@ def poll_detail(request, poll_id):
         except PollVote.DoesNotExist:
             pass
 
+    now = timezone.now()
+    online_cutoff = now - timedelta(minutes=5)
+
+    # Pre-build debate state lookups for all poll comments
+    debate_lookup = {}
+    completed_lookup = {}
+    blocked_pc_ids = set()
+    if request.user.is_authenticated and user_vote:
+        all_comment_owner_ids = list(
+            PollComment.objects.filter(
+                poll=poll, is_deleted_by_moderation=False
+            ).exclude(user=request.user).values_list('user_id', flat=True).distinct()
+        )
+        if all_comment_owner_ids:
+            accepted_debates = list(
+                Debate.objects.filter(
+                    poll=poll,
+                    target_id__in=all_comment_owner_ids,
+                    status='accepted',
+                ).order_by('target_id', '-updated_at')
+            )
+            latest_accepted = {}
+            for d in accepted_debates:
+                if d.target_id not in latest_accepted:
+                    latest_accepted[d.target_id] = d
+
+            if latest_accepted:
+                d_ids = [d.id for d in latest_accepted.values()]
+                active_side_counts = {
+                    (item['debate_id'], item['side']): item['total']
+                    for item in DebateParticipant.objects.filter(
+                        debate_id__in=d_ids, is_active=True
+                    ).values('debate_id', 'side').annotate(total=Count('id'))
+                }
+                user_participation = {
+                    p.debate_id: p
+                    for p in DebateParticipant.objects.filter(
+                        debate_id__in=d_ids, user=request.user
+                    )
+                }
+                for target_id, d in latest_accepted.items():
+                    part = user_participation.get(d.id)
+                    if part:
+                        mode, label = 'view', 'View Debate'
+                    else:
+                        yes_act = active_side_counts.get((d.id, 'yes'), 0)
+                        no_act = active_side_counts.get((d.id, 'no'), 0)
+                        full = (d.yes_supporters > 0 and d.no_supporters > 0
+                                and yes_act >= d.yes_supporters and no_act >= d.no_supporters)
+                        mode = 'view' if full else 'join'
+                        label = 'View Debate' if full else 'Join Debate'
+                    debate_lookup[target_id] = {'id': d.id, 'mode': mode, 'label': label, 'chat_url': f'/debates/{d.id}/chat/'}
+
+            for d in Debate.objects.filter(
+                poll=poll, target_id__in=all_comment_owner_ids, status='completed'
+            ).order_by('target_id', '-updated_at'):
+                if d.target_id not in completed_lookup:
+                    completed_lookup[d.target_id] = d
+
+            blocked_pc_ids = set(
+                DebateParticipant.objects.filter(
+                    user=request.user, is_banned=True, debate__poll=poll
+                ).values_list('debate__poll_comment_id', flat=True)
+            )
+
     option_data = []
     for opt in options:
         cnt = opt.votes.count()
         pct = round(cnt / total_votes * 100, 1) if total_votes > 0 else 0
         comments = opt.comments.filter(is_deleted_by_moderation=False).select_related('user', 'user__profile')
-        now = timezone.now()
-        online_cutoff = now - timedelta(minutes=5)
         comments_with_reaction = []
         for c in comments:
             user_reaction = None
@@ -3402,12 +3609,35 @@ def poll_detail(request, poll_id):
             except Exception:
                 last_seen = None
                 avatar_url = None
+
+            # Debate state for this comment
+            debate_state = debate_lookup.get(c.user_id)
+            completed_state = completed_lookup.get(c.user_id) if request.user.is_authenticated else None
+            show_debate = False
+            debate_mode = debate_state['mode'] if debate_state else 'start'
+            debate_label = debate_state['label'] if debate_state else 'Start Debate'
+            debate_chat_url = debate_state['chat_url'] if debate_state else ''
+            if request.user.is_authenticated and request.user != c.user:
+                user_chose_different = user_vote and user_vote.option_id != c.option_id
+                show_debate = bool(debate_state) or user_chose_different
+            is_blocked = c.id in blocked_pc_ids
+            if is_blocked and debate_mode == 'start':
+                debate_mode = 'blocked'
+                debate_label = 'Debate Blocked'
+                show_debate = True
+
             comments_with_reaction.append({
                 'comment': c,
                 'user_reaction': user_reaction,
                 'is_online': bool(last_seen and last_seen >= online_cutoff),
                 'presence_label': _presence_label(last_seen, now=now),
                 'avatar_url': avatar_url,
+                'show_debate_action': show_debate,
+                'debate_action_mode': debate_mode,
+                'debate_action_label': debate_label,
+                'debate_chat_url': debate_chat_url,
+                'show_debate_view_link': bool(completed_state and not debate_state),
+                'debate_view_url': f'/debates/{completed_state.id}/chat/' if (completed_state and not debate_state) else '',
             })
         option_data.append({
             'option': opt,

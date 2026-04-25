@@ -25,7 +25,7 @@
     }
         const debateData = {
             id: '{{ debate.id }}',
-            title: '{{ debate.post.title|escapejs }}',
+            title: '{{ debate.context_title|escapejs }}',
             opponent: '{% if user == debate.initiator %}{{ debate.target.username|escapejs }}{% else %}{{ debate.initiator.username|escapejs }}{% endif %}',
           opponent_avatar: '{{ opponent_avatar|escapejs }}',
       active_participants: activeParticipants,

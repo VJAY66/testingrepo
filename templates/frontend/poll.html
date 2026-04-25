@@ -293,6 +293,18 @@
                                     class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-2 py-1 hover:border-destructive/40 hover:text-destructive transition {% if cw.user_reaction == 'dislike' %}text-destructive border-destructive/40{% else %}text-muted-foreground{% endif %}">
                                 👎 <span id="dislike-count-{{ cw.comment.id }}" class="ml-0.5">{{ cw.comment.dislikes }}</span>
                             </button>
+                            {% if cw.show_debate_action %}
+                            {% if cw.show_debate_view_link and cw.debate_view_url and cw.debate_action_mode == 'start' %}
+                            <a href="{{ cw.debate_view_url }}" class="inline-flex items-center rounded-full bg-slate-500 px-2 py-1 text-[9px] text-white hover:bg-slate-600">View Debate</a>
+                            {% endif %}
+                            {% if cw.debate_action_mode == 'view' and cw.debate_chat_url %}
+                            <a href="{{ cw.debate_chat_url }}" class="inline-flex items-center rounded-full bg-blue-500 px-2 py-1 text-[9px] text-white hover:bg-blue-600">{{ cw.debate_action_label }}</a>
+                            {% elif cw.debate_action_mode == 'blocked' %}
+                            <button type="button" class="rounded-full bg-slate-400 px-2 py-1 text-[9px] text-white cursor-not-allowed opacity-80" aria-disabled="true" title="You were removed from this debate.">{{ cw.debate_action_label }}</button>
+                            {% else %}
+                            <button onclick="startPollDebate('{{ cw.comment.id }}', this)" class="rounded-full bg-blue-500 px-2 py-1 text-[9px] text-white hover:bg-blue-600">{{ cw.debate_action_label }}</button>
+                            {% endif %}
+                            {% endif %}
                             {% else %}
                             <span class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-2 py-1 text-muted-foreground">👍 {{ cw.comment.likes }}</span>
                             <span class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-2 py-1 text-muted-foreground">👎 {{ cw.comment.dislikes }}</span>
@@ -428,6 +440,31 @@ function reactPollComment(commentId, reaction) {
 
 function escapeHtml(s) {
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function startPollDebate(commentId, triggerEl) {
+    if (triggerEl) { triggerEl.disabled = true; triggerEl.textContent = '...'; }
+    const formData = new FormData();
+    formData.append('poll_comment_id', commentId);
+    formData.append('csrfmiddlewaretoken', CSRF_TOKEN);
+    fetch('{% url "start_debate" %}', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+            } else if (data.success) {
+                if (triggerEl) triggerEl.textContent = 'Sent!';
+                if (window.showToast) window.showToast(data.message || 'Debate request sent!', 'success');
+            } else {
+                if (triggerEl) { triggerEl.disabled = false; triggerEl.textContent = 'Start Debate'; }
+                if (window.showToast) window.showToast(data.error || 'Failed to start debate.', 'error');
+                else alert(data.error || 'Failed to start debate.');
+            }
+        })
+        .catch(() => {
+            if (triggerEl) { triggerEl.disabled = false; triggerEl.textContent = 'Start Debate'; }
+            alert('Network error. Please try again.');
+        });
 }
 </script>
 {% endblock %}
