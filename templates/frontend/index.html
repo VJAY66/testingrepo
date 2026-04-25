@@ -595,29 +595,76 @@
             animation: none !important;
         }
     }
+
+    /* ── Category Filter Bar ───────────────────────── */
+    .category-filter-bar::-webkit-scrollbar { display: none; }
+
+    .category-filter-pill--idle {
+        background: hsl(var(--card) / 0.72);
+        border-color: hsl(var(--border));
+        color: hsl(var(--muted-foreground));
+        backdrop-filter: blur(8px);
+    }
+    .category-filter-pill--idle:hover {
+        background: hsl(var(--background));
+        border-color: hsl(var(--primary) / 0.55);
+        color: hsl(var(--foreground));
+        transform: translateY(-1px);
+        box-shadow: 0 4px 14px -6px hsl(var(--primary) / 0.25);
+    }
+    .category-filter-pill--active {
+        background-image: var(--float-gradient);
+        background-color: transparent !important;
+        border-color: transparent;
+        color: hsl(var(--primary-foreground));
+        box-shadow: 0 4px 18px -6px hsl(var(--primary) / 0.55);
+    }
+    .category-filter-pill--active:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 22px -6px hsl(var(--primary) / 0.65);
+    }
 </style>
 <div class="home-fullbleed space-y-8" style="position:relative;z-index:1;">
 
     {% if not is_suggested_page %}
     <!-- Hero Section -->
-    <div class="text-center pt-7 pb-5 px-4">
+    <div class="text-center pt-7 pb-4 px-4">
         <h1 class="text-2xl sm:text-3xl font-bold leading-tight mb-1">
-            <span class="float-gradient-text">Latest Yes/No Questions</span>
+            <span class="float-gradient-text">{% if active_category %}{{ active_category }} Questions{% else %}Latest Yes/No Questions{% endif %}</span>
         </h1>
         <p class="text-sm text-muted-foreground">
             Pick a side. Start a debate. See where the world stands.
         </p>
     </div>
+
+    <!-- Category Filter Bar -->
+    <div class="relative">
+        <div class="category-filter-bar flex items-center gap-2 overflow-x-auto pb-2 px-1" style="scrollbar-width:none;-ms-overflow-style:none;">
+            <a href="{% url 'index' %}"
+               class="category-filter-pill flex-shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold border transition-all duration-200 whitespace-nowrap {% if not active_category %}category-filter-pill--active{% else %}category-filter-pill--idle{% endif %}">
+                <span>✨</span> All
+            </a>
+            {% for cat in categories %}
+            <a href="?category={{ cat.name|urlencode }}"
+               class="category-filter-pill flex-shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold border transition-all duration-200 whitespace-nowrap {% if active_category == cat.name %}category-filter-pill--active{% else %}category-filter-pill--idle{% endif %}">
+                <span>{{ cat.icon }}</span> {{ cat.name }}
+            </a>
+            {% endfor %}
+        </div>
+        <!-- fade edges -->
+        <div class="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent"></div>
+        <div class="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent"></div>
+    </div>
     {% endif %}
 
-    <!-- Posts Tabs -->
+    <!-- Posts Section -->
     <div id="posts-section">
         {% if not is_suggested_page %}
         <div class="section-head">
             <h2 class="section-title text-foreground">
-                {% if active_tab == 'suggested' %}Suggested for You{% else %}Latest Yes/No Discussions{% endif %}
+                {% if active_category %}{{ active_category }}{% elif active_tab == 'suggested' %}Suggested for You{% else %}Latest Yes/No Discussions{% endif %}
             </h2>
-            <span class="section-chip">Live Pulse</span>
+            <span class="section-chip">{% if active_category %}Filtered{% else %}Live Pulse{% endif %}</span>
         </div>
         {% endif %}
 
@@ -773,7 +820,7 @@
             {% if not is_suggested_page and page_obj and page_obj.paginator.num_pages > 1 %}
             <div class="mt-6 flex items-center justify-center gap-2 sm:gap-3">
                 {% if page_obj.has_previous %}
-                <a href="?page={{ page_obj.previous_page_number }}#posts-section" class="inline-flex items-center justify-center rounded-full border border-border bg-card px-3 py-1.5 text-xs sm:text-sm font-semibold text-foreground hover:border-primary hover:text-primary">
+                <a href="?{% if active_category %}category={{ active_category|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}#posts-section" class="inline-flex items-center justify-center rounded-full border border-border bg-card px-3 py-1.5 text-xs sm:text-sm font-semibold text-foreground hover:border-primary hover:text-primary">
                     Previous
                 </a>
                 {% else %}
@@ -785,7 +832,7 @@
                 </span>
 
                 {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}#posts-section" class="inline-flex items-center justify-center rounded-full border border-border bg-card px-3 py-1.5 text-xs sm:text-sm font-semibold text-foreground hover:border-primary hover:text-primary">
+                <a href="?{% if active_category %}category={{ active_category|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}#posts-section" class="inline-flex items-center justify-center rounded-full border border-border bg-card px-3 py-1.5 text-xs sm:text-sm font-semibold text-foreground hover:border-primary hover:text-primary">
                     Next
                 </a>
                 {% else %}
@@ -917,7 +964,7 @@
 <script>
 
 let currentShareUrl = '';
-let currentShareTitle = 'Discussion Hub';
+let currentShareTitle = 'PickASide';
 
 function setVoteCardProgress(card, yesValue, noValue) {
     const yesBar = card.querySelector('[data-vote-bar="yes"]');

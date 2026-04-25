@@ -755,7 +755,10 @@ def _build_suggested_posts_for_user(user, annotated_posts):
 
 def index(request):
     """Home page with trending posts and categories"""
+    active_category = request.GET.get('category', '').strip()
     annotated_posts = _annotated_feed_posts_queryset()
+    if active_category:
+        annotated_posts = annotated_posts.filter(category=active_category)
     trending_posts = annotated_posts.order_by(
         '-like_count',
         '-comment_count',
@@ -774,6 +777,7 @@ def index(request):
         'page_obj': page_obj,
         'active_tab': 'trending',
         'categories': get_frontend_categories(),
+        'active_category': active_category,
         'is_suggested_page': False,
     }
     return render(request, 'frontend/index.html', context)
