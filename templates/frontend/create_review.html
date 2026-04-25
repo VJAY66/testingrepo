@@ -1,0 +1,224 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Write a Review — Discussion Hub{% endblock %}
+
+{% block content %}
+<style>
+.review-form-card {
+    background: linear-gradient(152deg, hsl(var(--card) / 0.92), hsl(var(--card) / 0.72));
+    backdrop-filter: blur(18px);
+    box-shadow: 0 28px 72px -40px rgba(15,23,42,0.6), inset 0 1px 0 rgba(255,255,255,0.18);
+    border-radius: 1.5rem;
+    border: 1px solid hsl(var(--border) / 0.4);
+}
+.rf-input {
+    width: 100%;
+    padding: 0.82rem 1rem;
+    border-radius: 0.9rem;
+    border: 1.5px solid hsl(var(--border));
+    background: hsl(var(--background) / 0.72);
+    color: hsl(var(--foreground));
+    font-size: 0.95rem;
+    font-family: inherit;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+    outline: none;
+}
+.rf-input:focus {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+}
+.rf-label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 0.45rem;
+}
+.submit-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.88rem 1.5rem;
+    border-radius: 999px;
+    background-image: var(--float-gradient);
+    color: hsl(var(--primary-foreground));
+    font-size: 0.95rem;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 12px 28px -14px hsl(var(--primary) / 0.7);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+}
+.submit-btn:hover { transform: translateY(-1px); box-shadow: 0 16px 32px -12px hsl(var(--primary) / 0.9); }
+.error-msg { color: hsl(var(--destructive)); font-size: 0.8rem; margin-top: 0.35rem; font-weight: 600; }
+
+/* Star picker */
+.star-picker { display: flex; gap: 0.35rem; }
+.star-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: transform 120ms;
+}
+.star-btn:hover { transform: scale(1.15); }
+.star-btn svg { width: 2rem; height: 2rem; }
+.star-filled { color: hsl(38 92% 50%); }
+.star-empty  { color: hsl(var(--muted-foreground) / 0.35); }
+</style>
+
+<div class="max-w-xl mx-auto px-4 py-6 sm:py-10">
+
+    <a href="{% url 'reviews_list' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors mb-6">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        Back to reviews
+    </a>
+
+    <div class="review-form-card p-6 sm:p-8">
+
+        <div class="flex items-center gap-3 mb-7">
+            <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-2xl dark:bg-amber-900/40">⭐</span>
+            <div>
+                <h1 class="text-xl font-bold text-foreground">Write a Review</h1>
+                <p class="text-sm text-muted-foreground">Share your honest verdict with the community.</p>
+            </div>
+        </div>
+
+        <form method="post" autocomplete="off" class="space-y-5">
+            {% csrf_token %}
+
+            <!-- Subject -->
+            <div>
+                <label class="rf-label" for="rv-subject">What are you reviewing? *</label>
+                <input type="text" id="rv-subject" name="subject" maxlength="255"
+                       placeholder="e.g. Interstellar, iPhone 15, KFC Hyderabad…"
+                       class="rf-input"
+                       value="{{ form_data.subject|default:'' }}">
+                <div class="flex justify-between mt-1">
+                    {% if errors.subject %}<span class="error-msg">{{ errors.subject }}</span>{% else %}<span></span>{% endif %}
+                </div>
+            </div>
+
+            <!-- Subject Type -->
+            <div>
+                <label class="rf-label" for="rv-subject-type">Type *</label>
+                <select id="rv-subject-type" name="subject_type" class="rf-input" required>
+                    <option value="">Select a type</option>
+                    {% for val, label in subject_types %}
+                    <option value="{{ val }}" {% if form_data.subject_type == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                {% if errors.subject_type %}<span class="error-msg">{{ errors.subject_type }}</span>{% endif %}
+            </div>
+
+            <!-- Star Rating -->
+            <div>
+                <label class="rf-label">Your rating *</label>
+                <div class="star-picker" id="star-picker" role="group" aria-label="Star rating">
+                    {% for i in "12345" %}
+                    <button type="button" class="star-btn" data-value="{{ forloop.counter }}" onclick="setRating({{ forloop.counter }})" aria-label="{{ forloop.counter }} star">
+                        <svg class="star-empty" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                        </svg>
+                    </button>
+                    {% endfor %}
+                </div>
+                <input type="hidden" id="rating-input" name="rating" value="{{ form_data.rating|default:'' }}">
+                {% if errors.rating %}<span class="error-msg mt-1 block">{{ errors.rating }}</span>{% endif %}
+            </div>
+
+            <!-- Review Content -->
+            <div>
+                <label class="rf-label" for="rv-content">Your review *</label>
+                <textarea id="rv-content" name="content" rows="5" maxlength="2000"
+                          placeholder="Be honest — what did you love, hate, or find surprising?"
+                          class="rf-input resize-none"
+                          oninput="updateCharCount(this,2000,'content-count')"
+                >{{ form_data.content|default:'' }}</textarea>
+                <div class="flex justify-between mt-1">
+                    {% if errors.content %}<span class="error-msg">{{ errors.content }}</span>{% else %}<span></span>{% endif %}
+                    <span id="content-count" class="text-xs text-muted-foreground">0/2000</span>
+                </div>
+            </div>
+
+            <!-- Category -->
+            <div>
+                <label class="rf-label" for="rv-category">Category *</label>
+                <select id="rv-category" name="category" class="rf-input" required>
+                    <option value="">Select a category</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.name }}" {% if form_data.category == cat.name %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+                {% if errors.category %}<span class="error-msg">{{ errors.category }}</span>{% endif %}
+            </div>
+
+            <!-- Hashtags -->
+            <div>
+                <label class="rf-label" for="rv-hashtags">Hashtags <span class="font-normal normal-case text-muted-foreground">(optional, up to 5)</span></label>
+                <input type="text" id="rv-hashtags" name="hashtags" maxlength="200"
+                       placeholder="#movies #review #bollywood"
+                       class="rf-input"
+                       value="{{ form_data.hashtags|default:'' }}">
+                <p class="mt-1 text-xs text-muted-foreground">Space or comma separated.</p>
+            </div>
+
+            <button type="submit" class="submit-btn">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                Post Review
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+let currentRating = {{ form_data.rating|default:'0' }};
+
+function setRating(value) {
+    currentRating = value;
+    document.getElementById('rating-input').value = value;
+    renderStars(value);
+}
+
+function renderStars(filled) {
+    const btns = document.querySelectorAll('.star-btn');
+    btns.forEach((btn, idx) => {
+        const svg = btn.querySelector('svg');
+        if (idx < filled) {
+            svg.classList.add('star-filled');
+            svg.classList.remove('star-empty');
+        } else {
+            svg.classList.remove('star-filled');
+            svg.classList.add('star-empty');
+        }
+    });
+}
+
+function updateCharCount(el, max, id) {
+    const el2 = document.getElementById(id);
+    if (el2) el2.textContent = el.value.length + '/' + max;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (currentRating > 0) renderStars(currentRating);
+    const contentEl = document.getElementById('rv-content');
+    if (contentEl) updateCharCount(contentEl, 2000, 'content-count');
+
+    // Hover preview for stars
+    const picker = document.getElementById('star-picker');
+    if (picker) {
+        picker.addEventListener('mouseover', function(e) {
+            const btn = e.target.closest('.star-btn');
+            if (btn) renderStars(parseInt(btn.dataset.value));
+        });
+        picker.addEventListener('mouseleave', function() {
+            renderStars(currentRating);
+        });
+    }
+});
+</script>
+{% endblock %}

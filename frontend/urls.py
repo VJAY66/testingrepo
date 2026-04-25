@@ -60,8 +60,22 @@ urlpatterns = [
     # Polls
     path('polls/', views.polls_list, name='polls_list'),
     path('polls/create/', views.create_poll, name='create_poll'),
+    path('polls/comment/react/', views.like_poll_comment, name='like_poll_comment'),
     path('polls/<str:poll_id>/', views.poll_detail, name='poll_detail'),
     path('polls/<str:poll_id>/vote/', views.poll_vote, name='poll_vote'),
     path('polls/<str:poll_id>/comment/', views.create_poll_comment, name='create_poll_comment'),
-    path('polls/comment/react/', views.like_poll_comment, name='like_poll_comment'),
+    # Questions
+    path('questions/', views.questions_list, name='questions_list'),
+    path('questions/ask/', views.ask_general_question, name='ask_general_question'),
+    path('questions/answer/<str:answer_id>/vote/', views.vote_answer, name='vote_answer'),
+    path('questions/answer/<str:answer_id>/best/', views.mark_best_answer, name='mark_best_answer'),
+    path('questions/<str:question_id>/', views.question_detail, name='question_detail'),
+    path('questions/<str:question_id>/answer/', views.post_answer, name='post_answer'),
+    # Reviews
+    path('reviews/', views.reviews_list, name='reviews_list'),
+    path('reviews/create/', views.create_review, name='create_review'),
+    path('reviews/comment/react/', views.like_review_comment, name='like_review_comment'),
+    path('reviews/<str:review_id>/', views.review_detail, name='review_detail'),
+    path('reviews/<str:review_id>/react/', views.react_to_review, name='react_to_review'),
+    path('reviews/<str:review_id>/comment/', views.create_review_comment, name='create_review_comment'),
 ]

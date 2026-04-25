@@ -467,6 +467,152 @@ class PollCommentReaction(models.Model):
         ]
 
 
+class Question(models.Model):
+    id = models.CharField(max_length=36, primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='questions')
+    title = models.CharField(max_length=255)
+    content = models.TextField(blank=True, default='')
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
+    hashtags = models.TextField(blank=True, default='')
+    answer_count = models.IntegerField(default=0)
+    best_answer = models.ForeignKey('Answer', on_delete=models.SET_NULL, null=True, blank=True, related_name='best_for_question')
+    is_deleted_by_moderation = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def get_hashtags_list(self):
+        if not self.hashtags:
+            return []
+        return [t.strip().lstrip('#') for t in self.hashtags.split(',') if t.strip()]
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        ordering = ['-created_at']
+
+
+class Answer(models.Model):
+    id = models.CharField(max_length=36, primary_key=True)
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answers')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='answers')
+    content = models.TextField()
+    upvotes = models.IntegerField(default=0)
+    downvotes = models.IntegerField(default=0)
+    is_deleted_by_moderation = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Answer by {self.user.username} on {self.question.title}"
+
+    class Meta:
+        ordering = ['-upvotes', 'created_at']
+
+
+class AnswerVote(models.Model):
+    VOTE_CHOICES = [('up', 'Upvote'), ('down', 'Downvote')]
+    answer = models.ForeignKey(Answer, on_delete=models.CASCADE, related_name='votes')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='answer_votes')
+    vote = models.CharField(max_length=5, choices=VOTE_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        constraints = [
+            models.UniqueConstraint(fields=['answer', 'user'], name='unique_answer_vote_per_user'),
+        ]
+
+
+class Review(models.Model):
+    SUBJECT_TYPE_CHOICES = [
+        ('Movie', 'Movie'),
+        ('TV Show', 'TV Show'),
+        ('Book', 'Book'),
+        ('Music / Album', 'Music / Album'),
+        ('Product', 'Product'),
+        ('Place', 'Place'),
+        ('Restaurant', 'Restaurant'),
+        ('App / Game', 'App / Game'),
+        ('Person', 'Person'),
+        ('Other', 'Other'),
+    ]
+
+    id = models.CharField(max_length=36, primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews')
+    subject = models.CharField(max_length=255)
+    subject_type = models.CharField(max_length=50, choices=SUBJECT_TYPE_CHOICES)
+    rating = models.PositiveSmallIntegerField()
+    content = models.TextField()
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
+    hashtags = models.TextField(blank=True, default='')
+    agree_count = models.IntegerField(default=0)
+    disagree_count = models.IntegerField(default=0)
+    is_deleted_by_moderation = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def get_hashtags_list(self):
+        if not self.hashtags:
+            return []
+        return [t.strip().lstrip('#') for t in self.hashtags.split(',') if t.strip()]
+
+    def __str__(self):
+        return f"{self.user.username}'s review of {self.subject}"
+
+    class Meta:
+        ordering = ['-created_at']
+
+
+class ReviewReaction(models.Model):
+    REACTION_CHOICES = [('agree', 'Agree'), ('disagree', 'Disagree')]
+    review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name='reactions')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='review_reactions')
+    reaction = models.CharField(max_length=10, choices=REACTION_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        constraints = [
+            models.UniqueConstraint(fields=['review', 'user'], name='unique_review_reaction_per_user'),
+        ]
+
+
+class ReviewComment(models.Model):
+    id = models.CharField(max_length=36, primary_key=True)
+    review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name='comments')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='review_comments')
+    content = models.TextField()
+    likes = models.IntegerField(default=0)
+    dislikes = models.IntegerField(default=0)
+    is_deleted_by_moderation = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"ReviewComment on {self.review.subject} by {self.user.username}"
+
+    class Meta:
+        ordering = ['created_at']
+
+
+class ReviewCommentReaction(models.Model):
+    REACTION_CHOICES = [('like', 'Like'), ('dislike', 'Dislike')]
+    comment = models.ForeignKey(ReviewComment, on_delete=models.CASCADE, related_name='reactions')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='review_comment_reactions')
+    reaction = models.CharField(max_length=10, choices=REACTION_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        constraints = [
+            models.UniqueConstraint(fields=['comment', 'user'], name='unique_review_comment_reaction'),
+        ]
+
+
 class ProfileReport(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),

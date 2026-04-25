@@ -20,7 +20,7 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction
 from discussions.signals import notify_post_author
 from users.models import Follow
 from users.security import is_login_rate_limited, record_login_attempt
@@ -3481,6 +3481,444 @@ def like_poll_comment(request):
 
     likes = PollCommentReaction.objects.filter(comment=comment, reaction='like').count()
     dislikes = PollCommentReaction.objects.filter(comment=comment, reaction='dislike').count()
+    comment.likes = likes
+    comment.dislikes = dislikes
+    comment.save(update_fields=['likes', 'dislikes', 'updated_at'])
+
+    return JsonResponse({'success': True, 'likes': likes, 'dislikes': dislikes})
+
+
+# ─── Question Views ─────────────────────────────────────────────────────────────
+
+def questions_list(request):
+    category_filter = request.GET.get('category', '').strip()
+    qs = Question.objects.filter(is_deleted_by_moderation=False)
+    if category_filter:
+        qs = qs.filter(category=category_filter)
+
+    paginator = Paginator(qs, 20)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    categories = [{'name': c[0]} for c in CATEGORY_CHOICES]
+    return render(request, 'frontend/questions_list.html', {
+        'questions': page_obj,
+        'page_obj': page_obj,
+        'categories': categories,
+        'active_category': category_filter,
+    })
+
+
+def ask_general_question(request):
+    if not request.user.is_authenticated:
+        from django.urls import reverse
+        return redirect(f"{reverse('login')}?next={request.path}")
+
+    categories = [{'name': c[0]} for c in CATEGORY_CHOICES]
+
+    if request.method == 'POST':
+        title = request.POST.get('title', '').strip()
+        content = request.POST.get('content', '').strip()
+        category = request.POST.get('category', '').strip()
+        hashtags_raw = request.POST.get('hashtags', '').strip()
+
+        errors = {}
+        if not title:
+            errors['title'] = 'Question title is required.'
+        elif len(title) > 255:
+            errors['title'] = 'Title must be 255 characters or fewer.'
+        if not category:
+            errors['category'] = 'Category is required.'
+
+        if not errors:
+            combined = f"{title} {content}".strip()
+            if check_content_moderation(combined):
+                errors['title'] = 'Your question contains inappropriate content.'
+
+        if errors:
+            return render(request, 'frontend/ask_general_question.html', {
+                'categories': categories,
+                'errors': errors,
+                'form_data': request.POST,
+            })
+
+        question = Question.objects.create(
+            id=str(uuid.uuid4()),
+            user=request.user,
+            title=title,
+            content=content,
+            category=category,
+            hashtags=','.join(Post.parse_hashtags(hashtags_raw)),
+        )
+        return redirect('question_detail', question_id=question.id)
+
+    return render(request, 'frontend/ask_general_question.html', {'categories': categories})
+
+
+def question_detail(request, question_id):
+    question = get_object_or_404(Question, id=question_id, is_deleted_by_moderation=False)
+    answers = question.answers.filter(is_deleted_by_moderation=False).order_by('-upvotes', 'created_at')
+
+    user_answer = None
+    user_votes = {}
+    if request.user.is_authenticated:
+        user_answer = question.answers.filter(user=request.user, is_deleted_by_moderation=False).first()
+        voted_answer_ids = AnswerVote.objects.filter(
+            user=request.user, answer__question=question
+        ).values_list('answer_id', 'vote')
+        user_votes = {aid: v for aid, v in voted_answer_ids}
+
+    answers_with_data = []
+    for ans in answers:
+        answers_with_data.append({
+            'answer': ans,
+            'user_vote': user_votes.get(ans.id),
+            'is_best': question.best_answer_id == ans.id,
+        })
+
+    return render(request, 'frontend/question_detail.html', {
+        'question': question,
+        'answers_with_data': answers_with_data,
+        'user_answer': user_answer,
+        'total_answers': answers.count(),
+    })
+
+
+@require_POST
+def post_answer(request, question_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    question = get_object_or_404(Question, id=question_id, is_deleted_by_moderation=False)
+
+    try:
+        data = json.loads(request.body)
+        content = (data.get('content') or '').strip()
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    if not content:
+        return JsonResponse({'error': 'Answer cannot be empty.'}, status=400)
+
+    if question.answers.filter(user=request.user, is_deleted_by_moderation=False).exists():
+        return JsonResponse({'error': 'You have already answered this question.'}, status=400)
+
+    if check_content_moderation(content):
+        return JsonResponse({'error': 'Your answer contains inappropriate content.'}, status=400)
+
+    answer = Answer.objects.create(
+        id=str(uuid.uuid4()),
+        question=question,
+        user=request.user,
+        content=content,
+    )
+    Question.objects.filter(id=question_id).update(answer_count=F('answer_count') + 1)
+
+    return JsonResponse({
+        'success': True,
+        'answer': {
+            'id': answer.id,
+            'content': answer.content,
+            'username': request.user.username,
+            'upvotes': 0,
+            'downvotes': 0,
+            'created_at': answer.created_at.strftime('%b %d, %Y'),
+        },
+    })
+
+
+@require_POST
+def vote_answer(request, answer_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    answer = get_object_or_404(Answer, id=answer_id, is_deleted_by_moderation=False)
+
+    if answer.user_id == request.user.id:
+        return JsonResponse({'error': 'Cannot vote on your own answer.'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        vote_type = data.get('vote', 'up')
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    if vote_type not in ('up', 'down'):
+        return JsonResponse({'error': 'Invalid vote type.'}, status=400)
+
+    vote_obj, created = AnswerVote.objects.get_or_create(
+        answer=answer, user=request.user, defaults={'vote': vote_type}
+    )
+    if not created:
+        if vote_obj.vote == vote_type:
+            vote_obj.delete()
+            action = 'removed'
+        else:
+            vote_obj.vote = vote_type
+            vote_obj.save(update_fields=['vote', 'updated_at'])
+            action = 'changed'
+    else:
+        action = 'added'
+
+    upvotes = AnswerVote.objects.filter(answer=answer, vote='up').count()
+    downvotes = AnswerVote.objects.filter(answer=answer, vote='down').count()
+    Answer.objects.filter(id=answer_id).update(upvotes=upvotes, downvotes=downvotes)
+
+    return JsonResponse({'success': True, 'action': action, 'upvotes': upvotes, 'downvotes': downvotes})
+
+
+@require_POST
+def mark_best_answer(request, answer_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    answer = get_object_or_404(Answer, id=answer_id, is_deleted_by_moderation=False)
+    question = answer.question
+
+    if question.user_id != request.user.id:
+        return JsonResponse({'error': 'Only the question author can mark the best answer.'}, status=403)
+
+    if question.best_answer_id == answer.id:
+        question.best_answer = None
+    else:
+        question.best_answer = answer
+    question.save(update_fields=['best_answer', 'updated_at'])
+
+    return JsonResponse({'success': True, 'best_answer_id': str(question.best_answer_id) if question.best_answer_id else None})
+
+
+# ─── Review Views ────────────────────────────────────────────────────────────────
+
+def reviews_list(request):
+    category_filter = request.GET.get('category', '').strip()
+    qs = Review.objects.filter(is_deleted_by_moderation=False)
+    if category_filter:
+        qs = qs.filter(category=category_filter)
+
+    paginator = Paginator(qs, 20)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    reviews_data = []
+    for review in page_obj:
+        user_reaction = None
+        if request.user.is_authenticated:
+            try:
+                r = ReviewReaction.objects.get(review=review, user=request.user)
+                user_reaction = r.reaction
+            except ReviewReaction.DoesNotExist:
+                pass
+        reviews_data.append({'review': review, 'user_reaction': user_reaction})
+
+    categories = [{'name': c[0]} for c in CATEGORY_CHOICES]
+    return render(request, 'frontend/reviews_list.html', {
+        'reviews_data': reviews_data,
+        'page_obj': page_obj,
+        'categories': categories,
+        'active_category': category_filter,
+    })
+
+
+def create_review(request):
+    if not request.user.is_authenticated:
+        from django.urls import reverse
+        return redirect(f"{reverse('login')}?next={request.path}")
+
+    subject_types = Review.SUBJECT_TYPE_CHOICES
+    categories = [{'name': c[0]} for c in CATEGORY_CHOICES]
+
+    if request.method == 'POST':
+        subject = request.POST.get('subject', '').strip()
+        subject_type = request.POST.get('subject_type', '').strip()
+        rating_raw = request.POST.get('rating', '').strip()
+        content = request.POST.get('content', '').strip()
+        category = request.POST.get('category', '').strip()
+        hashtags_raw = request.POST.get('hashtags', '').strip()
+
+        errors = {}
+        if not subject:
+            errors['subject'] = 'Subject is required.'
+        if not subject_type:
+            errors['subject_type'] = 'Subject type is required.'
+        if not rating_raw:
+            errors['rating'] = 'Rating is required.'
+        else:
+            try:
+                rating = int(rating_raw)
+                if rating < 1 or rating > 5:
+                    errors['rating'] = 'Rating must be between 1 and 5.'
+            except ValueError:
+                errors['rating'] = 'Invalid rating.'
+                rating = None
+        if not content:
+            errors['content'] = 'Review content is required.'
+        if not category:
+            errors['category'] = 'Category is required.'
+
+        if not errors:
+            combined = f"{subject} {content}".strip()
+            if check_content_moderation(combined):
+                errors['content'] = 'Your review contains inappropriate content.'
+
+        if errors:
+            return render(request, 'frontend/create_review.html', {
+                'subject_types': subject_types,
+                'categories': categories,
+                'errors': errors,
+                'form_data': request.POST,
+            })
+
+        review = Review.objects.create(
+            id=str(uuid.uuid4()),
+            user=request.user,
+            subject=subject,
+            subject_type=subject_type,
+            rating=int(rating_raw),
+            content=content,
+            category=category,
+            hashtags=','.join(Post.parse_hashtags(hashtags_raw)),
+        )
+        return redirect('review_detail', review_id=review.id)
+
+    return render(request, 'frontend/create_review.html', {
+        'subject_types': subject_types,
+        'categories': categories,
+    })
+
+
+def review_detail(request, review_id):
+    review = get_object_or_404(Review, id=review_id, is_deleted_by_moderation=False)
+    comments = review.comments.filter(is_deleted_by_moderation=False).select_related('user')
+
+    user_reaction = None
+    comments_with_reaction = []
+    if request.user.is_authenticated:
+        try:
+            r = ReviewReaction.objects.get(review=review, user=request.user)
+            user_reaction = r.reaction
+        except ReviewReaction.DoesNotExist:
+            pass
+
+    for c in comments:
+        ur = None
+        if request.user.is_authenticated:
+            try:
+                rcr = ReviewCommentReaction.objects.get(comment=c, user=request.user)
+                ur = rcr.reaction
+            except ReviewCommentReaction.DoesNotExist:
+                pass
+        comments_with_reaction.append({'comment': c, 'user_reaction': ur})
+
+    return render(request, 'frontend/review_detail.html', {
+        'review': review,
+        'user_reaction': user_reaction,
+        'comments_with_reaction': comments_with_reaction,
+    })
+
+
+@require_POST
+def react_to_review(request, review_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    review = get_object_or_404(Review, id=review_id, is_deleted_by_moderation=False)
+
+    if review.user_id == request.user.id:
+        return JsonResponse({'error': 'Cannot react to your own review.'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        reaction_type = data.get('reaction', 'agree')
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    if reaction_type not in ('agree', 'disagree'):
+        return JsonResponse({'error': 'Invalid reaction.'}, status=400)
+
+    reaction, created = ReviewReaction.objects.get_or_create(
+        review=review, user=request.user, defaults={'reaction': reaction_type}
+    )
+    if not created:
+        if reaction.reaction == reaction_type:
+            reaction.delete()
+            action = 'removed'
+        else:
+            reaction.reaction = reaction_type
+            reaction.save(update_fields=['reaction', 'updated_at'])
+            action = 'changed'
+    else:
+        action = 'added'
+
+    agree = ReviewReaction.objects.filter(review=review, reaction='agree').count()
+    disagree = ReviewReaction.objects.filter(review=review, reaction='disagree').count()
+    Review.objects.filter(id=review_id).update(agree_count=agree, disagree_count=disagree)
+
+    return JsonResponse({'success': True, 'action': action, 'agree_count': agree, 'disagree_count': disagree})
+
+
+@require_POST
+def create_review_comment(request, review_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    review = get_object_or_404(Review, id=review_id, is_deleted_by_moderation=False)
+
+    try:
+        data = json.loads(request.body)
+        content = (data.get('content') or '').strip()
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    if not content:
+        return JsonResponse({'error': 'Comment cannot be empty.'}, status=400)
+
+    if check_content_moderation(content):
+        return JsonResponse({'error': 'Your comment contains inappropriate content.'}, status=400)
+
+    comment = ReviewComment.objects.create(
+        id=str(uuid.uuid4()),
+        review=review,
+        user=request.user,
+        content=content,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'comment': {
+            'id': comment.id,
+            'content': comment.content,
+            'username': request.user.username,
+            'likes': 0,
+            'dislikes': 0,
+            'created_at': comment.created_at.strftime('%b %d, %Y'),
+        },
+    })
+
+
+@require_POST
+def like_review_comment(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        data = json.loads(request.body)
+        comment_id = data.get('comment_id')
+        reaction_type = data.get('reaction', 'like')
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    comment = get_object_or_404(ReviewComment, id=comment_id)
+
+    if comment.user_id == request.user.id:
+        return JsonResponse({'error': 'Cannot react to your own comment.'}, status=403)
+
+    reaction, created = ReviewCommentReaction.objects.get_or_create(
+        comment=comment, user=request.user, defaults={'reaction': reaction_type}
+    )
+    if not created and reaction.reaction != reaction_type:
+        reaction.reaction = reaction_type
+        reaction.save(update_fields=['reaction', 'updated_at'])
+
+    likes = ReviewCommentReaction.objects.filter(comment=comment, reaction='like').count()
+    dislikes = ReviewCommentReaction.objects.filter(comment=comment, reaction='dislike').count()
     comment.likes = likes
     comment.dislikes = dislikes
     comment.save(update_fields=['likes', 'dislikes', 'updated_at'])

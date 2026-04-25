@@ -1,0 +1,148 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Ask a Question — Discussion Hub{% endblock %}
+
+{% block content %}
+<style>
+.q-form-card {
+    background: linear-gradient(152deg, hsl(var(--card) / 0.92), hsl(var(--card) / 0.72));
+    backdrop-filter: blur(18px);
+    box-shadow: 0 28px 72px -40px rgba(15,23,42,0.6), inset 0 1px 0 rgba(255,255,255,0.18);
+    border-radius: 1.5rem;
+    border: 1px solid hsl(var(--border) / 0.4);
+}
+.qf-input {
+    width: 100%;
+    padding: 0.82rem 1rem;
+    border-radius: 0.9rem;
+    border: 1.5px solid hsl(var(--border));
+    background: hsl(var(--background) / 0.72);
+    color: hsl(var(--foreground));
+    font-size: 0.95rem;
+    font-family: inherit;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+    outline: none;
+}
+.qf-input:focus {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+}
+.qf-label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 0.45rem;
+}
+.submit-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.88rem 1.5rem;
+    border-radius: 999px;
+    background-image: var(--float-gradient);
+    color: hsl(var(--primary-foreground));
+    font-size: 0.95rem;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 12px 28px -14px hsl(var(--primary) / 0.7);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+}
+.submit-btn:hover { transform: translateY(-1px); box-shadow: 0 16px 32px -12px hsl(var(--primary) / 0.9); }
+.error-msg { color: hsl(var(--destructive)); font-size: 0.8rem; margin-top: 0.35rem; font-weight: 600; }
+</style>
+
+<div class="max-w-xl mx-auto px-4 py-6 sm:py-10">
+
+    <a href="{% url 'questions_list' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors mb-6">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        Back to questions
+    </a>
+
+    <div class="q-form-card p-6 sm:p-8">
+
+        <div class="flex items-center gap-3 mb-7">
+            <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-2xl dark:bg-violet-900/40">💬</span>
+            <div>
+                <h1 class="text-xl font-bold text-foreground">Ask a Question</h1>
+                <p class="text-sm text-muted-foreground">Get answers from the community.</p>
+            </div>
+        </div>
+
+        <form method="post" autocomplete="off" class="space-y-5">
+            {% csrf_token %}
+
+            <!-- Title -->
+            <div>
+                <label class="qf-label" for="q-title">Your question *</label>
+                <textarea id="q-title" name="title" rows="2" maxlength="255"
+                          placeholder="e.g. What are the best tips for learning a new language fast?"
+                          class="qf-input resize-none"
+                          oninput="updateCharCount(this,255,'title-count')"
+                >{{ form_data.title|default:'' }}</textarea>
+                <div class="flex justify-between mt-1">
+                    {% if errors.title %}<span class="error-msg">{{ errors.title }}</span>{% else %}<span></span>{% endif %}
+                    <span id="title-count" class="text-xs text-muted-foreground">0/255</span>
+                </div>
+            </div>
+
+            <!-- Optional Description -->
+            <div>
+                <label class="qf-label" for="q-content">More details <span class="font-normal normal-case text-muted-foreground">(optional)</span></label>
+                <textarea id="q-content" name="content" rows="4" maxlength="2000"
+                          placeholder="Provide context, constraints, or what you've already tried…"
+                          class="qf-input resize-none"
+                          oninput="updateCharCount(this,2000,'content-count')"
+                >{{ form_data.content|default:'' }}</textarea>
+                <div class="flex justify-end mt-1">
+                    <span id="content-count" class="text-xs text-muted-foreground">0/2000</span>
+                </div>
+            </div>
+
+            <!-- Category -->
+            <div>
+                <label class="qf-label" for="q-category">Category *</label>
+                <select id="q-category" name="category" class="qf-input" required>
+                    <option value="">Select a category</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.name }}" {% if form_data.category == cat.name %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+                {% if errors.category %}<span class="error-msg">{{ errors.category }}</span>{% endif %}
+            </div>
+
+            <!-- Hashtags -->
+            <div>
+                <label class="qf-label" for="q-hashtags">Hashtags <span class="font-normal normal-case text-muted-foreground">(optional, up to 5)</span></label>
+                <input type="text" id="q-hashtags" name="hashtags" maxlength="200"
+                       placeholder="#learning #tips #language"
+                       class="qf-input"
+                       value="{{ form_data.hashtags|default:'' }}">
+                <p class="mt-1 text-xs text-muted-foreground">Space or comma separated.</p>
+            </div>
+
+            <button type="submit" class="submit-btn">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                Post Question
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+function updateCharCount(el, max, id) {
+    const counter = document.getElementById(id);
+    if (counter) counter.textContent = el.value.length + '/' + max;
+}
+document.addEventListener('DOMContentLoaded', function() {
+    const t = document.getElementById('q-title');
+    const c = document.getElementById('q-content');
+    if (t) updateCharCount(t, 255, 'title-count');
+    if (c) updateCharCount(c, 2000, 'content-count');
+});
+</script>
+{% endblock %}
