@@ -34,50 +34,150 @@
     </div>
 
     <!-- Search Results -->
-    {% if query or is_hashtag_search %}
+    {% if query and not is_hashtag_search %}
+    {% if total_all > 0 %}
+    <!-- Type tabs -->
+    <div class="flex gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 shadow-sm overflow-x-auto mb-6">
+        <button type="button" onclick="switchSearchTab('posts')" id="stab-btn-posts"
+            class="stab-btn {% if active_tab == 'posts' or not active_tab %}active bg-primary/10 text-primary shadow-sm{% else %}text-muted-foreground hover:text-foreground hover:bg-secondary/60{% endif %} flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all duration-200">
+            🗳️ Posts <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold">{{ totals.posts }}</span>
+        </button>
+        <button type="button" onclick="switchSearchTab('reviews')" id="stab-btn-reviews"
+            class="stab-btn {% if active_tab == 'reviews' %}active bg-primary/10 text-primary shadow-sm{% else %}text-muted-foreground hover:text-foreground hover:bg-secondary/60{% endif %} flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all duration-200">
+            ⭐ Reviews <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold">{{ totals.reviews }}</span>
+        </button>
+        <button type="button" onclick="switchSearchTab('questions')" id="stab-btn-questions"
+            class="stab-btn {% if active_tab == 'questions' %}active bg-primary/10 text-primary shadow-sm{% else %}text-muted-foreground hover:text-foreground hover:bg-secondary/60{% endif %} flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all duration-200">
+            💬 Questions <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold">{{ totals.questions }}</span>
+        </button>
+        <button type="button" onclick="switchSearchTab('polls')" id="stab-btn-polls"
+            class="stab-btn {% if active_tab == 'polls' %}active bg-primary/10 text-primary shadow-sm{% else %}text-muted-foreground hover:text-foreground hover:bg-secondary/60{% endif %} flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all duration-200">
+            📊 Polls <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold">{{ totals.polls }}</span>
+        </button>
+    </div>
+
+    <p class="text-sm text-muted-foreground mb-4">{{ total_all }} result{{ total_all|pluralize }} for "<strong class="text-foreground">{{ query }}</strong>"</p>
+
+    <!-- Posts tab -->
+    <div id="stab-posts" class="space-y-4 {% if active_tab and active_tab != 'posts' %}hidden{% endif %}">
+        {% for post in post_results %}
+        <div class="bg-card border border-border rounded-xl p-5 hover:border-primary/30 hover:shadow-md transition-all">
+            <h3 class="text-base font-bold text-foreground mb-1">
+                <a href="{% url 'discussion' post.id %}" class="hover:text-primary">{{ post.title }}</a>
+            </h3>
+            <p class="text-sm text-muted-foreground mb-3 line-clamp-2">{{ post.content|truncatechars:180 }}</p>
+            <div class="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                <span>{{ post.created_at|date:"M j, Y" }}</span>
+                <a href="{% url 'user_profile' post.user.username %}" class="font-semibold hover:text-primary">{{ post.user.username }}</a>
+                <span class="px-2 py-0.5 bg-secondary rounded-full">{{ post.category }}</span>
+                {% if post.hashtags %}
+                {% for tag in post.get_hashtags_list %}
+                <a href="{% url 'hashtag_search' %}?tag={{ tag }}" class="text-cyan-600 dark:text-cyan-400 hover:underline">#{{ tag }}</a>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-8 text-muted-foreground">No posts match "{{ query }}".</div>
+        {% endfor %}
+    </div>
+
+    <!-- Reviews tab -->
+    <div id="stab-reviews" class="space-y-4 {% if active_tab != 'reviews' %}hidden{% endif %}">
+        {% for review in review_results %}
+        <div class="bg-card border border-border rounded-xl p-5 hover:border-primary/30 hover:shadow-md transition-all">
+            <div class="flex items-start justify-between gap-3 mb-1">
+                <h3 class="text-base font-bold text-foreground">
+                    <a href="{% url 'review_detail' review.id %}" class="hover:text-primary">{{ review.subject }}</a>
+                </h3>
+                <div class="flex items-center gap-0.5 flex-shrink-0">
+                    {% for i in "12345" %}
+                    <svg class="w-3.5 h-3.5 {% if forloop.counter <= review.rating %}text-amber-400{% else %}text-muted-foreground/30{% endif %}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                    {% endfor %}
+                </div>
+            </div>
+            <p class="text-sm text-muted-foreground mb-3 line-clamp-2">{{ review.content|truncatechars:180 }}</p>
+            <div class="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                <span class="px-2 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full font-bold">{{ review.subject_type }}</span>
+                <a href="{% url 'user_profile' review.user.username %}" class="font-semibold hover:text-primary">{{ review.user.username }}</a>
+                <span>{{ review.created_at|date:"M j, Y" }}</span>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-8 text-muted-foreground">No reviews match "{{ query }}".</div>
+        {% endfor %}
+    </div>
+
+    <!-- Questions tab -->
+    <div id="stab-questions" class="space-y-4 {% if active_tab != 'questions' %}hidden{% endif %}">
+        {% for q in question_results %}
+        <div class="bg-card border border-border rounded-xl p-5 hover:border-primary/30 hover:shadow-md transition-all">
+            <h3 class="text-base font-bold text-foreground mb-1">
+                <a href="{% url 'question_detail' q.id %}" class="hover:text-primary">{{ q.title }}</a>
+            </h3>
+            {% if q.content %}<p class="text-sm text-muted-foreground mb-3 line-clamp-2">{{ q.content|truncatechars:180 }}</p>{% endif %}
+            <div class="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                <span class="px-2 py-0.5 bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 rounded-full font-bold">{{ q.category }}</span>
+                <a href="{% url 'user_profile' q.user.username %}" class="font-semibold hover:text-primary">{{ q.user.username }}</a>
+                <span>{{ q.answer_count }} answer{{ q.answer_count|pluralize }}</span>
+                <span>{{ q.created_at|date:"M j, Y" }}</span>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-8 text-muted-foreground">No questions match "{{ query }}".</div>
+        {% endfor %}
+    </div>
+
+    <!-- Polls tab -->
+    <div id="stab-polls" class="space-y-4 {% if active_tab != 'polls' %}hidden{% endif %}">
+        {% for poll in poll_results %}
+        <div class="bg-card border border-border rounded-xl p-5 hover:border-primary/30 hover:shadow-md transition-all">
+            <h3 class="text-base font-bold text-foreground mb-1">
+                <a href="{% url 'poll_detail' poll.id %}" class="hover:text-primary">{{ poll.title }}</a>
+            </h3>
+            {% if poll.description %}<p class="text-sm text-muted-foreground mb-3 line-clamp-2">{{ poll.description }}</p>{% endif %}
+            <div class="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                <span class="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full font-bold">{{ poll.category }}</span>
+                <a href="{% url 'user_profile' poll.user.username %}" class="font-semibold hover:text-primary">{{ poll.user.username }}</a>
+                <span>{{ poll.total_votes }} vote{{ poll.total_votes|pluralize }}</span>
+                <span>{{ poll.created_at|date:"M j, Y" }}</span>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-8 text-muted-foreground">No polls match "{{ query }}".</div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="text-center py-12">
+        <div class="text-6xl mb-4">🔍</div>
+        <h3 class="text-xl font-semibold text-foreground mb-2">No results found</h3>
+        <p class="text-muted-foreground">Try different keywords or check your spelling.</p>
+    </div>
+    {% endif %}
+
+    {% elif is_hashtag_search %}
     <div>
         {% if results %}
-        <h2 class="text-xl font-semibold text-foreground mb-4">
-            {% if is_hashtag_search %}
-            Found {{ results.count }} post{{ results.count|pluralize }} with #{{ tag }}
-            {% else %}
-            Found {{ results.count }} result{{ results.count|pluralize }} for "{{ query }}"
-            {% endif %}
-        </h2>
+        <h2 class="text-xl font-semibold text-foreground mb-4">Found {{ results.count }} post{{ results.count|pluralize }} with #{{ tag }}</h2>
         <div class="space-y-4">
             {% for post in results %}
-            <div class="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow">
-                <div class="flex items-start justify-between">
-                    <div class="flex-1">
-                        <h3 class="text-lg font-semibold text-foreground mb-2">
-                            <a href="{% url 'discussion' post.id %}" class="hover:text-primary">
-                                {{ post.title }}
-                            </a>
-                        </h3>
-                        <p class="text-muted-foreground mb-3 line-clamp-2">
-                            {{ post.content|truncatechars:200 }}
-                        </p>
-                        
-                        <!-- Hashtags Display -->
-                        {% if post.hashtags %}
-                        <div class="mb-3 flex flex-wrap gap-2">
-                            {% for hashtag in post.get_hashtags_list %}
-                            <a href="{% url 'hashtag_search' %}?tag={{ hashtag }}" 
-                               class="inline-flex items-center px-2 py-1 rounded-full text-cyan-600 dark:text-cyan-400 text-xs font-medium bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 transition">
-                                <span>#</span>{{ hashtag }}
-                            </a>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-                        
-                        <div class="flex items-center space-x-4 text-sm text-muted-foreground">
-                            <span>{{ post.created_at|date:"M j, Y" }}</span>
-                            <span>{{ post.user.username }}</span>
-                            <span class="px-2 py-1 bg-secondary rounded-full text-xs">
-                                {{ post.category }}
-                            </span>
-                        </div>
-                    </div>
+            <div class="bg-card border border-border rounded-xl p-5 hover:border-primary/30 hover:shadow-md transition-all">
+                <h3 class="text-base font-bold text-foreground mb-1">
+                    <a href="{% url 'discussion' post.id %}" class="hover:text-primary">{{ post.title }}</a>
+                </h3>
+                <p class="text-sm text-muted-foreground mb-3 line-clamp-2">{{ post.content|truncatechars:180 }}</p>
+                {% if post.hashtags %}
+                <div class="mb-3 flex flex-wrap gap-2">
+                    {% for hashtag in post.get_hashtags_list %}
+                    <a href="{% url 'hashtag_search' %}?tag={{ hashtag }}" class="inline-flex items-center px-2 py-1 rounded-full text-cyan-600 dark:text-cyan-400 text-xs font-medium bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 transition">#{{ hashtag }}</a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <div class="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{{ post.created_at|date:"M j, Y" }}</span>
+                    <a href="{% url 'user_profile' post.user.username %}" class="font-semibold hover:text-primary">{{ post.user.username }}</a>
+                    <span class="px-2 py-0.5 bg-secondary rounded-full">{{ post.category }}</span>
                 </div>
             </div>
             {% endfor %}
@@ -86,20 +186,37 @@
         <div class="text-center py-12">
             <div class="text-6xl mb-4">🔍</div>
             <h3 class="text-xl font-semibold text-foreground mb-2">No results found</h3>
-            {% if is_hashtag_search %}
             <p class="text-muted-foreground">No posts found with #{{ tag }}</p>
-            {% else %}
-            <p class="text-muted-foreground">Try different keywords or check your spelling.</p>
-            {% endif %}
         </div>
         {% endif %}
     </div>
+
     {% else %}
     <div class="text-center py-12">
         <div class="text-6xl mb-4">💡</div>
-        <h3 class="text-xl font-semibold text-foreground mb-2">Search for discussions</h3>
-        <p class="text-muted-foreground">Enter keywords to find relevant discussions and topics.</p>
+        <h3 class="text-xl font-semibold text-foreground mb-2">Search everything</h3>
+        <p class="text-muted-foreground">Search across posts, reviews, questions, and polls.</p>
     </div>
     {% endif %}
 </div>
+
+<script>
+function switchSearchTab(name) {
+    const tabs = ['posts', 'reviews', 'questions', 'polls'];
+    tabs.forEach(function(t) {
+        const panel = document.getElementById('stab-' + t);
+        const btn = document.getElementById('stab-btn-' + t);
+        if (!panel || !btn) return;
+        if (t === name) {
+            panel.classList.remove('hidden');
+            btn.classList.add('active', 'bg-primary/10', 'text-primary', 'shadow-sm');
+            btn.classList.remove('text-muted-foreground', 'hover:text-foreground', 'hover:bg-secondary/60');
+        } else {
+            panel.classList.add('hidden');
+            btn.classList.remove('active', 'bg-primary/10', 'text-primary', 'shadow-sm');
+            btn.classList.add('text-muted-foreground', 'hover:text-foreground', 'hover:bg-secondary/60');
+        }
+    });
+}
+</script>
 {% endblock %}
