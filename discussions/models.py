@@ -623,6 +623,72 @@ class ReviewCommentReaction(models.Model):
         ]
 
 
+class PollAction(models.Model):
+    ACTION_CHOICES = [('like', 'Like'), ('save', 'Save'), ('repost', 'Repost')]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='poll_actions')
+    poll = models.ForeignKey('Poll', on_delete=models.CASCADE, related_name='actions')
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [models.UniqueConstraint(fields=['user', 'poll', 'action'], name='unique_poll_action')]
+
+
+class PollFollow(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='followed_polls')
+    poll = models.ForeignKey('Poll', on_delete=models.CASCADE, related_name='followers')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [models.UniqueConstraint(fields=['user', 'poll'], name='unique_poll_follow')]
+
+
+class QuestionAction(models.Model):
+    ACTION_CHOICES = [('like', 'Like'), ('save', 'Save'), ('repost', 'Repost')]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='question_actions')
+    question = models.ForeignKey('Question', on_delete=models.CASCADE, related_name='actions')
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [models.UniqueConstraint(fields=['user', 'question', 'action'], name='unique_question_action')]
+
+
+class QuestionFollow(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='followed_questions')
+    question = models.ForeignKey('Question', on_delete=models.CASCADE, related_name='followers')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [models.UniqueConstraint(fields=['user', 'question'], name='unique_question_follow')]
+
+
+class ReviewAction(models.Model):
+    ACTION_CHOICES = [('like', 'Like'), ('save', 'Save'), ('repost', 'Repost')]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='review_actions')
+    review = models.ForeignKey('Review', on_delete=models.CASCADE, related_name='actions')
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [models.UniqueConstraint(fields=['user', 'review', 'action'], name='unique_review_action')]
+
+
+class ReviewFollow(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='followed_reviews')
+    review = models.ForeignKey('Review', on_delete=models.CASCADE, related_name='followers')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [models.UniqueConstraint(fields=['user', 'review'], name='unique_review_follow')]
+
+
 class ProfileReport(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),

@@ -58,6 +58,7 @@ urlpatterns = [
     path('debates/<str:debate_id>/end/', views.end_debate, name='end_debate'),
     path('debates/<str:debate_id>/remove-participant/', views.remove_debate_participant, name='remove_debate_participant'),
     # Polls
+    path('polls/<str:poll_id>/action/', views.poll_action, name='poll_action'),
     path('polls/', views.polls_list, name='polls_list'),
     path('polls/create/', views.create_poll, name='create_poll'),
     path('polls/comment/react/', views.like_poll_comment, name='like_poll_comment'),
@@ -65,6 +66,7 @@ urlpatterns = [
     path('polls/<str:poll_id>/vote/', views.poll_vote, name='poll_vote'),
     path('polls/<str:poll_id>/comment/', views.create_poll_comment, name='create_poll_comment'),
     # Questions
+    path('questions/<str:question_id>/action/', views.question_action, name='question_action'),
     path('questions/', views.questions_list, name='questions_list'),
     path('questions/ask/', views.ask_general_question, name='ask_general_question'),
     path('questions/answer/<str:answer_id>/vote/', views.vote_answer, name='vote_answer'),
@@ -74,6 +76,7 @@ urlpatterns = [
     # Leaderboard
     path('leaderboard/', views.leaderboard, name='leaderboard'),
     # Reviews
+    path('reviews/<str:review_id>/action/', views.review_action, name='review_action'),
     path('reviews/', views.reviews_list, name='reviews_list'),
     path('reviews/create/', views.create_review, name='create_review'),
     path('reviews/comment/react/', views.like_review_comment, name='like_review_comment'),

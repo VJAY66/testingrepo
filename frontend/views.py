@@ -20,7 +20,7 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow
 from discussions.signals import notify_post_author
 from users.models import Follow
 from users.security import is_login_rate_limited, record_login_attempt
@@ -579,6 +579,59 @@ def post_action(request, post_id):
                 'repost': repost_count
             }
         })
+
+
+def _content_action_toggle(request, model_cls, follow_cls, obj_field, obj):
+    """Generic toggle handler for like/save/repost/follow on any content type."""
+    action = request.POST.get('action')
+    if action not in ('like', 'save', 'repost', 'follow'):
+        return JsonResponse({'success': False, 'error': 'Invalid action.'}, status=400)
+
+    if action == 'follow':
+        existing = follow_cls.objects.filter(user=request.user, **{obj_field: obj}).first()
+        if existing:
+            existing.delete()
+            status = 'removed'
+        else:
+            follow_cls.objects.create(user=request.user, **{obj_field: obj})
+            status = 'added'
+        count = follow_cls.objects.filter(**{obj_field: obj}).count()
+        return JsonResponse({'success': True, 'action': 'follow', 'status': status, 'count': count})
+
+    existing = model_cls.objects.filter(user=request.user, action=action, **{obj_field: obj}).first()
+    if existing:
+        existing.delete()
+        status = 'removed'
+    else:
+        try:
+            model_cls.objects.create(user=request.user, action=action, **{obj_field: obj})
+            status = 'added'
+        except IntegrityError:
+            status = 'added'
+
+    count = model_cls.objects.filter(action=action, **{obj_field: obj}).count()
+    return JsonResponse({'success': True, 'action': action, 'status': status, 'count': count})
+
+
+@login_required
+@require_POST
+def poll_action(request, poll_id):
+    poll = get_object_or_404(Poll, id=poll_id)
+    return _content_action_toggle(request, PollAction, PollFollow, 'poll', poll)
+
+
+@login_required
+@require_POST
+def question_action(request, question_id):
+    question = get_object_or_404(Question, id=question_id)
+    return _content_action_toggle(request, QuestionAction, QuestionFollow, 'question', question)
+
+
+@login_required
+@require_POST
+def review_action(request, review_id):
+    review = get_object_or_404(Review, id=review_id)
+    return _content_action_toggle(request, ReviewAction, ReviewFollow, 'review', review)
 
 
 @require_GET
@@ -3426,16 +3479,29 @@ def polls_list(request):
     paginator = Paginator(polls_qs, 20)
     page_obj = paginator.get_page(request.GET.get('page', 1))
 
+    poll_ids = [p.id for p in page_obj]
+    user_poll_votes = {}
+    user_poll_actions = {}
+    user_poll_follows = set()
+    if request.user.is_authenticated:
+        for v in PollVote.objects.filter(poll_id__in=poll_ids, user=request.user):
+            user_poll_votes[v.poll_id] = v
+        for a in PollAction.objects.filter(poll_id__in=poll_ids, user=request.user):
+            user_poll_actions.setdefault(a.poll_id, set()).add(a.action)
+        user_poll_follows = set(PollFollow.objects.filter(poll_id__in=poll_ids, user=request.user).values_list('poll_id', flat=True))
+
+    from django.db.models import Count as _Count
+    like_counts = {r['poll_id']: r['c'] for r in PollAction.objects.filter(poll_id__in=poll_ids, action='like').values('poll_id').annotate(c=_Count('id'))}
+    save_counts = {r['poll_id']: r['c'] for r in PollAction.objects.filter(poll_id__in=poll_ids, action='save').values('poll_id').annotate(c=_Count('id'))}
+    repost_counts = {r['poll_id']: r['c'] for r in PollAction.objects.filter(poll_id__in=poll_ids, action='repost').values('poll_id').annotate(c=_Count('id'))}
+    follow_counts = {r['poll_id']: r['c'] for r in PollFollow.objects.filter(poll_id__in=poll_ids).values('poll_id').annotate(c=_Count('id'))}
+
     polls_data = []
     for poll in page_obj:
         opts = list(poll.options.all())
         total = poll.votes.count()
-        user_vote = None
-        if request.user.is_authenticated:
-            try:
-                user_vote = PollVote.objects.get(poll=poll, user=request.user)
-            except PollVote.DoesNotExist:
-                pass
+        user_vote = user_poll_votes.get(poll.id)
+        u_actions = user_poll_actions.get(poll.id, set())
         opt_data = []
         for opt in opts:
             cnt = opt.votes.count()
@@ -3447,6 +3513,14 @@ def polls_list(request):
             'option_data': opt_data,
             'total_votes': total,
             'user_vote': user_vote,
+            'like_count': like_counts.get(poll.id, 0),
+            'save_count': save_counts.get(poll.id, 0),
+            'repost_count': repost_counts.get(poll.id, 0),
+            'follow_count': follow_counts.get(poll.id, 0),
+            'is_liked': 'like' in u_actions,
+            'is_saved': 'save' in u_actions,
+            'is_reposted': 'repost' in u_actions,
+            'is_following': poll.id in user_poll_follows,
         })
 
     return render(request, 'frontend/polls_list.html', {
@@ -3795,9 +3869,38 @@ def questions_list(request):
 
     paginator = Paginator(qs, 20)
     page_obj = paginator.get_page(request.GET.get('page', 1))
+    q_ids = [q.id for q in page_obj]
+
+    user_q_actions = {}
+    user_q_follows = set()
+    if request.user.is_authenticated:
+        for a in QuestionAction.objects.filter(question_id__in=q_ids, user=request.user):
+            user_q_actions.setdefault(a.question_id, set()).add(a.action)
+        user_q_follows = set(QuestionFollow.objects.filter(question_id__in=q_ids, user=request.user).values_list('question_id', flat=True))
+
+    from django.db.models import Count as _Count
+    like_counts = {r['question_id']: r['c'] for r in QuestionAction.objects.filter(question_id__in=q_ids, action='like').values('question_id').annotate(c=_Count('id'))}
+    save_counts = {r['question_id']: r['c'] for r in QuestionAction.objects.filter(question_id__in=q_ids, action='save').values('question_id').annotate(c=_Count('id'))}
+    repost_counts = {r['question_id']: r['c'] for r in QuestionAction.objects.filter(question_id__in=q_ids, action='repost').values('question_id').annotate(c=_Count('id'))}
+    follow_counts = {r['question_id']: r['c'] for r in QuestionFollow.objects.filter(question_id__in=q_ids).values('question_id').annotate(c=_Count('id'))}
+
+    questions_data = []
+    for q in page_obj:
+        u_actions = user_q_actions.get(q.id, set())
+        questions_data.append({
+            'question': q,
+            'like_count': like_counts.get(q.id, 0),
+            'save_count': save_counts.get(q.id, 0),
+            'repost_count': repost_counts.get(q.id, 0),
+            'follow_count': follow_counts.get(q.id, 0),
+            'is_liked': 'like' in u_actions,
+            'is_saved': 'save' in u_actions,
+            'is_reposted': 'repost' in u_actions,
+            'is_following': q.id in user_q_follows,
+        })
 
     return render(request, 'frontend/questions_list.html', {
-        'questions': page_obj,
+        'questions_data': questions_data,
         'page_obj': page_obj,
         'categories': get_frontend_categories(),
         'active_category': category_filter,
@@ -3993,22 +4096,43 @@ def reviews_list(request):
     paginator = Paginator(qs, 20)
     page_obj = paginator.get_page(request.GET.get('page', 1))
 
+    rev_ids = [r.id for r in page_obj]
+    user_rev_reactions = {}
+    user_rev_actions = {}
+    user_rev_follows = set()
+    if request.user.is_authenticated:
+        for r in ReviewReaction.objects.filter(review_id__in=rev_ids, user=request.user):
+            user_rev_reactions[r.review_id] = r.reaction
+        for a in ReviewAction.objects.filter(review_id__in=rev_ids, user=request.user):
+            user_rev_actions.setdefault(a.review_id, set()).add(a.action)
+        user_rev_follows = set(ReviewFollow.objects.filter(review_id__in=rev_ids, user=request.user).values_list('review_id', flat=True))
+
+    from django.db.models import Count as _Count
+    like_counts = {r['review_id']: r['c'] for r in ReviewAction.objects.filter(review_id__in=rev_ids, action='like').values('review_id').annotate(c=_Count('id'))}
+    save_counts = {r['review_id']: r['c'] for r in ReviewAction.objects.filter(review_id__in=rev_ids, action='save').values('review_id').annotate(c=_Count('id'))}
+    repost_counts = {r['review_id']: r['c'] for r in ReviewAction.objects.filter(review_id__in=rev_ids, action='repost').values('review_id').annotate(c=_Count('id'))}
+    follow_counts = {r['review_id']: r['c'] for r in ReviewFollow.objects.filter(review_id__in=rev_ids).values('review_id').annotate(c=_Count('id'))}
+
     reviews_data = []
     for review in page_obj:
-        user_reaction = None
-        if request.user.is_authenticated:
-            try:
-                r = ReviewReaction.objects.get(review=review, user=request.user)
-                user_reaction = r.reaction
-            except ReviewReaction.DoesNotExist:
-                pass
-        reviews_data.append({'review': review, 'user_reaction': user_reaction})
+        u_actions = user_rev_actions.get(review.id, set())
+        reviews_data.append({
+            'review': review,
+            'user_reaction': user_rev_reactions.get(review.id),
+            'like_count': like_counts.get(review.id, 0),
+            'save_count': save_counts.get(review.id, 0),
+            'repost_count': repost_counts.get(review.id, 0),
+            'follow_count': follow_counts.get(review.id, 0),
+            'is_liked': 'like' in u_actions,
+            'is_saved': 'save' in u_actions,
+            'is_reposted': 'repost' in u_actions,
+            'is_following': review.id in user_rev_follows,
+        })
 
-    categories = [{'name': c[0]} for c in CATEGORY_CHOICES]
     return render(request, 'frontend/reviews_list.html', {
         'reviews_data': reviews_data,
         'page_obj': page_obj,
-        'categories': categories,
+        'categories': get_frontend_categories(),
         'active_category': category_filter,
     })
 

@@ -3,55 +3,34 @@
 
 {% block content %}
 <style>
-.q-list-card {
+.qlc {
     background: hsl(var(--card));
     border: 1px solid hsl(var(--border));
     border-radius: 1.2rem;
     transition: border-color 180ms ease, box-shadow 180ms ease;
+    padding: 1.15rem 1.25rem;
 }
-.q-list-card:hover {
-    border-color: hsl(var(--primary) / 0.4);
-    box-shadow: 0 8px 32px -12px hsl(var(--primary) / 0.2);
+.qlc:hover {
+    border-color: hsl(var(--primary) / 0.35);
+    box-shadow: 0 8px 32px -12px hsl(var(--primary) / 0.18);
 }
-
-/* ── Classy filter bar ── */
-.cfb { display:flex; align-items:center; gap:8px; overflow-x:auto; padding-bottom:6px; scrollbar-width:none; -ms-overflow-style:none; }
+/* ── Filter bar ── */
+.cfb { display:flex; align-items:center; gap:8px; overflow-x:auto; padding-bottom:6px; scrollbar-width:none; }
 .cfb::-webkit-scrollbar { display:none; }
-.cfb-pill {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 14px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
-    border: 1px solid hsl(var(--border));
-    background: hsl(var(--card) / 0.72);
-    color: hsl(var(--muted-foreground));
-    backdrop-filter: blur(8px);
-    transition: all 0.18s ease;
-    text-decoration: none;
-}
-.cfb-pill:hover {
-    background: hsl(var(--background));
-    border-color: hsl(var(--primary) / 0.55);
-    color: hsl(var(--foreground));
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px -6px hsl(var(--primary) / 0.25);
-}
-.cfb-pill.cfb-active {
-    background-image: var(--float-gradient);
-    background-color: transparent !important;
-    border-color: transparent;
-    color: hsl(var(--primary-foreground));
-    box-shadow: 0 4px 18px -6px hsl(var(--primary) / 0.55);
-}
-.cfb-pill.cfb-active:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 22px -6px hsl(var(--primary) / 0.65);
-}
+.cfb-pill { flex-shrink:0; display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; border:1px solid hsl(var(--border)); background:hsl(var(--card)/0.72); color:hsl(var(--muted-foreground)); backdrop-filter:blur(8px); transition:all 0.18s ease; text-decoration:none; }
+.cfb-pill:hover { background:hsl(var(--background)); border-color:hsl(var(--primary)/0.55); color:hsl(var(--foreground)); transform:translateY(-1px); box-shadow:0 4px 14px -6px hsl(var(--primary)/0.25); }
+.cfb-pill.cfb-active { background-image:var(--float-gradient); background-color:transparent!important; border-color:transparent; color:hsl(var(--primary-foreground)); box-shadow:0 4px 18px -6px hsl(var(--primary)/0.55); }
+.cfb-pill.cfb-active:hover { transform:translateY(-1px); }
+/* ── Action buttons ── */
+.ca-btn { display:inline-flex; align-items:center; gap:5px; padding:6px 10px; border-radius:999px; font-size:12px; font-weight:600; border:1px solid transparent; background:transparent; color:hsl(var(--muted-foreground)); cursor:pointer; transition:all 0.2s ease; line-height:1; }
+.ca-btn:hover { background:hsl(var(--muted)/0.6); color:hsl(var(--foreground)); transform:translateY(-1px); }
+.ca-btn:disabled { opacity:0.6; cursor:default; transform:none; }
+.ca-btn svg { width:15px; height:15px; flex-shrink:0; }
+.ca-like:hover,.ca-like.ca-active { color:#f59e0b; background:rgba(245,158,11,0.1); }
+.ca-repost:hover,.ca-repost.ca-active { color:#22c55e; background:rgba(34,197,94,0.1); }
+.ca-save:hover,.ca-save.ca-active { color:hsl(var(--primary)); background:hsl(var(--primary)/0.1); }
+.ca-follow:hover,.ca-follow.ca-active { color:#3b82f6; background:rgba(59,130,246,0.1); }
+.ca-like.ca-active svg,.ca-repost.ca-active svg,.ca-save.ca-active svg,.ca-follow.ca-active svg { transform:scale(1.15); }
 </style>
 
 <div class="max-w-3xl mx-auto px-4 py-6 sm:py-10 space-y-6">
@@ -61,12 +40,12 @@
         <div class="flex items-center gap-3">
             <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100 text-2xl dark:bg-violet-900/40">💬</span>
             <div>
-                <h1 class="text-xl font-bold text-foreground">Questions</h1>
+                <h1 class="text-xl font-bold text-foreground">Questions{% if active_category %} · {{ active_category }}{% endif %}</h1>
                 <p class="text-sm text-muted-foreground">Ask anything — get community answers.</p>
             </div>
         </div>
         {% if user.is_authenticated %}
-        <a href="{% url 'ask_general_question' %}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition">
+        <a href="{% url 'ask_general_question' %}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-bold shadow-sm shadow-primary/30 hover:shadow-md transition">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
             Ask Question
         </a>
@@ -76,13 +55,9 @@
     <!-- Category filter bar -->
     <div class="relative">
         <div class="cfb">
-            <a href="{% url 'questions_list' %}" class="cfb-pill {% if not active_category %}cfb-active{% endif %}">
-                <span>✨</span> All
-            </a>
+            <a href="{% url 'questions_list' %}" class="cfb-pill {% if not active_category %}cfb-active{% endif %}"><span>✨</span> All</a>
             {% for cat in categories %}
-            <a href="{% url 'questions_list' %}?category={{ cat.name|urlencode }}" class="cfb-pill {% if active_category == cat.name %}cfb-active{% endif %}">
-                <span>{{ cat.icon }}</span> {{ cat.name }}
-            </a>
+            <a href="{% url 'questions_list' %}?category={{ cat.name|urlencode }}" class="cfb-pill {% if active_category == cat.name %}cfb-active{% endif %}"><span>{{ cat.icon }}</span> {{ cat.name }}</a>
             {% endfor %}
         </div>
         <div style="pointer-events:none;position:absolute;inset-y:0;left:0;width:24px;background:linear-gradient(to right,hsl(var(--background)),transparent);"></div>
@@ -90,31 +65,32 @@
     </div>
 
     <!-- Question cards -->
-    {% if questions %}
+    {% if questions_data %}
     <div class="space-y-4">
-        {% for q in questions %}
-        <a href="{% url 'question_detail' q.id %}" class="q-list-card block p-5 no-underline group">
-            <!-- Top row -->
+        {% for qd in questions_data %}
+        {% with q=qd.question %}
+        <div class="qlc">
+            <!-- Author row -->
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-2">
-                    <div class="w-7 h-7 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">
-                        {{ q.user.username|first|upper }}
-                    </div>
-                    <span class="text-xs font-semibold text-muted-foreground">{{ q.user.username }}</span>
+                    <a href="{% url 'user_profile' q.user.username %}" class="w-7 h-7 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0 hover:opacity-80 transition">{{ q.user.username|first|upper }}</a>
+                    <a href="{% url 'user_profile' q.user.username %}" class="text-xs font-semibold text-primary hover:underline">@{{ q.user.username }}</a>
                     <span class="text-xs text-muted-foreground/60">· {{ q.created_at|date:"M j" }}</span>
                 </div>
-                <span class="px-2.5 py-0.5 bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 rounded-full text-xs font-bold uppercase tracking-wide">{{ q.category }}</span>
+                <a href="{% url 'questions_list' %}?category={{ q.category|urlencode }}" class="px-2.5 py-0.5 bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 rounded-full text-xs font-bold uppercase tracking-wide hover:bg-violet-200 transition">{{ q.category }}</a>
             </div>
 
             <!-- Title -->
-            <h2 class="text-base font-bold text-foreground group-hover:text-primary transition-colors leading-snug mb-2">{{ q.title }}</h2>
+            <h2 class="text-base font-bold text-foreground mb-2 leading-snug">
+                <a href="{% url 'question_detail' q.id %}" class="hover:text-primary transition-colors">{{ q.title }}</a>
+            </h2>
 
             {% if q.content %}
             <p class="text-sm text-muted-foreground line-clamp-2 mb-3">{{ q.content }}</p>
             {% endif %}
 
-            <!-- Footer -->
-            <div class="flex items-center gap-3 pt-3 border-t border-border/40 text-xs text-muted-foreground">
+            <!-- Stats row -->
+            <div class="flex items-center gap-3 text-xs text-muted-foreground mb-3">
                 <span class="flex items-center gap-1">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
                     {{ q.answer_count }} answer{{ q.answer_count|pluralize }}
@@ -122,12 +98,39 @@
                 {% if q.best_answer_id %}
                 <span class="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold">
                     <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                    Best answer
+                    Answered
                 </span>
                 {% endif %}
-                <span class="ml-auto text-primary/70 font-medium">Answer →</span>
             </div>
-        </a>
+
+            <!-- Action buttons -->
+            <div class="flex items-center gap-1 pt-3 border-t border-border/30 -mx-1">
+                {% if user.is_authenticated %}
+                <button type="button" class="ca-btn ca-like {% if qd.is_liked %}ca-active{% endif %}" onclick="doAction('question','{{ q.id }}','like',this)">
+                    <svg fill="{% if qd.is_liked %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                    <span data-count>{{ qd.like_count }}</span>
+                </button>
+                <button type="button" class="ca-btn ca-repost {% if qd.is_reposted %}ca-active{% endif %}" onclick="doAction('question','{{ q.id }}','repost',this)">
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3"/></svg>
+                    <span data-count>{{ qd.repost_count }}</span>
+                </button>
+                <button type="button" class="ca-btn ca-save {% if qd.is_saved %}ca-active{% endif %}" onclick="doAction('question','{{ q.id }}','save',this)">
+                    <svg fill="{% if qd.is_saved %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 3H7C5.9 3 5 3.9 5 5v16l7-4 7 4V5c0-1.1-.9-2-2-2z"/></svg>
+                    <span data-count>{{ qd.save_count }}</span>
+                </button>
+                <button type="button" class="ca-btn ca-follow {% if qd.is_following %}ca-active{% endif %}" onclick="doAction('question','{{ q.id }}','follow',this)" title="{% if qd.is_following %}Unfollow{% else %}Follow{% endif %}">
+                    <svg fill="{% if qd.is_following %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                    <span data-count>{{ qd.follow_count }}</span>
+                </button>
+                {% else %}
+                <span class="ca-btn pointer-events-none"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width:15px;height:15px;"><path stroke-linecap="round" stroke-linejoin="round" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> {{ qd.like_count }}</span>
+                {% endif %}
+                <a href="{% url 'question_detail' q.id %}" class="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/35 bg-primary/10 text-primary text-xs font-bold hover:bg-primary hover:text-primary-foreground transition-all">
+                    Answer →
+                </a>
+            </div>
+        </div>
+        {% endwith %}
         {% endfor %}
     </div>
 
@@ -135,18 +138,14 @@
     {% if page_obj.has_other_pages %}
     <div class="flex items-center justify-center gap-2 pt-2">
         {% if page_obj.has_previous %}
-        <a href="?{% if active_category %}category={{ active_category }}&{% endif %}page={{ page_obj.previous_page_number }}"
-           class="inline-flex items-center gap-1 px-4 py-2 rounded-full border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 transition">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-            Prev
+        <a href="?{% if active_category %}category={{ active_category|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}" class="inline-flex items-center gap-1 px-4 py-2 rounded-full border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg> Prev
         </a>
         {% endif %}
-        <span class="text-sm text-muted-foreground">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        <span class="text-sm text-muted-foreground">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
         {% if page_obj.has_next %}
-        <a href="?{% if active_category %}category={{ active_category }}&{% endif %}page={{ page_obj.next_page_number }}"
-           class="inline-flex items-center gap-1 px-4 py-2 rounded-full border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 transition">
-            Next
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        <a href="?{% if active_category %}category={{ active_category|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}" class="inline-flex items-center gap-1 px-4 py-2 rounded-full border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 transition">
+            Next <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
         </a>
         {% endif %}
     </div>
@@ -158,12 +157,39 @@
         <h2 class="text-lg font-bold text-foreground">No questions yet{% if active_category %} in {{ active_category }}{% endif %}</h2>
         <p class="text-sm text-muted-foreground max-w-xs">Be the first to ask something and get community answers!</p>
         {% if user.is_authenticated %}
-        <a href="{% url 'ask_general_question' %}" class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition mt-2">
-            Ask a Question
-        </a>
+        <a href="{% url 'ask_general_question' %}" class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition mt-2">Ask a Question</a>
         {% endif %}
     </div>
     {% endif %}
 
 </div>
+
+<script>
+function getCsrf() {
+    const m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+}
+async function doAction(type, id, action, btn) {
+    if (btn && btn.disabled) return;
+    if (btn) btn.disabled = true;
+    try {
+        const fd = new FormData();
+        fd.append('action', action);
+        fd.append('csrfmiddlewaretoken', getCsrf());
+        const resp = await fetch(`/${type}s/${id}/action/`, { method: 'POST', body: fd });
+        const data = await resp.json();
+        if (data.success && btn) {
+            const active = data.status === 'added';
+            btn.classList.toggle('ca-active', active);
+            const svgEl = btn.querySelector('svg');
+            const countEl = btn.querySelector('[data-count]');
+            if (countEl) countEl.textContent = data.count;
+            if (svgEl && (action === 'like' || action === 'save' || action === 'follow')) {
+                svgEl.setAttribute('fill', active ? 'currentColor' : 'none');
+            }
+        }
+    } catch(e) {}
+    if (btn) btn.disabled = false;
+}
+</script>
 {% endblock %}
