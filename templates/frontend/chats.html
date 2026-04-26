@@ -394,6 +394,10 @@ main:has(.ch-page) {
 body:has(.ch-page) {
     overflow: auto !important;
 }
+/* Always hide unread badge for the currently active chat item */
+.ch-item.active [data-unread-badge] {
+    display: none !important;
+}
 </style>
 
 <div class="ch-page">
@@ -547,7 +551,7 @@ function refreshUnreadBadges() {
         var chatId = item.getAttribute('data-chat-id');
         var badge = item.querySelector('[data-unread-badge]');
         if (!badge) return;
-        // The currently open chat is always treated as read
+        // Active chat is always read (CSS also enforces this)
         if (activeChatId && chatId === activeChatId) {
             badge.classList.add('hidden');
             return;
@@ -558,60 +562,63 @@ function refreshUnreadBadges() {
     });
 }
 
+// Fetch the live chat list from the server, write the exact last_message_id into
+// dhChatLastRead, then refresh ChatListManager so the nav badge updates too.
+function markActiveChatRead() {
+    if (!activeChatId) return;
+    fetch('/chats/list/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.success || !d.chats) return;
+            var chat = d.chats.find(function(c) { return String(c.id) === String(activeChatId); });
+            var lr = getLastRead();
+            // Use API value if available, fall back to data-last-id on the button
+            if (chat) {
+                lr[String(activeChatId)] = chat.last_message_id || 0;
+            } else {
+                var btn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
+                if (btn) lr[String(activeChatId)] = parseInt(btn.getAttribute('data-last-id') || '0', 10);
+            }
+            setLastRead(lr);
+            // Tell ChatListManager to re-read localStorage and update the nav badge
+            if (typeof ChatListManager !== 'undefined') {
+                ChatListManager.refresh();
+            }
+        })
+        .catch(function() {});
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-  bindChatSearch('ch-desktop-search', '#ch-desktop-list');
-  bindChatSearch('ch-mobile-search', '#ch-mobile-list');
+    bindChatSearch('ch-desktop-search', '#ch-desktop-list');
+    bindChatSearch('ch-mobile-search', '#ch-mobile-list');
 
-  // Mark pre-selected chat as read in localStorage and apply active state
-  if (activeChatId) {
-    var autoBtn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
-    if (autoBtn) {
-      autoBtn.classList.add('active');
-      var lr = getLastRead();
-      lr[activeChatId] = parseInt(autoBtn.getAttribute('data-last-id') || '0', 10);
-      setLastRead(lr);
+    // Apply active state to pre-selected chat
+    if (activeChatId) {
+        var autoBtn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
+        if (autoBtn) autoBtn.classList.add('active');
     }
-  }
 
-  refreshUnreadBadges();
+    refreshUnreadBadges();
+    markActiveChatRead();
 
-  // Re-evaluate badges whenever the iframe writes to dhChatLastRead
-  window.addEventListener('storage', function(e) {
-    if (e.key === 'dhChatLastRead') {
-      refreshUnreadBadges();
-    }
-  });
+    // Re-evaluate sidebar badges whenever the iframe updates dhChatLastRead
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'dhChatLastRead') refreshUnreadBadges();
+    });
 });
 
-// Ensure only one chat is active and open correct conversation
 function openDesktopChat(chatId, btn) {
     activeChatId = String(chatId);
-    // Remove active class from all chat items
     document.querySelectorAll('.ch-item.active').forEach(function(item) {
         item.classList.remove('active');
     });
-    // Add active class to clicked chat
     btn.classList.add('active');
-    // Open the chat in the iframe using the correct URL
     var frame = document.getElementById('ch-conv-frame');
-    if (frame) {
-        var url = btn.getAttribute('data-chat-url');
-        frame.src = url;
-    }
-    // Hide placeholder
+    if (frame) frame.src = btn.getAttribute('data-chat-url');
     var placeholder = document.getElementById('ch-conv-placeholder');
-    if (placeholder) {
-        placeholder.classList.add('hidden');
-    }
-    // Mark chat as read in localStorage and hide badge
-    var lastId = parseInt(btn.getAttribute('data-last-id') || '0', 10);
-    var lr = getLastRead();
-    lr[String(chatId)] = lastId;
-    setLastRead(lr);
-    if (typeof ChatListManager !== 'undefined') {
-        ChatListManager.markChatRead(chatId);
-    }
+    if (placeholder) placeholder.classList.add('hidden');
     refreshUnreadBadges();
+    markActiveChatRead();
 }
 </script>
 
