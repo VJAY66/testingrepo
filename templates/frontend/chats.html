@@ -562,28 +562,48 @@ function refreshUnreadBadges() {
     });
 }
 
-// Fetch the live chat list from the server, write the exact last_message_id into
-// dhChatLastRead, then refresh ChatListManager so the nav badge updates too.
+// Fetch the live chat list, mark the active chat as read, then directly update
+// the nav badge DOM — no second async hop needed.
 function markActiveChatRead() {
     if (!activeChatId) return;
     fetch('/chats/list/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function(r) { return r.json(); })
         .then(function(d) {
             if (!d.success || !d.chats) return;
-            var chat = d.chats.find(function(c) { return String(c.id) === String(activeChatId); });
             var lr = getLastRead();
-            // Use API value if available, fall back to data-last-id on the button
-            if (chat) {
-                lr[String(activeChatId)] = chat.last_message_id || 0;
+            var activeChat = d.chats.find(function(c) { return String(c.id) === String(activeChatId); });
+            if (activeChat) {
+                lr[String(activeChatId)] = activeChat.last_message_id || 0;
             } else {
                 var btn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
                 if (btn) lr[String(activeChatId)] = parseInt(btn.getAttribute('data-last-id') || '0', 10);
             }
             setLastRead(lr);
-            // Tell ChatListManager to re-read localStorage and update the nav badge
-            if (typeof ChatListManager !== 'undefined') {
-                ChatListManager.refresh();
+            // Compute total unread from same payload + updated lr, then set badge directly
+            var totalUnread = d.chats.reduce(function(acc, c) {
+                var stored = lr[String(c.id)] || 0;
+                return acc + ((c.last_message_id || 0) > stored ? 1 : 0);
+            }, 0);
+            var navBadge = document.getElementById('nav-chat-badge');
+            var mobBadge = document.getElementById('mobile-menu-chat-badge');
+            if (navBadge) {
+                if (totalUnread > 0) {
+                    navBadge.textContent = totalUnread > 9 ? '9+' : String(totalUnread);
+                    navBadge.classList.remove('hidden');
+                } else {
+                    navBadge.classList.add('hidden');
+                }
             }
+            if (mobBadge) {
+                if (totalUnread > 0) {
+                    mobBadge.textContent = totalUnread > 9 ? '9+' : String(totalUnread);
+                    mobBadge.style.display = 'inline-flex';
+                } else {
+                    mobBadge.style.display = 'none';
+                }
+            }
+            // Keep ChatListManager's internal state in sync for future polls
+            if (typeof ChatListManager !== 'undefined') ChatListManager.refresh();
         })
         .catch(function() {});
 }

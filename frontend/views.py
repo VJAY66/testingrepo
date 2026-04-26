@@ -1518,7 +1518,7 @@ def dismiss_notification(request):
 @login_required
 def chat_list(request):
     """Return list of active chats sorted by most recent message."""
-    chats = _build_chat_payload_for_user(request.user, only_active=False)
+    chats = _build_chat_payload_for_user(request.user, only_active=True)
     return JsonResponse({'success': True, 'chats': chats})
 
 
