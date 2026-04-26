@@ -554,7 +554,11 @@ document.addEventListener('DOMContentLoaded', function() {
   bindChatSearch('ch-desktop-search', '#ch-desktop-list');
   bindChatSearch('ch-mobile-search', '#ch-mobile-list');
 
-  // Auto-mark the pre-selected (auto-loaded) chat as read before evaluating badges
+  // Evaluate all badges first
+  refreshUnreadBadges();
+
+  // Then forcibly clear badge + mark as read for the auto-loaded chat.
+  // Must run AFTER refreshUnreadBadges so its toggle() cannot re-show the badge.
   {% if selected_chat_id %}
   (function() {
     var autoId = '{{ selected_chat_id }}';
@@ -565,11 +569,11 @@ document.addEventListener('DOMContentLoaded', function() {
       var lr = getLastRead();
       lr[autoId] = autoLastId;
       setLastRead(lr);
+      var badge = autoBtn.querySelector('[data-unread-badge]');
+      if (badge) badge.classList.add('hidden');
     }
   })();
   {% endif %}
-
-  refreshUnreadBadges();
 
   // Re-evaluate badges whenever the iframe writes to dhChatLastRead
   window.addEventListener('storage', function(e) {
