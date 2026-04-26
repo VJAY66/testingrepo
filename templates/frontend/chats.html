@@ -254,7 +254,11 @@
     height: 100%;
     min-height: 0;
     border: none;
-    background: transparent;
+    background: hsl(var(--background));
+    color-scheme: dark light;
+}
+.ch-item.active [data-unread-badge] {
+    display: none !important;
 }
 .ch-placeholder {
     height: 100%;
@@ -509,69 +513,109 @@ body:has(.ch-page) {
 </div>
 
 <script>
-// Make bindChatSearch globally available
 function bindChatSearch(inputId, listSelector) {
-    const input = document.getElementById(inputId);
-    const list = document.querySelector(listSelector);
+    var input = document.getElementById(inputId);
+    var list = document.querySelector(listSelector);
     if (!input || !list) return;
-    const items = Array.from(list.querySelectorAll('[data-filter]'));
+    var items = Array.from(list.querySelectorAll('[data-filter]'));
     input.addEventListener('input', function() {
-        const q = input.value.trim().toLowerCase();
+        var q = input.value.trim().toLowerCase();
         items.forEach(function(item) {
-            const haystack = String(item.getAttribute('data-filter') || '');
-            const ok = !q || haystack.indexOf(q) !== -1;
-            // For desktop chat list (button), use display property for filtering
+            var haystack = String(item.getAttribute('data-filter') || '');
+            var ok = !q || haystack.indexOf(q) !== -1;
             if (item.tagName === 'BUTTON') {
-                item.style.display = ok ? '' : 'none'; // Reset to default (flex from CSS)
+                item.style.display = ok ? '' : 'none';
             } else {
                 item.classList.toggle('hidden', !ok);
             }
-            if (!ok) {
-                item.classList.remove('active');
-            }
+            if (!ok) item.classList.remove('active');
         });
     });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  bindChatSearch('ch-desktop-search', '#ch-desktop-list');
-  bindChatSearch('ch-mobile-search', '#ch-mobile-list');
+function getLastRead() {
+    try { return JSON.parse(localStorage.getItem('dhChatLastRead') || '{}'); } catch { return {}; }
+}
+function setLastRead(lr) {
+    try { localStorage.setItem('dhChatLastRead', JSON.stringify(lr)); } catch {}
+}
 
-  // Mark the initially-selected chat as read when the page loads
-  {% if selected_chat_id %}
-  if (window.ChatListManager && typeof ChatListManager.markChatRead === 'function') {
-      ChatListManager.markChatRead('{{ selected_chat_id }}');
-  }
-  {% endif %}
+var activeChatId = '{{ selected_chat_id }}';
+
+function refreshUnreadBadges() {
+    var lr = getLastRead();
+    document.querySelectorAll('.ch-item[data-chat-id]').forEach(function(item) {
+        var chatId = item.getAttribute('data-chat-id');
+        var badge = item.querySelector('[data-unread-badge]');
+        if (!badge) return;
+        if (activeChatId && chatId === activeChatId) {
+            badge.classList.add('hidden');
+            return;
+        }
+        var lastId = parseInt(item.getAttribute('data-last-id') || '0', 10);
+        var readId = parseInt(lr[chatId] || '0', 10);
+        badge.classList.toggle('hidden', lastId <= readId);
+    });
+}
+
+function markActiveChatRead() {
+    if (!activeChatId) return;
+    fetch('/chats/list/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.success || !d.chats) return;
+            var lr = getLastRead();
+            var activeChat = d.chats.find(function(c) { return String(c.id) === String(activeChatId); });
+            if (activeChat) {
+                lr[String(activeChatId)] = activeChat.last_message_id || 0;
+            } else {
+                var btn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
+                if (btn) lr[String(activeChatId)] = parseInt(btn.getAttribute('data-last-id') || '0', 10);
+            }
+            setLastRead(lr);
+            var totalUnread = d.chats.reduce(function(acc, c) {
+                var stored = lr[String(c.id)] || 0;
+                return acc + ((c.last_message_id || 0) > stored ? 1 : 0);
+            }, 0);
+            var navBadge = document.getElementById('nav-chat-badge');
+            var mobBadge = document.getElementById('mobile-menu-chat-badge');
+            if (navBadge) {
+                if (totalUnread > 0) { navBadge.textContent = totalUnread > 9 ? '9+' : String(totalUnread); navBadge.classList.remove('hidden'); }
+                else { navBadge.classList.add('hidden'); }
+            }
+            if (mobBadge) {
+                if (totalUnread > 0) { mobBadge.textContent = totalUnread > 9 ? '9+' : String(totalUnread); mobBadge.style.display = 'inline-flex'; }
+                else { mobBadge.style.display = 'none'; }
+            }
+            if (typeof ChatListManager !== 'undefined') ChatListManager.refresh();
+        })
+        .catch(function() {});
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    bindChatSearch('ch-desktop-search', '#ch-desktop-list');
+    bindChatSearch('ch-mobile-search', '#ch-mobile-list');
+    if (activeChatId) {
+        var autoBtn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
+        if (autoBtn) autoBtn.classList.add('active');
+    }
+    refreshUnreadBadges();
+    markActiveChatRead();
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'dhChatLastRead') refreshUnreadBadges();
+    });
 });
 
-// Ensure only one chat is active and open correct conversation
 function openDesktopChat(chatId, btn) {
-    // Remove active class from all chat items
-    document.querySelectorAll('.ch-item.active').forEach(function(item) {
-        item.classList.remove('active');
-    });
-    // Add active class to clicked chat
+    activeChatId = String(chatId);
+    document.querySelectorAll('.ch-item.active').forEach(function(item) { item.classList.remove('active'); });
     btn.classList.add('active');
-    // Open the chat in the iframe using the correct URL
     var frame = document.getElementById('ch-conv-frame');
-    if (frame) {
-        var url = btn.getAttribute('data-chat-url');
-        frame.src = url;
-    }
-    // Hide placeholder
+    if (frame) frame.src = btn.getAttribute('data-chat-url');
     var placeholder = document.getElementById('ch-conv-placeholder');
-    if (placeholder) {
-        placeholder.classList.add('hidden');
-    }
-    // Hide unread badge for this chat and mark it read in localStorage
-    var unread = btn.querySelector('[data-unread-badge]');
-    if (unread) {
-        unread.classList.add('hidden');
-    }
-    if (window.ChatListManager && typeof ChatListManager.markChatRead === 'function') {
-        ChatListManager.markChatRead(chatId);
-    }
+    if (placeholder) placeholder.classList.add('hidden');
+    refreshUnreadBadges();
+    markActiveChatRead();
 }
 </script>
 
