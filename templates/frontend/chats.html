@@ -530,9 +530,29 @@ function bindChatSearch(inputId, listSelector) {
     });
 }
 
+function getLastRead() {
+    try { return JSON.parse(localStorage.getItem('dhChatLastRead') || '{}'); } catch { return {}; }
+}
+function setLastRead(lr) {
+    try { localStorage.setItem('dhChatLastRead', JSON.stringify(lr)); } catch {}
+}
+function refreshUnreadBadges() {
+    var lr = getLastRead();
+    document.querySelectorAll('.ch-item[data-chat-id]').forEach(function(item) {
+        var chatId = item.getAttribute('data-chat-id');
+        var lastId = parseInt(item.getAttribute('data-last-id') || '0', 10);
+        var readId = parseInt(lr[chatId] || '0', 10);
+        var badge = item.querySelector('[data-unread-badge]');
+        if (badge) {
+            badge.classList.toggle('hidden', lastId <= readId);
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
   bindChatSearch('ch-desktop-search', '#ch-desktop-list');
   bindChatSearch('ch-mobile-search', '#ch-mobile-list');
+  refreshUnreadBadges();
 });
 
 // Ensure only one chat is active and open correct conversation
@@ -554,7 +574,14 @@ function openDesktopChat(chatId, btn) {
     if (placeholder) {
         placeholder.classList.add('hidden');
     }
-    // Hide unread badge for this chat
+    // Mark chat as read in localStorage and hide badge
+    var lastId = parseInt(btn.getAttribute('data-last-id') || '0', 10);
+    var lr = getLastRead();
+    lr[String(chatId)] = lastId;
+    setLastRead(lr);
+    if (typeof ChatListManager !== 'undefined') {
+        ChatListManager.markChatRead(chatId);
+    }
     var unread = btn.querySelector('[data-unread-badge]');
     if (unread) {
         unread.classList.add('hidden');
