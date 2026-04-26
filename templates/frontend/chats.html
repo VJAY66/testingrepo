@@ -553,7 +553,30 @@ function refreshUnreadBadges() {
 document.addEventListener('DOMContentLoaded', function() {
   bindChatSearch('ch-desktop-search', '#ch-desktop-list');
   bindChatSearch('ch-mobile-search', '#ch-mobile-list');
+
+  // Auto-mark the pre-selected (auto-loaded) chat as read before evaluating badges
+  {% if selected_chat_id %}
+  (function() {
+    var autoId = '{{ selected_chat_id }}';
+    var autoBtn = document.querySelector('.ch-item[data-chat-id="' + autoId + '"]');
+    if (autoBtn) {
+      autoBtn.classList.add('active');
+      var autoLastId = parseInt(autoBtn.getAttribute('data-last-id') || '0', 10);
+      var lr = getLastRead();
+      lr[autoId] = autoLastId;
+      setLastRead(lr);
+    }
+  })();
+  {% endif %}
+
   refreshUnreadBadges();
+
+  // Re-evaluate badges whenever the iframe writes to dhChatLastRead
+  window.addEventListener('storage', function(e) {
+    if (e.key === 'dhChatLastRead') {
+      refreshUnreadBadges();
+    }
+  });
 });
 
 // Ensure only one chat is active and open correct conversation
