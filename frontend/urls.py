@@ -57,4 +57,53 @@ urlpatterns = [
     path('debates/<str:debate_id>/increase-limits/', views.increase_debate_limits, name='increase_debate_limits'),
     path('debates/<str:debate_id>/end/', views.end_debate, name='end_debate'),
     path('debates/<str:debate_id>/remove-participant/', views.remove_debate_participant, name='remove_debate_participant'),
+    # Polls
+    path('polls/<str:poll_id>/action/', views.poll_action, name='poll_action'),
+    path('polls/', views.polls_list, name='polls_list'),
+    path('polls/create/', views.create_poll, name='create_poll'),
+    path('polls/comment/react/', views.like_poll_comment, name='like_poll_comment'),
+    path('polls/<str:poll_id>/', views.poll_detail, name='poll_detail'),
+    path('polls/<str:poll_id>/vote/', views.poll_vote, name='poll_vote'),
+    path('polls/<str:poll_id>/comment/', views.create_poll_comment, name='create_poll_comment'),
+    # Questions
+    path('questions/<str:question_id>/action/', views.question_action, name='question_action'),
+    path('questions/', views.questions_list, name='questions_list'),
+    path('questions/ask/', views.ask_general_question, name='ask_general_question'),
+    path('questions/answer/<str:answer_id>/vote/', views.vote_answer, name='vote_answer'),
+    path('questions/answer/<str:answer_id>/best/', views.mark_best_answer, name='mark_best_answer'),
+    path('questions/<str:question_id>/', views.question_detail, name='question_detail'),
+    path('questions/<str:question_id>/answer/', views.post_answer, name='post_answer'),
+    # Leaderboard
+    path('leaderboard/', views.leaderboard, name='leaderboard'),
+    # Reviews
+    path('reviews/<str:review_id>/action/', views.review_action, name='review_action'),
+    path('reviews/', views.reviews_list, name='reviews_list'),
+    path('reviews/create/', views.create_review, name='create_review'),
+    path('reviews/comment/react/', views.like_review_comment, name='like_review_comment'),
+    path('reviews/<str:review_id>/', views.review_detail, name='review_detail'),
+    path('reviews/<str:review_id>/react/', views.react_to_review, name='react_to_review'),
+    path('reviews/<str:review_id>/comment/', views.create_review_comment, name='create_review_comment'),
+    # Trending hashtags
+    path('trending/', views.trending_hashtags, name='trending_hashtags'),
+    # Activity feed
+    path('activity/', views.activity_feed, name='activity_feed'),
+    # Debate transcript (public)
+    path('debates/<str:debate_id>/transcript/', views.debate_transcript, name='debate_transcript'),
+    # Observer voting
+    path('debates/<str:debate_id>/observer-vote/', views.observer_vote, name='observer_vote'),
+    # User blocking
+    path('block-user/', views.block_user, name='block_user'),
+    path('unblock-user/', views.unblock_user, name='unblock_user'),
+    # Profile bio/website update
+    path('profile/update-bio/', views.update_profile_bio, name='update_profile_bio'),
+    # Comment reporting
+    path('report-post-comment/', views.report_post_comment, name='report_post_comment'),
+    # Debate stats JSON
+    path('stats/debates/', views.debate_stats, name='debate_stats'),
+    path('stats/debates/<str:username>/', views.debate_stats, name='debate_stats_user'),
+    # Hashtag following
+    path('hashtags/follow/', views.follow_hashtag, name='follow_hashtag'),
+    path('hashtags/feed/', views.hashtag_followed_feed, name='hashtag_followed_feed'),
+    # Moderation dashboard
+    path('moderation/', views.moderation_dashboard, name='moderation_dashboard'),
 ]

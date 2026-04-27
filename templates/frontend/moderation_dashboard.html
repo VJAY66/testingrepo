@@ -1,0 +1,197 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Moderation Dashboard — PickASide{% endblock %}
+
+{% block content %}
+<style>
+.mod-page { max-width: 860px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+.mod-title { font-size: 1.55rem; font-weight: 900; color: hsl(var(--foreground)); letter-spacing: -0.01em; }
+.mod-section { margin-top: 2.5rem; }
+.mod-section-label {
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: hsl(var(--muted-foreground));
+  margin-bottom: 0.85rem;
+}
+.mod-card {
+  border: 1px solid hsl(var(--border) / 0.7);
+  border-radius: 1rem;
+  background: hsl(var(--card));
+  padding: 1rem 1.1rem;
+  margin-bottom: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: box-shadow 0.15s ease;
+}
+.mod-card:hover { box-shadow: 0 4px 20px -8px hsl(var(--primary) / 0.15); }
+.mod-card-meta { font-size: 0.78rem; color: hsl(var(--muted-foreground)); }
+.mod-card-content {
+  font-size: 0.88rem; color: hsl(var(--foreground));
+  background: hsl(var(--background)); border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem; border: 1px solid hsl(var(--border) / 0.5);
+  line-height: 1.5;
+}
+.mod-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem; }
+.mod-btn {
+  border-radius: 999px; padding: 0.3rem 0.9rem;
+  font-size: 0.75rem; font-weight: 700; border: none; cursor: pointer; transition: all 0.15s ease;
+}
+.mod-btn-dismiss { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+.mod-btn-dismiss:hover { background: hsl(var(--border)); }
+.mod-btn-action { background: hsl(220 14% 20%); color: #f8fafc; }
+.mod-btn-action:hover { background: hsl(220 14% 14%); }
+.mod-btn-warn { background: hsl(38 92% 50%); color: #1c1917; }
+.mod-btn-warn:hover { background: hsl(38 92% 44%); }
+
+.mod-empty {
+  text-align: center; padding: 2.5rem 1rem;
+  color: hsl(var(--muted-foreground)); font-size: 0.9rem;
+  border: 1px dashed hsl(var(--border)); border-radius: 1rem;
+}
+
+.mod-badge {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.15rem 0.55rem; border-radius: 999px;
+  font-size: 0.68rem; font-weight: 700;
+  background: hsl(var(--destructive) / 0.15); color: hsl(var(--destructive));
+}
+
+.done-overlay {
+  opacity: 0.4; pointer-events: none; transition: opacity 0.3s;
+}
+</style>
+
+<div class="mod-page">
+  <div class="flex items-center gap-3 mb-1">
+    <span style="font-size:1.5rem;">🛡️</span>
+    <h1 class="mod-title">Moderation Dashboard</h1>
+    {% if total_pending > 0 %}
+    <span class="mod-badge">{{ total_pending }} pending</span>
+    {% endif %}
+  </div>
+  <p style="font-size:0.85rem;color:hsl(var(--muted-foreground));margin-top:0.25rem;">
+    Review flagged content and take action. Only visible to configured moderators.
+  </p>
+
+  <!-- Comment Reports -->
+  <div class="mod-section">
+    <p class="mod-section-label">💬 Comment Reports ({{ comment_reports|length }})</p>
+    {% if comment_reports %}
+      {% for report in comment_reports %}
+      <div class="mod-card" id="cr-{{ report.id }}">
+        <div class="mod-card-meta">
+          <strong>@{{ report.reporter.username }}</strong> reported @{{ report.comment.user.username }}'s comment
+          &middot; Reason: <strong>{{ report.get_reason_display }}</strong>
+          &middot; {{ report.created_at|timesince }} ago
+          {% if report.details %}&middot; "{{ report.details|truncatechars:80 }}"{% endif %}
+        </div>
+        <div class="mod-card-content">{{ report.comment.content|truncatechars:250 }}</div>
+        <div style="font-size:0.75rem;color:hsl(var(--muted-foreground));">
+          Post: <a href="{% url 'discussion' report.comment.post.id %}" class="text-primary hover:underline" target="_blank">{{ report.comment.post.title|truncatechars:60 }}</a>
+        </div>
+        <div class="mod-actions">
+          <button class="mod-btn mod-btn-dismiss" onclick="resolveReport('comment', {{ report.id }}, 'dismiss')">Dismiss</button>
+          <button class="mod-btn mod-btn-warn" onclick="resolveReport('comment', {{ report.id }}, 'delete_comment')">Delete Comment</button>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="mod-empty">No pending comment reports.</div>
+    {% endif %}
+  </div>
+
+  <!-- Debate Message Reports -->
+  <div class="mod-section">
+    <p class="mod-section-label">⚔️ Debate Message Reports ({{ message_reports|length }})</p>
+    {% if message_reports %}
+      {% for report in message_reports %}
+      <div class="mod-card" id="mr-{{ report.id }}">
+        <div class="mod-card-meta">
+          <strong>@{{ report.reporter.username }}</strong> reported @{{ report.reported_user.username }}'s message
+          &middot; {{ report.created_at|timesince }} ago
+          {% if report.details %}&middot; "{{ report.details|truncatechars:80 }}"{% endif %}
+        </div>
+        <div class="mod-card-content">{{ report.message.content|truncatechars:250 }}</div>
+        <div style="font-size:0.75rem;color:hsl(var(--muted-foreground));">
+          Debate: <a href="{% url 'debate_chat' report.message.debate.id %}" class="text-primary hover:underline" target="_blank">{{ report.message.debate.id }}</a>
+        </div>
+        <div class="mod-actions">
+          <button class="mod-btn mod-btn-dismiss" onclick="resolveReport('message', {{ report.id }}, 'dismiss')">Dismiss</button>
+          <button class="mod-btn mod-btn-warn" onclick="resolveReport('message', {{ report.id }}, 'delete_message')">Delete Message</button>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="mod-empty">No pending debate message reports.</div>
+    {% endif %}
+  </div>
+
+  <!-- Profile Reports -->
+  <div class="mod-section">
+    <p class="mod-section-label">👤 Profile Reports ({{ profile_reports|length }})</p>
+    {% if profile_reports %}
+      {% for report in profile_reports %}
+      <div class="mod-card" id="pr-{{ report.id }}">
+        <div class="mod-card-meta">
+          <strong>@{{ report.reporter.username }}</strong> reported
+          <a href="{% url 'user_profile' report.reported_user.username %}" target="_blank" class="text-primary hover:underline">@{{ report.reported_user.username }}</a>
+          &middot; {{ report.created_at|timesince }} ago
+        </div>
+        {% if report.details %}
+        <div class="mod-card-content">{{ report.details|truncatechars:300 }}</div>
+        {% endif %}
+        <div class="mod-actions">
+          <button class="mod-btn mod-btn-dismiss" onclick="resolveReport('profile', {{ report.id }}, 'dismiss')">Dismiss</button>
+          <button class="mod-btn mod-btn-warn" onclick="resolveReport('profile', {{ report.id }}, 'warn')">Warn User</button>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="mod-empty">No pending profile reports.</div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function getCookie(name) {
+  var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+  return v ? v[2] : null;
+}
+
+var actionUrls = {
+  comment: function(id) { return '/moderation/comment-reports/' + id + '/review/'; },
+  message: function(id) { return '/moderation/debate-message-reports/' + id + '/review/'; },
+  profile: function(id) { return '/moderation/profile-reports/' + id + '/review/'; },
+};
+
+var cardPrefix = { comment: 'cr-', message: 'mr-', profile: 'pr-' };
+
+function resolveReport(type, id, action) {
+  var url = actionUrls[type](id);
+  var card = document.getElementById(cardPrefix[type] + id);
+  if (!url || !card) return;
+
+  var body = 'action=' + encodeURIComponent(action);
+  if (action === 'warn') body += '&warning_message=' + encodeURIComponent('A moderator has reviewed a report against your profile and issued a warning. Please follow community guidelines.');
+  if (action === 'delete_message') { body = 'action=delete'; }
+
+  fetch(url, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body,
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.success) {
+      card.classList.add('done-overlay');
+      setTimeout(function() { card.remove(); }, 600);
+      if (typeof window.showToast === 'function') window.showToast(d.message || 'Done.', 'success');
+    } else {
+      if (typeof window.showToast === 'function') window.showToast(d.error || 'Error.', 'error');
+    }
+  })
+  .catch(function() {
+    if (typeof window.showToast === 'function') window.showToast('Network error.', 'error');
+  });
+}
+</script>
+{% endblock %}

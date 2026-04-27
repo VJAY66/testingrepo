@@ -1,0 +1,133 @@
+{% extends 'frontend/base.html' %}
+{% block title %}My Hashtag Feed — PickASide{% endblock %}
+
+{% block content %}
+<style>
+.hf-page { max-width: 680px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+.hf-title { font-size: 1.55rem; font-weight: 900; color: hsl(var(--foreground)); letter-spacing: -0.01em; }
+.hf-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0 1.5rem; }
+.hf-tag {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.3rem 0.75rem; border-radius: 999px;
+  background: hsl(var(--primary) / 0.1); color: hsl(var(--primary));
+  font-size: 0.8rem; font-weight: 700; border: 1px solid hsl(var(--primary) / 0.25);
+}
+.hf-section-label {
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: hsl(var(--muted-foreground));
+  margin: 1.75rem 0 0.65rem;
+}
+.hf-card {
+  border: 1px solid hsl(var(--border) / 0.7);
+  border-radius: 1rem; background: hsl(var(--card));
+  padding: 0.9rem 1rem; margin-bottom: 0.6rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.hf-card:hover { transform: translateY(-1px); box-shadow: 0 6px 20px -8px hsl(var(--primary) / 0.15); }
+.hf-card-title { font-size: 0.95rem; font-weight: 700; color: hsl(var(--foreground)); text-decoration: none; }
+.hf-card-title:hover { color: hsl(var(--primary)); }
+.hf-card-meta { font-size: 0.75rem; color: hsl(var(--muted-foreground)); margin-top: 0.3rem; }
+
+.hf-empty {
+  text-align: center; padding: 4rem 2rem;
+  color: hsl(var(--muted-foreground));
+}
+.hf-empty-icon { font-size: 3rem; margin-bottom: 0.75rem; display: block; }
+</style>
+
+<div class="hf-page">
+  <div class="flex items-center gap-3 mb-1">
+    <span style="font-size:1.5rem;">#</span>
+    <h1 class="hf-title">My Hashtag Feed</h1>
+  </div>
+
+  {% if followed_tags %}
+    <div class="hf-tags">
+      {% for tag in followed_tags %}
+      <span class="hf-tag">
+        <span>#</span>{{ tag }}
+        <button type="button" onclick="unfollowTag('{{ tag }}')" title="Unfollow" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;margin-left:2px;font-size:0.9em;">×</button>
+      </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if not followed_tags %}
+    <div class="hf-empty mt-10">
+      <span class="hf-empty-icon">🏷️</span>
+      <p class="font-semibold text-base">You're not following any hashtags yet</p>
+      <p class="text-sm mt-2">Go to <a href="{% url 'trending_hashtags' %}" class="text-primary hover:underline">Trending Tags</a> and click the ♡ button to follow tags you care about.</p>
+    </div>
+  {% elif not posts and not polls and not questions and not reviews %}
+    <div class="hf-empty mt-6">
+      <span class="hf-empty-icon">💤</span>
+      <p class="font-semibold">No recent content found for your hashtags.</p>
+      <p class="text-sm mt-2">Content using these hashtags will appear here.</p>
+    </div>
+  {% else %}
+    {% if posts %}
+    <p class="hf-section-label">📝 Discussions ({{ posts|length }})</p>
+    {% for post in posts %}
+    <div class="hf-card">
+      <a href="{% url 'discussion' post.id %}" class="hf-card-title">{{ post.title }}</a>
+      <div class="hf-card-meta">
+        by @{{ post.user.username }} &middot; {{ post.category }} &middot; {{ post.created_at|date:"M j, Y" }}
+        {% if post.view_count %}&middot; {{ post.view_count }} views{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if polls %}
+    <p class="hf-section-label">📊 Polls ({{ polls|length }})</p>
+    {% for poll in polls %}
+    <div class="hf-card">
+      <a href="{% url 'poll_detail' poll.id %}" class="hf-card-title">{{ poll.title }}</a>
+      <div class="hf-card-meta">by @{{ poll.user.username }} &middot; {{ poll.category }} &middot; {{ poll.created_at|date:"M j, Y" }}</div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if questions %}
+    <p class="hf-section-label">💬 Questions ({{ questions|length }})</p>
+    {% for q in questions %}
+    <div class="hf-card">
+      <a href="{% url 'question_detail' q.id %}" class="hf-card-title">{{ q.title }}</a>
+      <div class="hf-card-meta">by @{{ q.user.username }} &middot; {{ q.answer_count }} answer{{ q.answer_count|pluralize }} &middot; {{ q.created_at|date:"M j, Y" }}</div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if reviews %}
+    <p class="hf-section-label">⭐ Reviews ({{ reviews|length }})</p>
+    {% for review in reviews %}
+    <div class="hf-card">
+      <a href="{% url 'review_detail' review.id %}" class="hf-card-title">{{ review.subject }}</a>
+      <div class="hf-card-meta">by @{{ review.user.username }} &middot; {{ review.subject_type }} &middot; {{ review.created_at|date:"M j, Y" }}</div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  {% endif %}
+</div>
+
+<script>
+function getCookie(name) {
+  var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+  return v ? v[2] : null;
+}
+function unfollowTag(tag) {
+  fetch('/hashtags/follow/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'tag=' + encodeURIComponent(tag),
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.success) {
+      if (typeof window.showToast === 'function') window.showToast('#' + tag + ' unfollowed.', 'success');
+      setTimeout(function() { window.location.reload(); }, 600);
+    }
+  });
+}
+</script>
+{% endblock %}

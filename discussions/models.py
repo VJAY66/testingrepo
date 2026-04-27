@@ -81,6 +81,7 @@ class Comment(models.Model):
     id = models.CharField(max_length=36, primary_key=True)
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')
+    reply_to = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='replies')
     content = models.TextField(blank=True)
     vote_type = models.CharField(max_length=10, choices=VOTE_CHOICES)
     likes = models.IntegerField(default=0)
@@ -250,6 +251,7 @@ class Notification(models.Model):
         ('author_debate', 'New Debate on Your Post'),
         ('author_repost', 'Your Post was Reposted'),
         ('author_save', 'Your Post was Saved'),
+        ('mention', 'You Were Mentioned'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
@@ -398,4 +400,72 @@ class ProfileReport(models.Model):
         ordering = ['-created_at']
         constraints = [
             models.UniqueConstraint(fields=['reporter', 'reported_user'], name='unique_profile_report_per_reporter'),
+        ]
+
+
+class ObserverVote(models.Model):
+    """Spectators vote on who argued best in a completed debate."""
+    SIDE_CHOICES = [('yes', 'Yes'), ('no', 'No')]
+
+    debate = models.ForeignKey(Debate, on_delete=models.CASCADE, related_name='observer_votes')
+    voter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='observer_votes_cast')
+    winner_side = models.CharField(max_length=10, choices=SIDE_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.voter.username} voted '{self.winner_side}' wins debate {self.debate_id}"
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['debate', 'voter'], name='unique_observer_vote_per_debate'),
+        ]
+
+
+class CommentReport(models.Model):
+    """User-submitted report on a post comment."""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('dismissed', 'Dismissed'),
+        ('actioned', 'Actioned'),
+    ]
+    REASON_CHOICES = [
+        ('abusive_language', 'Abusive language'),
+        ('spam', 'Spam or misleading'),
+        ('misinformation', 'Misinformation'),
+        ('harassment', 'Harassment'),
+        ('other', 'Other'),
+    ]
+
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='reports')
+    reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comment_reports_submitted')
+    reason = models.CharField(max_length=30, choices=REASON_CHOICES, default='abusive_language')
+    details = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Report #{self.id} on comment {self.comment_id} ({self.status})"
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['comment', 'reporter'], name='unique_comment_report_per_reporter'),
+        ]
+
+
+class HashtagFollow(models.Model):
+    """User follows a hashtag — shows up in their hashtag feed."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hashtag_follows')
+    tag = models.CharField(max_length=40, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} follows #{self.tag}"
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'tag'], name='unique_hashtag_follow'),
         ]

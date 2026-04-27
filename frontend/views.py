@@ -20,7 +20,7 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow
 from discussions.signals import notify_post_author
 from users.models import Follow
 from users.security import is_login_rate_limited, record_login_attempt
@@ -2012,6 +2012,8 @@ def create_comment(request, post_id):
             existing_comment.vote_type = vote_type
             existing_comment.content = content
             existing_comment.save(update_fields=['vote_type', 'content', 'updated_at'])
+            if content:
+                _notify_mentions(request.user, content, post)
 
             if is_ajax:
                 return JsonResponse(build_vote_payload('Comment submitted!', has_comment=True))
@@ -2030,6 +2032,8 @@ def create_comment(request, post_id):
                 vote_type=vote_type,
                 content=content if content else ''
             )
+            if content:
+                _notify_mentions(request.user, content, post)
 
             if is_ajax:
                 return JsonResponse(build_vote_payload('Vote submitted!' if not content else 'Comment submitted!', has_comment=bool(content)))
@@ -3214,4 +3218,1344 @@ def remove_debate_participant(request, debate_id):
     return JsonResponse({
         'success': True,
         'message': f'{participation.user.username} was removed from participation and can now only view this conversation.'
+    })
+
+# ─── Poll Views ────────────────────────────────────────────────────────────────
+
+def polls_list(request):
+    """Show paginated list of all active polls."""
+    category_filter = request.GET.get('category', '').strip()
+    polls_qs = Poll.objects.filter(is_deleted_by_moderation=False)
+    if category_filter:
+        polls_qs = polls_qs.filter(category=category_filter)
+
+    paginator = Paginator(polls_qs, 20)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    poll_ids = [p.id for p in page_obj]
+    user_poll_votes = {}
+    user_poll_actions = {}
+    user_poll_follows = set()
+    if request.user.is_authenticated:
+        for v in PollVote.objects.filter(poll_id__in=poll_ids, user=request.user):
+            user_poll_votes[v.poll_id] = v
+        for a in PollAction.objects.filter(poll_id__in=poll_ids, user=request.user):
+            user_poll_actions.setdefault(a.poll_id, set()).add(a.action)
+        user_poll_follows = set(PollFollow.objects.filter(poll_id__in=poll_ids, user=request.user).values_list('poll_id', flat=True))
+
+    from django.db.models import Count as _Count
+    like_counts = {r['poll_id']: r['c'] for r in PollAction.objects.filter(poll_id__in=poll_ids, action='like').values('poll_id').annotate(c=_Count('id'))}
+    save_counts = {r['poll_id']: r['c'] for r in PollAction.objects.filter(poll_id__in=poll_ids, action='save').values('poll_id').annotate(c=_Count('id'))}
+    repost_counts = {r['poll_id']: r['c'] for r in PollAction.objects.filter(poll_id__in=poll_ids, action='repost').values('poll_id').annotate(c=_Count('id'))}
+    follow_counts = {r['poll_id']: r['c'] for r in PollFollow.objects.filter(poll_id__in=poll_ids).values('poll_id').annotate(c=_Count('id'))}
+
+    polls_data = []
+    for poll in page_obj:
+        opts = list(poll.options.all())
+        total = poll.votes.count()
+        user_vote = user_poll_votes.get(poll.id)
+        u_actions = user_poll_actions.get(poll.id, set())
+        opt_data = []
+        for opt in opts:
+            cnt = opt.votes.count()
+            pct = round(cnt / total * 100, 1) if total > 0 else 0
+            opt_data.append({'option': opt, 'vote_count': cnt, 'percentage': pct})
+        polls_data.append({
+            'poll': poll,
+            'options': opts,
+            'option_data': opt_data,
+            'total_votes': total,
+            'user_vote': user_vote,
+            'like_count': like_counts.get(poll.id, 0),
+            'save_count': save_counts.get(poll.id, 0),
+            'repost_count': repost_counts.get(poll.id, 0),
+            'follow_count': follow_counts.get(poll.id, 0),
+            'is_liked': 'like' in u_actions,
+            'is_saved': 'save' in u_actions,
+            'is_reposted': 'repost' in u_actions,
+            'is_following': poll.id in user_poll_follows,
+        })
+
+    return render(request, 'frontend/polls_list.html', {
+        'polls_data': polls_data,
+        'page_obj': page_obj,
+        'categories': get_frontend_categories(),
+        'active_category': category_filter,
+    })
+
+
+def create_poll(request):
+    """Poll creation page."""
+    if not request.user.is_authenticated:
+        from django.urls import reverse
+        return redirect(f"{reverse('login')}?next={request.path}")
+
+    categories = [{'name': c[0]} for c in CATEGORY_CHOICES]
+
+    if request.method == 'POST':
+        title = request.POST.get('title', '').strip()
+        option1 = request.POST.get('option1', '').strip()
+        option2 = request.POST.get('option2', '').strip()
+        category = request.POST.get('category', '').strip()
+        hashtags_raw = request.POST.get('hashtags', '').strip()
+        description = request.POST.get('description', '').strip()
+
+        errors = {}
+        if not title:
+            errors['title'] = 'Question is required.'
+        if not option1:
+            errors['option1'] = 'Option 1 is required.'
+        if not option2:
+            errors['option2'] = 'Option 2 is required.'
+        if option1 and option2 and option1.lower() == option2.lower():
+            errors['option2'] = 'Options must be different.'
+        if not category:
+            errors['category'] = 'Category is required.'
+
+        if not errors:
+            combined = f"{title} {option1} {option2} {description}".strip()
+            if check_content_moderation(combined):
+                errors['title'] = 'Your poll contains inappropriate content.'
+
+        if errors:
+            return render(request, 'frontend/create_poll.html', {
+                'categories': categories,
+                'errors': errors,
+                'form_data': request.POST,
+            })
+
+        poll = Poll.objects.create(
+            id=str(uuid.uuid4()),
+            user=request.user,
+            title=title,
+            description=description,
+            category=category,
+            hashtags=','.join(Post.parse_hashtags(hashtags_raw)),
+        )
+        PollOption.objects.create(poll=poll, text=option1, order=0)
+        PollOption.objects.create(poll=poll, text=option2, order=1)
+
+        return redirect('poll_detail', poll_id=poll.id)
+
+    return render(request, 'frontend/create_poll.html', {'categories': categories})
+
+
+def poll_detail(request, poll_id):
+    """Poll detail page with vote chart and side comments."""
+    poll = get_object_or_404(Poll, id=poll_id, is_deleted_by_moderation=False)
+    options = list(poll.options.all())
+    total_votes = poll.votes.count()
+
+    user_vote = None
+    if request.user.is_authenticated:
+        try:
+            user_vote = PollVote.objects.get(poll=poll, user=request.user)
+        except PollVote.DoesNotExist:
+            pass
+
+    now = timezone.now()
+    online_cutoff = now - timedelta(minutes=5)
+
+    # Pre-build debate state lookups for all poll comments
+    debate_lookup = {}
+    completed_lookup = {}
+    blocked_pc_ids = set()
+    if request.user.is_authenticated and user_vote:
+        all_comment_owner_ids = list(
+            PollComment.objects.filter(
+                poll=poll, is_deleted_by_moderation=False
+            ).exclude(user=request.user).values_list('user_id', flat=True).distinct()
+        )
+        if all_comment_owner_ids:
+            accepted_debates = list(
+                Debate.objects.filter(
+                    poll=poll,
+                    target_id__in=all_comment_owner_ids,
+                    status='accepted',
+                ).order_by('target_id', '-updated_at')
+            )
+            latest_accepted = {}
+            for d in accepted_debates:
+                if d.target_id not in latest_accepted:
+                    latest_accepted[d.target_id] = d
+
+            if latest_accepted:
+                d_ids = [d.id for d in latest_accepted.values()]
+                active_side_counts = {
+                    (item['debate_id'], item['side']): item['total']
+                    for item in DebateParticipant.objects.filter(
+                        debate_id__in=d_ids, is_active=True
+                    ).values('debate_id', 'side').annotate(total=Count('id'))
+                }
+                user_participation = {
+                    p.debate_id: p
+                    for p in DebateParticipant.objects.filter(
+                        debate_id__in=d_ids, user=request.user
+                    )
+                }
+                for target_id, d in latest_accepted.items():
+                    part = user_participation.get(d.id)
+                    if part:
+                        mode, label = 'view', 'View Debate'
+                    else:
+                        yes_act = active_side_counts.get((d.id, 'yes'), 0)
+                        no_act = active_side_counts.get((d.id, 'no'), 0)
+                        full = (d.yes_supporters > 0 and d.no_supporters > 0
+                                and yes_act >= d.yes_supporters and no_act >= d.no_supporters)
+                        mode = 'view' if full else 'join'
+                        label = 'View Debate' if full else 'Join Debate'
+                    debate_lookup[target_id] = {'id': d.id, 'mode': mode, 'label': label, 'chat_url': f'/debates/{d.id}/chat/'}
+
+            for d in Debate.objects.filter(
+                poll=poll, target_id__in=all_comment_owner_ids, status='completed'
+            ).order_by('target_id', '-updated_at'):
+                if d.target_id not in completed_lookup:
+                    completed_lookup[d.target_id] = d
+
+            blocked_pc_ids = set(
+                DebateParticipant.objects.filter(
+                    user=request.user, is_banned=True, debate__poll=poll
+                ).values_list('debate__poll_comment_id', flat=True)
+            )
+
+    option_data = []
+    for opt in options:
+        cnt = opt.votes.count()
+        pct = round(cnt / total_votes * 100, 1) if total_votes > 0 else 0
+        comments = opt.comments.filter(is_deleted_by_moderation=False).select_related('user', 'user__profile')
+        comments_with_reaction = []
+        for c in comments:
+            user_reaction = None
+            if request.user.is_authenticated:
+                try:
+                    r = PollCommentReaction.objects.get(comment=c, user=request.user)
+                    user_reaction = r.reaction
+                except PollCommentReaction.DoesNotExist:
+                    pass
+            try:
+                p = c.user.profile
+                last_seen = p.last_seen
+                avatar_url = p.get_picture_url
+            except Exception:
+                last_seen = None
+                avatar_url = None
+
+            # Debate state for this comment
+            debate_state = debate_lookup.get(c.user_id)
+            completed_state = completed_lookup.get(c.user_id) if request.user.is_authenticated else None
+            show_debate = False
+            debate_mode = debate_state['mode'] if debate_state else 'start'
+            debate_label = debate_state['label'] if debate_state else 'Start Debate'
+            debate_chat_url = debate_state['chat_url'] if debate_state else ''
+            if request.user.is_authenticated and request.user != c.user:
+                user_chose_different = user_vote and user_vote.option_id != c.option_id
+                show_debate = bool(debate_state) or user_chose_different
+            is_blocked = c.id in blocked_pc_ids
+            if is_blocked and debate_mode == 'start':
+                debate_mode = 'blocked'
+                debate_label = 'Debate Blocked'
+                show_debate = True
+
+            comments_with_reaction.append({
+                'comment': c,
+                'user_reaction': user_reaction,
+                'is_online': bool(last_seen and last_seen >= online_cutoff),
+                'presence_label': _presence_label(last_seen, now=now),
+                'avatar_url': avatar_url,
+                'show_debate_action': show_debate,
+                'debate_action_mode': debate_mode,
+                'debate_action_label': debate_label,
+                'debate_chat_url': debate_chat_url,
+                'show_debate_view_link': bool(completed_state and not debate_state),
+                'debate_view_url': f'/debates/{completed_state.id}/chat/' if (completed_state and not debate_state) else '',
+            })
+        option_data.append({
+            'option': opt,
+            'vote_count': cnt,
+            'percentage': pct,
+            'comments': comments_with_reaction,
+        })
+
+    return render(request, 'frontend/poll.html', {
+        'poll': poll,
+        'options': options,
+        'option_data': option_data,
+        'total_votes': total_votes,
+        'user_vote': user_vote,
+        'voted_option_id': str(user_vote.option_id) if user_vote else None,
+    })
+
+
+@require_POST
+def poll_vote(request, poll_id):
+    """AJAX endpoint — cast or change a poll vote."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    poll = get_object_or_404(Poll, id=poll_id, is_deleted_by_moderation=False)
+
+    try:
+        data = json.loads(request.body)
+        option_id = int(data.get('option_id', 0))
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    try:
+        option = PollOption.objects.get(id=option_id, poll=poll)
+    except PollOption.DoesNotExist:
+        return JsonResponse({'error': 'Invalid option'}, status=400)
+
+    if PollVote.objects.filter(poll=poll, user=request.user).exists():
+        return JsonResponse({'error': 'You have already voted on this poll.'}, status=400)
+
+    PollVote.objects.create(user=request.user, poll=poll, option=option)
+
+    total = poll.votes.count()
+    options_out = []
+    for opt in poll.options.all():
+        cnt = opt.votes.count()
+        pct = round(cnt / total * 100, 1) if total > 0 else 0
+        options_out.append({'id': opt.id, 'text': opt.text, 'vote_count': cnt, 'percentage': pct})
+
+    return JsonResponse({'success': True, 'voted_option_id': option.id, 'total_votes': total, 'options': options_out})
+
+
+@require_POST
+def create_poll_comment(request, poll_id):
+    """AJAX endpoint — post a side comment on a poll."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    poll = get_object_or_404(Poll, id=poll_id, is_deleted_by_moderation=False)
+
+    try:
+        data = json.loads(request.body)
+        option_id = int(data.get('option_id', 0))
+        content = (data.get('content') or '').strip()
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    try:
+        user_vote = PollVote.objects.get(poll=poll, user=request.user)
+    except PollVote.DoesNotExist:
+        return JsonResponse({'error': 'You must vote before commenting.'}, status=400)
+
+    if user_vote.option_id != option_id:
+        return JsonResponse({'error': 'You can only comment on the side you voted for.'}, status=403)
+
+    if PollComment.objects.filter(poll=poll, user=request.user).exists():
+        return JsonResponse({'error': 'You can only comment once per poll.'}, status=400)
+
+    try:
+        option = PollOption.objects.get(id=option_id, poll=poll)
+    except PollOption.DoesNotExist:
+        return JsonResponse({'error': 'Invalid option.'}, status=400)
+
+    if not content:
+        return JsonResponse({'error': 'Comment cannot be empty.'}, status=400)
+
+    if check_content_moderation(content):
+        return JsonResponse({'error': 'Your comment contains inappropriate content.'}, status=400)
+
+    comment = PollComment.objects.create(
+        id=str(uuid.uuid4()),
+        poll=poll,
+        user=request.user,
+        option=option,
+        content=content,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'comment': {
+            'id': comment.id,
+            'content': comment.content,
+            'username': request.user.username,
+            'likes': 0,
+            'dislikes': 0,
+            'created_at': comment.created_at.strftime('%b %d, %Y'),
+        },
+    })
+
+
+@require_POST
+def like_poll_comment(request):
+    """Toggle like/dislike on a poll comment."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        data = json.loads(request.body)
+        comment_id = data.get('comment_id')
+        reaction_type = data.get('reaction', 'like')
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    comment = get_object_or_404(PollComment, id=comment_id)
+
+    if comment.user_id == request.user.id:
+        return JsonResponse({'error': 'Cannot react to your own comment.'}, status=403)
+
+    reaction, created = PollCommentReaction.objects.get_or_create(
+        comment=comment, user=request.user, defaults={'reaction': reaction_type}
+    )
+    if not created and reaction.reaction != reaction_type:
+        reaction.reaction = reaction_type
+        reaction.save(update_fields=['reaction', 'updated_at'])
+
+    likes = PollCommentReaction.objects.filter(comment=comment, reaction='like').count()
+    dislikes = PollCommentReaction.objects.filter(comment=comment, reaction='dislike').count()
+    comment.likes = likes
+    comment.dislikes = dislikes
+    comment.save(update_fields=['likes', 'dislikes', 'updated_at'])
+
+    return JsonResponse({'success': True, 'likes': likes, 'dislikes': dislikes})
+
+
+# ─── Question Views ─────────────────────────────────────────────────────────────
+
+def questions_list(request):
+    category_filter = request.GET.get('category', '').strip()
+    qs = Question.objects.filter(is_deleted_by_moderation=False)
+    if category_filter:
+        qs = qs.filter(category=category_filter)
+
+    paginator = Paginator(qs, 20)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    q_ids = [q.id for q in page_obj]
+
+    user_q_actions = {}
+    user_q_follows = set()
+    if request.user.is_authenticated:
+        for a in QuestionAction.objects.filter(question_id__in=q_ids, user=request.user):
+            user_q_actions.setdefault(a.question_id, set()).add(a.action)
+        user_q_follows = set(QuestionFollow.objects.filter(question_id__in=q_ids, user=request.user).values_list('question_id', flat=True))
+
+    from django.db.models import Count as _Count
+    like_counts = {r['question_id']: r['c'] for r in QuestionAction.objects.filter(question_id__in=q_ids, action='like').values('question_id').annotate(c=_Count('id'))}
+    save_counts = {r['question_id']: r['c'] for r in QuestionAction.objects.filter(question_id__in=q_ids, action='save').values('question_id').annotate(c=_Count('id'))}
+    repost_counts = {r['question_id']: r['c'] for r in QuestionAction.objects.filter(question_id__in=q_ids, action='repost').values('question_id').annotate(c=_Count('id'))}
+    follow_counts = {r['question_id']: r['c'] for r in QuestionFollow.objects.filter(question_id__in=q_ids).values('question_id').annotate(c=_Count('id'))}
+
+    questions_data = []
+    for q in page_obj:
+        u_actions = user_q_actions.get(q.id, set())
+        questions_data.append({
+            'question': q,
+            'like_count': like_counts.get(q.id, 0),
+            'save_count': save_counts.get(q.id, 0),
+            'repost_count': repost_counts.get(q.id, 0),
+            'follow_count': follow_counts.get(q.id, 0),
+            'is_liked': 'like' in u_actions,
+            'is_saved': 'save' in u_actions,
+            'is_reposted': 'repost' in u_actions,
+            'is_following': q.id in user_q_follows,
+        })
+
+    return render(request, 'frontend/questions_list.html', {
+        'questions_data': questions_data,
+        'page_obj': page_obj,
+        'categories': get_frontend_categories(),
+        'active_category': category_filter,
+    })
+
+
+def ask_general_question(request):
+    if not request.user.is_authenticated:
+        from django.urls import reverse
+        return redirect(f"{reverse('login')}?next={request.path}")
+
+    categories = [{'name': c[0]} for c in CATEGORY_CHOICES]
+
+    if request.method == 'POST':
+        title = request.POST.get('title', '').strip()
+        content = request.POST.get('content', '').strip()
+        category = request.POST.get('category', '').strip()
+        hashtags_raw = request.POST.get('hashtags', '').strip()
+
+        errors = {}
+        if not title:
+            errors['title'] = 'Question title is required.'
+        elif len(title) > 255:
+            errors['title'] = 'Title must be 255 characters or fewer.'
+        if not category:
+            errors['category'] = 'Category is required.'
+
+        if not errors:
+            combined = f"{title} {content}".strip()
+            if check_content_moderation(combined):
+                errors['title'] = 'Your question contains inappropriate content.'
+
+        if errors:
+            return render(request, 'frontend/ask_general_question.html', {
+                'categories': categories,
+                'errors': errors,
+                'form_data': request.POST,
+            })
+
+        question = Question.objects.create(
+            id=str(uuid.uuid4()),
+            user=request.user,
+            title=title,
+            content=content,
+            category=category,
+            hashtags=','.join(Post.parse_hashtags(hashtags_raw)),
+        )
+        return redirect('question_detail', question_id=question.id)
+
+    return render(request, 'frontend/ask_general_question.html', {'categories': categories})
+
+
+def question_detail(request, question_id):
+    question = get_object_or_404(Question, id=question_id, is_deleted_by_moderation=False)
+    answers = question.answers.filter(is_deleted_by_moderation=False).order_by('-upvotes', 'created_at')
+
+    user_answer = None
+    user_votes = {}
+    if request.user.is_authenticated:
+        user_answer = question.answers.filter(user=request.user, is_deleted_by_moderation=False).first()
+        voted_answer_ids = AnswerVote.objects.filter(
+            user=request.user, answer__question=question
+        ).values_list('answer_id', 'vote')
+        user_votes = {aid: v for aid, v in voted_answer_ids}
+
+    answers_with_data = []
+    for ans in answers:
+        answers_with_data.append({
+            'answer': ans,
+            'user_vote': user_votes.get(ans.id),
+            'is_best': question.best_answer_id == ans.id,
+        })
+
+    return render(request, 'frontend/question_detail.html', {
+        'question': question,
+        'answers_with_data': answers_with_data,
+        'user_answer': user_answer,
+        'total_answers': answers.count(),
+    })
+
+
+@require_POST
+def post_answer(request, question_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    question = get_object_or_404(Question, id=question_id, is_deleted_by_moderation=False)
+
+    try:
+        data = json.loads(request.body)
+        content = (data.get('content') or '').strip()
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    if not content:
+        return JsonResponse({'error': 'Answer cannot be empty.'}, status=400)
+
+    if question.answers.filter(user=request.user, is_deleted_by_moderation=False).exists():
+        return JsonResponse({'error': 'You have already answered this question.'}, status=400)
+
+    if check_content_moderation(content):
+        return JsonResponse({'error': 'Your answer contains inappropriate content.'}, status=400)
+
+    answer = Answer.objects.create(
+        id=str(uuid.uuid4()),
+        question=question,
+        user=request.user,
+        content=content,
+    )
+    Question.objects.filter(id=question_id).update(answer_count=F('answer_count') + 1)
+
+    return JsonResponse({
+        'success': True,
+        'answer': {
+            'id': answer.id,
+            'content': answer.content,
+            'username': request.user.username,
+            'upvotes': 0,
+            'downvotes': 0,
+            'created_at': answer.created_at.strftime('%b %d, %Y'),
+        },
+    })
+
+
+@require_POST
+def vote_answer(request, answer_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    answer = get_object_or_404(Answer, id=answer_id, is_deleted_by_moderation=False)
+
+    if answer.user_id == request.user.id:
+        return JsonResponse({'error': 'Cannot vote on your own answer.'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        vote_type = data.get('vote', 'up')
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    if vote_type not in ('up', 'down'):
+        return JsonResponse({'error': 'Invalid vote type.'}, status=400)
+
+    vote_obj, created = AnswerVote.objects.get_or_create(
+        answer=answer, user=request.user, defaults={'vote': vote_type}
+    )
+    if not created:
+        if vote_obj.vote == vote_type:
+            vote_obj.delete()
+            action = 'removed'
+        else:
+            vote_obj.vote = vote_type
+            vote_obj.save(update_fields=['vote', 'updated_at'])
+            action = 'changed'
+    else:
+        action = 'added'
+
+    upvotes = AnswerVote.objects.filter(answer=answer, vote='up').count()
+    downvotes = AnswerVote.objects.filter(answer=answer, vote='down').count()
+    Answer.objects.filter(id=answer_id).update(upvotes=upvotes, downvotes=downvotes)
+
+    return JsonResponse({'success': True, 'action': action, 'upvotes': upvotes, 'downvotes': downvotes})
+
+
+@require_POST
+def mark_best_answer(request, answer_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    answer = get_object_or_404(Answer, id=answer_id, is_deleted_by_moderation=False)
+    question = answer.question
+
+    if question.user_id != request.user.id:
+        return JsonResponse({'error': 'Only the question author can mark the best answer.'}, status=403)
+
+    if question.best_answer_id == answer.id:
+        question.best_answer = None
+    else:
+        question.best_answer = answer
+    question.save(update_fields=['best_answer', 'updated_at'])
+
+    return JsonResponse({'success': True, 'best_answer_id': str(question.best_answer_id) if question.best_answer_id else None})
+
+
+# ─── Review Views ────────────────────────────────────────────────────────────────
+
+def reviews_list(request):
+    category_filter = request.GET.get('category', '').strip()
+    qs = Review.objects.filter(is_deleted_by_moderation=False)
+    if category_filter:
+        qs = qs.filter(category=category_filter)
+
+    paginator = Paginator(qs, 20)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    rev_ids = [r.id for r in page_obj]
+    user_rev_reactions = {}
+    user_rev_actions = {}
+    user_rev_follows = set()
+    if request.user.is_authenticated:
+        for r in ReviewReaction.objects.filter(review_id__in=rev_ids, user=request.user):
+            user_rev_reactions[r.review_id] = r.reaction
+        for a in ReviewAction.objects.filter(review_id__in=rev_ids, user=request.user):
+            user_rev_actions.setdefault(a.review_id, set()).add(a.action)
+        user_rev_follows = set(ReviewFollow.objects.filter(review_id__in=rev_ids, user=request.user).values_list('review_id', flat=True))
+
+    from django.db.models import Count as _Count
+    like_counts = {r['review_id']: r['c'] for r in ReviewAction.objects.filter(review_id__in=rev_ids, action='like').values('review_id').annotate(c=_Count('id'))}
+    save_counts = {r['review_id']: r['c'] for r in ReviewAction.objects.filter(review_id__in=rev_ids, action='save').values('review_id').annotate(c=_Count('id'))}
+    repost_counts = {r['review_id']: r['c'] for r in ReviewAction.objects.filter(review_id__in=rev_ids, action='repost').values('review_id').annotate(c=_Count('id'))}
+    follow_counts = {r['review_id']: r['c'] for r in ReviewFollow.objects.filter(review_id__in=rev_ids).values('review_id').annotate(c=_Count('id'))}
+
+    reviews_data = []
+    for review in page_obj:
+        u_actions = user_rev_actions.get(review.id, set())
+        reviews_data.append({
+            'review': review,
+            'user_reaction': user_rev_reactions.get(review.id),
+            'like_count': like_counts.get(review.id, 0),
+            'save_count': save_counts.get(review.id, 0),
+            'repost_count': repost_counts.get(review.id, 0),
+            'follow_count': follow_counts.get(review.id, 0),
+            'is_liked': 'like' in u_actions,
+            'is_saved': 'save' in u_actions,
+            'is_reposted': 'repost' in u_actions,
+            'is_following': review.id in user_rev_follows,
+        })
+
+    return render(request, 'frontend/reviews_list.html', {
+        'reviews_data': reviews_data,
+        'page_obj': page_obj,
+        'categories': get_frontend_categories(),
+        'active_category': category_filter,
+    })
+
+
+def create_review(request):
+    if not request.user.is_authenticated:
+        from django.urls import reverse
+        return redirect(f"{reverse('login')}?next={request.path}")
+
+    subject_types = Review.SUBJECT_TYPE_CHOICES
+    categories = [{'name': c[0]} for c in CATEGORY_CHOICES]
+
+    if request.method == 'POST':
+        subject = request.POST.get('subject', '').strip()
+        subject_type = request.POST.get('subject_type', '').strip()
+        rating_raw = request.POST.get('rating', '').strip()
+        content = request.POST.get('content', '').strip()
+        category = request.POST.get('category', '').strip()
+        hashtags_raw = request.POST.get('hashtags', '').strip()
+
+        errors = {}
+        if not subject:
+            errors['subject'] = 'Subject is required.'
+        if not subject_type:
+            errors['subject_type'] = 'Subject type is required.'
+        if not rating_raw:
+            errors['rating'] = 'Rating is required.'
+        else:
+            try:
+                rating = int(rating_raw)
+                if rating < 1 or rating > 5:
+                    errors['rating'] = 'Rating must be between 1 and 5.'
+            except ValueError:
+                errors['rating'] = 'Invalid rating.'
+                rating = None
+        if not content:
+            errors['content'] = 'Review content is required.'
+        if not category:
+            errors['category'] = 'Category is required.'
+
+        if not errors:
+            combined = f"{subject} {content}".strip()
+            if check_content_moderation(combined):
+                errors['content'] = 'Your review contains inappropriate content.'
+
+        if errors:
+            return render(request, 'frontend/create_review.html', {
+                'subject_types': subject_types,
+                'categories': categories,
+                'errors': errors,
+                'form_data': request.POST,
+            })
+
+        review = Review.objects.create(
+            id=str(uuid.uuid4()),
+            user=request.user,
+            subject=subject,
+            subject_type=subject_type,
+            rating=int(rating_raw),
+            content=content,
+            category=category,
+            hashtags=','.join(Post.parse_hashtags(hashtags_raw)),
+        )
+        return redirect('review_detail', review_id=review.id)
+
+    return render(request, 'frontend/create_review.html', {
+        'subject_types': subject_types,
+        'categories': categories,
+    })
+
+
+def review_detail(request, review_id):
+    review = get_object_or_404(Review, id=review_id, is_deleted_by_moderation=False)
+    comments = review.comments.filter(is_deleted_by_moderation=False).select_related('user')
+
+    user_reaction = None
+    comments_with_reaction = []
+    if request.user.is_authenticated:
+        try:
+            r = ReviewReaction.objects.get(review=review, user=request.user)
+            user_reaction = r.reaction
+        except ReviewReaction.DoesNotExist:
+            pass
+
+    for c in comments:
+        ur = None
+        if request.user.is_authenticated:
+            try:
+                rcr = ReviewCommentReaction.objects.get(comment=c, user=request.user)
+                ur = rcr.reaction
+            except ReviewCommentReaction.DoesNotExist:
+                pass
+        comments_with_reaction.append({'comment': c, 'user_reaction': ur})
+
+    return render(request, 'frontend/review_detail.html', {
+        'review': review,
+        'user_reaction': user_reaction,
+        'comments_with_reaction': comments_with_reaction,
+    })
+
+
+@require_POST
+def react_to_review(request, review_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    review = get_object_or_404(Review, id=review_id, is_deleted_by_moderation=False)
+
+    if review.user_id == request.user.id:
+        return JsonResponse({'error': 'Cannot react to your own review.'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        reaction_type = data.get('reaction', 'agree')
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    if reaction_type not in ('agree', 'disagree'):
+        return JsonResponse({'error': 'Invalid reaction.'}, status=400)
+
+    reaction, created = ReviewReaction.objects.get_or_create(
+        review=review, user=request.user, defaults={'reaction': reaction_type}
+    )
+    if not created:
+        if reaction.reaction == reaction_type:
+            reaction.delete()
+            action = 'removed'
+        else:
+            reaction.reaction = reaction_type
+            reaction.save(update_fields=['reaction', 'updated_at'])
+            action = 'changed'
+    else:
+        action = 'added'
+
+    agree = ReviewReaction.objects.filter(review=review, reaction='agree').count()
+    disagree = ReviewReaction.objects.filter(review=review, reaction='disagree').count()
+    Review.objects.filter(id=review_id).update(agree_count=agree, disagree_count=disagree)
+
+    return JsonResponse({'success': True, 'action': action, 'agree_count': agree, 'disagree_count': disagree})
+
+
+@require_POST
+def create_review_comment(request, review_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    review = get_object_or_404(Review, id=review_id, is_deleted_by_moderation=False)
+
+    try:
+        data = json.loads(request.body)
+        content = (data.get('content') or '').strip()
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    if not content:
+        return JsonResponse({'error': 'Comment cannot be empty.'}, status=400)
+
+    if check_content_moderation(content):
+        return JsonResponse({'error': 'Your comment contains inappropriate content.'}, status=400)
+
+    comment = ReviewComment.objects.create(
+        id=str(uuid.uuid4()),
+        review=review,
+        user=request.user,
+        content=content,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'comment': {
+            'id': comment.id,
+            'content': comment.content,
+            'username': request.user.username,
+            'likes': 0,
+            'dislikes': 0,
+            'created_at': comment.created_at.strftime('%b %d, %Y'),
+        },
+    })
+
+
+@require_POST
+def like_review_comment(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        data = json.loads(request.body)
+        comment_id = data.get('comment_id')
+        reaction_type = data.get('reaction', 'like')
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    comment = get_object_or_404(ReviewComment, id=comment_id)
+
+    if comment.user_id == request.user.id:
+        return JsonResponse({'error': 'Cannot react to your own comment.'}, status=403)
+
+    reaction, created = ReviewCommentReaction.objects.get_or_create(
+        comment=comment, user=request.user, defaults={'reaction': reaction_type}
+    )
+    if not created and reaction.reaction != reaction_type:
+        reaction.reaction = reaction_type
+        reaction.save(update_fields=['reaction', 'updated_at'])
+
+    likes = ReviewCommentReaction.objects.filter(comment=comment, reaction='like').count()
+    dislikes = ReviewCommentReaction.objects.filter(comment=comment, reaction='dislike').count()
+    comment.likes = likes
+    comment.dislikes = dislikes
+    comment.save(update_fields=['likes', 'dislikes', 'updated_at'])
+
+    return JsonResponse({'success': True, 'likes': likes, 'dislikes': dislikes})
+
+
+# ─── Leaderboard ─────────────────────────────────────────────────────────────
+
+def leaderboard(request):
+    from django.contrib.auth.models import User as AuthUser
+    from django.db.models import Sum, IntegerField
+    from django.db.models.functions import Coalesce
+
+    users = AuthUser.objects.annotate(
+        post_count=Count('posts', distinct=True),
+        review_count=Count('reviews', distinct=True, filter=Q(reviews__is_deleted_by_moderation=False)),
+        question_count=Count('questions', distinct=True, filter=Q(questions__is_deleted_by_moderation=False)),
+        answer_count_ann=Count('answers', distinct=True, filter=Q(answers__is_deleted_by_moderation=False)),
+        poll_count=Count('polls', distinct=True),
+    ).filter(
+        post_count__gt=0
+    ).order_by(
+        '-post_count', '-review_count', '-question_count', '-answer_count_ann', '-poll_count'
+    )[:50]
+
+    board = []
+    for rank, u in enumerate(users, start=1):
+        total = u.post_count + u.review_count + u.question_count + u.answer_count_ann + u.poll_count
+        p = getattr(u, 'profile', None)
+        board.append({
+            'rank': rank,
+            'username': u.username,
+            'avatar_url': p.get_picture_url if p else '',
+            'post_count': u.post_count,
+            'review_count': u.review_count,
+            'question_count': u.question_count,
+            'answer_count': u.answer_count_ann,
+            'poll_count': u.poll_count,
+            'total': total,
+        })
+
+    board.sort(key=lambda x: x['total'], reverse=True)
+    for i, entry in enumerate(board):
+        entry['rank'] = i + 1
+
+    return render(request, 'frontend/leaderboard.html', {'board': board})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Trending Hashtags
+# ─────────────────────────────────────────────────────────────────────────────
+
+def trending_hashtags(request):
+    """Show top hashtags by usage across posts, polls, questions, and reviews in the last 7 days."""
+    from datetime import timedelta
+    cutoff = timezone.now() - timedelta(days=7)
+    tag_counts = {}
+
+    for model in [Post, Poll, Question, Review]:
+        qs = model.objects.filter(created_at__gte=cutoff).exclude(hashtags='').values_list('hashtags', flat=True)
+        for raw in qs:
+            for tag in Post.parse_hashtags(raw, max_tags=20):
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
+
+    trending = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:50]
+    max_count = trending[0][1] if trending else 1
+
+    tag_list = [
+        {'tag': tag, 'count': count, 'weight': round((count / max_count) * 100)}
+        for tag, count in trending
+    ]
+
+    return render(request, 'frontend/trending_hashtags.html', {
+        'tag_list': tag_list,
+        'period_days': 7,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Activity Feed
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+def activity_feed(request):
+    """Show recent activity from users the current user follows."""
+    following_ids = list(request.user.following_links.values_list('following_id', flat=True))
+
+    if not following_ids:
+        return render(request, 'frontend/activity.html', {
+            'events': [],
+            'has_following': False,
+        })
+
+    cutoff = timezone.now() - timedelta(days=14)
+
+    events = []
+
+    # Posts created by followed users
+    for post in Post.objects.filter(user_id__in=following_ids, created_at__gte=cutoff).select_related('user', 'user__profile').order_by('-created_at')[:30]:
+        events.append({
+            'type': 'post',
+            'actor': post.user,
+            'avatar': _safe_avatar_url(post.user),
+            'text': f'posted a discussion',
+            'title': post.title,
+            'url': f'/discussion/{post.id}/',
+            'ts': post.created_at,
+        })
+
+    # Debates started by followed users
+    for debate in Debate.objects.filter(initiator_id__in=following_ids, created_at__gte=cutoff, status__in=['accepted', 'completed']).select_related('initiator', 'initiator__profile', 'post', 'poll').order_by('-created_at')[:20]:
+        events.append({
+            'type': 'debate',
+            'actor': debate.initiator,
+            'avatar': _safe_avatar_url(debate.initiator),
+            'text': 'started a debate',
+            'title': debate.context_title,
+            'url': f'/debates/{debate.id}/chat/',
+            'ts': debate.created_at,
+        })
+
+    # Likes by followed users
+    for action in PostAction.objects.filter(user_id__in=following_ids, action='like', created_at__gte=cutoff).select_related('user', 'user__profile', 'post').order_by('-created_at')[:20]:
+        events.append({
+            'type': 'like',
+            'actor': action.user,
+            'avatar': _safe_avatar_url(action.user),
+            'text': 'liked a discussion',
+            'title': action.post.title,
+            'url': f'/discussion/{action.post_id}/',
+            'ts': action.created_at,
+        })
+
+    # New follows of the current user
+    for follow in Follow.objects.filter(following=request.user, created_at__gte=cutoff).select_related('follower', 'follower__profile').order_by('-created_at')[:10]:
+        events.append({
+            'type': 'follow',
+            'actor': follow.follower,
+            'avatar': _safe_avatar_url(follow.follower),
+            'text': 'started following you',
+            'title': '',
+            'url': f'/user/{follow.follower.username}/',
+            'ts': follow.created_at,
+        })
+
+    events.sort(key=lambda e: e['ts'], reverse=True)
+
+    return render(request, 'frontend/activity.html', {
+        'events': events[:60],
+        'has_following': True,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Debate Transcript (public read-only view)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def debate_transcript(request, debate_id):
+    """Public read-only transcript for a completed or accepted debate."""
+    debate = get_object_or_404(Debate, id=debate_id)
+
+    messages_qs = DebateMessage.objects.filter(
+        debate=debate,
+    ).select_related('sender', 'sender__profile').order_by('created_at')
+
+    side_map = _sender_side_map(debate)
+
+    message_list = []
+    for msg in messages_qs:
+        message_list.append({
+            'id': msg.id,
+            'sender': msg.sender.username,
+            'avatar': _safe_avatar_url(msg.sender),
+            'content': _decode_chat_content_from_storage(msg.content),
+            'side': side_map.get(msg.sender_id, ''),
+            'is_system': msg.is_system,
+            'is_edited': msg.is_edited,
+            'created_at': msg.created_at,
+            'is_deleted': msg.is_deleted_by_moderation,
+        })
+
+    # Observer vote tallies
+    yes_votes = ObserverVote.objects.filter(debate=debate, winner_side='yes').count()
+    no_votes = ObserverVote.objects.filter(debate=debate, winner_side='no').count()
+    user_observer_vote = None
+    if request.user.is_authenticated:
+        ov = ObserverVote.objects.filter(debate=debate, voter=request.user).first()
+        user_observer_vote = ov.winner_side if ov else None
+
+    participants = DebateParticipant.objects.filter(debate=debate).select_related('user', 'user__profile')
+
+    return render(request, 'frontend/debate_transcript.html', {
+        'debate': debate,
+        'message_list': message_list,
+        'participants': participants,
+        'yes_votes': yes_votes,
+        'no_votes': no_votes,
+        'user_observer_vote': user_observer_vote,
+        'can_vote': request.user.is_authenticated and user_observer_vote is None and debate.status == 'completed',
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Observer Vote
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def observer_vote(request, debate_id):
+    """Cast or update an observer vote on who argued best."""
+    debate = get_object_or_404(Debate, id=debate_id, status='completed')
+    winner_side = request.POST.get('winner_side')
+    if winner_side not in ('yes', 'no'):
+        return JsonResponse({'success': False, 'error': 'Invalid side.'}, status=400)
+
+    if DebateParticipant.objects.filter(debate=debate, user=request.user).exists():
+        return JsonResponse({'success': False, 'error': 'Participants cannot vote on their own debate.'}, status=400)
+
+    ObserverVote.objects.update_or_create(
+        debate=debate,
+        voter=request.user,
+        defaults={'winner_side': winner_side},
+    )
+
+    yes_votes = ObserverVote.objects.filter(debate=debate, winner_side='yes').count()
+    no_votes = ObserverVote.objects.filter(debate=debate, winner_side='no').count()
+    return JsonResponse({'success': True, 'yes_votes': yes_votes, 'no_votes': no_votes, 'your_vote': winner_side})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# User Blocking
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def block_user(request):
+    username = request.POST.get('username', '').strip()
+    if not username:
+        return JsonResponse({'success': False, 'error': 'Username required.'}, status=400)
+    if username == request.user.username:
+        return JsonResponse({'success': False, 'error': 'You cannot block yourself.'}, status=400)
+    target = get_object_or_404(User, username=username)
+    _, created = UserBlock.objects.get_or_create(blocker=request.user, blocked=target)
+    return JsonResponse({'success': True, 'blocked': True, 'created': created})
+
+
+@login_required
+@require_POST
+def unblock_user(request):
+    username = request.POST.get('username', '').strip()
+    if not username:
+        return JsonResponse({'success': False, 'error': 'Username required.'}, status=400)
+    target = get_object_or_404(User, username=username)
+    deleted, _ = UserBlock.objects.filter(blocker=request.user, blocked=target).delete()
+    return JsonResponse({'success': True, 'blocked': False, 'removed': deleted > 0})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Profile Bio / Website Update
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def update_profile_bio(request):
+    bio = (request.POST.get('bio') or '').strip()[:280]
+    website = (request.POST.get('website') or '').strip()[:200]
+
+    if bio and check_content_moderation(bio):
+        return JsonResponse({'success': False, 'error': 'Bio contains abusive language.'}, status=400)
+
+    profile, _ = Profile.objects.get_or_create(user=request.user, defaults={'username': request.user.username})
+    profile.bio = bio
+    profile.website = website
+    profile.save(update_fields=['bio', 'website', 'updated_at'])
+    return JsonResponse({'success': True, 'bio': profile.bio, 'website': profile.website})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Comment Reporting
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def report_post_comment(request):
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, AttributeError):
+        data = request.POST
+
+    comment_id = data.get('comment_id')
+    reason = data.get('reason', 'abusive_language')
+    details = (data.get('details') or '').strip()[:500]
+
+    if not comment_id:
+        return JsonResponse({'success': False, 'error': 'comment_id required.'}, status=400)
+
+    comment = get_object_or_404(Comment, id=comment_id)
+
+    if comment.user == request.user:
+        return JsonResponse({'success': False, 'error': 'You cannot report your own comment.'}, status=400)
+
+    valid_reasons = {'abusive_language', 'spam', 'misinformation', 'harassment', 'other'}
+    if reason not in valid_reasons:
+        reason = 'other'
+
+    try:
+        CommentReport.objects.create(
+            comment=comment,
+            reporter=request.user,
+            reason=reason,
+            details=details,
+        )
+    except IntegrityError:
+        return JsonResponse({'success': False, 'error': 'You already reported this comment.'}, status=400)
+
+    return JsonResponse({'success': True, 'message': 'Comment reported. Our team will review it.'})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Debate Stats JSON endpoint (used by profile page)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+def debate_stats(request, username=None):
+    if username:
+        target_user = get_object_or_404(User, username=username)
+    else:
+        target_user = request.user
+
+    participations = DebateParticipant.objects.filter(user=target_user).select_related('debate')
+    total = participations.count()
+    completed = participations.filter(debate__status='completed').count()
+    active = participations.filter(debate__status='accepted', is_active=True).count()
+
+    yes_wins = ObserverVote.objects.filter(
+        debate__participants__user=target_user,
+        debate__participants__side='yes',
+        winner_side='yes',
+    ).values('debate').distinct().count()
+    no_wins = ObserverVote.objects.filter(
+        debate__participants__user=target_user,
+        debate__participants__side='no',
+        winner_side='no',
+    ).values('debate').distinct().count()
+
+    return JsonResponse({
+        'success': True,
+        'username': target_user.username,
+        'total_debates': total,
+        'completed_debates': completed,
+        'active_debates': active,
+        'observer_wins': yes_wins + no_wins,
+        'posts_count': Post.objects.filter(user=target_user).count(),
+        'comments_count': Comment.objects.filter(user=target_user).count(),
+    })
+
+
+# ─── @Mention helpers ──────────────────────────────────────────────────────────
+
+import re as _re
+
+def _parse_mentions(content):
+    """Return list of unique lowercase usernames found in @mention syntax."""
+    return list(dict.fromkeys(
+        m.lower() for m in _re.findall(r'@([A-Za-z0-9_]+)', content or '')
+    ))
+
+def _notify_mentions(author, content, post):
+    """Create mention notifications for all @mentioned users in content."""
+    usernames = _parse_mentions(content)
+    if not usernames:
+        return
+    mentioned_users = User.objects.filter(username__in=usernames).exclude(id=author.id)
+    for user in mentioned_users:
+        Notification.objects.create(
+            user=user,
+            post=post,
+            notification_type='mention',
+            message=f'@{author.username} mentioned you in a comment on "{post.title}".',
+        )
+
+
+# ─── Hashtag following ─────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def follow_hashtag(request):
+    tag = (request.POST.get('tag') or '').strip().lower().lstrip('#')
+    if not tag or len(tag) > 40:
+        return JsonResponse({'success': False, 'error': 'Invalid tag.'}, status=400)
+
+    hf, created = HashtagFollow.objects.get_or_create(user=request.user, tag=tag)
+    if not created:
+        hf.delete()
+        return JsonResponse({'success': True, 'following': False})
+    return JsonResponse({'success': True, 'following': True})
+
+
+@login_required
+def hashtag_followed_feed(request):
+    followed_tags = list(
+        HashtagFollow.objects.filter(user=request.user).values_list('tag', flat=True)
+    )
+
+    posts, polls, questions, reviews = [], [], [], []
+    if followed_tags:
+        tag_filter = _re.compile(r'\b(?:' + '|'.join(_re.escape(t) for t in followed_tags) + r')\b', _re.I)
+
+        def _matches(obj):
+            return bool(tag_filter.search(getattr(obj, 'hashtags', '') or ''))
+
+        raw_posts = _annotated_feed_posts_queryset().order_by('-created_at')[:200]
+        posts = [p for p in raw_posts if _matches(p)][:30]
+
+        polls = list(Poll.objects.filter(
+            is_active=True
+        ).order_by('-created_at')[:200])
+        polls = [p for p in polls if _matches(p)][:20]
+
+        questions = list(Question.objects.filter(
+            is_deleted_by_moderation=False
+        ).order_by('-created_at')[:200])
+        questions = [q for q in questions if _matches(q)][:20]
+
+        reviews = list(Review.objects.filter(
+            is_deleted_by_moderation=False
+        ).order_by('-created_at')[:200])
+        reviews = [r for r in reviews if _matches(r)][:20]
+
+        _enrich_posts_for_feed(posts, request.user)
+
+    return render(request, 'frontend/hashtag_feed.html', {
+        'followed_tags': followed_tags,
+        'posts': posts,
+        'polls': polls,
+        'questions': questions,
+        'reviews': reviews,
+    })
+
+
+# ─── Moderation dashboard ──────────────────────────────────────────────────────
+
+@login_required
+def moderation_dashboard(request):
+    if not _is_configured_moderator(request.user):
+        from django.http import Http404
+        raise Http404
+
+    comment_reports = CommentReport.objects.filter(
+        status='pending'
+    ).select_related('comment', 'comment__post', 'comment__user', 'reporter').order_by('-created_at')[:50]
+
+    message_reports = DebateMessageReport.objects.filter(
+        status='pending'
+    ).select_related('message', 'message__debate', 'reporter', 'reported_user').order_by('-created_at')[:50]
+
+    profile_reports = ProfileReport.objects.filter(
+        status='pending'
+    ).select_related('reporter', 'reported_user').order_by('-created_at')[:50]
+
+    return render(request, 'frontend/moderation_dashboard.html', {
+        'comment_reports': comment_reports,
+        'message_reports': message_reports,
+        'profile_reports': profile_reports,
+        'total_pending': comment_reports.count() + message_reports.count() + profile_reports.count(),
     })
