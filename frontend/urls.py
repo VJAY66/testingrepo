@@ -101,4 +101,9 @@ urlpatterns = [
     # Debate stats JSON
     path('stats/debates/', views.debate_stats, name='debate_stats'),
     path('stats/debates/<str:username>/', views.debate_stats, name='debate_stats_user'),
+    # Hashtag following
+    path('hashtags/follow/', views.follow_hashtag, name='follow_hashtag'),
+    path('hashtags/feed/', views.hashtag_followed_feed, name='hashtag_followed_feed'),
+    # Moderation dashboard
+    path('moderation/', views.moderation_dashboard, name='moderation_dashboard'),
 ]

@@ -81,6 +81,7 @@ class Comment(models.Model):
     id = models.CharField(max_length=36, primary_key=True)
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='comments')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')
+    reply_to = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='replies')
     content = models.TextField(blank=True)
     vote_type = models.CharField(max_length=10, choices=VOTE_CHOICES)
     likes = models.IntegerField(default=0)
@@ -260,6 +261,7 @@ class Notification(models.Model):
         ('author_debate', 'New Debate on Your Post'),
         ('author_repost', 'Your Post was Reposted'),
         ('author_save', 'Your Post was Saved'),
+        ('mention', 'You Were Mentioned'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
@@ -763,4 +765,20 @@ class CommentReport(models.Model):
         ordering = ['-created_at']
         constraints = [
             models.UniqueConstraint(fields=['comment', 'reporter'], name='unique_comment_report_per_reporter'),
+        ]
+
+
+class HashtagFollow(models.Model):
+    """User follows a hashtag — shows up in their hashtag feed."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hashtag_follows')
+    tag = models.CharField(max_length=40, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} follows #{self.tag}"
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'tag'], name='unique_hashtag_follow'),
         ]

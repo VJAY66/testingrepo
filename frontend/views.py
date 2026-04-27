@@ -20,7 +20,7 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow
 from discussions.signals import notify_post_author
 from users.models import Follow, UserBlock
 from users.security import is_login_rate_limited, record_login_attempt
@@ -2142,6 +2142,8 @@ def create_comment(request, post_id):
             existing_comment.vote_type = vote_type
             existing_comment.content = content
             existing_comment.save(update_fields=['vote_type', 'content', 'updated_at'])
+            if content:
+                _notify_mentions(request.user, content, post)
 
             if is_ajax:
                 return JsonResponse(build_vote_payload('Comment submitted!', has_comment=True))
@@ -2160,6 +2162,8 @@ def create_comment(request, post_id):
                 vote_type=vote_type,
                 content=content if content else ''
             )
+            if content:
+                _notify_mentions(request.user, content, post)
 
             if is_ajax:
                 return JsonResponse(build_vote_payload('Vote submitted!' if not content else 'Comment submitted!', has_comment=bool(content)))
@@ -4714,4 +4718,115 @@ def debate_stats(request, username=None):
         'observer_wins': yes_wins + no_wins,
         'posts_count': Post.objects.filter(user=target_user).count(),
         'comments_count': Comment.objects.filter(user=target_user).count(),
+    })
+
+
+# ─── @Mention helpers ──────────────────────────────────────────────────────────
+
+import re as _re
+
+def _parse_mentions(content):
+    """Return list of unique lowercase usernames found in @mention syntax."""
+    return list(dict.fromkeys(
+        m.lower() for m in _re.findall(r'@([A-Za-z0-9_]+)', content or '')
+    ))
+
+def _notify_mentions(author, content, post):
+    """Create mention notifications for all @mentioned users in content."""
+    usernames = _parse_mentions(content)
+    if not usernames:
+        return
+    mentioned_users = User.objects.filter(username__in=usernames).exclude(id=author.id)
+    for user in mentioned_users:
+        Notification.objects.create(
+            user=user,
+            post=post,
+            notification_type='mention',
+            message=f'@{author.username} mentioned you in a comment on "{post.title}".',
+        )
+
+
+# ─── Hashtag following ─────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def follow_hashtag(request):
+    tag = (request.POST.get('tag') or '').strip().lower().lstrip('#')
+    if not tag or len(tag) > 40:
+        return JsonResponse({'success': False, 'error': 'Invalid tag.'}, status=400)
+
+    hf, created = HashtagFollow.objects.get_or_create(user=request.user, tag=tag)
+    if not created:
+        hf.delete()
+        return JsonResponse({'success': True, 'following': False})
+    return JsonResponse({'success': True, 'following': True})
+
+
+@login_required
+def hashtag_followed_feed(request):
+    followed_tags = list(
+        HashtagFollow.objects.filter(user=request.user).values_list('tag', flat=True)
+    )
+
+    posts, polls, questions, reviews = [], [], [], []
+    if followed_tags:
+        tag_filter = _re.compile(r'\b(?:' + '|'.join(_re.escape(t) for t in followed_tags) + r')\b', _re.I)
+
+        def _matches(obj):
+            return bool(tag_filter.search(getattr(obj, 'hashtags', '') or ''))
+
+        raw_posts = _annotated_feed_posts_queryset().order_by('-created_at')[:200]
+        posts = [p for p in raw_posts if _matches(p)][:30]
+
+        polls = list(Poll.objects.filter(
+            is_active=True
+        ).order_by('-created_at')[:200])
+        polls = [p for p in polls if _matches(p)][:20]
+
+        questions = list(Question.objects.filter(
+            is_deleted_by_moderation=False
+        ).order_by('-created_at')[:200])
+        questions = [q for q in questions if _matches(q)][:20]
+
+        reviews = list(Review.objects.filter(
+            is_deleted_by_moderation=False
+        ).order_by('-created_at')[:200])
+        reviews = [r for r in reviews if _matches(r)][:20]
+
+        _enrich_posts_for_feed(posts, request.user)
+
+    return render(request, 'frontend/hashtag_feed.html', {
+        'followed_tags': followed_tags,
+        'posts': posts,
+        'polls': polls,
+        'questions': questions,
+        'reviews': reviews,
+    })
+
+
+# ─── Moderation dashboard ──────────────────────────────────────────────────────
+
+@login_required
+def moderation_dashboard(request):
+    if not _is_configured_moderator(request.user):
+        from django.http import Http404
+        raise Http404
+
+    comment_reports = CommentReport.objects.filter(
+        status='pending'
+    ).select_related('comment', 'comment__post', 'comment__user', 'reporter').order_by('-created_at')[:50]
+
+    message_reports = DebateMessageReport.objects.filter(
+        status='pending'
+    ).select_related('message', 'message__debate', 'reporter', 'reported_user').order_by('-created_at')[:50]
+
+    profile_reports = ProfileReport.objects.filter(
+        status='pending'
+    ).select_related('reporter', 'reported_user').order_by('-created_at')[:50]
+
+    return render(request, 'frontend/moderation_dashboard.html', {
+        'comment_reports': comment_reports,
+        'message_reports': message_reports,
+        'profile_reports': profile_reports,
+        'total_pending': comment_reports.count() + message_reports.count() + profile_reports.count(),
     })
