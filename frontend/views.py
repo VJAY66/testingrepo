@@ -21,9 +21,9 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem
 from discussions.signals import notify_post_author
-from users.models import Follow, UserBlock, SaveCollection, CollectionItem
+from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword
 from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
 from utils.moderation import check_content_moderation
@@ -677,6 +677,10 @@ def _annotated_feed_posts_queryset():
         like_count=Count('actions', filter=Q(actions__action='like'), distinct=True),
         save_count=Count('actions', filter=Q(actions__action='save'), distinct=True),
         repost_count=Count('actions', filter=Q(actions__action='repost'), distinct=True),
+        hot_count=Count('actions', filter=Q(actions__action='hot'), distinct=True),
+        debatable_count=Count('actions', filter=Q(actions__action='debatable'), distinct=True),
+        agree_count=Count('actions', filter=Q(actions__action='agree'), distinct=True),
+        surprising_count=Count('actions', filter=Q(actions__action='surprising'), distinct=True),
         yes_count=Count('comments', filter=Q(comments__vote_type='yes'), distinct=True),
         no_count=Count('comments', filter=Q(comments__vote_type='no'), distinct=True),
         comment_count=Count('comments', distinct=True),

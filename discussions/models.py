@@ -235,6 +235,10 @@ class PostAction(models.Model):
         ('like', 'Like'),
         ('save', 'Save'),
         ('repost', 'Repost'),
+        ('hot', '🔥 Hot'),
+        ('debatable', '🤔 Debatable'),
+        ('agree', '👏 Agree'),
+        ('surprising', '😮 Surprising'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='post_actions')
@@ -411,6 +415,7 @@ class Poll(models.Model):
     is_deleted_by_moderation = models.BooleanField(default=False)
     expires_at = models.DateTimeField(null=True, blank=True, help_text='Auto-close this poll at this time. Leave blank for no expiry.')
     expiry_notified = models.BooleanField(default=False, help_text='Whether followers have been notified of poll closure')
+    is_anonymous = models.BooleanField(default=False, help_text='Hide voter identities from results')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -802,4 +807,32 @@ class HashtagFollow(models.Model):
         ordering = ['-created_at']
         constraints = [
             models.UniqueConstraint(fields=['user', 'tag'], name='unique_hashtag_follow'),
+        ]
+
+
+class PostSeries(models.Model):
+    id = models.CharField(max_length=36, primary_key=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='post_series')
+    title = models.CharField(max_length=120)
+    description = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name_plural = 'Post series'
+
+
+class PostSeriesItem(models.Model):
+    series = models.ForeignKey(PostSeries, on_delete=models.CASCADE, related_name='items')
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='series_items')
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+        constraints = [
+            models.UniqueConstraint(fields=['series', 'post'], name='unique_series_post'),
         ]
