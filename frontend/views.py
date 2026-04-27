@@ -20,9 +20,9 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport
 from discussions.signals import notify_post_author
-from users.models import Follow
+from users.models import Follow, UserBlock
 from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
 from utils.moderation import check_content_moderation
@@ -671,6 +671,7 @@ def _annotated_feed_posts_queryset():
         comment_count=Count('comments', distinct=True),
         conversation_count=Count('debates', distinct=True),
         author_posts_count=Count('user__posts', distinct=True),
+        view_count=Count('views', distinct=True),
     ).select_related('user', 'user__profile')
 
 
@@ -1076,6 +1077,8 @@ def discussion(request, post_id):
     if request.user.is_authenticated:
         is_following_post = PostFollow.objects.filter(user=request.user, post=post).exists()
 
+    views_count = PostView.objects.filter(post=post).count()
+
     context = {
         'post': post,
         'post_display_content': _normalize_post_content(post.content),
@@ -1098,6 +1101,7 @@ def discussion(request, post_id):
         'top_yes_comment_id': top_yes_comment.id if top_yes_comment else '',
         'top_no_comment_id': top_no_comment.id if top_no_comment else '',
         'is_following_post': is_following_post,
+        'views_count': views_count,
     }
     return render(request, 'frontend/discussion.html', context)
 
@@ -1150,6 +1154,9 @@ def profile(request):
         p = getattr(u, 'profile', None)
         return {'username': u.username, 'avatar_url': p.get_picture_url if p else ''}
 
+    debate_participations_count = user_debate_participations.count()
+    completed_debates = user_debate_participations.filter(debate__status='completed').count()
+
     context = {
         'user_posts': user_posts,
         'user_reposts': user_reposts,
@@ -1168,6 +1175,10 @@ def profile(request):
         'following_count': request.user.following_links.count(),
         'followers_list': [_card(f.follower) for f in followers_qs],
         'following_list': [_card(f.following) for f in following_qs],
+        'profile_bio': profile_obj.bio if profile_obj else '',
+        'profile_website': profile_obj.website if profile_obj else '',
+        'debate_participations_count': debate_participations_count,
+        'completed_debates_count': completed_debates,
     }
     return render(request, 'frontend/profile.html', context)
 
@@ -1231,8 +1242,10 @@ def user_profile(request, username):
 
     # Check if current user is following this user
     is_following = False
+    is_blocked = False
     if request.user.is_authenticated:
         is_following = Follow.objects.filter(follower=request.user, following=profile_user).exists()
+        is_blocked = UserBlock.objects.filter(blocker=request.user, blocked=profile_user).exists()
 
     user_reviews = Review.objects.filter(user=profile_user, is_deleted_by_moderation=False).order_by('-created_at')
     user_questions = Question.objects.filter(user=profile_user, is_deleted_by_moderation=False).order_by('-created_at')
@@ -1251,6 +1264,10 @@ def user_profile(request, username):
         'following_count': profile_user.following_links.count(),
         'is_following': is_following,
         'is_own_profile': request.user == profile_user,
+        'is_blocked': is_blocked,
+        'profile_bio': profile_obj.bio if profile_obj else '',
+        'profile_website': profile_obj.website if profile_obj else '',
+        'debate_participations_count': DebateParticipant.objects.filter(user=profile_user).count(),
     }
     return render(request, 'frontend/user_profile.html', context)
 
@@ -4389,3 +4406,312 @@ def leaderboard(request):
         entry['rank'] = i + 1
 
     return render(request, 'frontend/leaderboard.html', {'board': board})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Trending Hashtags
+# ─────────────────────────────────────────────────────────────────────────────
+
+def trending_hashtags(request):
+    """Show top hashtags by usage across posts, polls, questions, and reviews in the last 7 days."""
+    from datetime import timedelta
+    cutoff = timezone.now() - timedelta(days=7)
+    tag_counts = {}
+
+    for model in [Post, Poll, Question, Review]:
+        qs = model.objects.filter(created_at__gte=cutoff).exclude(hashtags='').values_list('hashtags', flat=True)
+        for raw in qs:
+            for tag in Post.parse_hashtags(raw, max_tags=20):
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
+
+    trending = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:50]
+    max_count = trending[0][1] if trending else 1
+
+    tag_list = [
+        {'tag': tag, 'count': count, 'weight': round((count / max_count) * 100)}
+        for tag, count in trending
+    ]
+
+    return render(request, 'frontend/trending_hashtags.html', {
+        'tag_list': tag_list,
+        'period_days': 7,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Activity Feed
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+def activity_feed(request):
+    """Show recent activity from users the current user follows."""
+    following_ids = list(request.user.following_links.values_list('following_id', flat=True))
+
+    if not following_ids:
+        return render(request, 'frontend/activity.html', {
+            'events': [],
+            'has_following': False,
+        })
+
+    cutoff = timezone.now() - timedelta(days=14)
+
+    events = []
+
+    # Posts created by followed users
+    for post in Post.objects.filter(user_id__in=following_ids, created_at__gte=cutoff).select_related('user', 'user__profile').order_by('-created_at')[:30]:
+        events.append({
+            'type': 'post',
+            'actor': post.user,
+            'avatar': _safe_avatar_url(post.user),
+            'text': f'posted a discussion',
+            'title': post.title,
+            'url': f'/discussion/{post.id}/',
+            'ts': post.created_at,
+        })
+
+    # Debates started by followed users
+    for debate in Debate.objects.filter(initiator_id__in=following_ids, created_at__gte=cutoff, status__in=['accepted', 'completed']).select_related('initiator', 'initiator__profile', 'post', 'poll').order_by('-created_at')[:20]:
+        events.append({
+            'type': 'debate',
+            'actor': debate.initiator,
+            'avatar': _safe_avatar_url(debate.initiator),
+            'text': 'started a debate',
+            'title': debate.context_title,
+            'url': f'/debates/{debate.id}/chat/',
+            'ts': debate.created_at,
+        })
+
+    # Likes by followed users
+    for action in PostAction.objects.filter(user_id__in=following_ids, action='like', created_at__gte=cutoff).select_related('user', 'user__profile', 'post').order_by('-created_at')[:20]:
+        events.append({
+            'type': 'like',
+            'actor': action.user,
+            'avatar': _safe_avatar_url(action.user),
+            'text': 'liked a discussion',
+            'title': action.post.title,
+            'url': f'/discussion/{action.post_id}/',
+            'ts': action.created_at,
+        })
+
+    # New follows of the current user
+    for follow in Follow.objects.filter(following=request.user, created_at__gte=cutoff).select_related('follower', 'follower__profile').order_by('-created_at')[:10]:
+        events.append({
+            'type': 'follow',
+            'actor': follow.follower,
+            'avatar': _safe_avatar_url(follow.follower),
+            'text': 'started following you',
+            'title': '',
+            'url': f'/user/{follow.follower.username}/',
+            'ts': follow.created_at,
+        })
+
+    events.sort(key=lambda e: e['ts'], reverse=True)
+
+    return render(request, 'frontend/activity.html', {
+        'events': events[:60],
+        'has_following': True,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Debate Transcript (public read-only view)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def debate_transcript(request, debate_id):
+    """Public read-only transcript for a completed or accepted debate."""
+    debate = get_object_or_404(Debate, id=debate_id)
+
+    messages_qs = DebateMessage.objects.filter(
+        debate=debate,
+    ).select_related('sender', 'sender__profile').order_by('created_at')
+
+    side_map = _sender_side_map(debate)
+
+    message_list = []
+    for msg in messages_qs:
+        message_list.append({
+            'id': msg.id,
+            'sender': msg.sender.username,
+            'avatar': _safe_avatar_url(msg.sender),
+            'content': _decode_chat_content_from_storage(msg.content),
+            'side': side_map.get(msg.sender_id, ''),
+            'is_system': msg.is_system,
+            'is_edited': msg.is_edited,
+            'created_at': msg.created_at,
+            'is_deleted': msg.is_deleted_by_moderation,
+        })
+
+    # Observer vote tallies
+    yes_votes = ObserverVote.objects.filter(debate=debate, winner_side='yes').count()
+    no_votes = ObserverVote.objects.filter(debate=debate, winner_side='no').count()
+    user_observer_vote = None
+    if request.user.is_authenticated:
+        ov = ObserverVote.objects.filter(debate=debate, voter=request.user).first()
+        user_observer_vote = ov.winner_side if ov else None
+
+    participants = DebateParticipant.objects.filter(debate=debate).select_related('user', 'user__profile')
+
+    return render(request, 'frontend/debate_transcript.html', {
+        'debate': debate,
+        'message_list': message_list,
+        'participants': participants,
+        'yes_votes': yes_votes,
+        'no_votes': no_votes,
+        'user_observer_vote': user_observer_vote,
+        'can_vote': request.user.is_authenticated and user_observer_vote is None and debate.status == 'completed',
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Observer Vote
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def observer_vote(request, debate_id):
+    """Cast or update an observer vote on who argued best."""
+    debate = get_object_or_404(Debate, id=debate_id, status='completed')
+    winner_side = request.POST.get('winner_side')
+    if winner_side not in ('yes', 'no'):
+        return JsonResponse({'success': False, 'error': 'Invalid side.'}, status=400)
+
+    if DebateParticipant.objects.filter(debate=debate, user=request.user).exists():
+        return JsonResponse({'success': False, 'error': 'Participants cannot vote on their own debate.'}, status=400)
+
+    ObserverVote.objects.update_or_create(
+        debate=debate,
+        voter=request.user,
+        defaults={'winner_side': winner_side},
+    )
+
+    yes_votes = ObserverVote.objects.filter(debate=debate, winner_side='yes').count()
+    no_votes = ObserverVote.objects.filter(debate=debate, winner_side='no').count()
+    return JsonResponse({'success': True, 'yes_votes': yes_votes, 'no_votes': no_votes, 'your_vote': winner_side})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# User Blocking
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def block_user(request):
+    username = request.POST.get('username', '').strip()
+    if not username:
+        return JsonResponse({'success': False, 'error': 'Username required.'}, status=400)
+    if username == request.user.username:
+        return JsonResponse({'success': False, 'error': 'You cannot block yourself.'}, status=400)
+    target = get_object_or_404(User, username=username)
+    _, created = UserBlock.objects.get_or_create(blocker=request.user, blocked=target)
+    return JsonResponse({'success': True, 'blocked': True, 'created': created})
+
+
+@login_required
+@require_POST
+def unblock_user(request):
+    username = request.POST.get('username', '').strip()
+    if not username:
+        return JsonResponse({'success': False, 'error': 'Username required.'}, status=400)
+    target = get_object_or_404(User, username=username)
+    deleted, _ = UserBlock.objects.filter(blocker=request.user, blocked=target).delete()
+    return JsonResponse({'success': True, 'blocked': False, 'removed': deleted > 0})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Profile Bio / Website Update
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def update_profile_bio(request):
+    bio = (request.POST.get('bio') or '').strip()[:280]
+    website = (request.POST.get('website') or '').strip()[:200]
+
+    if bio and check_content_moderation(bio):
+        return JsonResponse({'success': False, 'error': 'Bio contains abusive language.'}, status=400)
+
+    profile, _ = Profile.objects.get_or_create(user=request.user, defaults={'username': request.user.username})
+    profile.bio = bio
+    profile.website = website
+    profile.save(update_fields=['bio', 'website', 'updated_at'])
+    return JsonResponse({'success': True, 'bio': profile.bio, 'website': profile.website})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Comment Reporting
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def report_post_comment(request):
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, AttributeError):
+        data = request.POST
+
+    comment_id = data.get('comment_id')
+    reason = data.get('reason', 'abusive_language')
+    details = (data.get('details') or '').strip()[:500]
+
+    if not comment_id:
+        return JsonResponse({'success': False, 'error': 'comment_id required.'}, status=400)
+
+    comment = get_object_or_404(Comment, id=comment_id)
+
+    if comment.user == request.user:
+        return JsonResponse({'success': False, 'error': 'You cannot report your own comment.'}, status=400)
+
+    valid_reasons = {'abusive_language', 'spam', 'misinformation', 'harassment', 'other'}
+    if reason not in valid_reasons:
+        reason = 'other'
+
+    try:
+        CommentReport.objects.create(
+            comment=comment,
+            reporter=request.user,
+            reason=reason,
+            details=details,
+        )
+    except IntegrityError:
+        return JsonResponse({'success': False, 'error': 'You already reported this comment.'}, status=400)
+
+    return JsonResponse({'success': True, 'message': 'Comment reported. Our team will review it.'})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Debate Stats JSON endpoint (used by profile page)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+def debate_stats(request, username=None):
+    if username:
+        target_user = get_object_or_404(User, username=username)
+    else:
+        target_user = request.user
+
+    participations = DebateParticipant.objects.filter(user=target_user).select_related('debate')
+    total = participations.count()
+    completed = participations.filter(debate__status='completed').count()
+    active = participations.filter(debate__status='accepted', is_active=True).count()
+
+    yes_wins = ObserverVote.objects.filter(
+        debate__participants__user=target_user,
+        debate__participants__side='yes',
+        winner_side='yes',
+    ).values('debate').distinct().count()
+    no_wins = ObserverVote.objects.filter(
+        debate__participants__user=target_user,
+        debate__participants__side='no',
+        winner_side='no',
+    ).values('debate').distinct().count()
+
+    return JsonResponse({
+        'success': True,
+        'username': target_user.username,
+        'total_debates': total,
+        'completed_debates': completed,
+        'active_debates': active,
+        'observer_wins': yes_wins + no_wins,
+        'posts_count': Post.objects.filter(user=target_user).count(),
+        'comments_count': Comment.objects.filter(user=target_user).count(),
+    })

@@ -83,4 +83,22 @@ urlpatterns = [
     path('reviews/<str:review_id>/', views.review_detail, name='review_detail'),
     path('reviews/<str:review_id>/react/', views.react_to_review, name='react_to_review'),
     path('reviews/<str:review_id>/comment/', views.create_review_comment, name='create_review_comment'),
+    # Trending hashtags
+    path('trending/', views.trending_hashtags, name='trending_hashtags'),
+    # Activity feed
+    path('activity/', views.activity_feed, name='activity_feed'),
+    # Debate transcript (public)
+    path('debates/<str:debate_id>/transcript/', views.debate_transcript, name='debate_transcript'),
+    # Observer voting
+    path('debates/<str:debate_id>/observer-vote/', views.observer_vote, name='observer_vote'),
+    # User blocking
+    path('block-user/', views.block_user, name='block_user'),
+    path('unblock-user/', views.unblock_user, name='unblock_user'),
+    # Profile bio/website update
+    path('profile/update-bio/', views.update_profile_bio, name='update_profile_bio'),
+    # Comment reporting
+    path('report-post-comment/', views.report_post_comment, name='report_post_comment'),
+    # Debate stats JSON
+    path('stats/debates/', views.debate_stats, name='debate_stats'),
+    path('stats/debates/<str:username>/', views.debate_stats, name='debate_stats_user'),
 ]

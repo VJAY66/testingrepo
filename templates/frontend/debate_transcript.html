@@ -1,0 +1,337 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Debate Transcript — {{ debate.context_title|truncatechars:40 }}{% endblock %}
+
+{% block content %}
+<style>
+.tr-page { max-width: 760px; margin: 0 auto; padding: 2rem 1rem 5rem; }
+
+/* Header card */
+.tr-header {
+  background: linear-gradient(135deg, hsl(var(--card) / 0.98), hsl(var(--card) / 0.85));
+  border: 1px solid hsl(var(--border) / 0.8);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  backdrop-filter: blur(8px);
+}
+.tr-title { font-size: 1.25rem; font-weight: 900; color: hsl(var(--foreground)); line-height: 1.3; }
+.tr-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+.tr-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: 1px solid hsl(var(--border)); border-radius: 999px;
+  padding: 3px 10px; font-size: 0.75rem; font-weight: 700;
+  background: hsl(var(--secondary)); color: hsl(var(--foreground));
+}
+.tr-badge-yes  { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.35); color: #16a34a; }
+.tr-badge-no   { background: rgba(239,68,68,0.11);  border-color: rgba(239,68,68,0.3);  color: #dc2626; }
+html[data-theme="dark"] .tr-badge-yes { color: #4ade80; }
+html[data-theme="dark"] .tr-badge-no  { color: #f87171; }
+.tr-badge-status-completed { background: hsl(var(--primary) / 0.1); border-color: hsl(var(--primary) / 0.3); color: hsl(var(--primary)); }
+
+/* Participants */
+.tr-participants { display: flex; flex-wrap: wrap; gap: 0.65rem; margin-top: 1rem; }
+.tr-participant {
+  display: flex; align-items: center; gap: 0.5rem;
+  border: 1px solid hsl(var(--border)); border-radius: 999px;
+  padding: 5px 12px 5px 6px; background: hsl(var(--card));
+}
+.tr-p-avatar {
+  width: 22px; height: 22px; border-radius: 50%; object-fit: cover;
+  border: 1px solid hsl(var(--border));
+}
+.tr-p-avatar-fallback {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: hsl(var(--primary) / 0.12); color: hsl(var(--primary));
+  font-size: 10px; font-weight: 800;
+}
+.tr-p-name { font-size: 0.8rem; font-weight: 700; color: hsl(var(--foreground)); }
+.tr-p-side {
+  font-size: 0.65rem; font-weight: 800; border-radius: 999px;
+  padding: 1px 6px; border: 1px solid; letter-spacing: 0.05em;
+}
+.tr-p-side.yes { color: #16a34a; border-color: rgba(34,197,94,0.4); background: rgba(34,197,94,0.1); }
+.tr-p-side.no  { color: #dc2626; border-color: rgba(239,68,68,0.4);  background: rgba(239,68,68,0.1); }
+html[data-theme="dark"] .tr-p-side.yes { color: #4ade80; }
+html[data-theme="dark"] .tr-p-side.no  { color: #f87171; }
+
+/* Observer voting panel */
+.tr-vote-panel {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 1.1rem;
+  padding: 1.2rem 1.4rem;
+  margin-bottom: 1.5rem;
+}
+.tr-vote-title { font-size: 1rem; font-weight: 800; color: hsl(var(--foreground)); margin-bottom: 0.75rem; }
+.tr-vote-bars { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+.tr-vote-row { display: flex; align-items: center; gap: 0.65rem; }
+.tr-vote-label { font-size: 0.8rem; font-weight: 700; width: 40px; flex-shrink: 0; }
+.tr-vote-bar-wrap { flex: 1; height: 8px; border-radius: 999px; background: hsl(var(--muted)); overflow: hidden; }
+.tr-vote-bar { height: 100%; border-radius: 999px; transition: width 0.5s ease; }
+.tr-vote-bar.yes { background: linear-gradient(90deg, #22c55e, #16a34a); }
+.tr-vote-bar.no  { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.tr-vote-num { font-size: 0.78rem; font-weight: 700; width: 28px; text-align: right; flex-shrink: 0; color: hsl(var(--muted-foreground)); }
+.tr-vote-btns { display: flex; gap: 0.65rem; flex-wrap: wrap; }
+.tr-vote-btn {
+  flex: 1; min-width: 100px; border-radius: 10px; padding: 0.55rem 1rem;
+  font-size: 0.88rem; font-weight: 700; border: 1.5px solid; cursor: pointer;
+  transition: all 0.15s ease;
+}
+.tr-vote-btn.yes { border-color: rgba(34,197,94,0.5); color: #16a34a; background: rgba(34,197,94,0.08); }
+.tr-vote-btn.yes:hover { background: rgba(34,197,94,0.18); }
+.tr-vote-btn.yes.active { background: rgba(34,197,94,0.22); box-shadow: 0 0 0 3px rgba(34,197,94,0.2); }
+.tr-vote-btn.no  { border-color: rgba(239,68,68,0.45); color: #dc2626; background: rgba(239,68,68,0.07); }
+.tr-vote-btn.no:hover  { background: rgba(239,68,68,0.16); }
+.tr-vote-btn.no.active { background: rgba(239,68,68,0.2); box-shadow: 0 0 0 3px rgba(239,68,68,0.18); }
+.tr-voted-note { font-size: 0.8rem; color: hsl(var(--muted-foreground)); text-align: center; margin-top: 0.5rem; }
+html[data-theme="dark"] .tr-vote-btn.yes { color: #4ade80; }
+html[data-theme="dark"] .tr-vote-btn.no  { color: #f87171; }
+
+/* Messages */
+.tr-messages { display: flex; flex-direction: column; gap: 0.3rem; }
+.tr-date-divider {
+  display: flex; justify-content: center; margin: 1rem 0 0.6rem;
+}
+.tr-date-divider span {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--card)); border: 1px solid hsl(var(--border) / 0.7);
+  border-radius: 999px; padding: 3px 12px;
+}
+.tr-msg { display: flex; flex-direction: column; padding: 2px 0; }
+.tr-msg.yes-side { align-items: flex-start; }
+.tr-msg.no-side  { align-items: flex-end; }
+.tr-msg.system-msg { align-items: center; margin: 0.5rem 0; }
+
+.tr-msg-row { display: flex; align-items: flex-end; gap: 8px; max-width: 82%; }
+.tr-msg.no-side .tr-msg-row { flex-direction: row-reverse; }
+.tr-msg-avatar-wrap { flex-shrink: 0; }
+.tr-msg-avatar {
+  width: 26px; height: 26px; border-radius: 50%; object-fit: cover;
+  border: 1px solid hsl(var(--border));
+}
+.tr-msg-avatar-fallback {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700;
+  background: hsl(var(--primary) / 0.12); color: hsl(var(--primary));
+}
+.tr-msg-main { min-width: 0; }
+.tr-msg-sender {
+  font-size: 10px; font-weight: 800; margin-bottom: 3px; padding: 0 2px;
+}
+.yes-side .tr-msg-sender { color: #16a34a; }
+.no-side  .tr-msg-sender { color: #dc2626; }
+html[data-theme="dark"] .yes-side .tr-msg-sender { color: #4ade80; }
+html[data-theme="dark"] .no-side  .tr-msg-sender { color: #f87171; }
+
+.tr-bubble {
+  padding: 9px 13px; font-size: 13.5px; line-height: 1.56;
+  word-break: break-word; border: 1px solid;
+}
+.yes-side .tr-bubble {
+  border-color: hsl(var(--primary) / 0.25);
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.12), hsl(var(--primary) / 0.05));
+  border-radius: 16px 4px 16px 16px; color: hsl(var(--foreground));
+}
+.no-side .tr-bubble {
+  border-color: hsl(var(--border) / 0.8);
+  background: linear-gradient(135deg, hsl(var(--card)), hsl(var(--secondary) / 0.5));
+  border-radius: 4px 16px 16px 16px; color: hsl(var(--foreground));
+}
+.tr-bubble-deleted { opacity: 0.4; font-style: italic; }
+.tr-msg-time { font-size: 9.5px; opacity: 0.5; margin-top: 3px; padding: 0 2px; }
+.yes-side .tr-msg-time { text-align: left; }
+.no-side  .tr-msg-time { text-align: right; }
+
+.tr-system-pill {
+  font-size: 10px; color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted) / 0.45);
+  border: 1px solid hsl(var(--border) / 0.5);
+  border-radius: 999px; padding: 3px 12px; text-align: center;
+}
+
+.tr-edited-label { font-size: 9px; opacity: 0.5; font-style: italic; margin-left: 4px; }
+
+/* Share/copy bar */
+.tr-share {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.65rem;
+  background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+  border-radius: 0.9rem; padding: 0.85rem 1.1rem; margin-bottom: 1.5rem;
+}
+.tr-share-text { font-size: 0.82rem; color: hsl(var(--muted-foreground)); font-weight: 600; }
+.tr-copy-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid hsl(var(--border)); border-radius: 999px;
+  background: hsl(var(--background)); color: hsl(var(--foreground));
+  padding: 6px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.tr-copy-btn:hover { border-color: hsl(var(--primary)); color: hsl(var(--primary)); }
+</style>
+
+<div class="tr-page">
+
+  <!-- Header -->
+  <div class="tr-header">
+    <div class="tr-meta" style="margin-bottom: 0.5rem;">
+      <span class="tr-badge tr-badge-status-{{ debate.status }}">{{ debate.status|capfirst }}</span>
+      <span class="tr-badge">{{ message_list|length }} message{{ message_list|length|pluralize }}</span>
+    </div>
+    <h1 class="tr-title">{{ debate.context_title|default:"Debate Transcript" }}</h1>
+    <div class="tr-meta">
+      <span class="tr-badge tr-badge-yes">YES side</span>
+      <span class="tr-badge tr-badge-no">NO side</span>
+    </div>
+    <div class="tr-participants">
+      {% for p in participants %}
+        <div class="tr-participant">
+          {% if p.user.profile.get_picture_url %}
+            <img src="{{ p.user.profile.get_picture_url }}" alt="{{ p.user.username }}" class="tr-p-avatar">
+          {% else %}
+            <div class="tr-p-avatar-fallback">{{ p.user.username|first|upper }}</div>
+          {% endif %}
+          <a href="/user/{{ p.user.username }}/" class="tr-p-name">{{ p.user.username }}</a>
+          <span class="tr-p-side {{ p.side }}">{{ p.side|upper }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Share bar -->
+  <div class="tr-share">
+    <span class="tr-share-text">📎 Share this transcript</span>
+    <button class="tr-copy-btn" onclick="copyTranscriptLink()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy Link
+    </button>
+  </div>
+
+  <!-- Observer voting -->
+  {% if debate.status == 'completed' %}
+  <div class="tr-vote-panel" id="tr-vote-panel">
+    <div class="tr-vote-title">🏆 Who argued best? Cast your vote</div>
+    <div class="tr-vote-bars">
+      <div class="tr-vote-row">
+        <span class="tr-vote-label" style="color:#16a34a;">YES</span>
+        <div class="tr-vote-bar-wrap">
+          <div class="tr-vote-bar yes" id="tr-bar-yes" style="width: {% if yes_votes or no_votes %}{{ yes_votes|add:0 }}{% else %}0{% endif %}%"></div>
+        </div>
+        <span class="tr-vote-num" id="tr-num-yes">{{ yes_votes }}</span>
+      </div>
+      <div class="tr-vote-row">
+        <span class="tr-vote-label" style="color:#dc2626;">NO</span>
+        <div class="tr-vote-bar-wrap">
+          <div class="tr-vote-bar no" id="tr-bar-no" style="width: {% if yes_votes or no_votes %}{{ no_votes|add:0 }}{% else %}0{% endif %}%"></div>
+        </div>
+        <span class="tr-vote-num" id="tr-num-no">{{ no_votes }}</span>
+      </div>
+    </div>
+    {% if can_vote %}
+      <div class="tr-vote-btns">
+        <button class="tr-vote-btn yes" onclick="castObserverVote('yes')">👍 YES argued better</button>
+        <button class="tr-vote-btn no" onclick="castObserverVote('no')">👍 NO argued better</button>
+      </div>
+    {% elif user_observer_vote %}
+      <p class="tr-voted-note">You voted <strong>{{ user_observer_vote|upper }}</strong> argued better. Thanks for voting!</p>
+    {% else %}
+      {% if user.is_authenticated %}
+        <p class="tr-voted-note">Only spectators (non-participants) can vote on completed debates.</p>
+      {% else %}
+        <p class="tr-voted-note"><a href="/login/?next={{ request.path }}" style="color:hsl(var(--primary))">Log in</a> to cast your observer vote.</p>
+      {% endif %}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Messages -->
+  <div class="tr-messages">
+    {% if not message_list %}
+      <p class="text-center text-muted-foreground py-10 text-sm">No messages in this debate yet.</p>
+    {% endif %}
+    {% for msg in message_list %}
+      {% if msg.is_system %}
+        <div class="tr-msg system-msg">
+          <div class="tr-system-pill">{{ msg.content }}</div>
+        </div>
+      {% else %}
+        <div class="tr-msg {% if msg.side == 'yes' %}yes-side{% else %}no-side{% endif %}">
+          <div class="tr-msg-row">
+            <div class="tr-msg-avatar-wrap">
+              {% if msg.avatar %}
+                <img src="{{ msg.avatar }}" alt="{{ msg.sender }}" class="tr-msg-avatar">
+              {% else %}
+                <div class="tr-msg-avatar-fallback">{{ msg.sender|first|upper }}</div>
+              {% endif %}
+            </div>
+            <div class="tr-msg-main">
+              <div class="tr-msg-sender">{{ msg.sender }}</div>
+              <div class="tr-bubble {% if msg.is_deleted %}tr-bubble-deleted{% endif %}">
+                {% if msg.is_deleted %}
+                  [Message removed by moderation]
+                {% else %}
+                  {{ msg.content }}
+                {% endif %}
+                {% if msg.is_edited %}<span class="tr-edited-label">(edited)</span>{% endif %}
+              </div>
+              <div class="tr-msg-time">{{ msg.created_at|date:"g:i A" }}</div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+</div>
+
+<script>
+function copyTranscriptLink() {
+  var url = window.location.href;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(function() {
+      var btn = document.querySelector('.tr-copy-btn');
+      if (btn) { btn.textContent = '✓ Copied!'; setTimeout(function(){ btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy Link'; }, 2000); }
+    });
+  }
+}
+
+function updateBars(yesVotes, noVotes) {
+  var total = yesVotes + noVotes || 1;
+  var yesBar = document.getElementById('tr-bar-yes');
+  var noBar  = document.getElementById('tr-bar-no');
+  var yesNum = document.getElementById('tr-num-yes');
+  var noNum  = document.getElementById('tr-num-no');
+  if (yesBar) yesBar.style.width = Math.round((yesVotes / total) * 100) + '%';
+  if (noBar)  noBar.style.width  = Math.round((noVotes  / total) * 100) + '%';
+  if (yesNum) yesNum.textContent = yesVotes;
+  if (noNum)  noNum.textContent  = noVotes;
+}
+updateBars({{ yes_votes }}, {{ no_votes }});
+
+function castObserverVote(side) {
+  var csrfToken = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+  fetch('/debates/{{ debate.id }}/observer-vote/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'winner_side=' + side,
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.success) {
+      updateBars(d.yes_votes, d.no_votes);
+      var btns = document.querySelectorAll('.tr-vote-btn');
+      btns.forEach(function(b) { b.classList.remove('active'); });
+      var active = document.querySelector('.tr-vote-btn.' + d.your_vote);
+      if (active) active.classList.add('active');
+      var note = document.createElement('p');
+      note.className = 'tr-voted-note';
+      note.innerHTML = 'You voted <strong>' + d.your_vote.toUpperCase() + '</strong> argued better. Thanks!';
+      var btnsEl = document.querySelector('.tr-vote-btns');
+      if (btnsEl) btnsEl.replaceWith(note);
+    }
+  })
+  .catch(function() {});
+}
+</script>
+{% endblock %}
