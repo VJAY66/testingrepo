@@ -294,6 +294,7 @@
                     <div class="px-2.5 py-2">
                         <p class="text-xs leading-relaxed font-medium text-foreground break-words">{{ cw.comment.content }}</p>
                         <div class="mt-1.5 flex flex-wrap items-center gap-1 text-muted-foreground">
+                            {% if show_voters %}
                             {% if cw.avatar_url %}
                             <img src="{{ cw.avatar_url }}" alt="{{ cw.comment.user.username }}" class="h-5 w-5 rounded-full object-cover border border-border flex-shrink-0" loading="lazy">
                             {% else %}
@@ -304,6 +305,9 @@
                                 <span class="h-1.5 w-1.5 rounded-full {% if cw.is_online %}bg-emerald-500{% else %}bg-gray-400{% endif %}"></span>
                                 {% if cw.is_online %}Online{% else %}Offline{% endif %}
                             </span>
+                            {% else %}
+                            <span class="text-xs text-muted-foreground italic">Anonymous voter</span>
+                            {% endif %}
                             <span class="ml-auto text-[9px] text-muted-foreground">{{ cw.comment.created_at|date:"M j" }}</span>
                         </div>
                         {% if user.is_authenticated %}

@@ -1,0 +1,30 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Create Series — PickASide{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto px-4 py-8">
+    <div class="rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+        <h1 class="text-xl font-black tracking-tight text-foreground mb-4">Create a Post Series</h1>
+        {% if error %}
+        <div class="mb-4 rounded-xl border border-red-400/40 bg-red-50/70 px-3 py-2 text-xs text-red-700">{{ error }}</div>
+        {% endif %}
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-4">
+                <label class="block text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5" for="series-title">Title</label>
+                <input type="text" id="series-title" name="title" maxlength="120" placeholder="Series title..." required
+                       class="w-full rounded-xl border border-border px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30">
+            </div>
+            <div class="mb-6">
+                <label class="block text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5" for="series-description">Description (optional)</label>
+                <textarea id="series-description" name="description" rows="3" placeholder="Describe this series..."
+                          class="w-full rounded-xl border border-border px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"></textarea>
+            </div>
+            <div class="flex gap-3">
+                <button type="submit" class="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-bold hover:bg-primary/90 transition">Create Series</button>
+                <a href="{% url 'profile' %}" class="flex-1 text-center rounded-full border border-border py-2.5 text-sm font-semibold text-foreground hover:border-primary hover:text-primary transition">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

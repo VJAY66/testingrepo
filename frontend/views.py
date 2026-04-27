@@ -12,7 +12,7 @@ from django.core.cache import cache
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.db.models import Q, F, Count, IntegerField, ExpressionWrapper
+from django.db.models import Q, F, Count, Max, IntegerField, ExpressionWrapper
 from django.db import DataError, IntegrityError
 from django.utils import timezone
 from datetime import timedelta
@@ -493,10 +493,46 @@ def _remove_repost_copy_for_user(user, original_post):
 @require_POST
 def post_action(request, post_id):
     action = request.POST.get('action')
-    if action not in ['like', 'save', 'repost']:
+    if action not in ['like', 'save', 'repost', 'hot', 'debatable', 'agree', 'surprising']:
         return JsonResponse({'success': False, 'error': 'Invalid action.'}, status=400)
 
     post = get_object_or_404(Post, id=post_id)
+
+    if action in ['hot', 'debatable', 'agree', 'surprising']:
+        existing_action = PostAction.objects.filter(user=request.user, post=post, action=action).first()
+        if existing_action:
+            existing_action.delete()
+            status = 'removed'
+        else:
+            try:
+                PostAction.objects.create(user=request.user, post=post, action=action)
+                status = 'added'
+            except IntegrityError:
+                status = 'added'
+
+        like_count = PostAction.objects.filter(post=post, action='like').count()
+        save_count = PostAction.objects.filter(post=post, action='save').count()
+        repost_count = PostAction.objects.filter(post=post, action='repost').count()
+        hot_count = PostAction.objects.filter(post=post, action='hot').count()
+        debatable_count = PostAction.objects.filter(post=post, action='debatable').count()
+        agree_count = PostAction.objects.filter(post=post, action='agree').count()
+        surprising_count = PostAction.objects.filter(post=post, action='surprising').count()
+
+        return JsonResponse({
+            'success': True,
+            'action': action,
+            'status': status,
+            'counts': {
+                'like': like_count,
+                'save': save_count,
+                'repost': repost_count,
+                'hot': hot_count,
+                'debatable': debatable_count,
+                'agree': agree_count,
+                'surprising': surprising_count,
+            }
+        })
+
     if action in ['like', 'save']:
         existing_action = PostAction.objects.filter(user=request.user, post=post, action=action).first()
         if existing_action:
@@ -710,11 +746,15 @@ def _enrich_posts_for_feed(posts, user):
     liked_post_ids = set()
     saved_post_ids = set()
     reposted_post_ids = set()
+    hot_post_ids = set()
+    debatable_post_ids = set()
+    agree_post_ids = set()
+    surprising_post_ids = set()
     if post_ids:
         post_actions = PostAction.objects.filter(
             user=user,
             post__in=post_ids,
-            action__in=['like', 'save', 'repost']
+            action__in=['like', 'save', 'repost', 'hot', 'debatable', 'agree', 'surprising']
         ).values('post_id', 'action')
         for item in post_actions:
             if item['action'] == 'like':
@@ -723,11 +763,23 @@ def _enrich_posts_for_feed(posts, user):
                 saved_post_ids.add(item['post_id'])
             elif item['action'] == 'repost':
                 reposted_post_ids.add(item['post_id'])
+            elif item['action'] == 'hot':
+                hot_post_ids.add(item['post_id'])
+            elif item['action'] == 'debatable':
+                debatable_post_ids.add(item['post_id'])
+            elif item['action'] == 'agree':
+                agree_post_ids.add(item['post_id'])
+            elif item['action'] == 'surprising':
+                surprising_post_ids.add(item['post_id'])
 
     for post in posts:
         post.is_liked = post.id in liked_post_ids
         post.is_saved = post.id in saved_post_ids
         post.is_reposted = post.id in reposted_post_ids
+        post.is_hot = post.id in hot_post_ids
+        post.is_debatable = post.id in debatable_post_ids
+        post.is_agree = post.id in agree_post_ids
+        post.is_surprising = post.id in surprising_post_ids
 
 
 def _build_suggested_posts_for_user(user, annotated_posts):
@@ -822,6 +874,21 @@ def _build_suggested_posts_for_user(user, annotated_posts):
     return tier1 + tier2 + tier3 + tier4
 
 
+def _filter_muted_posts(posts, user):
+    """Filter out posts that contain any of the user's muted keywords."""
+    if not getattr(user, 'is_authenticated', False):
+        return posts
+    keywords = list(MutedKeyword.objects.filter(user=user).values_list('keyword', flat=True))
+    if not keywords:
+        return posts
+    filtered = []
+    for p in posts:
+        text = f"{p.title} {p.content} {p.hashtags}".lower()
+        if not any(kw.lower() in text for kw in keywords):
+            filtered.append(p)
+    return filtered
+
+
 def _follow_suggestions(user, limit=5):
     """Return users the viewer might want to follow based on shared interest categories."""
     if not user.is_authenticated:
@@ -864,6 +931,7 @@ def index(request):
     page_obj = paginator.get_page(request.GET.get('page'))
     posts = list(page_obj.object_list)
     _enrich_posts_for_feed(posts, request.user)
+    posts = _filter_muted_posts(posts, request.user)
 
     context = {
         'posts': posts,
@@ -897,6 +965,7 @@ def suggested(request):
     page_obj = paginator.get_page(request.GET.get('page'))
     posts = list(page_obj.object_list)
     _enrich_posts_for_feed(posts, request.user)
+    posts = _filter_muted_posts(posts, request.user)
 
     context = {
         'posts': posts,
@@ -1119,6 +1188,24 @@ def discussion(request, post_id):
 
     views_count = PostView.objects.filter(post=post).count()
 
+    if is_post_creator:
+        from django.db.models.functions import TruncDate
+        daily_views = list(
+            PostView.objects.filter(post=post, viewed_at__gte=timezone.now() - timedelta(days=7))
+            .annotate(day=TruncDate('viewed_at'))
+            .values('day')
+            .annotate(count=Count('id'))
+            .order_by('day')
+        )
+        analytics = {
+            'total_views': views_count,
+            'daily_views': [{'day': str(d['day']), 'count': d['count']} for d in daily_views],
+            'yes_pct': round(yes_percentage, 1),
+            'no_pct': round(no_percentage, 1),
+        }
+    else:
+        analytics = None
+
     context = {
         'post': post,
         'post_display_content': _normalize_post_content(post.content),
@@ -1142,6 +1229,7 @@ def discussion(request, post_id):
         'top_no_comment_id': top_no_comment.id if top_no_comment else '',
         'is_following_post': is_following_post,
         'views_count': views_count,
+        'analytics': analytics,
     }
     return render(request, 'frontend/discussion.html', context)
 
@@ -1205,6 +1293,10 @@ def profile(request):
         ).order_by('name')
     )
 
+    muted_keywords = list(MutedKeyword.objects.filter(user=request.user).values_list('keyword', flat=True))
+
+    user_series = list(PostSeries.objects.filter(user=request.user).annotate(post_count=Count('items')))
+
     context = {
         'user_posts': user_posts,
         'user_reposts': user_reposts,
@@ -1232,6 +1324,8 @@ def profile(request):
         'trust_level': profile_obj.trust_level if profile_obj else 'new',
         'user_drafts': user_drafts,
         'pinned_post': pinned_post,
+        'muted_keywords': muted_keywords,
+        'user_series': user_series,
     }
     return render(request, 'frontend/profile.html', context)
 
@@ -3738,6 +3832,8 @@ def create_poll(request):
                 'form_data': request.POST,
             })
 
+        is_anonymous = request.POST.get('is_anonymous') == 'on'
+
         poll = Poll.objects.create(
             id=str(uuid.uuid4()),
             user=request.user,
@@ -3746,6 +3842,7 @@ def create_poll(request):
             category=category,
             hashtags=','.join(Post.parse_hashtags(hashtags_raw)),
             expires_at=expires_at,
+            is_anonymous=is_anonymous,
         )
         PollOption.objects.create(poll=poll, text=option1, order=0)
         PollOption.objects.create(poll=poll, text=option2, order=1)
@@ -3898,6 +3995,7 @@ def poll_detail(request, poll_id):
         'total_votes': total_votes,
         'user_vote': user_vote,
         'voted_option_id': str(user_vote.option_id) if user_vote else None,
+        'show_voters': not poll.is_anonymous,
     })
 
 
@@ -5065,3 +5163,82 @@ def toggle_verify_user(request, username):
             'You will now display a verified badge on your profile.',
         )
     return JsonResponse({'success': True, 'is_verified': profile.is_verified})
+
+
+# ─── Muted Keywords ───────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def add_muted_keyword(request):
+    keyword = (request.POST.get('keyword') or '').strip().lower()
+    if not keyword:
+        return JsonResponse({'success': False, 'error': 'Keyword is required.'}, status=400)
+    if len(keyword) > 60:
+        return JsonResponse({'success': False, 'error': 'Keyword too long (max 60 chars).'}, status=400)
+    obj, created = MutedKeyword.objects.get_or_create(user=request.user, keyword=keyword)
+    return JsonResponse({'success': True, 'keyword': keyword, 'created': created})
+
+
+@login_required
+@require_POST
+def remove_muted_keyword(request):
+    keyword = (request.POST.get('keyword') or '').strip().lower()
+    if not keyword:
+        return JsonResponse({'success': False, 'error': 'Keyword is required.'}, status=400)
+    MutedKeyword.objects.filter(user=request.user, keyword=keyword).delete()
+    return JsonResponse({'success': True, 'keyword': keyword})
+
+
+# ─── Post Series ──────────────────────────────────────────────────────────────
+
+@login_required
+def create_series(request):
+    if request.method == 'POST':
+        title = (request.POST.get('title') or '').strip()
+        description = (request.POST.get('description') or '').strip()
+        if not title:
+            return render(request, 'frontend/create_series.html', {'error': 'Title is required.'})
+        series = PostSeries.objects.create(
+            id=str(uuid.uuid4()),
+            user=request.user,
+            title=title,
+            description=description,
+        )
+        return redirect('series_detail', series_id=series.id)
+    return render(request, 'frontend/create_series.html', {})
+
+
+def series_detail(request, series_id):
+    series = get_object_or_404(PostSeries, id=series_id)
+    items = series.items.select_related('post', 'post__user').order_by('order')
+    return render(request, 'frontend/series_detail.html', {
+        'series': series,
+        'items': items,
+    })
+
+
+@login_required
+@require_POST
+def add_post_to_series(request, series_id):
+    series = get_object_or_404(PostSeries, id=series_id, user=request.user)
+    post_id = (request.POST.get('post_id') or '').strip()
+    if not post_id:
+        return JsonResponse({'success': False, 'error': 'post_id is required.'}, status=400)
+    post = get_object_or_404(Post, id=post_id)
+    max_order = series.items.aggregate(m=Max('order'))['m'] or 0
+    try:
+        PostSeriesItem.objects.create(series=series, post=post, order=max_order + 1)
+    except IntegrityError:
+        pass
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_POST
+def remove_from_series(request, series_id):
+    series = get_object_or_404(PostSeries, id=series_id, user=request.user)
+    post_id = (request.POST.get('post_id') or '').strip()
+    if not post_id:
+        return JsonResponse({'success': False, 'error': 'post_id is required.'}, status=400)
+    PostSeriesItem.objects.filter(series=series, post_id=post_id).delete()
+    return JsonResponse({'success': True})

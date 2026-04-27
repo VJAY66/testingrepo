@@ -179,6 +179,11 @@
                 {% if errors.expires_at %}<span class="mt-1 block text-xs text-red-500 font-semibold">{{ errors.expires_at }}</span>{% endif %}
             </div>
 
+            <label class="flex items-center gap-2 text-sm text-foreground">
+                <input type="checkbox" name="is_anonymous" class="rounded" {% if form_data.is_anonymous %}checked{% endif %}>
+                Anonymous voting (hide voter identities)
+            </label>
+
             <button type="submit" class="submit-btn">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                 Launch Poll

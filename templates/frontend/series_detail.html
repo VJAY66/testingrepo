@@ -1,0 +1,54 @@
+{% extends 'frontend/base.html' %}
+{% block title %}{{ series.title }} — Series{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-8">
+    <div class="mb-6">
+        <a href="{% url 'profile' %}" class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors mb-4">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Back to Profile
+        </a>
+        <div class="rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+            <h1 class="text-2xl font-black tracking-tight text-foreground mb-1">{{ series.title }}</h1>
+            {% if series.description %}
+            <p class="text-sm text-muted-foreground mb-2">{{ series.description }}</p>
+            {% endif %}
+            <div class="flex items-center gap-3 text-xs text-muted-foreground">
+                <span>by <a href="{% url 'user_profile' series.user.username %}" class="font-semibold hover:text-primary transition-colors">{{ series.user.username }}</a></span>
+                <span>{{ items|length }} post{{ items|length|pluralize }}</span>
+                <span>Created {{ series.created_at|date:"M j, Y" }}</span>
+            </div>
+        </div>
+    </div>
+
+    {% if items %}
+    <div class="space-y-4">
+        {% for item in items %}
+        <article class="group rounded-2xl border border-border/70 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:border-primary/30">
+            <div class="flex items-start gap-3">
+                <span class="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary text-sm font-black">{{ forloop.counter }}</span>
+                <div class="min-w-0 flex-1">
+                    <h2 class="text-base font-bold text-foreground group-hover:text-primary transition-colors leading-snug mb-1">
+                        <a href="{% url 'discussion' item.post.id %}">{{ item.post.title }}</a>
+                    </h2>
+                    <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span class="px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground font-semibold">{{ item.post.category }}</span>
+                        <span>{{ item.post.created_at|date:"M j, Y" }}</span>
+                        <span>by {{ item.post.user.username }}</span>
+                    </div>
+                    {% if item.post.content %}
+                    <p class="mt-2 text-sm text-muted-foreground line-clamp-2">{{ item.post.content|truncatechars:160 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="rounded-2xl border border-dashed border-border bg-card/70 p-10 text-center">
+        <p class="font-semibold text-foreground mb-1">No posts in this series yet</p>
+        <p class="text-sm text-muted-foreground">Add posts to this series from your profile.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

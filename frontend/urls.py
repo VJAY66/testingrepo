@@ -117,4 +117,12 @@ urlpatterns = [
     path('collections/<int:collection_id>/delete/', views.delete_collection, name='delete_collection'),
     # User verification
     path('user/<str:username>/verify/', views.toggle_verify_user, name='toggle_verify_user'),
+    # Muted keywords
+    path('keywords/mute/', views.add_muted_keyword, name='add_muted_keyword'),
+    path('keywords/unmute/', views.remove_muted_keyword, name='remove_muted_keyword'),
+    # Post series
+    path('series/create/', views.create_series, name='create_series'),
+    path('series/<str:series_id>/', views.series_detail, name='series_detail'),
+    path('series/<str:series_id>/add/', views.add_post_to_series, name='add_post_to_series'),
+    path('series/<str:series_id>/remove/', views.remove_from_series, name='remove_from_series'),
 ]

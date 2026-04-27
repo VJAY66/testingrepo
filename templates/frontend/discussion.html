@@ -121,6 +121,27 @@
             </div>
         </div>
 
+        {% if is_post_creator and analytics %}
+        <div class="mt-4 rounded-2xl border border-border/70 bg-card/80 p-4">
+            <h3 class="text-sm font-bold mb-2">Post Analytics</h3>
+            <div class="grid grid-cols-3 gap-3 mb-3">
+                <div class="text-center"><p class="text-xl font-black">{{ analytics.total_views }}</p><p class="text-xs text-muted-foreground">Views</p></div>
+                <div class="text-center"><p class="text-xl font-black text-green-600">{{ analytics.yes_pct }}%</p><p class="text-xs text-muted-foreground">Yes votes</p></div>
+                <div class="text-center"><p class="text-xl font-black text-red-600">{{ analytics.no_pct }}%</p><p class="text-xs text-muted-foreground">No votes</p></div>
+            </div>
+            {% if analytics.daily_views %}
+            <div id="analytics-bars" class="flex items-end gap-1 h-16">
+                {% for d in analytics.daily_views %}
+                <div class="flex-1 flex flex-col items-center gap-0.5" title="{{ d.day }}: {{ d.count }} views">
+                    <div class="w-full bg-primary/70 rounded-t" style="height: calc({{ d.count }} / {{ analytics.total_views }} * 60px)"></div>
+                    <span class="text-[8px] text-muted-foreground">{{ d.day|slice:"8:" }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
         {% if user.is_authenticated %}
         <div class="mb-1 flex items-center sm:gap-6 gap-3">
             <button type="button" data-action="like" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-like {% if post.is_liked %}active text-amber-500 shadow-md shadow-amber-500/20 bg-amber-50/60 dark:bg-amber-950/30{% else %}text-muted-foreground hover:text-amber-500{% endif %} hover:bg-amber-50/70 dark:hover:bg-amber-950/20 hover:shadow-md overflow-hidden">
@@ -160,6 +181,10 @@
                 </svg>
                 <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Share</span>
             </button>
+            <button type="button" data-action="hot" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_hot %}active text-orange-500 bg-orange-50/60 border-orange-300/60{% else %}text-muted-foreground hover:text-orange-500 hover:bg-orange-50/60{% endif %}">🔥 <span class="action-count text-xs">{{ post.hot_count|default:0 }}</span></button>
+            <button type="button" data-action="debatable" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_debatable %}active text-purple-500 bg-purple-50/60 border-purple-300/60{% else %}text-muted-foreground hover:text-purple-500 hover:bg-purple-50/60{% endif %}">🤔 <span class="action-count text-xs">{{ post.debatable_count|default:0 }}</span></button>
+            <button type="button" data-action="agree" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_agree %}active text-green-600 bg-green-50/60 border-green-300/60{% else %}text-muted-foreground hover:text-green-600 hover:bg-green-50/60{% endif %}">👏 <span class="action-count text-xs">{{ post.agree_count|default:0 }}</span></button>
+            <button type="button" data-action="surprising" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_surprising %}active text-blue-500 bg-blue-50/60 border-blue-300/60{% else %}text-muted-foreground hover:text-blue-500 hover:bg-blue-50/60{% endif %}">😮 <span class="action-count text-xs">{{ post.surprising_count|default:0 }}</span></button>
         </div>
         {% else %}
         <div class="mb-1 flex items-center sm:gap-6 gap-3">

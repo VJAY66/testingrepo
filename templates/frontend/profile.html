@@ -335,6 +335,12 @@
             <span>Drafts</span>
             <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_drafts.count }}</span>
         </button>
+        <button type="button" id="tab-btn-series" onclick="switchProfileTab('series')"
+            class="profile-tab-btn flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-2 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200">
+            <svg class="w-3.5 h-3.5 shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            <span>Series</span>
+            <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_series|length }}</span>
+        </button>
     </div>
 
     <!-- Tab: Posts -->
@@ -812,6 +818,44 @@
         {% endif %}
     </section>
 
+    <!-- Tab: Series -->
+    <section id="tab-series" class="hidden">
+        <div class="mb-4 flex justify-end">
+            <a href="{% url 'create_series' %}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition">+ New Series</a>
+        </div>
+        {% if user_series %}
+        <div class="grid gap-4 sm:grid-cols-2">
+            {% for series in user_series %}
+            <a href="{% url 'series_detail' series.id %}" class="group rounded-2xl border border-border/70 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:border-primary/30 block">
+                <h3 class="text-base font-bold text-foreground group-hover:text-primary transition-colors mb-1">{{ series.title }}</h3>
+                {% if series.description %}<p class="text-sm text-muted-foreground line-clamp-2 mb-2">{{ series.description }}</p>{% endif %}
+                <span class="inline-block px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">{{ series.post_count }} post{{ series.post_count|pluralize }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-2xl border border-dashed border-border bg-card/70 p-10 text-center">
+            <p class="font-semibold text-foreground mb-1">No series yet</p>
+            <p class="text-sm text-muted-foreground">Create a series to group related posts together.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- Muted Keywords Section -->
+    <div class="mt-4 rounded-2xl border border-border/70 bg-card p-4">
+        <h3 class="text-sm font-bold mb-3">Muted Keywords</h3>
+        <div id="muted-keywords-list" class="flex flex-wrap gap-2 mb-3">
+            {% for kw in muted_keywords %}
+            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted text-muted-foreground text-xs font-medium">
+                {{ kw }}<button onclick="removeMutedKeyword('{{ kw }}', this)" class="ml-1 text-muted-foreground hover:text-destructive">×</button>
+            </span>
+            {% endfor %}
+        </div>
+        <div class="flex gap-2">
+            <input type="text" id="mute-kw-input" placeholder="Add keyword..." class="flex-1 rounded-full border border-border px-3 py-1.5 text-xs bg-background">
+            <button onclick="addMutedKeyword()" class="px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold">Mute</button>
+        </div>
+    </div>
 
 
 </div>
@@ -976,7 +1020,7 @@ function togglePin(postId, btn) {
 }
 
 function switchProfileTab(name) {
-    ['posts', 'reposts', 'debates', 'saved', 'followed', 'followers', 'following', 'reviews', 'questions', 'polls', 'answers', 'drafts'].forEach(function(t) {
+    ['posts', 'reposts', 'debates', 'saved', 'followed', 'followers', 'following', 'reviews', 'questions', 'polls', 'answers', 'drafts', 'series'].forEach(function(t) {
         var sec = document.getElementById('tab-' + t);
         var btn = document.getElementById('tab-btn-' + t);
         if (sec) {
@@ -1282,6 +1326,39 @@ function saveBio() {
         saveBtn.textContent = 'Save';
         errEl.textContent = 'Network error. Please try again.';
         errEl.classList.remove('hidden');
+    });
+}
+
+function addMutedKeyword() {
+    var input = document.getElementById('mute-kw-input');
+    var keyword = (input.value || '').trim().toLowerCase();
+    if (!keyword) return;
+    fetch('/keywords/mute/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'keyword=' + encodeURIComponent(keyword)
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.success && d.created) {
+            var list = document.getElementById('muted-keywords-list');
+            var span = document.createElement('span');
+            span.className = 'inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted text-muted-foreground text-xs font-medium';
+            span.innerHTML = keyword + '<button onclick="removeMutedKeyword(\'' + keyword + '\', this)" class="ml-1 text-muted-foreground hover:text-destructive">×</button>';
+            list.appendChild(span);
+            input.value = '';
+        }
+    });
+}
+
+function removeMutedKeyword(kw, btn) {
+    fetch('/keywords/unmute/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'keyword=' + encodeURIComponent(kw)
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.success) {
+            var pill = btn.closest('span');
+            if (pill) pill.remove();
+        }
     });
 }
 </script>
