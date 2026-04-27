@@ -21,7 +21,7 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView
 from discussions.signals import notify_post_author
 from users.models import Follow, UserBlock, SaveCollection, CollectionItem
 from users.security import is_login_rate_limited, record_login_attempt
@@ -672,7 +672,7 @@ def post_likes(request, post_id):
 
 
 def _annotated_feed_posts_queryset():
-    base_posts = Post.objects.filter(id__isnull=False).exclude(id='')
+    base_posts = Post.objects.filter(id__isnull=False, is_draft=False).exclude(id='')
     return base_posts.annotate(
         like_count=Count('actions', filter=Q(actions__action='like'), distinct=True),
         save_count=Count('actions', filter=Q(actions__action='save'), distinct=True),
@@ -818,6 +818,30 @@ def _build_suggested_posts_for_user(user, annotated_posts):
     return tier1 + tier2 + tier3 + tier4
 
 
+def _follow_suggestions(user, limit=5):
+    """Return users the viewer might want to follow based on shared interest categories."""
+    if not user.is_authenticated:
+        return []
+    profile = getattr(user, 'profile', None)
+    cats = list(profile.interested_categories or []) if profile else []
+    already_following = set(
+        Follow.objects.filter(follower=user).values_list('following_id', flat=True)
+    )
+    already_following.add(user.id)
+    qs = Profile.objects.select_related('user').exclude(user_id__in=already_following)
+    if cats:
+        # Prefer users who share interest categories
+        qs = qs.filter(
+            interested_categories__isnull=False
+        ).exclude(interested_categories=[])
+    suggestions = []
+    for p in qs.order_by('-user__follower_links')[:50]:
+        shared = len(set(p.interested_categories or []) & set(cats)) if cats else 0
+        suggestions.append((shared, p))
+    suggestions.sort(key=lambda x: -x[0])
+    return [p for _, p in suggestions[:limit]]
+
+
 def index(request):
     """Home page with trending posts and categories"""
     active_category = request.GET.get('category', '').strip()
@@ -844,6 +868,7 @@ def index(request):
         'categories': get_frontend_categories(),
         'active_category': active_category,
         'is_suggested_page': False,
+        'follow_suggestions': _follow_suggestions(request.user),
     }
     return render(request, 'frontend/index.html', context)
 
@@ -1119,7 +1144,9 @@ def discussion(request, post_id):
 @login_required
 def profile(request):
     """User profile page"""
-    user_posts = Post.objects.filter(user=request.user).exclude(id='').order_by('-created_at')
+    user_posts = Post.objects.filter(user=request.user, is_draft=False).exclude(id='').order_by('-is_pinned', '-created_at')
+    user_drafts = Post.objects.filter(user=request.user, is_draft=True).exclude(id='').order_by('-created_at')
+    pinned_post = Post.objects.filter(user=request.user, is_pinned=True, is_draft=False).first()
     user_reposts = PostAction.objects.filter(
         user=request.user, action='repost'
     ).select_related('post', 'post__user').order_by('-created_at')
@@ -1199,6 +1226,8 @@ def profile(request):
         'save_collections': save_collections,
         'trust_badge': profile_obj.trust_badge if profile_obj else ('', '', ''),
         'trust_level': profile_obj.trust_level if profile_obj else 'new',
+        'user_drafts': user_drafts,
+        'pinned_post': pinned_post,
     }
     return render(request, 'frontend/profile.html', context)
 
@@ -1955,19 +1984,20 @@ def mark_offline(request):
 @login_required
 @require_POST
 def create_post(request):
-    """Create a new post"""
+    """Create a new post (or save as draft)."""
     if request.method == 'POST':
         title = request.POST.get('title', '').strip()
         content = _normalize_post_content(request.POST.get('content', ''))
         category = request.POST.get('category', '').strip()
         hashtags = request.POST.get('hashtags', '').strip()
         accepted_rules = request.POST.get('accepted_rules', '0').strip()
+        save_as_draft = request.POST.get('save_draft') == '1'
 
         if not title or not category:
             messages.error(request, 'Title and category are required')
             return redirect('index')
 
-        if accepted_rules != '1':
+        if not save_as_draft and accepted_rules != '1':
             messages.error(request, 'Please review and accept the ask question instructions before posting.')
             return redirect('ask_question')
 
@@ -1976,10 +2006,11 @@ def create_post(request):
             messages.error(request, 'Your post contains abusive language and cannot be posted.')
             return redirect('ask_question')
 
-        limit_reached, _, limit = has_reached_daily_post_limit(request.user)
-        if limit_reached:
-            messages.error(request, f'You can create up to {limit} posts per day.')
-            return redirect('index')
+        if not save_as_draft:
+            limit_reached, _, limit = has_reached_daily_post_limit(request.user)
+            if limit_reached:
+                messages.error(request, f'You can create up to {limit} posts per day.')
+                return redirect('index')
 
         long_hashtags = [
             token.lstrip('#')
@@ -1990,7 +2021,6 @@ def create_post(request):
             messages.error(request, f'Each hashtag must be at most {Post.HASHTAG_MAX_LENGTH} characters.')
             return redirect('ask_question')
 
-        # Process hashtags from free input (comma/space separated, with or without '#').
         hashtag_list = Post.parse_hashtags(hashtags, max_tags=5)
         processed_hashtags = ', '.join(hashtag_list)
 
@@ -2001,19 +2031,55 @@ def create_post(request):
                 title=title,
                 content=content,
                 category=category,
-                hashtags=processed_hashtags
+                hashtags=processed_hashtags,
+                is_draft=save_as_draft,
             )
-            
+
             if not post or not post.id:
                 messages.error(request, 'Failed to create post')
                 return redirect('index')
-            
+
+            if save_as_draft:
+                messages.success(request, 'Draft saved.')
+                return redirect('profile')
+
             return redirect(f'/discussion/{post.id}/?created=1')
         except Exception as e:
             messages.error(request, f'Failed to create post: {str(e)}')
             return redirect('index')
 
     return redirect('index')
+
+
+@login_required
+@require_POST
+def publish_draft(request, post_id):
+    """Publish a saved draft post."""
+    post = get_object_or_404(Post, id=post_id, user=request.user, is_draft=True)
+
+    limit_reached, _, limit = has_reached_daily_post_limit(request.user)
+    if limit_reached:
+        return JsonResponse({'success': False, 'error': f'You can create up to {limit} posts per day.'}, status=429)
+
+    post.is_draft = False
+    post.save(update_fields=['is_draft', 'updated_at'])
+    return JsonResponse({'success': True, 'url': f'/discussion/{post.id}/?created=1'})
+
+
+@login_required
+@require_POST
+def pin_post(request, post_id):
+    """Toggle pin on a post for the author's profile. Only one post can be pinned at a time."""
+    post = get_object_or_404(Post, id=post_id, user=request.user, is_draft=False)
+    if post.is_pinned:
+        post.is_pinned = False
+        post.save(update_fields=['is_pinned', 'updated_at'])
+        return JsonResponse({'success': True, 'is_pinned': False})
+    # Unpin any existing pinned post first
+    Post.objects.filter(user=request.user, is_pinned=True).update(is_pinned=False)
+    post.is_pinned = True
+    post.save(update_fields=['is_pinned', 'updated_at'])
+    return JsonResponse({'success': True, 'is_pinned': True})
 
 
 @login_required
@@ -2836,6 +2902,13 @@ def debate_chat(request, debate_id):
         for message in raw_messages
     ]
 
+    # Record this user as a current spectator/viewer
+    if request.user.is_authenticated:
+        DebateView.objects.update_or_create(debate=debate, user=request.user, defaults={})
+
+    active_cutoff = timezone.now() - timedelta(seconds=90)
+    spectator_count = debate.spectators.filter(last_seen__gte=active_cutoff).count()
+
     opponent = debate.target if request.user == debate.initiator else debate.initiator
     context = {
         'debate': debate,
@@ -2850,6 +2923,7 @@ def debate_chat(request, debate_id):
         'current_controller_name': debate.end_controller.username if debate.end_controller else '',
         'current_controller_side': debate.end_controller_side,
         'can_moderate_chat': (not is_spectator) and request.user.id == debate.target_id,
+        'spectator_count': spectator_count,
     }
     return render(request, 'frontend/debate_chat.html', context)
 
@@ -3008,6 +3082,11 @@ def debate_messages(request, debate_id):
         for message in raw_messages
     ]
 
+    # Refresh viewer's last_seen for spectator count
+    DebateView.objects.update_or_create(debate=debate, user=request.user, defaults={})
+    active_cutoff = timezone.now() - timedelta(seconds=90)
+    spectator_count = debate.spectators.filter(last_seen__gte=active_cutoff).count()
+
     return JsonResponse({
         'success': True,
         'messages': messages,
@@ -3025,6 +3104,7 @@ def debate_messages(request, debate_id):
         'current_controller_name': debate.end_controller.username if debate.end_controller else '',
         'current_controller_side': debate.end_controller_side,
         'can_moderate_chat': request.user.id == debate.target_id,
+        'spectator_count': spectator_count,
     })
 
 

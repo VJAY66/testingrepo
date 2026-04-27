@@ -106,6 +106,9 @@ urlpatterns = [
     path('hashtags/feed/', views.hashtag_followed_feed, name='hashtag_followed_feed'),
     # Moderation dashboard
     path('moderation/', views.moderation_dashboard, name='moderation_dashboard'),
+    # Draft posts & pinned posts
+    path('posts/<str:post_id>/publish/', views.publish_draft, name='publish_draft'),
+    path('posts/<str:post_id>/pin/', views.pin_post, name='pin_post'),
     # Save collections
     path('collections/create/', views.create_collection, name='create_collection'),
     path('collections/add/', views.add_to_collection, name='add_to_collection'),

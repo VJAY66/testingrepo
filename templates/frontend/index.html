@@ -272,6 +272,38 @@
 </div>
 
 <!-- Create Post Modal -->
+{% if user.is_authenticated and follow_suggestions and not is_suggested_page %}
+<div class="mt-6 rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+    <h3 class="text-sm font-bold text-foreground mb-3">People you may know</h3>
+    <div class="space-y-3">
+        {% for suggestion in follow_suggestions %}
+        <div class="flex items-center justify-between gap-2">
+            <a href="{% url 'user_profile' suggestion.username %}" class="flex items-center gap-2 min-w-0">
+                {% if suggestion.get_picture_url %}
+                <img src="{{ suggestion.get_picture_url }}" alt="{{ suggestion.username }}" class="h-8 w-8 rounded-full object-cover border border-border flex-shrink-0">
+                {% else %}
+                <div class="h-8 w-8 rounded-full bg-primary/15 flex items-center justify-center text-primary text-xs font-bold flex-shrink-0">{{ suggestion.username|first|upper }}</div>
+                {% endif %}
+                <span class="text-sm font-medium text-foreground truncate">@{{ suggestion.username }}</span>
+            </a>
+            <button onclick="quickFollow('{{ suggestion.username }}', this)" class="shrink-0 px-3 py-1 rounded-full border border-primary/40 text-primary text-xs font-semibold hover:bg-primary hover:text-primary-foreground transition">Follow</button>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+<script>
+function quickFollow(username, btn) {
+    fetch('/api/users/follow/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') || ''},
+        body: JSON.stringify({username: username, action: 'follow'})
+    }).then(r => r.json()).then(d => {
+        if (d.success) { btn.textContent = 'Following'; btn.disabled = true; btn.className = btn.className.replace('border-primary/40 text-primary', 'border-border text-muted-foreground'); }
+    });
+}
+</script>
+{% endif %}
+
 {% if user.is_authenticated and not is_suggested_page %}
 <div id="create-post-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-card p-6 rounded-lg w-full max-w-md mx-4">

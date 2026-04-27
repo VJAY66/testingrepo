@@ -733,7 +733,7 @@
     </div>
     <div id="mc-header-info">
       <p id="mc-opp-name"><a href="{% url 'discussion' debate.post.id %}" title="Open original discussion">{{ debate.post.title }}</a></p>
-      <p id="mc-sub"><span id="mc-peer-name">{% if user == debate.initiator %}{{ debate.target.username }}{% else %}{{ debate.initiator.username }}{% endif %}</span><span>•</span><span id="mc-controller-text">{% if current_controller_name %}Controller: {{ current_controller_name }}{% if current_controller_side %} ({{ current_controller_side|upper }}){% endif %}{% else %}Controller: None{% endif %}</span></p>
+      <p id="mc-sub"><span id="mc-peer-name">{% if user == debate.initiator %}{{ debate.target.username }}{% else %}{{ debate.initiator.username }}{% endif %}</span><span>•</span><span id="mc-controller-text">{% if current_controller_name %}Controller: {{ current_controller_name }}{% if current_controller_side %} ({{ current_controller_side|upper }}){% endif %}{% else %}Controller: None{% endif %}</span><span>•</span><span id="mc-spectator-count" title="Current viewers">👁 <span id="mc-spectator-num">{{ spectator_count }}</span></span></p>
     </div>
     <div id="mc-hacts">
       <button id="mc-members-btn" onclick="mcToggleMembers()" aria-label="Participants" title="Participants">
@@ -1626,6 +1626,10 @@
           }
           if (typeof d.can_moderate_chat === 'boolean') {
             canModerate = d.can_moderate_chat;
+          }
+          if (typeof d.spectator_count === 'number') {
+            const el = document.getElementById('mc-spectator-num');
+            if (el) el.textContent = d.spectator_count;
           }
           if (Array.isArray(d.active_participants)) {
             activeParticipants = d.active_participants;

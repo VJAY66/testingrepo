@@ -41,6 +41,8 @@ class Post(models.Model):
     is_deleted_by_moderation = models.BooleanField(default=False, help_text='Automatically deleted by moderation')
     is_flagged = models.BooleanField(default=False, help_text='Flagged by moderation system')
     moderation_reason = models.TextField(blank=True, default='', help_text='Reason for moderation action')
+    is_draft = models.BooleanField(default=False, help_text='Saved draft, not yet published')
+    is_pinned = models.BooleanField(default=False, help_text='Pinned to top of author profile')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -279,6 +281,16 @@ class Notification(models.Model):
         ordering = ['-created_at']
 
 
+class DebateView(models.Model):
+    """Tracks who is currently viewing a debate chat page (for live spectator count)."""
+    debate = models.ForeignKey(Debate, on_delete=models.CASCADE, related_name='spectators')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='debate_views')
+    last_seen = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['debate', 'user'], name='unique_debate_view')]
+
+
 class DebateMessage(models.Model):
     id = models.BigAutoField(primary_key=True)
     debate = models.ForeignKey(Debate, on_delete=models.CASCADE, related_name='messages')
@@ -398,6 +410,7 @@ class Poll(models.Model):
     is_active = models.BooleanField(default=True)
     is_deleted_by_moderation = models.BooleanField(default=False)
     expires_at = models.DateTimeField(null=True, blank=True, help_text='Auto-close this poll at this time. Leave blank for no expiry.')
+    expiry_notified = models.BooleanField(default=False, help_text='Whether followers have been notified of poll closure')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
