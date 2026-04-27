@@ -397,8 +397,16 @@ class Poll(models.Model):
     hashtags = models.TextField(blank=True, default='')
     is_active = models.BooleanField(default=True)
     is_deleted_by_moderation = models.BooleanField(default=False)
+    expires_at = models.DateTimeField(null=True, blank=True, help_text='Auto-close this poll at this time. Leave blank for no expiry.')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def is_expired(self):
+        if not self.expires_at:
+            return False
+        from django.utils import timezone
+        return timezone.now() >= self.expires_at
 
     def get_hashtags_list(self):
         if not self.hashtags:

@@ -110,8 +110,34 @@
         {% endif %}
 
         <!-- Voting section -->
+        {% if poll.is_expired %}
+        <div class="mb-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-700/40 dark:bg-amber-900/20">
+            <span class="text-base">⏰</span>
+            <p class="text-sm font-semibold text-amber-700 dark:text-amber-300">This poll has closed. Voting is no longer available.</p>
+        </div>
+        {% endif %}
         <div id="vote-section">
-        {% if not user.is_authenticated %}
+        {% if poll.is_expired %}
+        <!-- Poll expired: show results read-only -->
+        <div class="space-y-3 mb-5">
+            {% for od in option_data %}
+            <div class="flex items-center gap-3">
+                <div class="vote-btn {% if forloop.first %}vote-btn-a{% else %}vote-btn-b{% endif %} flex-1 pointer-events-none opacity-80">
+                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full {% if forloop.first %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50{% else %}bg-rose-100 text-rose-700 dark:bg-rose-900/50{% endif %} text-sm font-bold">{% if forloop.first %}A{% else %}B{% endif %}</span>
+                    <span class="flex-1">{{ od.option.text }}</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 px-1 -mt-1">
+                <div class="result-bar-track">
+                    <div class="{% if forloop.first %}result-bar-a{% else %}result-bar-b{% endif %}" style="width: {{ od.percentage }}%"></div>
+                </div>
+                <span class="text-xs font-bold text-muted-foreground w-12 text-right">{{ od.percentage }}%</span>
+                <span class="text-xs text-muted-foreground w-8 text-right">{{ od.vote_count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        <p class="text-center text-xs text-muted-foreground mb-1">{{ total_votes }} vote{{ total_votes|pluralize }} · Poll closed</p>
+        {% elif not user.is_authenticated %}
         <!-- Not logged in: show options greyed, prompt to login -->
         <div class="space-y-3 mb-4">
             {% for od in option_data %}
@@ -167,8 +193,8 @@
         {% endif %}
         </div>
 
-        <!-- Donut chart (shown after voting) -->
-        {% if voted_option_id or not user.is_authenticated %}
+        <!-- Donut chart (shown after voting or when expired) -->
+        {% if voted_option_id or not user.is_authenticated or poll.is_expired %}
         {% with od0=option_data.0 od1=option_data.1 %}
         <div class="flex items-center justify-center gap-8 mt-6 pt-5 border-t border-border/40">
             <!-- SVG Donut -->

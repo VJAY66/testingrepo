@@ -9,6 +9,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.core.cache import cache
+from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.db.models import Q, F, Count, IntegerField, ExpressionWrapper
@@ -22,7 +23,7 @@ import uuid
 
 from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow
 from discussions.signals import notify_post_author
-from users.models import Follow, UserBlock
+from users.models import Follow, UserBlock, SaveCollection, CollectionItem
 from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
 from utils.moderation import check_content_moderation
@@ -30,6 +31,16 @@ from utils.moderation import check_content_moderation
 
 _EMOJI_TOKEN_RE = re.compile(r'__EMJ__([0-9A-F]{5,6})__')
 _OPEN_ENDED_START_RE = re.compile(r'^(what|why|how|when|where|which|who|whom|whose)\b', re.IGNORECASE)
+
+
+def _send_notification_email(user, subject, body):
+    """Fire-and-forget notification email; skips silently if no address or send fails."""
+    if not getattr(user, 'email', None):
+        return
+    try:
+        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
+    except Exception:
+        pass
 
 
 def _normalize_post_content(content):
@@ -891,7 +902,7 @@ def discussion(request, post_id):
     if request.user.is_authenticated:
         PostView.objects.get_or_create(user=request.user, post=post)
 
-    comments = Comment.objects.filter(post=post).select_related('user', 'user__profile').annotate(
+    comments = Comment.objects.filter(post=post).select_related('user', 'user__profile', 'reply_to', 'reply_to__user').annotate(
         reaction_score=ExpressionWrapper(F('likes') - F('dislikes'), output_field=IntegerField())
     )
 
@@ -1157,6 +1168,12 @@ def profile(request):
     debate_participations_count = user_debate_participations.count()
     completed_debates = user_debate_participations.filter(debate__status='completed').count()
 
+    save_collections = list(
+        SaveCollection.objects.filter(user=request.user).annotate(
+            item_count=Count('items')
+        ).order_by('name')
+    )
+
     context = {
         'user_posts': user_posts,
         'user_reposts': user_reposts,
@@ -1179,6 +1196,9 @@ def profile(request):
         'profile_website': profile_obj.website if profile_obj else '',
         'debate_participations_count': debate_participations_count,
         'completed_debates_count': completed_debates,
+        'save_collections': save_collections,
+        'trust_badge': profile_obj.trust_badge if profile_obj else ('', '', ''),
+        'trust_level': profile_obj.trust_level if profile_obj else 'new',
     }
     return render(request, 'frontend/profile.html', context)
 
@@ -1251,6 +1271,8 @@ def user_profile(request, username):
     user_questions = Question.objects.filter(user=profile_user, is_deleted_by_moderation=False).order_by('-created_at')
     user_polls = Poll.objects.filter(user=profile_user).order_by('-created_at')
 
+    is_moderator = _is_configured_moderator(request.user) if request.user.is_authenticated else False
+
     context = {
         'profile_user': profile_user,
         'user_posts': user_posts,
@@ -1268,6 +1290,10 @@ def user_profile(request, username):
         'profile_bio': profile_obj.bio if profile_obj else '',
         'profile_website': profile_obj.website if profile_obj else '',
         'debate_participations_count': DebateParticipant.objects.filter(user=profile_user).count(),
+        'trust_badge': profile_obj.trust_badge if profile_obj else ('', '', ''),
+        'trust_level': profile_obj.trust_level if profile_obj else 'new',
+        'is_verified': profile_obj.is_verified if profile_obj else False,
+        'is_moderator': is_moderator,
     }
     return render(request, 'frontend/user_profile.html', context)
 
@@ -2155,15 +2181,37 @@ def create_comment(request, post_id):
             if content and check_content_moderation(content):
                 return handle_error('Your comment contains abusive language and cannot be posted.')
 
+            reply_to_comment = None
+            reply_to_id = request.POST.get('reply_to_id', '').strip()
+            if reply_to_id and content:
+                try:
+                    reply_to_comment = Comment.objects.get(id=reply_to_id, post=post)
+                except Comment.DoesNotExist:
+                    pass
+
             Comment.objects.create(
                 id=str(uuid.uuid4()),
                 post=post,
                 user=request.user,
                 vote_type=vote_type,
-                content=content if content else ''
+                content=content if content else '',
+                reply_to=reply_to_comment,
             )
             if content:
                 _notify_mentions(request.user, content, post)
+            if reply_to_comment and reply_to_comment.user != request.user:
+                Notification.objects.create(
+                    user=reply_to_comment.user,
+                    post=post,
+                    notification_type='reply',
+                    message=f'@{request.user.username} replied to your comment on "{post.title}".',
+                )
+                _send_notification_email(
+                    reply_to_comment.user,
+                    f'New reply on "{post.title}"',
+                    f'@{request.user.username} replied to your comment:\n\n"{content[:280]}"\n\n'
+                    f'View it at: {settings.SITE_URL}/discussion/{post.id}/',
+                )
 
             if is_ajax:
                 return JsonResponse(build_vote_payload('Vote submitted!' if not content else 'Comment submitted!', has_comment=bool(content)))
@@ -3570,6 +3618,7 @@ def create_poll(request):
         category = request.POST.get('category', '').strip()
         hashtags_raw = request.POST.get('hashtags', '').strip()
         description = request.POST.get('description', '').strip()
+        expires_at_raw = request.POST.get('expires_at', '').strip()
 
         errors = {}
         if not title:
@@ -3582,6 +3631,16 @@ def create_poll(request):
             errors['option2'] = 'Options must be different.'
         if not category:
             errors['category'] = 'Category is required.'
+
+        expires_at = None
+        if expires_at_raw:
+            from datetime import datetime
+            try:
+                expires_at = timezone.make_aware(datetime.fromisoformat(expires_at_raw))
+                if expires_at <= timezone.now():
+                    errors['expires_at'] = 'Expiry date must be in the future.'
+            except ValueError:
+                errors['expires_at'] = 'Invalid date format.'
 
         if not errors:
             combined = f"{title} {option1} {option2} {description}".strip()
@@ -3602,6 +3661,7 @@ def create_poll(request):
             description=description,
             category=category,
             hashtags=','.join(Post.parse_hashtags(hashtags_raw)),
+            expires_at=expires_at,
         )
         PollOption.objects.create(poll=poll, text=option1, order=0)
         PollOption.objects.create(poll=poll, text=option2, order=1)
@@ -4744,6 +4804,13 @@ def _notify_mentions(author, content, post):
             notification_type='mention',
             message=f'@{author.username} mentioned you in a comment on "{post.title}".',
         )
+        _send_notification_email(
+            user,
+            f'@{author.username} mentioned you',
+            f'You were mentioned in a comment on "{post.title}".\n\n'
+            f'"{content[:280]}"\n\n'
+            f'View it at: {settings.SITE_URL}/discussion/{post.id}/',
+        )
 
 
 # ─── Hashtag following ─────────────────────────────────────────────────────────
@@ -4830,3 +4897,87 @@ def moderation_dashboard(request):
         'profile_reports': profile_reports,
         'total_pending': comment_reports.count() + message_reports.count() + profile_reports.count(),
     })
+
+
+# ─── Save collections ──────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def create_collection(request):
+    name = (request.POST.get('name') or '').strip()
+    if not name or len(name) > 60:
+        return JsonResponse({'success': False, 'error': 'Name must be 1–60 characters.'}, status=400)
+    collection, created = SaveCollection.objects.get_or_create(user=request.user, name=name)
+    if not created:
+        return JsonResponse({'success': False, 'error': 'You already have a collection with that name.'}, status=400)
+    return JsonResponse({'success': True, 'id': collection.id, 'name': collection.name})
+
+
+@login_required
+@require_POST
+def add_to_collection(request):
+    collection_id = (request.POST.get('collection_id') or '').strip()
+    post_id = (request.POST.get('post_id') or '').strip()
+    if not collection_id or not post_id:
+        return JsonResponse({'success': False, 'error': 'Missing parameters.'}, status=400)
+    collection = get_object_or_404(SaveCollection, id=collection_id, user=request.user)
+    post = get_object_or_404(Post, id=post_id)
+    item, created = CollectionItem.objects.get_or_create(collection=collection, post=post)
+    return JsonResponse({'success': True, 'added': created})
+
+
+@login_required
+@require_POST
+def remove_from_collection(request):
+    collection_id = (request.POST.get('collection_id') or '').strip()
+    post_id = (request.POST.get('post_id') or '').strip()
+    if not collection_id or not post_id:
+        return JsonResponse({'success': False, 'error': 'Missing parameters.'}, status=400)
+    collection = get_object_or_404(SaveCollection, id=collection_id, user=request.user)
+    CollectionItem.objects.filter(collection=collection, post_id=post_id).delete()
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_POST
+def delete_collection(request, collection_id):
+    collection = get_object_or_404(SaveCollection, id=collection_id, user=request.user)
+    collection.delete()
+    return JsonResponse({'success': True})
+
+
+@login_required
+def collection_detail(request, collection_id):
+    collection = get_object_or_404(SaveCollection, id=collection_id, user=request.user)
+    items = collection.items.select_related('post', 'post__user', 'post__user__profile').order_by('-added_at')
+    return render(request, 'frontend/collection_detail.html', {
+        'collection': collection,
+        'items': items,
+    })
+
+
+# ─── User verification (moderator only) ───────────────────────────────────────
+
+@login_required
+@require_POST
+def toggle_verify_user(request, username):
+    if not _is_configured_moderator(request.user):
+        return JsonResponse({'success': False, 'error': 'Only moderators can verify users.'}, status=403)
+    target_user = get_object_or_404(User, username=username)
+    profile = get_object_or_404(Profile, user=target_user)
+    profile.is_verified = not profile.is_verified
+    profile.save(update_fields=['is_verified', 'updated_at'])
+    if profile.is_verified:
+        Notification.objects.create(
+            user=target_user,
+            post=None,
+            notification_type='system',
+            message='Your account has been verified by a moderator. You now have a verified badge.',
+        )
+        _send_notification_email(
+            target_user,
+            'Your account is now verified',
+            'Congratulations! A moderator has verified your account on PickASide. '
+            'You will now display a verified badge on your profile.',
+        )
+    return JsonResponse({'success': True, 'is_verified': profile.is_verified})

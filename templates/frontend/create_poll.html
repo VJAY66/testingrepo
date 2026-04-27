@@ -169,6 +169,16 @@
                 <p class="mt-1 text-xs text-muted-foreground">Space or comma separated. Hashtags are mandatory for discovery.</p>
             </div>
 
+            <!-- Expiry date (optional) -->
+            <div>
+                <label class="poll-label" for="poll-expires-at">Auto-close date <span class="font-normal normal-case text-muted-foreground">(optional)</span></label>
+                <input type="datetime-local" id="poll-expires-at" name="expires_at"
+                       class="poll-input"
+                       value="{{ form_data.expires_at|default:'' }}">
+                <p class="mt-1 text-xs text-muted-foreground">Leave blank for no expiry. Voting will be disabled after this date.</p>
+                {% if errors.expires_at %}<span class="mt-1 block text-xs text-red-500 font-semibold">{{ errors.expires_at }}</span>{% endif %}
+            </div>
+
             <button type="submit" class="submit-btn">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                 Launch Poll

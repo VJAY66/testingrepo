@@ -106,4 +106,12 @@ urlpatterns = [
     path('hashtags/feed/', views.hashtag_followed_feed, name='hashtag_followed_feed'),
     # Moderation dashboard
     path('moderation/', views.moderation_dashboard, name='moderation_dashboard'),
+    # Save collections
+    path('collections/create/', views.create_collection, name='create_collection'),
+    path('collections/add/', views.add_to_collection, name='add_to_collection'),
+    path('collections/remove/', views.remove_from_collection, name='remove_from_collection'),
+    path('collections/<int:collection_id>/', views.collection_detail, name='collection_detail'),
+    path('collections/<int:collection_id>/delete/', views.delete_collection, name='delete_collection'),
+    # User verification
+    path('user/<str:username>/verify/', views.toggle_verify_user, name='toggle_verify_user'),
 ]
