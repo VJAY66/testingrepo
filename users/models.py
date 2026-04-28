@@ -128,6 +128,7 @@ class CollectionItem(models.Model):
     """A post bookmarked into a SaveCollection."""
     collection = models.ForeignKey(SaveCollection, on_delete=models.CASCADE, related_name='items')
     post = models.ForeignKey('discussions.Post', on_delete=models.CASCADE, related_name='collection_items')
+    tag = models.CharField(max_length=40, blank=True, default='', help_text='Optional label for this bookmark')
     added_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

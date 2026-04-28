@@ -18,6 +18,7 @@ urlpatterns = [
     path('ask/', views.ask_question, name='ask_question'),
     path('notifications/', views.notifications, name='notifications'),
     path('notifications/count/', views.notification_count, name='notification_count'),
+    path('notifications/mark-all-read/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
     path('notifications/unfollow-post/', views.unfollow_post, name='unfollow_post'),
     path('notifications/dismiss/', views.dismiss_notification, name='dismiss_notification'),
     path('chats/', views.chats, name='chats'),
@@ -114,6 +115,7 @@ urlpatterns = [
     # Save collections
     path('collections/create/', views.create_collection, name='create_collection'),
     path('collections/add/', views.add_to_collection, name='add_to_collection'),
+    path('collections/tag-item/', views.tag_collection_item, name='tag_collection_item'),
     path('collections/remove/', views.remove_from_collection, name='remove_from_collection'),
     path('collections/<int:collection_id>/', views.collection_detail, name='collection_detail'),
     path('collections/<int:collection_id>/delete/', views.delete_collection, name='delete_collection'),

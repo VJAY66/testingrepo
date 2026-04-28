@@ -1648,6 +1648,8 @@ def report_user_profile(request, username):
 def search(request):
     query = request.GET.get('q', '').strip()
     active_tab = request.GET.get('tab', 'posts')
+    sort = request.GET.get('sort', 'newest')        # newest | oldest | most_liked
+    date_range = request.GET.get('date_range', '')  # today | week | month | ''
 
     post_results = []
     review_results = []
@@ -1655,25 +1657,54 @@ def search(request):
     poll_results = []
 
     if query:
-        post_results = list(Post.objects.filter(
-            Q(title__icontains=query) | Q(content__icontains=query)
-        ).order_by('-created_at')[:50])
+        from django.utils import timezone as _tz
+        now = _tz.now()
+        date_filter = {}
+        if date_range == 'today':
+            date_filter['created_at__date'] = now.date()
+        elif date_range == 'week':
+            date_filter['created_at__gte'] = now - timedelta(days=7)
+        elif date_range == 'month':
+            date_filter['created_at__gte'] = now - timedelta(days=30)
 
-        review_results = list(Review.objects.filter(
+        if sort == 'most_liked':
+            post_order = '-like_count'
+        elif sort == 'oldest':
+            post_order = 'created_at'
+        else:
+            post_order = '-created_at'
+
+        post_qs = Post.objects.filter(
+            Q(title__icontains=query) | Q(content__icontains=query), is_draft=False
+        ).filter(**date_filter).annotate(like_count=Count('actions', filter=Q(actions__action='like')))
+
+        if sort == 'most_liked':
+            post_qs = post_qs.order_by('-like_count', '-created_at')
+        elif sort == 'oldest':
+            post_qs = post_qs.order_by('created_at')
+        else:
+            post_qs = post_qs.order_by('-created_at')
+
+        post_results = list(post_qs[:50])
+
+        review_qs = Review.objects.filter(
             is_deleted_by_moderation=False
         ).filter(
             Q(subject__icontains=query) | Q(content__icontains=query)
-        ).order_by('-created_at')[:50])
+        ).filter(**date_filter)
+        review_results = list(review_qs.order_by(post_order.replace('like_count', 'created_at').replace('-like_count', '-created_at'))[:50])
 
-        question_results = list(Question.objects.filter(
+        question_qs = Question.objects.filter(
             is_deleted_by_moderation=False
         ).filter(
             Q(title__icontains=query) | Q(content__icontains=query)
-        ).order_by('-created_at')[:50])
+        ).filter(**date_filter)
+        question_results = list(question_qs.order_by(post_order.replace('like_count', 'created_at').replace('-like_count', '-created_at'))[:50])
 
-        poll_results = list(Poll.objects.filter(
+        poll_qs = Poll.objects.filter(
             Q(title__icontains=query) | Q(description__icontains=query)
-        ).order_by('-created_at')[:50])
+        ).filter(**date_filter)
+        poll_results = list(poll_qs.order_by(post_order.replace('like_count', 'created_at').replace('-like_count', '-created_at'))[:50])
 
     totals = {
         'posts': len(post_results),
@@ -1692,6 +1723,10 @@ def search(request):
         'poll_results': poll_results,
         'totals': totals,
         'total_all': total_all,
+        'sort': sort,
+        'date_range': date_range,
+        'sort_options': [('newest', 'Newest'), ('oldest', 'Oldest'), ('most_liked', 'Most Liked')],
+        'date_options': [('', 'All time'), ('today', 'Today'), ('week', 'This week'), ('month', 'This month')],
     }
     return render(request, 'frontend/search.html', context)
 
@@ -1934,6 +1969,29 @@ def notifications(request):
             report.reviewed_reports = counts.get('reviewed_reports', 0)
             report.dismissed_reports = counts.get('dismissed_reports', 0)
 
+    # In-app notifications grouped by type
+    raw_notifs = list(
+        Notification.objects.filter(user=request.user)
+        .order_by('notification_type', '-created_at')
+    )
+    # Group by notification_type
+    from collections import defaultdict as _dd
+    grouped = _dd(list)
+    for n in raw_notifs:
+        grouped[n.notification_type].append(n)
+    grouped_notifs = [
+        {
+            'type': ntype,
+            'label': dict(Notification.NOTIFICATION_TYPES).get(ntype, ntype),
+            'items': items,
+            'unread_count': sum(1 for n in items if not n.is_read),
+            'latest': items[0] if items else None,
+        }
+        for ntype, items in grouped.items()
+    ]
+    grouped_notifs.sort(key=lambda x: -x['unread_count'])
+    total_unread = sum(g['unread_count'] for g in grouped_notifs)
+
     context = {
         'debates': debates,
         'post_notifications': Notification.objects.filter(
@@ -1942,8 +2000,17 @@ def notifications(request):
         'is_configured_moderator': _is_configured_moderator(request.user),
         'moderation_reports': moderation_reports,
         'profile_reports': profile_reports,
+        'grouped_notifs': grouped_notifs,
+        'total_unread': total_unread,
     }
     return render(request, 'frontend/notifications.html', context)
+
+
+@login_required
+@require_POST
+def mark_all_notifications_read(request):
+    Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+    return JsonResponse({'success': True})
 
 
 @login_required
@@ -3238,6 +3305,18 @@ def debate_chat(request, debate_id):
     spectator_count = debate.spectators.filter(last_seen__gte=active_cutoff).count()
 
     opponent = debate.target if request.user == debate.initiator else debate.initiator
+
+    # Observer votes tally for sidebar
+    from discussions.models import ObserverVote as _OV
+    obs_yes = _OV.objects.filter(debate=debate, winner_side='yes').count()
+    obs_no = _OV.objects.filter(debate=debate, winner_side='no').count()
+    user_is_participant = False
+    user_obs_vote = None
+    if request.user.is_authenticated:
+        user_is_participant = DebateParticipant.objects.filter(debate=debate, user=request.user).exists()
+        ov = _OV.objects.filter(debate=debate, voter=request.user).first()
+        user_obs_vote = ov.winner_side if ov else None
+
     context = {
         'debate': debate,
         'messages_list': messages_list,
@@ -3252,6 +3331,10 @@ def debate_chat(request, debate_id):
         'current_controller_side': debate.end_controller_side,
         'can_moderate_chat': (not is_spectator) and request.user.id == debate.target_id,
         'spectator_count': spectator_count,
+        'obs_yes': obs_yes,
+        'obs_no': obs_no,
+        'user_is_participant': user_is_participant,
+        'user_obs_vote': user_obs_vote,
     }
     return render(request, 'frontend/debate_chat.html', context)
 
@@ -3415,6 +3498,9 @@ def debate_messages(request, debate_id):
     active_cutoff = timezone.now() - timedelta(seconds=90)
     spectator_count = debate.spectators.filter(last_seen__gte=active_cutoff).count()
 
+    obs_yes = ObserverVote.objects.filter(debate=debate, winner_side='yes').count()
+    obs_no = ObserverVote.objects.filter(debate=debate, winner_side='no').count()
+
     return JsonResponse({
         'success': True,
         'messages': messages,
@@ -3433,6 +3519,8 @@ def debate_messages(request, debate_id):
         'current_controller_side': debate.end_controller_side,
         'can_moderate_chat': request.user.id == debate.target_id,
         'spectator_count': spectator_count,
+        'obs_yes': obs_yes,
+        'obs_no': obs_no,
     })
 
 
@@ -5047,7 +5135,7 @@ def debate_transcript(request, debate_id):
 @require_POST
 def observer_vote(request, debate_id):
     """Cast or update an observer vote on who argued best."""
-    debate = get_object_or_404(Debate, id=debate_id, status='completed')
+    debate = get_object_or_404(Debate, id=debate_id, status__in=('accepted', 'completed'))
     winner_side = request.POST.get('winner_side')
     if winner_side not in ('yes', 'no'):
         return JsonResponse({'success': False, 'error': 'Invalid side.'}, status=400)
@@ -5330,14 +5418,18 @@ def create_collection(request):
 @login_required
 @require_POST
 def add_to_collection(request):
-    collection_id = (request.POST.get('collection_id') or '').strip()
+    collection_id = request.POST.get('collection_id')
     post_id = (request.POST.get('post_id') or '').strip()
-    if not collection_id or not post_id:
-        return JsonResponse({'success': False, 'error': 'Missing parameters.'}, status=400)
+    tag = (request.POST.get('tag') or '').strip()[:40]
+    if not post_id:
+        return JsonResponse({'success': False, 'error': 'post_id is required.'}, status=400)
     collection = get_object_or_404(SaveCollection, id=collection_id, user=request.user)
     post = get_object_or_404(Post, id=post_id)
     item, created = CollectionItem.objects.get_or_create(collection=collection, post=post)
-    return JsonResponse({'success': True, 'added': created})
+    if tag:
+        item.tag = tag
+        item.save(update_fields=['tag'])
+    return JsonResponse({'success': True, 'created': created})
 
 
 @login_required
@@ -5363,11 +5455,30 @@ def delete_collection(request, collection_id):
 @login_required
 def collection_detail(request, collection_id):
     collection = get_object_or_404(SaveCollection, id=collection_id, user=request.user)
-    items = collection.items.select_related('post', 'post__user', 'post__user__profile').order_by('-added_at')
+    active_tag = request.GET.get('tag', '').strip()
+    items_qs = collection.items.select_related('post', 'post__user').order_by('-added_at')
+    if active_tag:
+        items_qs = items_qs.filter(tag=active_tag)
+    all_tags = list(
+        collection.items.exclude(tag='').values_list('tag', flat=True).distinct().order_by('tag')
+    )
     return render(request, 'frontend/collection_detail.html', {
         'collection': collection,
-        'items': items,
+        'items': items_qs,
+        'active_tag': active_tag,
+        'all_tags': all_tags,
     })
+
+
+@login_required
+@require_POST
+def tag_collection_item(request):
+    item_id = request.POST.get('item_id')
+    tag = (request.POST.get('tag') or '').strip()[:40]
+    item = get_object_or_404(CollectionItem, id=item_id, collection__user=request.user)
+    item.tag = tag
+    item.save(update_fields=['tag'])
+    return JsonResponse({'success': True, 'tag': item.tag})
 
 
 # ─── User verification (moderator only) ───────────────────────────────────────

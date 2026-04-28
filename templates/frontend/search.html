@@ -36,6 +36,24 @@
     <!-- Search Results -->
     {% if query and not is_hashtag_search %}
     {% if total_all > 0 %}
+    {% if query %}
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <!-- Sort -->
+      <div class="flex items-center gap-1 rounded-xl border border-border bg-card px-1 py-1">
+        {% for val, label in sort_options %}
+        <a href="?q={{ query|urlencode }}&tab={{ active_tab }}&sort={{ val }}&date_range={{ date_range }}"
+           class="px-3 py-1 rounded-lg text-xs font-semibold transition-colors {% if sort == val %}bg-primary text-primary-foreground{% else %}text-muted-foreground hover:text-foreground{% endif %}">{{ label }}</a>
+        {% endfor %}
+      </div>
+      <!-- Date range -->
+      <div class="flex items-center gap-1 rounded-xl border border-border bg-card px-1 py-1">
+        {% for val, label in date_options %}
+        <a href="?q={{ query|urlencode }}&tab={{ active_tab }}&sort={{ sort }}&date_range={{ val }}"
+           class="px-3 py-1 rounded-lg text-xs font-semibold transition-colors {% if date_range == val %}bg-primary text-primary-foreground{% else %}text-muted-foreground hover:text-foreground{% endif %}">{{ label }}</a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
     <!-- Type tabs -->
     <div class="flex gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 shadow-sm overflow-x-auto mb-6">
         <button type="button" onclick="switchSearchTab('posts')" id="stab-btn-posts"

@@ -2347,6 +2347,24 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 </head>
 <body class="bg-background text-foreground min-h-screen {% if request.resolver_match.url_name == 'index' %}home-bg{% endif %}">
+    <div id="reading-progress-bar" style="position:fixed;top:0;left:0;width:0%;height:3px;background:hsl(var(--primary));z-index:99999;transition:width 0.1s linear;pointer-events:none;"></div>
+    <script>
+    (function() {
+      var bar = document.getElementById('reading-progress-bar');
+      if (!bar) return;
+      // Only show on discussion pages
+      var isDiscussion = /^\/discussion\//.test(window.location.pathname);
+      if (!isDiscussion) { bar.style.display = 'none'; return; }
+      function update() {
+        var scrollTop = window.scrollY || document.documentElement.scrollTop;
+        var docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        var pct = docHeight > 0 ? Math.min(100, (scrollTop / docHeight) * 100) : 0;
+        bar.style.width = pct + '%';
+      }
+      window.addEventListener('scroll', update, { passive: true });
+      update();
+    })();
+    </script>
     <div id="toast-root" aria-live="polite" aria-atomic="true"></div>
     {% if request.resolver_match.url_name == 'index' %}
     <!-- Full-page galaxy background layer -->
