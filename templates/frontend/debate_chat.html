@@ -758,6 +758,77 @@
     <span id="mc-topic">{{ debate.post.title|truncatechars:36 }}</span>
   </div>
 
+  {% if debate.status == 'accepted' %}
+  <div id="observer-vote-panel" style="padding:8px 12px 4px;border-bottom:1px solid hsl(var(--border)/0.5);background:hsl(var(--card)/0.7);flex-shrink:0;">
+    <p style="font-size:10px;font-weight:700;color:hsl(var(--muted-foreground));text-transform:uppercase;letter-spacing:0.06em;margin:0 0 6px;">&#128065; Observer Poll — Who's winning?</p>
+    <div style="display:flex;gap:6px;margin-bottom:6px;">
+      <div style="flex:1;border-radius:8px;background:rgba(16,185,129,0.07);border:1px solid rgba(16,185,129,0.25);padding:5px 8px;text-align:center;">
+        <p id="obs-yes-count" style="font-size:16px;font-weight:900;color:#059669;margin:0;line-height:1.1;">{{ obs_yes }}</p>
+        <p style="font-size:9px;font-weight:700;color:#059669;text-transform:uppercase;margin:0;">Yes side</p>
+      </div>
+      <div style="flex:1;border-radius:8px;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.25);padding:5px 8px;text-align:center;">
+        <p id="obs-no-count" style="font-size:16px;font-weight:900;color:#dc2626;margin:0;line-height:1.1;">{{ obs_no }}</p>
+        <p style="font-size:9px;font-weight:700;color:#dc2626;text-transform:uppercase;margin:0;">No side</p>
+      </div>
+    </div>
+    {% if user.is_authenticated and not user_is_participant %}
+    <div style="display:flex;gap:6px;margin-bottom:4px;" id="obs-vote-btns">
+      <button onclick="castObserverVote('yes')"
+        id="obs-btn-yes"
+        style="flex:1;padding:5px 0;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.14s;border:1px solid {% if user_obs_vote == 'yes' %}#059669;background:#059669;color:#fff{% else %}rgba(16,185,129,0.4);background:transparent;color:#059669{% endif %};">
+        {% if user_obs_vote == 'yes' %}&#10003; {% endif %}Yes winning
+      </button>
+      <button onclick="castObserverVote('no')"
+        id="obs-btn-no"
+        style="flex:1;padding:5px 0;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.14s;border:1px solid {% if user_obs_vote == 'no' %}#dc2626;background:#dc2626;color:#fff{% else %}rgba(239,68,68,0.4);background:transparent;color:#dc2626{% endif %};">
+        {% if user_obs_vote == 'no' %}&#10003; {% endif %}No winning
+      </button>
+    </div>
+    {% elif user_is_participant %}
+    <p style="font-size:10px;color:hsl(var(--muted-foreground));text-align:center;margin:0 0 4px;">Participants can't vote in the observer poll.</p>
+    {% else %}
+    <p style="font-size:10px;color:hsl(var(--muted-foreground));text-align:center;margin:0 0 4px;"><a href="{% url 'login' %}" style="color:hsl(var(--primary));text-decoration:underline;">Log in</a> to vote.</p>
+    {% endif %}
+  </div>
+
+  <script>
+  function castObserverVote(side) {
+    fetch('{% url "observer_vote" debate.id %}', {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrf(), 'Content-Type': 'application/x-www-form-urlencoded'},
+      body: 'winner_side=' + encodeURIComponent(side)
+    }).then(r => r.json()).then(d => {
+      if (d.success) {
+        var yEl = document.getElementById('obs-yes-count');
+        var nEl = document.getElementById('obs-no-count');
+        if (yEl) yEl.textContent = d.yes_votes;
+        if (nEl) nEl.textContent = d.no_votes;
+        var btnY = document.getElementById('obs-btn-yes');
+        var btnN = document.getElementById('obs-btn-no');
+        if (btnY) {
+          if (side === 'yes') {
+            btnY.style.background = '#059669'; btnY.style.color = '#fff'; btnY.style.borderColor = '#059669';
+            btnY.textContent = '✓ Yes winning';
+          } else {
+            btnY.style.background = 'transparent'; btnY.style.color = '#059669'; btnY.style.borderColor = 'rgba(16,185,129,0.4)';
+            btnY.textContent = 'Yes winning';
+          }
+        }
+        if (btnN) {
+          if (side === 'no') {
+            btnN.style.background = '#dc2626'; btnN.style.color = '#fff'; btnN.style.borderColor = '#dc2626';
+            btnN.textContent = '✓ No winning';
+          } else {
+            btnN.style.background = 'transparent'; btnN.style.color = '#dc2626'; btnN.style.borderColor = 'rgba(239,68,68,0.4)';
+            btnN.textContent = 'No winning';
+          }
+        }
+      }
+    }).catch(function(){});
+  }
+  </script>
+  {% endif %}
+
   <div id="mc-caution">
     <span>Please do not insult others, maintain respect and collaborate effectively.</span>
     <button type="button" id="mc-caution-accept">I Understand</button>
@@ -1630,6 +1701,14 @@
           if (typeof d.spectator_count === 'number') {
             const el = document.getElementById('mc-spectator-num');
             if (el) el.textContent = d.spectator_count;
+          }
+          if (typeof d.obs_yes === 'number') {
+            const yEl = document.getElementById('obs-yes-count');
+            if (yEl) yEl.textContent = d.obs_yes;
+          }
+          if (typeof d.obs_no === 'number') {
+            const nEl = document.getElementById('obs-no-count');
+            if (nEl) nEl.textContent = d.obs_no;
           }
           if (Array.isArray(d.active_participants)) {
             activeParticipants = d.active_participants;
