@@ -23,7 +23,7 @@ import uuid
 
 from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem
 from discussions.signals import notify_post_author
-from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword
+from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS
 from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
 from utils.moderation import check_content_moderation
@@ -33,9 +33,24 @@ _EMOJI_TOKEN_RE = re.compile(r'__EMJ__([0-9A-F]{5,6})__')
 _OPEN_ENDED_START_RE = re.compile(r'^(what|why|how|when|where|which|who|whom|whose)\b', re.IGNORECASE)
 
 
-def _send_notification_email(user, subject, body):
+def _notif_pref(user, notif_type, channel):
+    """Return True if user has opted in to the given notification type/channel."""
+    try:
+        prefs = user.profile.notification_prefs or {}
+    except Exception:
+        prefs = {}
+    type_prefs = prefs.get(notif_type) or DEFAULT_NOTIFICATION_PREFS.get(notif_type) or {}
+    default_type_prefs = DEFAULT_NOTIFICATION_PREFS.get(notif_type) or {}
+    if channel in type_prefs:
+        return bool(type_prefs[channel])
+    return bool(default_type_prefs.get(channel, True))
+
+
+def _send_notification_email(user, subject, body, notif_type='mention'):
     """Fire-and-forget notification email; skips silently if no address or send fails."""
     if not getattr(user, 'email', None):
+        return
+    if not _notif_pref(user, notif_type, 'email'):
         return
     try:
         send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
@@ -584,8 +599,9 @@ def post_action(request, post_id):
                 }
             })
 
+        quote_content = request.POST.get('quote_content', '').strip()[:500]
         try:
-            PostAction.objects.create(user=request.user, post=post, action=action)
+            PostAction.objects.create(user=request.user, post=post, action=action, quote_content=quote_content)
             notify_post_author(post, 'author_repost', request.user)
         except IntegrityError:
             # Another request already created the repost action; return current counters.
@@ -620,6 +636,7 @@ def post_action(request, post_id):
             'action': action,
             'status': 'reposted',
             'repost_id': new_post.id,
+            'quote_content': quote_content,
             'counts': {
                 'like': like_count,
                 'save': save_count,
@@ -941,6 +958,7 @@ def index(request):
         'active_category': active_category,
         'is_suggested_page': False,
         'follow_suggestions': _follow_suggestions(request.user),
+        'trending_sidebar': _get_trending_hashtags(),
     }
     return render(request, 'frontend/index.html', context)
 
@@ -1297,6 +1315,13 @@ def profile(request):
 
     user_series = list(PostSeries.objects.filter(user=request.user).annotate(post_count=Count('items')))
 
+    user_achievements = list(Achievement.objects.filter(user=request.user).values_list('code', flat=True))
+    user_achievements_set = set(user_achievements)
+    achievement_details = [
+        {'code': d[0], 'icon': d[1], 'label': d[2], 'desc': d[3]}
+        for d in ACHIEVEMENT_DEFS if d[0] in user_achievements_set
+    ]
+
     context = {
         'user_posts': user_posts,
         'user_reposts': user_reposts,
@@ -1326,6 +1351,10 @@ def profile(request):
         'pinned_post': pinned_post,
         'muted_keywords': muted_keywords,
         'user_series': user_series,
+        'user_achievements': user_achievements,
+        'achievement_details': achievement_details,
+        'notification_prefs': profile_obj.notification_prefs if profile_obj else {},
+        'default_notification_prefs': DEFAULT_NOTIFICATION_PREFS,
     }
     return render(request, 'frontend/profile.html', context)
 
@@ -1400,6 +1429,13 @@ def user_profile(request, username):
 
     is_moderator = _is_configured_moderator(request.user) if request.user.is_authenticated else False
 
+    up_achievements = list(Achievement.objects.filter(user=profile_user).values_list('code', flat=True))
+    up_achievements_set = set(up_achievements)
+    up_achievement_details = [
+        {'code': d[0], 'icon': d[1], 'label': d[2], 'desc': d[3]}
+        for d in ACHIEVEMENT_DEFS if d[0] in up_achievements_set
+    ]
+
     context = {
         'profile_user': profile_user,
         'user_posts': user_posts,
@@ -1421,6 +1457,8 @@ def user_profile(request, username):
         'trust_level': profile_obj.trust_level if profile_obj else 'new',
         'is_verified': profile_obj.is_verified if profile_obj else False,
         'is_moderator': is_moderator,
+        'user_achievements': up_achievements,
+        'achievement_details': up_achievement_details,
     }
     return render(request, 'frontend/user_profile.html', context)
 
@@ -2122,6 +2160,24 @@ def create_post(request):
         hashtag_list = Post.parse_hashtags(hashtags, max_tags=5)
         processed_hashtags = ', '.join(hashtag_list)
 
+        # Handle scheduled publishing
+        scheduled_for_dt = None
+        scheduled_for_raw = request.POST.get('scheduled_for', '').strip()
+        if scheduled_for_raw and save_as_draft:
+            try:
+                from django.utils.dateparse import parse_datetime
+                naive_dt = parse_datetime(scheduled_for_raw)
+                if naive_dt is not None:
+                    if timezone.is_naive(naive_dt):
+                        scheduled_for_dt = timezone.make_aware(naive_dt)
+                    else:
+                        scheduled_for_dt = naive_dt
+                    if scheduled_for_dt <= timezone.now():
+                        messages.error(request, 'Scheduled time must be in the future.')
+                        return redirect('ask_question')
+            except Exception:
+                pass
+
         try:
             post = Post.objects.create(
                 id=str(uuid.uuid4()),
@@ -2131,6 +2187,7 @@ def create_post(request):
                 category=category,
                 hashtags=processed_hashtags,
                 is_draft=save_as_draft,
+                scheduled_for=scheduled_for_dt,
             )
 
             if not post or not post.id:
@@ -2139,8 +2196,10 @@ def create_post(request):
 
             if save_as_draft:
                 messages.success(request, 'Draft saved.')
+                _maybe_award_achievements(request.user)
                 return redirect('profile')
 
+            _maybe_award_achievements(request.user)
             return redirect(f'/discussion/{post.id}/?created=1')
         except Exception as e:
             messages.error(request, f'Failed to create post: {str(e)}')
@@ -2160,7 +2219,8 @@ def publish_draft(request, post_id):
         return JsonResponse({'success': False, 'error': f'You can create up to {limit} posts per day.'}, status=429)
 
     post.is_draft = False
-    post.save(update_fields=['is_draft', 'updated_at'])
+    post.scheduled_for = None
+    post.save(update_fields=['is_draft', 'scheduled_for', 'updated_at'])
     return JsonResponse({'success': True, 'url': f'/discussion/{post.id}/?created=1'})
 
 
@@ -2375,6 +2435,7 @@ def create_comment(request, post_id):
                     f'New reply on "{post.title}"',
                     f'@{request.user.username} replied to your comment:\n\n"{content[:280]}"\n\n'
                     f'View it at: {settings.SITE_URL}/discussion/{post.id}/',
+                    notif_type='reply',
                 )
 
             if is_ajax:
@@ -3847,6 +3908,7 @@ def create_poll(request):
         PollOption.objects.create(poll=poll, text=option1, order=0)
         PollOption.objects.create(poll=poll, text=option2, order=1)
 
+        _maybe_award_achievements(request.user)
         return redirect('poll_detail', poll_id=poll.id)
 
     return render(request, 'frontend/create_poll.html', {'categories': categories})
@@ -4992,6 +5054,7 @@ def _notify_mentions(author, content, post):
             f'You were mentioned in a comment on "{post.title}".\n\n'
             f'"{content[:280]}"\n\n'
             f'View it at: {settings.SITE_URL}/discussion/{post.id}/',
+            notif_type='mention',
         )
 
 
@@ -5242,3 +5305,108 @@ def remove_from_series(request, series_id):
         return JsonResponse({'success': False, 'error': 'post_id is required.'}, status=400)
     PostSeriesItem.objects.filter(series=series, post_id=post_id).delete()
     return JsonResponse({'success': True})
+
+
+# ─── Notification Preferences ────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def update_notification_prefs(request):
+    """Update the authenticated user's notification preferences."""
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'Invalid JSON.'}, status=400)
+
+    new_prefs = data.get('prefs')
+    if not isinstance(new_prefs, dict):
+        return JsonResponse({'success': False, 'error': 'prefs must be an object.'}, status=400)
+
+    valid_keys = set(DEFAULT_NOTIFICATION_PREFS.keys())
+    for key in new_prefs:
+        if key not in valid_keys:
+            return JsonResponse({'success': False, 'error': f'Unknown preference key: {key}'}, status=400)
+
+    profile = Profile.objects.filter(user=request.user).first()
+    if not profile:
+        return JsonResponse({'success': False, 'error': 'Profile not found.'}, status=404)
+
+    current = dict(profile.notification_prefs or {})
+    for notif_type, channels in new_prefs.items():
+        if not isinstance(channels, dict):
+            continue
+        if notif_type not in current:
+            current[notif_type] = {}
+        for channel, value in channels.items():
+            current[notif_type][channel] = bool(value)
+
+    profile.notification_prefs = current
+    profile.save(update_fields=['notification_prefs', 'updated_at'])
+    return JsonResponse({'success': True, 'prefs': current})
+
+
+# ─── Achievement Badges ───────────────────────────────────────────────────────
+
+def _maybe_award_achievements(user):
+    """Check and award newly-earned achievements for the given user."""
+    try:
+        profile = user.profile
+    except Exception:
+        profile = None
+
+    posts_count = user.posts.filter(is_draft=False).count()
+    earned_codes = []
+
+    if posts_count >= 1:
+        earned_codes.append('first_post')
+    if posts_count >= 10:
+        earned_codes.append('contributor')
+
+    debates_initiated = user.debate_participations.filter(
+        debate__initiator=user
+    ).values('debate_id').distinct().count()
+    if debates_initiated >= 5:
+        earned_codes.append('debate_starter')
+
+    likes_total = PostAction.objects.filter(post__user=user, action='like').count()
+    if likes_total >= 50:
+        earned_codes.append('top_voice')
+
+    if Answer.objects.filter(user=user, question__best_answer__user=user).exists():
+        earned_codes.append('helpful')
+
+    polls_count = Poll.objects.filter(user=user).count()
+    if polls_count >= 10:
+        earned_codes.append('poll_master')
+
+    if profile and profile.is_verified:
+        earned_codes.append('verified_voice')
+
+    from django.utils import timezone as _tz
+    if ((_tz.now() - user.date_joined).days >= 30):
+        earned_codes.append('veteran')
+
+    for code in earned_codes:
+        Achievement.objects.get_or_create(user=user, code=code)
+
+
+# ─── Trending Topics Sidebar ──────────────────────────────────────────────────
+
+def _get_trending_hashtags(limit=10):
+    cache_key = 'trending_hashtags_sidebar'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+    from datetime import timedelta as _timedelta
+    from collections import Counter
+    cutoff = timezone.now() - _timedelta(hours=24)
+    all_tags = []
+    for model, field in [(Post, 'hashtags'), (Poll, 'hashtags')]:
+        for obj in model.objects.filter(created_at__gte=cutoff).values_list(field, flat=True):
+            if obj:
+                all_tags.extend(
+                    t.strip().lstrip('#') for t in str(obj).replace(',', ' ').split() if t.strip()
+                )
+    top = [{'tag': tag, 'count': count} for tag, count in Counter(all_tags).most_common(limit) if tag]
+    cache.set(cache_key, top, 900)  # 15 min cache
+    return top

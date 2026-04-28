@@ -43,6 +43,7 @@ class Post(models.Model):
     moderation_reason = models.TextField(blank=True, default='', help_text='Reason for moderation action')
     is_draft = models.BooleanField(default=False, help_text='Saved draft, not yet published')
     is_pinned = models.BooleanField(default=False, help_text='Pinned to top of author profile')
+    scheduled_for = models.DateTimeField(null=True, blank=True, help_text='Publish this draft automatically at this time')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -244,6 +245,7 @@ class PostAction(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='post_actions')
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='actions')
     action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    quote_content = models.TextField(blank=True, default='', help_text='Optional comment when reposting')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -308,6 +308,20 @@ function quickFollow(username, btn) {
 </script>
 {% endif %}
 
+{% if trending_sidebar and not is_suggested_page %}
+<div class="mt-4 rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+    <h3 class="text-sm font-bold text-foreground mb-3">Trending Today</h3>
+    <div class="space-y-2">
+        {% for item in trending_sidebar %}
+        <a href="{% url 'hashtag_search' %}?tag={{ item.tag }}" class="flex items-center justify-between hover:text-primary transition-colors group">
+            <span class="text-sm font-medium text-foreground group-hover:text-primary">#{{ item.tag }}</span>
+            <span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{{ item.count }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 {% if user.is_authenticated and not is_suggested_page %}
 <div id="create-post-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-card p-6 rounded-lg w-full max-w-md mx-4">
@@ -425,10 +439,37 @@ function quickFollow(username, btn) {
     </div>
 </div>
 
+<!-- Quote Repost Modal -->
+<div id="quote-repost-modal" class="hidden fixed inset-0 z-[8000] items-center justify-center bg-black/50 px-4">
+    <div class="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
+        <div class="mb-3 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-foreground">Repost</h3>
+            <button type="button" onclick="closeQuoteRepostModal()" class="rounded-md p-1 text-muted-foreground hover:bg-muted" aria-label="Close">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <textarea id="quote-repost-content" maxlength="500" rows="3"
+            class="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder-muted-foreground resize-none focus:border-primary focus:ring-2 focus:ring-primary/20 mb-1"
+            placeholder="Add a comment (optional)..."></textarea>
+        <p class="text-xs text-muted-foreground text-right mb-3"><span id="quote-char-count">0</span>/500</p>
+        <div class="flex gap-2">
+            <button type="button" onclick="submitQuoteRepost(false)"
+                class="flex-1 rounded-full border border-border px-4 py-2 text-sm font-semibold text-muted-foreground hover:border-green-400 hover:text-green-600 transition">
+                Repost
+            </button>
+            <button type="button" onclick="submitQuoteRepost(true)"
+                class="flex-1 rounded-full bg-green-500 text-white px-4 py-2 text-sm font-semibold hover:bg-green-600 transition">
+                Quote &amp; Repost
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 
 let currentShareUrl = '';
 let currentShareTitle = 'PickASide';
+let _quoteRepostPostId = null;
 
 function setVoteCardProgress(card, yesValue, noValue) {
     const yesBar = card.querySelector('[data-vote-bar="yes"]');
@@ -884,6 +925,75 @@ document.addEventListener('keydown', function(event) {
     }, {rootMargin: '200px'});
     observer.observe(sentinel);
 })();
+
+// ── Quote Repost ──────────────────────────────────────────────────────────────
+function openQuoteRepostModal(postId) {
+    _quoteRepostPostId = postId;
+    var modal = document.getElementById('quote-repost-modal');
+    var textarea = document.getElementById('quote-repost-content');
+    var counter = document.getElementById('quote-char-count');
+    textarea.value = '';
+    counter.textContent = '0';
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    textarea.focus();
+}
+
+function closeQuoteRepostModal() {
+    var modal = document.getElementById('quote-repost-modal');
+    modal.classList.add('hidden');
+    modal.style.display = '';
+    _quoteRepostPostId = null;
+}
+
+function submitQuoteRepost(withQuote) {
+    var postId = _quoteRepostPostId;
+    if (!postId) return;
+    var content = withQuote ? (document.getElementById('quote-repost-content').value || '').trim() : '';
+    closeQuoteRepostModal();
+
+    var body = 'action=repost';
+    if (content) body += '&quote_content=' + encodeURIComponent(content);
+
+    fetch('/posts/' + encodeURIComponent(postId) + '/action/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': getCookie('csrftoken')},
+        body: body,
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data && data.success && typeof updatePostActionUI === 'function') {
+            updatePostActionUI(postId, 'repost', data.status, data.counts);
+        }
+    }).catch(function(e) { console.warn('Quote repost failed:', e); });
+}
+
+(function() {
+    var quoteContent = document.getElementById('quote-repost-content');
+    var quoteCounter = document.getElementById('quote-char-count');
+    if (quoteContent && quoteCounter) {
+        quoteContent.addEventListener('input', function() {
+            quoteCounter.textContent = quoteContent.value.length;
+        });
+    }
+    document.addEventListener('click', function(event) {
+        var modal = document.getElementById('quote-repost-modal');
+        if (modal && !modal.classList.contains('hidden') && event.target === modal) {
+            closeQuoteRepostModal();
+        }
+    });
+})();
+
+// Intercept repost button clicks to show quote modal
+document.addEventListener('click', function(event) {
+    var button = event.target.closest('button[data-action="repost"]');
+    if (!button) return;
+    var postCard = button.closest('[data-post-id]');
+    if (!postCard) return;
+    // Only intercept if not already reposted (let toggle through normally)
+    if (button.classList.contains('text-green-500')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openQuoteRepostModal(postCard.dataset.postId);
+}, true);
 </script>
 
 {% endblock %}

@@ -9,6 +9,16 @@ TRUST_BADGE_MAP = {
     'new':      ('', '', ''),
 }
 
+DEFAULT_NOTIFICATION_PREFS = {
+    'follow': {'email': True, 'inapp': True},
+    'mention': {'email': True, 'inapp': True},
+    'reply': {'email': True, 'inapp': True},
+    'debate_request': {'email': True, 'inapp': True},
+    'poll_closed': {'email': True, 'inapp': True},
+    'weekly_digest': {'email': True},
+    'moderation_warning': {'email': False, 'inapp': True},
+}
+
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     username = models.CharField(max_length=30, unique=True)
@@ -19,6 +29,7 @@ class Profile(models.Model):
     interested_categories = models.JSONField(default=list, blank=True)
     last_seen = models.DateTimeField(null=True, blank=True, db_index=True)
     is_verified = models.BooleanField(default=False, help_text='Manually verified by a moderator')
+    notification_prefs = models.JSONField(default=dict, blank=True, help_text='Per-type notification opt-in settings')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -142,6 +153,28 @@ class MutedKeyword(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['user', 'keyword'], name='unique_muted_keyword'),
         ]
+
+
+ACHIEVEMENT_DEFS = [
+    ('first_post',      '✍️',  'First Post',         'Published your first discussion'),
+    ('debate_starter',  '⚔️',  'Debate Starter',     'Started 5 debates'),
+    ('top_voice',       '🔥',  'Top Voice',          'Received 50 likes across all posts'),
+    ('helpful',         '🌟',  'Helpful',            'Had a Best Answer marked'),
+    ('poll_master',     '📊',  'Poll Master',        'Created 10 polls'),
+    ('verified_voice',  '✓',   'Verified Voice',     'Account verified by a moderator'),
+    ('contributor',     '💎',  'Contributor',        'Posted 10 discussions'),
+    ('veteran',         '🏆',  'Veteran',            'Active for 30+ days'),
+]
+
+
+class Achievement(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='achievements')
+    code = models.CharField(max_length=40, db_index=True)
+    awarded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-awarded_at']
+        constraints = [models.UniqueConstraint(fields=['user', 'code'], name='unique_user_achievement')]
 
 
 class LoginAttempt(models.Model):

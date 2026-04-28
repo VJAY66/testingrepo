@@ -96,6 +96,8 @@ urlpatterns = [
     path('unblock-user/', views.unblock_user, name='unblock_user'),
     # Profile bio/website update
     path('profile/update-bio/', views.update_profile_bio, name='update_profile_bio'),
+    # Notification preferences
+    path('profile/notification-prefs/', views.update_notification_prefs, name='update_notification_prefs'),
     # Comment reporting
     path('report-post-comment/', views.report_post_comment, name='report_post_comment'),
     # Debate stats JSON

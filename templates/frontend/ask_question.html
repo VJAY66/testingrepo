@@ -140,13 +140,18 @@
             </div>
 
             <input type="hidden" name="save_draft" id="save-draft-flag" value="0">
-            <div class="flex gap-3">
+            <div id="schedule-input-wrapper" class="hidden mt-2">
+                <label for="scheduled-for-input" class="block text-xs font-medium text-muted-foreground mb-1">Schedule publish time (optional)</label>
+                <input type="datetime-local" name="scheduled_for" id="scheduled-for-input"
+                       class="w-full rounded-2xl border border-border bg-background px-4 py-2 text-foreground text-sm shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
+                       placeholder="Schedule for...">
+            </div>
+            <div class="flex gap-3 mt-3">
                 <button type="submit" id="submit-btn"
                         class="flex-1 rounded-full bg-primary text-primary-foreground px-6 py-3 text-sm font-semibold hover:bg-primary/90 transition">
                     Post Question
                 </button>
                 <button type="button" id="draft-btn"
-                        onclick="document.getElementById('save-draft-flag').value='1'; document.getElementById('ask-form').submit();"
                         class="rounded-full border border-border px-5 py-3 text-sm font-semibold text-muted-foreground hover:border-primary/40 hover:text-primary transition">
                     Save Draft
                 </button>
@@ -406,6 +411,23 @@
         if (!validateHashtagsInput()) {
             event.preventDefault();
             hashtagsInput.focus();
+        }
+    });
+
+    // Save Draft button — show scheduling input, then submit on second click
+    const draftBtn = document.getElementById('draft-btn');
+    const scheduleWrapper = document.getElementById('schedule-input-wrapper');
+    const scheduledForInput = document.getElementById('scheduled-for-input');
+    let draftBtnReady = false;
+
+    draftBtn.addEventListener('click', function() {
+        if (!draftBtnReady) {
+            scheduleWrapper.classList.remove('hidden');
+            draftBtnReady = true;
+            draftBtn.textContent = 'Save Draft Now';
+        } else {
+            document.getElementById('save-draft-flag').value = '1';
+            askForm.submit();
         }
     });
 </script>

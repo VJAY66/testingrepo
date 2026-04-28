@@ -218,6 +218,15 @@
                         {{ profile_website|truncatechars:40 }}
                     </a>
                     {% endif %}
+                    {% if achievement_details %}
+                    <div class="mt-2 flex flex-wrap gap-1.5">
+                        {% for ach in achievement_details %}
+                        <span class="inline-flex items-center gap-1 rounded-full border border-border/70 bg-secondary px-2.5 py-0.5 text-xs font-semibold text-foreground cursor-default" title="{{ ach.desc }}">
+                            <span>{{ ach.icon }}</span><span>{{ ach.label }}</span>
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     <div class="mt-2">
                         <button type="button" onclick="openBioModal()" class="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[11px] font-semibold text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
@@ -401,6 +410,9 @@
                     <svg class="w-3.5 h-3.5 text-primary/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     <span>You reposted &middot; {{ action.created_at|date:"M j, Y" }}</span>
                 </div>
+                {% if action.quote_content %}
+                <blockquote class="mb-3 border-l-4 border-primary/40 pl-3 italic text-sm text-foreground/80">{{ action.quote_content }}</blockquote>
+                {% endif %}
                 <div class="flex items-start justify-between gap-3 mb-2">
                     <h3 class="text-base sm:text-lg font-bold tracking-tight text-foreground leading-snug">
                         <a href="{% url 'discussion' action.post.id %}" class="hover:text-primary transition-colors">{{ action.post.title }}</a>
@@ -751,9 +763,10 @@
                 {% if post.content %}
                 <p class="text-sm text-muted-foreground line-clamp-2 mb-3">{{ post.content|truncatechars:160 }}</p>
                 {% endif %}
-                <div class="flex items-center gap-2 mt-2">
+                <div class="flex items-center gap-2 mt-2 flex-wrap">
                     <button type="button" onclick="publishDraft('{{ post.id }}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition">Publish</button>
                     <span class="text-xs text-muted-foreground">Saved {{ post.created_at|date:"M j, Y" }}</span>
+                    {% if post.scheduled_for %}<span class="text-xs text-blue-600 dark:text-blue-400">Scheduled: {{ post.scheduled_for|date:"M j, g:i A" }}</span>{% endif %}
                 </div>
             </article>
             {% endfor %}
@@ -857,8 +870,85 @@
         </div>
     </div>
 
+    <!-- Notification Preferences Section -->
+    <div class="mt-4 rounded-2xl border border-border/70 bg-card p-4">
+        <h3 class="text-sm font-bold mb-3">Notification Preferences</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+                <thead>
+                    <tr class="text-muted-foreground">
+                        <th class="text-left py-1.5 pr-4 font-semibold">Type</th>
+                        <th class="text-center py-1.5 px-3 font-semibold">Email</th>
+                        <th class="text-center py-1.5 px-3 font-semibold">In-App</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border/40">
+                    {% for notif_type, defaults in default_notification_prefs.items %}
+                    <tr class="hover:bg-muted/30 transition-colors">
+                        <td class="py-2 pr-4 font-medium capitalize text-foreground">{{ notif_type|cut:"_"|title }}</td>
+                        <td class="py-2 px-3 text-center">
+                            {% if 'email' in defaults %}
+                            <input type="checkbox" class="notif-pref-toggle rounded accent-primary cursor-pointer w-4 h-4"
+                                data-notif-type="{{ notif_type }}" data-channel="email"
+                                {% with cur_prefs=notification_prefs %}
+                                    {% if cur_prefs and notif_type in cur_prefs %}
+                                        {% if cur_prefs|dictsort:notif_type %}{% endif %}
+                                    {% endif %}
+                                {% endwith %}
+                                onchange="updateNotifPref('{{ notif_type }}','email',this.checked)"
+                                {% comment %}checked state via JS on load{% endcomment %}>
+                            {% else %}
+                            <span class="text-muted-foreground">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2 px-3 text-center">
+                            {% if 'inapp' in defaults %}
+                            <input type="checkbox" class="notif-pref-toggle rounded accent-primary cursor-pointer w-4 h-4"
+                                data-notif-type="{{ notif_type }}" data-channel="inapp"
+                                onchange="updateNotifPref('{{ notif_type }}','inapp',this.checked)"
+                                {% comment %}checked state via JS on load{% endcomment %}>
+                            {% else %}
+                            <span class="text-muted-foreground">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 
 </div>
+<script>
+(function() {
+    var currentPrefs = {{ notification_prefs|default:"{}"|safe }};
+    var defaultPrefs = {{ default_notification_prefs|safe }};
+    document.querySelectorAll('.notif-pref-toggle').forEach(function(cb) {
+        var type = cb.dataset.notifType;
+        var channel = cb.dataset.channel;
+        var typePrefs = (currentPrefs[type] !== undefined) ? currentPrefs[type] : (defaultPrefs[type] || {});
+        if (channel in typePrefs) {
+            cb.checked = !!typePrefs[channel];
+        } else {
+            var defType = defaultPrefs[type] || {};
+            cb.checked = (channel in defType) ? !!defType[channel] : true;
+        }
+    });
+})();
+
+function updateNotifPref(notifType, channel, value) {
+    var prefs = {};
+    prefs[notifType] = {};
+    prefs[notifType][channel] = value;
+    fetch('{% url "update_notification_prefs" %}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+        body: JSON.stringify({prefs: prefs})
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (!d.success) { console.warn('Failed to update notification pref:', d.error); }
+    });
+}
+</script>
 
 <script>
 function deletePost(postId, btn) {
