@@ -921,8 +921,8 @@
 </div>
 <script>
 (function() {
-    var currentPrefs = {{ notification_prefs|default:"{}"|safe }};
-    var defaultPrefs = {{ default_notification_prefs|safe }};
+    var currentPrefs = {{ notification_prefs_json|safe }};
+    var defaultPrefs = {{ default_notification_prefs_json|safe }};
     document.querySelectorAll('.notif-pref-toggle').forEach(function(cb) {
         var type = cb.dataset.notifType;
         var channel = cb.dataset.channel;

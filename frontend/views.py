@@ -1355,6 +1355,8 @@ def profile(request):
         'achievement_details': achievement_details,
         'notification_prefs': profile_obj.notification_prefs if profile_obj else {},
         'default_notification_prefs': DEFAULT_NOTIFICATION_PREFS,
+        'notification_prefs_json': json.dumps(profile_obj.notification_prefs if profile_obj else {}),
+        'default_notification_prefs_json': json.dumps(DEFAULT_NOTIFICATION_PREFS),
     }
     return render(request, 'frontend/profile.html', context)
 
