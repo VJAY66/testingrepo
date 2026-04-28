@@ -1004,6 +1004,39 @@ def category(request, category_name):
     }
     return render(request, 'frontend/category.html', context)
 
+def _get_related_posts(post, limit=4):
+    """Return up to `limit` posts related to `post` by category and shared hashtags."""
+    if not post.category:
+        return []
+
+    candidates = (
+        Post.objects.filter(category=post.category, is_draft=False)
+        .exclude(id=post.id)
+        .annotate(like_count=Count('actions', filter=Q(actions__action='like')))
+        .select_related('user')
+        [:50]
+    )
+
+    post_tags = set(
+        t.lstrip('#').lower()
+        for t in re.split(r'[\s,]+', post.hashtags or '')
+        if t.strip()
+    )
+
+    def _score(p):
+        if post_tags:
+            p_tags = set(
+                t.lstrip('#').lower()
+                for t in re.split(r'[\s,]+', p.hashtags or '')
+                if t.strip()
+            )
+            return len(post_tags & p_tags)
+        return 0
+
+    scored = sorted(candidates, key=lambda p: (_score(p), p.like_count), reverse=True)
+    return scored[:limit]
+
+
 def discussion(request, post_id):
     """Discussion page for a specific post"""
     post = _annotated_feed_posts_queryset().filter(id=post_id).first()
@@ -1248,6 +1281,7 @@ def discussion(request, post_id):
         'is_following_post': is_following_post,
         'views_count': views_count,
         'analytics': analytics,
+        'related_posts': _get_related_posts(post),
     }
     return render(request, 'frontend/discussion.html', context)
 
@@ -1322,6 +1356,40 @@ def profile(request):
         for d in ACHIEVEMENT_DEFS if d[0] in user_achievements_set
     ]
 
+    # Activity heatmap: count posts+comments per day for last 364 days
+    from django.db.models.functions import TruncDate as _TruncDate
+    from collections import defaultdict as _defaultdict
+    _heatmap_start = timezone.now().date() - timedelta(days=363)
+    _post_counts = {
+        str(r['day']): r['n']
+        for r in Post.objects.filter(
+            user=request.user, is_draft=False,
+            created_at__date__gte=_heatmap_start
+        ).annotate(day=_TruncDate('created_at')).values('day').annotate(n=Count('id'))
+    }
+    _comment_counts = {
+        str(r['day']): r['n']
+        for r in Comment.objects.filter(
+            user=request.user,
+            created_at__date__gte=_heatmap_start
+        ).annotate(day=_TruncDate('created_at')).values('day').annotate(n=Count('id'))
+    }
+    import json as _json
+    _all_days = {}
+    _d = _heatmap_start
+    import datetime as _dt
+    while _d <= timezone.now().date():
+        key = str(_d)
+        _all_days[key] = _post_counts.get(key, 0) + _comment_counts.get(key, 0)
+        _d += _dt.timedelta(days=1)
+    activity_heatmap_json = _json.dumps(_all_days)
+
+    blocked_users = list(
+        UserBlock.objects.filter(blocker=request.user)
+        .select_related('blocked', 'blocked__profile')
+        .order_by('-created_at')
+    )
+
     context = {
         'user_posts': user_posts,
         'user_reposts': user_reposts,
@@ -1357,6 +1425,8 @@ def profile(request):
         'default_notification_prefs': DEFAULT_NOTIFICATION_PREFS,
         'notification_prefs_json': json.dumps(profile_obj.notification_prefs if profile_obj else {}),
         'default_notification_prefs_json': json.dumps(DEFAULT_NOTIFICATION_PREFS),
+        'activity_heatmap_json': activity_heatmap_json,
+        'blocked_users': blocked_users,
     }
     return render(request, 'frontend/profile.html', context)
 

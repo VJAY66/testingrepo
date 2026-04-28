@@ -1476,4 +1476,27 @@ bindDiscussionVoteForms();
     }, 5000);
 })();
 </script>
+
+{% if related_posts %}
+<section class="mt-8">
+    <h2 class="text-lg font-semibold text-foreground mb-4">You may also like</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {% for related in related_posts %}
+        <a href="{% url 'discussion' related.id %}" class="block rounded-2xl border border-border/70 bg-card p-4 hover:border-primary/50 hover:shadow-sm transition group">
+            <span class="inline-block px-2 py-0.5 bg-secondary text-secondary-foreground rounded-full text-xs mb-2">{{ related.category }}</span>
+            <p class="font-medium text-foreground group-hover:text-primary transition line-clamp-2 mb-2">{{ related.title }}</p>
+            <div class="flex items-center justify-between text-sm text-muted-foreground">
+                <span>{{ related.user.username }}</span>
+                <span class="flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                    </svg>
+                    {{ related.like_count }}
+                </span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
 {% endblock %}
