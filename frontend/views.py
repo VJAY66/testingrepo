@@ -504,6 +504,23 @@ def _remove_repost_copy_for_user(user, original_post):
     return False
 
 
+def post_reaction_users(request, post_id):
+    action = request.GET.get('action', '')
+    valid = ['hot', 'debatable', 'agree', 'surprising', 'like']
+    if action not in valid:
+        return JsonResponse({'success': False, 'error': 'Invalid action'}, status=400)
+    post = get_object_or_404(Post, id=post_id)
+    actions = PostAction.objects.filter(post=post, action=action).select_related('user', 'user__profile').order_by('-created_at')[:50]
+    users = []
+    for a in actions:
+        p = getattr(a.user, 'profile', None)
+        users.append({
+            'username': a.user.username,
+            'avatar_url': p.get_picture_url if p else '',
+        })
+    return JsonResponse({'success': True, 'users': users, 'action': action})
+
+
 @login_required
 @require_POST
 def post_action(request, post_id):
@@ -1248,11 +1265,32 @@ def discussion(request, post_id):
             .annotate(count=Count('id'))
             .order_by('day')
         )
+        unique_viewers = PostView.objects.filter(post=post).values('user').distinct().count()
+        like_count = PostAction.objects.filter(post=post, action='like').count()
+        save_count = PostAction.objects.filter(post=post, action='save').count()
+        repost_count = PostAction.objects.filter(post=post, action='repost').count()
+        # comment velocity: comments in last 24h vs previous 24h
+        now = timezone.now()
+        recent_comments = Comment.objects.filter(post=post, created_at__gte=now - timedelta(hours=24)).count()
+        prev_comments = Comment.objects.filter(
+            post=post,
+            created_at__gte=now - timedelta(hours=48),
+            created_at__lt=now - timedelta(hours=24),
+        ).count()
+        velocity_delta = recent_comments - prev_comments
+
         analytics = {
             'total_views': views_count,
+            'unique_viewers': unique_viewers,
             'daily_views': [{'day': str(d['day']), 'count': d['count']} for d in daily_views],
             'yes_pct': round(yes_percentage, 1),
             'no_pct': round(no_percentage, 1),
+            'like_count': like_count,
+            'save_count': save_count,
+            'repost_count': repost_count,
+            'recent_comments': recent_comments,
+            'velocity_delta': velocity_delta,
+            'max_daily_views': max((d['count'] for d in daily_views), default=1),
         }
     else:
         analytics = None
@@ -1390,6 +1428,22 @@ def profile(request):
         .order_by('-created_at')
     )
 
+    # Profile completion score
+    _completion_steps = [
+        ('Avatar', bool(profile_obj and profile_obj.profile_picture)),
+        ('Bio', bool(profile_obj and (profile_obj.bio or '').strip())),
+        ('Website', bool(profile_obj and (profile_obj.website or '').strip())),
+        ('Interests', bool(profile_obj and profile_obj.interested_categories)),
+        ('First Post', Post.objects.filter(user=request.user, is_draft=False).exists()),
+        ('First Debate', user_debate_participations.exists()),
+        ('First Poll', user_polls.exists()),
+        ('Verified', bool(profile_obj and profile_obj.is_verified)),
+    ]
+    completion_steps = _completion_steps
+    completion_score = sum(1 for _, done in _completion_steps if done)
+    completion_total = len(_completion_steps)
+    completion_pct = round(completion_score / completion_total * 100)
+
     context = {
         'user_posts': user_posts,
         'user_reposts': user_reposts,
@@ -1427,6 +1481,10 @@ def profile(request):
         'default_notification_prefs_json': json.dumps(DEFAULT_NOTIFICATION_PREFS),
         'activity_heatmap_json': activity_heatmap_json,
         'blocked_users': blocked_users,
+        'completion_steps': completion_steps,
+        'completion_score': completion_score,
+        'completion_total': completion_total,
+        'completion_pct': completion_pct,
     }
     return render(request, 'frontend/profile.html', context)
 
@@ -1748,6 +1806,16 @@ def hashtag_suggestions(request):
     ]
 
     return JsonResponse({'success': True, 'hashtags': suggestions})
+
+
+def mention_suggestions(request):
+    q = request.GET.get('q', '').strip().lstrip('@')
+    if len(q) < 1:
+        return JsonResponse({'users': []})
+    from django.contrib.auth.models import User as _User
+    users = _User.objects.filter(username__istartswith=q).values_list('username', flat=True)[:8]
+    return JsonResponse({'users': list(users)})
+
 
 @login_required
 def ask_question(request):
@@ -3078,6 +3146,35 @@ def reject_debate(request, debate_id):
         messages.error(request, 'Debate not found')
 
     return redirect('notifications')
+
+
+@login_required
+def debate_inbox(request):
+    participations = DebateParticipant.objects.filter(
+        user=request.user
+    ).select_related(
+        'debate', 'debate__post', 'debate__initiator', 'debate__target',
+        'debate__initiator__profile', 'debate__target__profile',
+    ).order_by('-debate__created_at')
+
+    debates_with_status = []
+    for p in participations:
+        d = p.debate
+        opponent = d.target if d.initiator == request.user else d.initiator
+        debates_with_status.append({
+            'debate': d,
+            'opponent': opponent,
+            'side': p.side,
+            'status': d.status,
+            'post': d.post,
+        })
+
+    pending_count = sum(1 for x in debates_with_status if x['status'] == 'pending')
+
+    return render(request, 'frontend/debate_inbox.html', {
+        'debates': debates_with_status,
+        'pending_count': pending_count,
+    })
 
 
 @login_required

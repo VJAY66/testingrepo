@@ -5630,5 +5630,89 @@
     });
     </script>
     {% endif %}
+<script>
+(function() {
+  function setupMentionAutocomplete(textarea) {
+    if (textarea._mentionSetup) return;
+    textarea._mentionSetup = true;
+    var dropdown = document.createElement('ul');
+    dropdown.className = 'mention-dropdown hidden absolute z-[9999] bg-card border border-border rounded-xl shadow-lg py-1 w-48 text-sm';
+    dropdown.style.cssText = 'min-width:160px;';
+    document.body.appendChild(dropdown);
+
+    var _query = '', _caretPos = 0;
+
+    function getCaretCoords() {
+      var rect = textarea.getBoundingClientRect();
+      return { top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX };
+    }
+
+    function hide() { dropdown.classList.add('hidden'); dropdown.innerHTML = ''; }
+
+    function pick(username) {
+      var val = textarea.value;
+      var before = val.lastIndexOf('@', _caretPos - 1);
+      if (before === -1) { hide(); return; }
+      textarea.value = val.slice(0, before) + '@' + username + ' ' + val.slice(_caretPos);
+      textarea.selectionStart = textarea.selectionEnd = before + username.length + 2;
+      hide();
+      textarea.focus();
+    }
+
+    textarea.addEventListener('input', function() {
+      _caretPos = textarea.selectionStart;
+      var val = textarea.value.slice(0, _caretPos);
+      var atPos = val.lastIndexOf('@');
+      if (atPos === -1) { hide(); return; }
+      var fragment = val.slice(atPos + 1);
+      if (/\s/.test(fragment)) { hide(); return; }
+      _query = fragment;
+      if (_query.length === 0 && atPos < val.length - 1) { hide(); return; }
+      fetch('/mentions/suggest/?q=' + encodeURIComponent(_query))
+        .then(r => r.json()).then(d => {
+          if (!d.users || !d.users.length) { hide(); return; }
+          var coords = getCaretCoords();
+          dropdown.style.top = coords.top + 'px';
+          dropdown.style.left = coords.left + 'px';
+          dropdown.innerHTML = d.users.map(u =>
+            '<li class="px-3 py-1.5 hover:bg-muted/60 cursor-pointer text-foreground font-medium" data-username="' + u + '">@' + u + '</li>'
+          ).join('');
+          dropdown.classList.remove('hidden');
+          dropdown.querySelectorAll('li').forEach(li => {
+            li.addEventListener('mousedown', function(e) { e.preventDefault(); pick(this.dataset.username); });
+          });
+        });
+    });
+    textarea.addEventListener('blur', function() { setTimeout(hide, 150); });
+    textarea.addEventListener('keydown', function(e) {
+      if (dropdown.classList.contains('hidden')) return;
+      var items = dropdown.querySelectorAll('li');
+      var active = dropdown.querySelector('li.bg-muted');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        var next = active ? active.nextElementSibling : items[0];
+        if (active) active.classList.remove('bg-muted');
+        if (next) next.classList.add('bg-muted');
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        var prev = active ? active.previousElementSibling : items[items.length - 1];
+        if (active) active.classList.remove('bg-muted');
+        if (prev) prev.classList.add('bg-muted');
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        if (active) { e.preventDefault(); pick(active.dataset.username); }
+      } else if (e.key === 'Escape') { hide(); }
+    });
+  }
+
+  function initAll() {
+    document.querySelectorAll('textarea').forEach(setupMentionAutocomplete);
+  }
+
+  document.addEventListener('DOMContentLoaded', initAll);
+  // Re-run when new textareas appear (modals, etc.)
+  var obs = new MutationObserver(initAll);
+  obs.observe(document.body, { childList: true, subtree: true });
+})();
+</script>
 </body>
 </html>

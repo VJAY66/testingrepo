@@ -190,10 +190,10 @@
                                         </svg>
                                         <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Share</span>
                                     </button>
-                                    <button type="button" data-action="hot" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_hot %}active text-orange-500 bg-orange-50/60 border-orange-300/60{% else %}text-muted-foreground hover:text-orange-500 hover:bg-orange-50/60{% endif %}">🔥 <span class="action-count text-xs">{{ post.hot_count|default:0 }}</span></button>
-                                    <button type="button" data-action="debatable" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_debatable %}active text-purple-500 bg-purple-50/60 border-purple-300/60{% else %}text-muted-foreground hover:text-purple-500 hover:bg-purple-50/60{% endif %}">🤔 <span class="action-count text-xs">{{ post.debatable_count|default:0 }}</span></button>
-                                    <button type="button" data-action="agree" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_agree %}active text-green-600 bg-green-50/60 border-green-300/60{% else %}text-muted-foreground hover:text-green-600 hover:bg-green-50/60{% endif %}">👏 <span class="action-count text-xs">{{ post.agree_count|default:0 }}</span></button>
-                                    <button type="button" data-action="surprising" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_surprising %}active text-blue-500 bg-blue-50/60 border-blue-300/60{% else %}text-muted-foreground hover:text-blue-500 hover:bg-blue-50/60{% endif %}">😮 <span class="action-count text-xs">{{ post.surprising_count|default:0 }}</span></button>
+                                    <button type="button" data-action="hot" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_hot %}active text-orange-500 bg-orange-50/60 border-orange-300/60{% else %}text-muted-foreground hover:text-orange-500 hover:bg-orange-50/60{% endif %}">🔥 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','hot')">{{ post.hot_count|default:0 }}</span></button>
+                                    <button type="button" data-action="debatable" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_debatable %}active text-purple-500 bg-purple-50/60 border-purple-300/60{% else %}text-muted-foreground hover:text-purple-500 hover:bg-purple-50/60{% endif %}">🤔 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','debatable')">{{ post.debatable_count|default:0 }}</span></button>
+                                    <button type="button" data-action="agree" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_agree %}active text-green-600 bg-green-50/60 border-green-300/60{% else %}text-muted-foreground hover:text-green-600 hover:bg-green-50/60{% endif %}">👏 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','agree')">{{ post.agree_count|default:0 }}</span></button>
+                                    <button type="button" data-action="surprising" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_surprising %}active text-blue-500 bg-blue-50/60 border-blue-300/60{% else %}text-muted-foreground hover:text-blue-500 hover:bg-blue-50/60{% endif %}">😮 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','surprising')">{{ post.surprising_count|default:0 }}</span></button>
                                     <a href="{% url 'discussion' post.id %}" class="ml-auto group inline-flex items-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full border border-primary/35 bg-primary/12 text-primary shadow-sm shadow-primary/20 transition-all duration-300 hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/35 focus:outline-none focus:ring-2 focus:ring-primary/35 whitespace-nowrap">
                                         <span class="sm:hidden text-xs font-medium">Open</span>
                                         <span class="hidden sm:inline sm:text-sm font-medium">Open discussion</span>
@@ -996,4 +996,38 @@ document.addEventListener('click', function(event) {
 }, true);
 </script>
 
+<!-- Reaction Users Modal -->
+<div id="reaction-users-modal" class="hidden fixed inset-0 z-[9000] flex items-center justify-center bg-black/50 px-4" onclick="if(event.target===this)closeReactionModal()">
+  <div class="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-sm p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 id="reaction-modal-title" class="text-base font-bold text-foreground">Reactions</h3>
+      <button onclick="closeReactionModal()" class="text-muted-foreground hover:text-foreground text-xl leading-none">&times;</button>
+    </div>
+    <div id="reaction-modal-body" class="space-y-2 max-h-64 overflow-y-auto">
+      <p class="text-sm text-muted-foreground">Loading…</p>
+    </div>
+  </div>
+</div>
+<script>
+const REACTION_LABELS = {hot:'🔥 Hot',debatable:'🤔 Debatable',agree:'👏 Agree',surprising:'😮 Surprising',like:'❤️ Like'};
+function showReactionUsers(postId, action) {
+  document.getElementById('reaction-modal-title').textContent = REACTION_LABELS[action] || action;
+  document.getElementById('reaction-modal-body').innerHTML = '<p class="text-sm text-muted-foreground">Loading…</p>';
+  document.getElementById('reaction-users-modal').classList.remove('hidden');
+  fetch('/posts/' + postId + '/reaction-users/?action=' + encodeURIComponent(action))
+    .then(r => r.json()).then(d => {
+      if (!d.success || !d.users.length) {
+        document.getElementById('reaction-modal-body').innerHTML = '<p class="text-sm text-muted-foreground">No reactions yet.</p>';
+        return;
+      }
+      document.getElementById('reaction-modal-body').innerHTML = d.users.map(u =>
+        '<a href="/user/' + u.username + '/" class="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-muted/60 transition-colors">' +
+        (u.avatar_url ? '<img src="' + u.avatar_url + '" class="h-7 w-7 rounded-full object-cover border border-border">' :
+          '<div class="h-7 w-7 rounded-full bg-primary/15 flex items-center justify-center text-primary text-xs font-bold">' + u.username[0].toUpperCase() + '</div>') +
+        '<span class="text-sm font-medium text-foreground">@' + u.username + '</span></a>'
+      ).join('');
+    });
+}
+function closeReactionModal() { document.getElementById('reaction-users-modal').classList.add('hidden'); }
+</script>
 {% endblock %}

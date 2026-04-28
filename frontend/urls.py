@@ -127,4 +127,7 @@ urlpatterns = [
     path('series/<str:series_id>/', views.series_detail, name='series_detail'),
     path('series/<str:series_id>/add/', views.add_post_to_series, name='add_post_to_series'),
     path('series/<str:series_id>/remove/', views.remove_from_series, name='remove_from_series'),
+    path('posts/<str:post_id>/reaction-users/', views.post_reaction_users, name='post_reaction_users'),
+    path('mentions/suggest/', views.mention_suggestions, name='mention_suggestions'),
+    path('debates/inbox/', views.debate_inbox, name='debate_inbox'),
 ]
