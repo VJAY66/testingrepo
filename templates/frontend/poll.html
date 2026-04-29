@@ -248,6 +248,31 @@
 
     </div><!-- /poll-card -->
 
+    <!-- Ranked Choice Voting -->
+    {% if poll.allows_ranked_choice and not poll.is_expired and request.user.is_authenticated and not user_has_ranked %}
+    <div class="card rounded-2xl border border-border shadow-sm p-5 mb-4" id="ranked-choice-section">
+      <h3 class="font-semibold text-base mb-1">📊 Ranked Choice</h3>
+      <p class="text-xs text-muted-foreground mb-4">Rank the options in your order of preference (1 = top choice). Leave blank to skip.</p>
+      <div class="space-y-2 mb-4" id="ranked-options">
+        {% for od in option_data %}
+        <div class="flex items-center gap-3">
+          <span class="flex-1 text-sm font-medium truncate">{{ od.option.text }}</span>
+          <select data-option-id="{{ od.option.id }}"
+                  class="ranked-select w-20 rounded-lg border border-border bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+            <option value="">—</option>
+            {% for od2 in option_data %}
+            <option value="{{ forloop.counter }}">{{ forloop.counter }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endfor %}
+      </div>
+      <button onclick="submitRankedVote('{{ poll.id }}')" id="ranked-submit-btn"
+              class="btn btn-sm btn-primary w-full">Submit Rankings</button>
+      <p class="text-xs text-muted-foreground text-center mt-2 hidden" id="ranked-success">✓ Rankings submitted!</p>
+    </div>
+    {% endif %}
+
     <!-- Comments section: two columns -->
     {% if voted_option_id %}
     <div class="grid grid-cols-2 gap-2" id="comments-grid">
@@ -495,6 +520,41 @@ function startPollDebate(commentId, triggerEl) {
             if (triggerEl) { triggerEl.disabled = false; triggerEl.textContent = 'Start Debate'; }
             alert('Network error. Please try again.');
         });
+}
+
+function submitRankedVote(pollId) {
+    const selects = document.querySelectorAll('.ranked-select');
+    const rankings = [];
+    const usedRanks = new Set();
+    for (const sel of selects) {
+        if (!sel.value) continue;
+        const rank = parseInt(sel.value);
+        if (usedRanks.has(rank)) { alert('Each rank can only be assigned once.'); return; }
+        usedRanks.add(rank);
+        rankings.push({ option_id: parseInt(sel.dataset.optionId), rank });
+    }
+    if (!rankings.length) { alert('Please rank at least one option.'); return; }
+    const btn = document.getElementById('ranked-submit-btn');
+    btn.disabled = true;
+    fetch('/polls/' + pollId + '/ranked-vote/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ''
+        },
+        body: JSON.stringify({ rankings })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            document.getElementById('ranked-choice-section').classList.add('opacity-60', 'pointer-events-none');
+            document.getElementById('ranked-success').classList.remove('hidden');
+        } else {
+            alert(d.error || 'Could not submit rankings.');
+            btn.disabled = false;
+        }
+    })
+    .catch(() => { alert('Network error.'); btn.disabled = false; });
 }
 </script>
 {% endblock %}

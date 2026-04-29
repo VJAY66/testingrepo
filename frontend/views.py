@@ -4408,6 +4408,13 @@ def poll_detail(request, poll_id):
             'comments': comments_with_reaction,
         })
 
+    user_ranked_options = set()
+    if request.user.is_authenticated and poll.allows_ranked_choice:
+        from discussions.models import RankedChoiceVote as _RCV
+        user_ranked_options = set(
+            _RCV.objects.filter(user=request.user, poll=poll).values_list('option_id', flat=True)
+        )
+
     return render(request, 'frontend/poll.html', {
         'poll': poll,
         'options': options,
@@ -4416,6 +4423,7 @@ def poll_detail(request, poll_id):
         'user_vote': user_vote,
         'voted_option_id': str(user_vote.option_id) if user_vote else None,
         'show_voters': not poll.is_anonymous,
+        'user_has_ranked': bool(user_ranked_options),
     })
 
 
@@ -4451,6 +4459,37 @@ def poll_vote(request, poll_id):
         options_out.append({'id': opt.id, 'text': opt.text, 'vote_count': cnt, 'percentage': pct})
 
     return JsonResponse({'success': True, 'voted_option_id': option.id, 'total_votes': total, 'options': options_out})
+
+
+@login_required
+@require_POST
+def poll_ranked_vote(request, poll_id):
+    """Submit ranked-choice preferences for a poll that allows_ranked_choice."""
+    from discussions.models import RankedChoiceVote as _RCV
+    poll = get_object_or_404(Poll, id=poll_id, is_deleted_by_moderation=False, allows_ranked_choice=True)
+    if poll.is_expired or not poll.is_active:
+        return JsonResponse({'success': False, 'error': 'Poll is closed'}, status=400)
+    try:
+        data = json.loads(request.body)
+        rankings = data.get('rankings', [])  # [{option_id, rank}, ...]
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return JsonResponse({'success': False, 'error': 'Invalid request'}, status=400)
+    if not rankings or len(rankings) > 10:
+        return JsonResponse({'success': False, 'error': 'Provide 1–10 rankings'}, status=400)
+    option_ids = [r.get('option_id') for r in rankings]
+    ranks = [r.get('rank') for r in rankings]
+    if len(set(ranks)) != len(ranks):
+        return JsonResponse({'success': False, 'error': 'Duplicate ranks not allowed'}, status=400)
+    valid_options = set(poll.options.values_list('id', flat=True))
+    if not all(oid in valid_options for oid in option_ids):
+        return JsonResponse({'success': False, 'error': 'Invalid option'}, status=400)
+    _RCV.objects.filter(user=request.user, poll=poll).delete()
+    _RCV.objects.bulk_create([
+        _RCV(user=request.user, poll=poll,
+             option_id=r['option_id'], rank=r['rank'])
+        for r in rankings
+    ])
+    return JsonResponse({'success': True, 'ranked': len(rankings)})
 
 
 @require_POST
@@ -4497,6 +4536,18 @@ def create_poll_comment(request, poll_id):
         option=option,
         content=content,
     )
+
+    # Mention notifications in polls
+    usernames = _parse_mentions(content)
+    if usernames:
+        mentioned_users = User.objects.filter(username__in=usernames).exclude(id=request.user.id)
+        for mu in mentioned_users:
+            Notification.objects.create(
+                user=mu,
+                post=None,
+                notification_type='mention',
+                message=f'@{request.user.username} mentioned you in a poll comment on "{poll.title}".',
+            )
 
     return JsonResponse({
         'success': True,

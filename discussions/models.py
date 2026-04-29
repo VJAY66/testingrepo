@@ -421,6 +421,7 @@ class Poll(models.Model):
     expires_at = models.DateTimeField(null=True, blank=True, help_text='Auto-close this poll at this time. Leave blank for no expiry.')
     expiry_notified = models.BooleanField(default=False, help_text='Whether followers have been notified of poll closure')
     is_anonymous = models.BooleanField(default=False, help_text='Hide voter identities from results')
+    allows_ranked_choice = models.BooleanField(default=False, help_text='Allow voters to rank options in order of preference')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -904,6 +905,25 @@ class Challenge(models.Model):
     def is_ongoing(self):
         from django.utils import timezone
         return self.starts_at <= timezone.now() <= self.ends_at
+
+
+class RankedChoiceVote(models.Model):
+    """Stores a single rank preference in a ranked-choice poll."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ranked_votes')
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name='ranked_votes')
+    option = models.ForeignKey(PollOption, on_delete=models.CASCADE, related_name='ranked_votes')
+    rank = models.PositiveSmallIntegerField(help_text='1 = first choice, 2 = second, etc.')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'poll', 'option'], name='unique_ranked_choice_vote_option'),
+            models.UniqueConstraint(fields=['user', 'poll', 'rank'], name='unique_ranked_choice_vote_rank'),
+        ]
+        ordering = ['rank']
+
+    def __str__(self):
+        return f"{self.user.username} ranked '{self.option.text}' #{self.rank} on {self.poll.title}"
 
 
 class ChallengeEntry(models.Model):

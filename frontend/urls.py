@@ -65,6 +65,7 @@ urlpatterns = [
     path('polls/comment/react/', views.like_poll_comment, name='like_poll_comment'),
     path('polls/<str:poll_id>/', views.poll_detail, name='poll_detail'),
     path('polls/<str:poll_id>/vote/', views.poll_vote, name='poll_vote'),
+    path('polls/<str:poll_id>/ranked-vote/', views.poll_ranked_vote, name='poll_ranked_vote'),
     path('polls/<str:poll_id>/comment/', views.create_poll_comment, name='create_poll_comment'),
     # Questions
     path('questions/<str:question_id>/action/', views.question_action, name='question_action'),
