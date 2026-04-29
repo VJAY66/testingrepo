@@ -717,6 +717,8 @@
       #mc-shell, .mc-msg { animation: none !important; }
       .mc-msg-hover-bar { transition: none !important; }
     }
+    .mc-read-receipt { opacity: 0.7; }
+    .mc-read-receipt.seen { color: hsl(var(--primary)); opacity: 1; }
   }
 </style>
 
@@ -1535,6 +1537,12 @@
       lastRead[String(mobileDebateId)] = Number(lastMsgId || 0);
       localStorage.setItem('dhChatLastRead', JSON.stringify(lastRead));
     } catch {}
+    // Also persist to server for cross-device read receipts
+    fetch('{% url "mark_debate_read" debate.id %}', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/)||[])[1]||''},
+    }).catch(function(){});
   }
 
   function setReply(msg) {
@@ -1650,6 +1658,7 @@
       + `<span class="mc-reaction-chip ${userReaction === 'like' ? 'active' : ''} ${likesCount > 0 ? '' : 'hidden'}" data-reaction-chip="like"><span>👍</span><span data-reaction-count="like">${likesCount}</span></span>`
       + `<span class="mc-reaction-chip ${userReaction === 'dislike' ? 'active' : ''} ${dislikesCount > 0 ? '' : 'hidden'}" data-reaction-chip="dislike"><span>👎</span><span data-reaction-count="dislike">${dislikesCount}</span></span>`
       + `</div>`
+      + (m.is_own ? `<span class="mc-read-receipt text-[10px] text-muted-foreground mt-0.5 text-right block" id="receipt-${Number(m.id)}">Sent</span>` : '')
       + `</div></div>`;
     msgs.appendChild(div);
     wireSwipe(div, m.id);
@@ -1739,6 +1748,16 @@
 
           d.messages.forEach(addMsg);
           d.messages.forEach(updateReactionSummaryUI);
+          if (typeof d.opponent_last_read_msg_id === 'number') {
+            const opponentRead = d.opponent_last_read_msg_id;
+            document.querySelectorAll('[id^="receipt-"]').forEach(function(el) {
+              const receiptMsgId = Number((el.id || '').replace('receipt-', ''));
+              if (receiptMsgId && receiptMsgId <= opponentRead) {
+                el.textContent = '✓ Seen';
+                el.classList.add('seen');
+              }
+            });
+          }
           updateStickyDate();
           if (isEmbedded && d.messages.length) markCurrentChatRead();
           return;

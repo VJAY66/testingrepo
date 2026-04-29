@@ -178,6 +178,7 @@ class DebateParticipant(models.Model):
     is_banned = models.BooleanField(default=False)
     joined_at = models.DateTimeField(auto_now_add=True)
     left_at = models.DateTimeField(null=True, blank=True)
+    last_read_message_id = models.BigIntegerField(default=0, help_text='ID of the last message this participant has read')
 
     def __str__(self):
         return f"{self.user.username} ({self.side}) in debate {self.debate_id}"

@@ -10,7 +10,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="PickASide">
     <script>
-    (function(){try{var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}}());
+    (function(){
+      // Server-side preference takes priority; fall back to localStorage
+      var serverTheme = '{% if user.is_authenticated and user.profile.theme %}{{ user.profile.theme }}{% endif %}';
+      var t = serverTheme || (function(){try{return localStorage.getItem('theme');}catch(e){return null;}}());
+      if(t==='dark'){document.documentElement.setAttribute('data-theme','dark');document.documentElement.classList.add('dark');}
+    }());
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2867,6 +2872,15 @@
             }
             localStorage.setItem('theme', theme);
             updateThemeButton(theme);
+            {% if user.is_authenticated %}
+            // Persist to server so preference survives across devices
+            fetch('{% url "save_theme_preference" %}', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/)||[])[1]||''},
+                body: 'theme=' + encodeURIComponent(theme)
+            }).catch(function(){});
+            {% endif %}
         }
 
         function toggleTheme() {

@@ -30,6 +30,12 @@ class Profile(models.Model):
     last_seen = models.DateTimeField(null=True, blank=True, db_index=True)
     is_verified = models.BooleanField(default=False, help_text='Manually verified by a moderator')
     notification_prefs = models.JSONField(default=dict, blank=True, help_text='Per-type notification opt-in settings')
+    theme = models.CharField(
+        max_length=10,
+        default='light',
+        choices=[('light', 'Light'), ('dark', 'Dark')],
+        help_text='User preferred color theme'
+    )
     reputation_score = models.IntegerField(default=0, db_index=True, help_text='Computed reputation from likes, answers, debates')
     streak_days = models.PositiveIntegerField(default=0, help_text='Current consecutive days of activity')
     last_activity_date = models.DateField(null=True, blank=True, help_text='Last date the user posted or commented')

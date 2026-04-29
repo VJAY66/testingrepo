@@ -372,6 +372,18 @@ function quickFollow(username, btn) {
                               class="w-full px-3 py-2 border border-border rounded-md bg-background"></textarea>
                 </div>
             </div>
+            <div class="border-t border-border pt-3 mt-1">
+  <label class="flex items-center gap-2 cursor-pointer select-none mb-2">
+    <input type="checkbox" name="save_as_draft" id="save-as-draft-toggle" value="1" class="rounded border-border">
+    <span class="text-sm font-medium">Save as draft</span>
+  </label>
+  <div id="schedule-row" class="hidden">
+    <label class="block text-xs text-muted-foreground mb-1">Schedule publish date (optional)</label>
+    <input type="datetime-local" name="scheduled_for" id="scheduled-for-input"
+           class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm">
+    <p class="text-xs text-muted-foreground mt-1">Leave blank to save as unscheduled draft.</p>
+  </div>
+</div>
             <div class="flex space-x-3 mt-6">
                 <button type="submit" class="flex-1 bg-primary text-primary-foreground py-2 rounded-md hover:bg-primary/90">
                     Create
@@ -1051,5 +1063,16 @@ function showReactionUsers(postId, action) {
     });
 }
 function closeReactionModal() { document.getElementById('reaction-users-modal').classList.add('hidden'); }
+</script>
+<script>
+(function(){
+  var toggle = document.getElementById('save-as-draft-toggle');
+  var row = document.getElementById('schedule-row');
+  if (toggle && row) {
+    toggle.addEventListener('change', function() {
+      row.classList.toggle('hidden', !this.checked);
+    });
+  }
+})();
 </script>
 {% endblock %}

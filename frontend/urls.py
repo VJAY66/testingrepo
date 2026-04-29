@@ -51,6 +51,7 @@ urlpatterns = [
     path('debates/<str:debate_id>/messages/<int:message_id>/react/', views.react_to_debate_message, name='react_to_debate_message'),
     path('debates/<str:debate_id>/messages/<int:message_id>/report/', views.report_debate_message, name='report_debate_message'),
     path('debates/<str:debate_id>/messages/list/', views.debate_messages, name='debate_messages'),
+    path('debates/<str:debate_id>/messages/mark-read/', views.mark_debate_read, name='mark_debate_read'),
     path('moderation/debate-message-reports/<int:report_id>/review/', views.moderate_debate_message_report, name='moderate_debate_message_report'),
     path('moderation/profile-reports/<int:report_id>/review/', views.moderate_profile_report, name='moderate_profile_report'),
     path('debates/<str:debate_id>/info/', views.debate_info, name='debate_info'),
@@ -99,6 +100,7 @@ urlpatterns = [
     path('unblock-user/', views.unblock_user, name='unblock_user'),
     # Profile bio/website update
     path('profile/update-bio/', views.update_profile_bio, name='update_profile_bio'),
+    path('profile/theme/', views.save_theme_preference, name='save_theme_preference'),
     # Notification preferences
     path('profile/notification-prefs/', views.update_notification_prefs, name='update_notification_prefs'),
     # Comment reporting

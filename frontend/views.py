@@ -3653,7 +3653,42 @@ def debate_messages(request, debate_id):
         'spectator_count': spectator_count,
         'obs_yes': obs_yes,
         'obs_no': obs_no,
+        'opponent_last_read_msg_id': (
+            DebateParticipant.objects.filter(debate=debate, user=opponent)
+            .values_list('last_read_message_id', flat=True).first() or 0
+        ),
     })
+
+
+@login_required
+@require_POST
+def mark_debate_read(request, debate_id):
+    """Mark all messages in a debate as read up to the latest message."""
+    debate = get_object_or_404(Debate, id=debate_id)
+    participation = get_object_or_404(DebateParticipant, debate=debate, user=request.user)
+    latest_id = DebateMessage.objects.filter(debate=debate).aggregate(
+        max_id=Max('id')
+    )['max_id'] or 0
+    if latest_id > participation.last_read_message_id:
+        participation.last_read_message_id = latest_id
+        participation.save(update_fields=['last_read_message_id'])
+    return JsonResponse({'success': True, 'last_read': latest_id})
+
+
+@login_required
+@require_POST
+def save_theme_preference(request):
+    """Persist the user's dark/light theme choice to their profile."""
+    theme = (request.POST.get('theme') or '').strip().lower()
+    if theme not in ('light', 'dark'):
+        return JsonResponse({'success': False, 'error': 'Invalid theme'}, status=400)
+    try:
+        profile = request.user.profile
+        profile.theme = theme
+        profile.save(update_fields=['theme'])
+    except Exception:
+        pass
+    return JsonResponse({'success': True})
 
 
 @login_required
