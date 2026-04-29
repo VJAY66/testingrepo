@@ -18,6 +18,7 @@ urlpatterns = [
     path('ask/', views.ask_question, name='ask_question'),
     path('notifications/', views.notifications, name='notifications'),
     path('notifications/count/', views.notification_count, name='notification_count'),
+    path('notifications/stream/', views.notification_stream, name='notification_stream'),
     path('notifications/mark-all-read/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
     path('notifications/unfollow-post/', views.unfollow_post, name='unfollow_post'),
     path('notifications/dismiss/', views.dismiss_notification, name='dismiss_notification'),

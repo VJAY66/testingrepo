@@ -2247,6 +2247,37 @@ def notification_count(request):
         'accepted_debate_ids': [str(x) for x in accepted_ids],
     })
 
+
+def notification_stream(request):
+    """Server-Sent Events endpoint — pushes notification count when it changes."""
+    if not request.user.is_authenticated:
+        from django.http import HttpResponse
+        return HttpResponse(status=401)
+
+    import time as _time
+
+    def _event_gen(user):
+        last_count = -1
+        # max ~5 min per connection, then client reconnects
+        for _ in range(60):
+            try:
+                count = Notification.objects.filter(user=user, is_read=False).count()
+                if count != last_count:
+                    last_count = count
+                    import json as _json
+                    yield f'data: {_json.dumps({"count": count})}\n\n'
+                _time.sleep(5)
+            except Exception:
+                break
+        yield 'data: {"reconnect":true}\n\n'
+
+    from django.http import StreamingHttpResponse
+    response = StreamingHttpResponse(_event_gen(request.user), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    return response
+
+
 def login_view(request):
     """Login page"""
     raw_next = request.POST.get('next') or request.GET.get('next') or ''
@@ -5817,6 +5848,32 @@ def _maybe_award_achievements(user):
     from django.utils import timezone as _tz
     if ((_tz.now() - user.date_joined).days >= 30):
         earned_codes.append('veteran')
+
+    # Reputation badges
+    try:
+        rep = user.profile.reputation_score
+        if rep >= 100:
+            earned_codes.append('rep_100')
+        if rep >= 500:
+            earned_codes.append('rep_500')
+        streak = user.profile.streak_days
+        if streak >= 7:
+            earned_codes.append('streak_7')
+        if streak >= 30:
+            earned_codes.append('streak_30')
+    except Exception:
+        pass
+
+    # Challenger badge
+    from discussions.models import ChallengeEntry as _CE2
+    if _CE2.objects.filter(user=user).exists():
+        earned_codes.append('challenger')
+
+    # Hot author badge
+    if Post.objects.filter(user=user, is_hot=True).exists():
+        earned_codes.append('hot_author')
+
+    # Debate winner badge skipped: Debate model has no 'winner' field
 
     for code in earned_codes:
         Achievement.objects.get_or_create(user=user, code=code)

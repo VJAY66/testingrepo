@@ -3410,40 +3410,27 @@
             }
 
             {% if user.is_authenticated %}
-            let notificationsPollInFlight = false;
-
-            function refreshNotificationCount() {
-                if (notificationsPollInFlight) {
+            function startNotificationStream() {
+                if (!window.EventSource) {
+                    // Fallback to polling for old browsers
+                    window.setInterval(function() {
+                        fetch('{% url "notification_count" %}', {method:'GET', credentials:'same-origin'})
+                            .then(r => r.json()).then(d => updateNotificationBadge(d.pending_notifications_count || 0))
+                            .catch(() => {});
+                    }, 15000);
                     return;
                 }
-
-                notificationsPollInFlight = true;
-                fetch('{% url "notification_count" %}', {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                })
-                    .then(response => response.ok ? response.json() : null)
-                    .then(data => {
-                        if (!data || !data.success) {
-                            return;
-                        }
-                        updateNotificationBadge(data.pending_notifications_count || 0);
-                    })
-                    .catch(() => {})
-                    .finally(() => {
-                        notificationsPollInFlight = false;
-                    });
+                var src = new EventSource('{% url "notification_stream" %}');
+                src.onmessage = function(e) {
+                    try {
+                        var d = JSON.parse(e.data);
+                        if (d.reconnect) { src.close(); setTimeout(startNotificationStream, 1000); return; }
+                        if (typeof d.count === 'number') updateNotificationBadge(d.count);
+                    } catch(_) {}
+                };
+                src.onerror = function() { src.close(); setTimeout(startNotificationStream, 10000); };
             }
-
-            refreshNotificationCount();
-            window.setInterval(refreshNotificationCount, 5000);
-            document.addEventListener('visibilitychange', function() {
-                if (!document.hidden) {
-                    refreshNotificationCount();
-                }
-            });
-            window.addEventListener('focus', refreshNotificationCount);
+            startNotificationStream();
             {% endif %}
 
             function bindUserMenu(toggleEl, panelEl) {

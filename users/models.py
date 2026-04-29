@@ -168,6 +168,13 @@ ACHIEVEMENT_DEFS = [
     ('verified_voice',  '✓',   'Verified Voice',     'Account verified by a moderator'),
     ('contributor',     '💎',  'Contributor',        'Posted 10 discussions'),
     ('veteran',         '🏆',  'Veteran',            'Active for 30+ days'),
+    ('rep_100',        '⭐',  'Rising Star',       'Earned 100 reputation points'),
+    ('rep_500',        '🌠',  'Shining Star',      'Earned 500 reputation points'),
+    ('streak_7',       '📅',  'Week Warrior',      'Maintained a 7-day activity streak'),
+    ('streak_30',      '🗓️',  'Monthly Legend',    'Maintained a 30-day activity streak'),
+    ('challenger',     '🎯',  'Challenger',        'Entered a community challenge'),
+    ('hot_author',     '♨️',  'Hot Author',        'Had a post flagged as Hot'),
+    ('debate_winner',  '🥇',  'Debate Winner',     'Won 3 or more debates'),
 ]
 
 
