@@ -30,6 +30,9 @@ class Profile(models.Model):
     last_seen = models.DateTimeField(null=True, blank=True, db_index=True)
     is_verified = models.BooleanField(default=False, help_text='Manually verified by a moderator')
     notification_prefs = models.JSONField(default=dict, blank=True, help_text='Per-type notification opt-in settings')
+    reputation_score = models.IntegerField(default=0, db_index=True, help_text='Computed reputation from likes, answers, debates')
+    streak_days = models.PositiveIntegerField(default=0, help_text='Current consecutive days of activity')
+    last_activity_date = models.DateField(null=True, blank=True, help_text='Last date the user posted or commented')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -176,6 +179,18 @@ class Achievement(models.Model):
     class Meta:
         ordering = ['-awarded_at']
         constraints = [models.UniqueConstraint(fields=['user', 'code'], name='unique_user_achievement')]
+
+
+class Endorsement(models.Model):
+    """One user endorses a topic/skill on another user's profile."""
+    endorser = models.ForeignKey(User, on_delete=models.CASCADE, related_name='given_endorsements')
+    endorsed = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_endorsements')
+    topic = models.CharField(max_length=60)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['endorser', 'endorsed', 'topic'], name='unique_endorsement')]
+        ordering = ['-created_at']
 
 
 class LoginAttempt(models.Model):

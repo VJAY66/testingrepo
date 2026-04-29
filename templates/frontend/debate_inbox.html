@@ -49,6 +49,12 @@
         <a href="{% url 'reject_debate' d.id %}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:text-destructive hover:border-destructive transition">Reject</a>
         {% elif d.status == 'completed' %}
         <a href="{% url 'debate_transcript' d.id %}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-foreground hover:bg-muted/60 transition">View Transcript</a>
+        {% if d.status == 'completed' %}
+        <button onclick="requestRematch('{{ d.id }}', this)"
+            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-amber-300 text-amber-600 dark:border-amber-700 dark:text-amber-400 text-xs font-semibold hover:bg-amber-50 dark:hover:bg-amber-950/30 transition">
+            ⚔️ Rematch
+        </button>
+        {% endif %}
         {% endif %}
         <a href="{% url 'discussion' d.post.id %}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:bg-muted/60 transition">View Post</a>
       </div>
@@ -58,4 +64,17 @@
   </div>
   {% endif %}
 </div>
+<script>
+function requestRematch(debateId, btn) {
+    btn.disabled = true; btn.textContent = 'Requesting…';
+    fetch('/debates/' + debateId + '/rematch/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'}
+    }).then(r => r.json()).then(d => {
+        if (d.success) { btn.textContent = '✓ Requested'; }
+        else { btn.textContent = '⚔️ Rematch'; btn.disabled = false; alert(d.error || 'Could not request rematch.'); }
+    });
+}
+function getCookie(n) { var v = document.cookie.match('(^|;) ?'+n+'=([^;]*)(;|$)'); return v ? v[2] : null; }
+</script>
 {% endblock %}

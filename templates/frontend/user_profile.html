@@ -175,6 +175,24 @@
                         {% endfor %}
                     </div>
                     {% endif %}
+                    {% if user_endorsements %}
+                    <div class="mt-2 flex flex-wrap gap-1.5">
+                        {% for e in user_endorsements %}
+                        <span class="inline-flex items-center gap-1 rounded-full border border-border/60 bg-secondary px-2.5 py-0.5 text-[11px] font-semibold text-foreground cursor-default" title="Endorsed by: {{ e.endorsers|join:', ' }}">
+                            {{ e.topic }} <span class="text-primary font-bold">×{{ e.count }}</span>
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {% if request.user.is_authenticated and not is_own_profile %}
+                    <div class="mt-2 flex items-center gap-2">
+                        <input type="text" id="endorse-topic-input" maxlength="60" placeholder="Endorse a skill (e.g. Debates)…"
+                            class="flex-1 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
+                        <button onclick="submitEndorsement('{{ profile_user.username }}')"
+                            class="shrink-0 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition">Endorse</button>
+                    </div>
+                    {% endif %}
 
                     <div class="mt-4 flex flex-wrap gap-2 justify-center sm:justify-start">
                         <div class="inline-flex items-center gap-3 rounded-2xl border border-border/70 bg-background/80 px-4 py-2.5">
@@ -197,6 +215,9 @@
 
                     {% if user.is_authenticated and not is_own_profile %}
                     <div class="mt-4 flex flex-wrap items-center gap-2 justify-center sm:justify-start">
+                        {% if follows_you_back and not is_own_profile %}
+                        <span class="text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">Follows you</span>
+                        {% endif %}
                         <button id="follow-btn" type="button" onclick="toggleFollow('{{ profile_user.username }}')"
                                 class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition
                                 {% if is_following %}bg-gray-500 text-white hover:bg-gray-600{% else %}bg-primary text-primary-foreground hover:bg-primary/90{% endif %}">
@@ -620,6 +641,27 @@ function toggleBlock(username) {
     .catch(function(){
         if (btn) { btn.disabled = false; btn.textContent = isBlocked ? 'Unblock' : 'Block'; }
         alert('Network error. Please try again.');
+    });
+}
+</script>
+
+<script>
+function submitEndorsement(username) {
+    var topic = (document.getElementById('endorse-topic-input') || {}).value || '';
+    topic = topic.trim();
+    if (!topic) { alert('Please enter a skill or topic to endorse.'); return; }
+    fetch('/user/' + username + '/endorse/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'topic=' + encodeURIComponent(topic)
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            document.getElementById('endorse-topic-input').value = '';
+            var msg = d.created ? 'Endorsed as "' + d.topic + '"!' : 'Already endorsed for "' + d.topic + '"';
+            alert(msg);
+        } else {
+            alert(d.error || 'Could not submit endorsement.');
+        }
     });
 }
 </script>

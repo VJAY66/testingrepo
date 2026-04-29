@@ -227,6 +227,16 @@
                         {% endfor %}
                     </div>
                     {% endif %}
+                    {% if computed_reputation > 0 or current_streak > 1 %}
+                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                      {% if computed_reputation > 0 %}
+                      <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/30 px-2.5 py-1 text-[11px] font-bold text-amber-700 dark:text-amber-400" title="Reputation score based on likes received">⭐ {{ computed_reputation }} rep</span>
+                      {% endif %}
+                      {% if current_streak > 1 %}
+                      <span class="inline-flex items-center gap-1 rounded-full bg-orange-100 dark:bg-orange-900/30 px-2.5 py-1 text-[11px] font-bold text-orange-600 dark:text-orange-400" title="{{ current_streak }}-day activity streak">🔥 {{ current_streak }}-day streak</span>
+                      {% endif %}
+                    </div>
+                    {% endif %}
                     <div class="mt-2">
                         <button type="button" onclick="openBioModal()" class="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[11px] font-semibold text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
@@ -368,6 +378,14 @@
             <svg class="w-3.5 h-3.5 shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
             <span>Series</span>
             <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_series|length }}</span>
+        </button>
+        <button type="button" id="tab-btn-reactions" onclick="switchProfileTab('reactions')"
+            class="profile-tab-btn flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-2 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200">
+            🔥 <span class="hidden sm:inline">Reactions</span>
+        </button>
+        <button type="button" id="tab-btn-calendar" onclick="switchProfileTab('calendar')"
+            class="profile-tab-btn flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-2 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200">
+            📅 <span class="hidden sm:inline">Calendar</span>
         </button>
         <button type="button" id="tab-btn-blocked" onclick="switchProfileTab('blocked')"
             class="profile-tab-btn flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-2 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200">
@@ -774,6 +792,25 @@
 
     <!-- Tab: Drafts -->
     <section id="tab-drafts" class="hidden">
+        {% if coauthor_invites %}
+        <div class="mb-4 rounded-2xl border border-primary/30 bg-primary/5 p-4">
+          <h3 class="text-sm font-bold text-foreground mb-2">📝 Co-author Invitations</h3>
+          <div class="space-y-2">
+            {% for inv in coauthor_invites %}
+            <div class="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card px-4 py-2.5">
+              <div class="min-w-0">
+                <p class="text-sm font-semibold text-foreground truncate">{{ inv.post.title }}</p>
+                <p class="text-xs text-muted-foreground">from @{{ inv.invited_by.username }}</p>
+              </div>
+              <div class="flex gap-2 shrink-0">
+                <button onclick="respondCoauthorInvite('{{ inv.post.id }}', 'accept', this)" class="px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition">Accept</button>
+                <button onclick="respondCoauthorInvite('{{ inv.post.id }}', 'decline', this)" class="px-3 py-1 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:text-destructive transition">Decline</button>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
         {% if user_drafts %}
         <div class="space-y-4">
             {% for post in user_drafts %}
@@ -879,6 +916,74 @@
         {% endif %}
     </section>
 
+    <section id="tab-reactions" class="hidden">
+        {% if user_reactions_feed %}
+        <div class="grid gap-3 sm:gap-4">
+            {% for action in user_reactions_feed %}
+            <article class="group rounded-2xl border border-border/70 bg-card p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+                <div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+                    <span>{% if action.action == 'hot' %}🔥 Hot{% elif action.action == 'agree' %}👏 Agree{% elif action.action == 'debatable' %}🤔 Debatable{% elif action.action == 'surprising' %}😮 Surprising{% endif %} &middot; {{ action.created_at|date:"M j, Y" }}</span>
+                </div>
+                <a href="{% url 'discussion' action.post.id %}" class="text-sm font-bold text-foreground hover:text-primary transition-colors leading-snug">{{ action.post.title }}</a>
+                <p class="text-xs text-muted-foreground mt-1">by @{{ action.post.user.username }} · {{ action.post.category }}</p>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="rounded-2xl border border-dashed border-border bg-card/70 p-10 text-center">
+            <p class="text-2xl mb-2">🔥</p>
+            <p class="font-semibold text-foreground mb-1">No emoji reactions yet</p>
+            <p class="text-sm text-muted-foreground">React to posts with 🔥 🤔 👏 😮 to see them here.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    <section id="tab-calendar" class="hidden">
+        <div class="rounded-2xl border border-border/70 bg-card p-5 mb-4">
+            <h3 class="text-sm font-bold text-foreground mb-1">Content Calendar</h3>
+            <p class="text-xs text-muted-foreground mb-3">Last 60 days of posts + scheduled drafts</p>
+            <div id="content-calendar-grid" class="overflow-x-auto pb-2"></div>
+        </div>
+        <script>
+        (function() {
+            var data = {{ content_calendar_json|safe }};
+            var container = document.getElementById('content-calendar-grid');
+            if (!container) return;
+            var today = new Date(); today.setHours(0,0,0,0);
+            var start = new Date(today); start.setDate(start.getDate() - 59);
+            function pad(n){ return n<10?'0'+n:''+n; }
+            function key(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+            var table = document.createElement('table');
+            table.style.cssText = 'border-collapse:separate;border-spacing:4px;width:max-content';
+            var rows = [0,1,2,3,4,5,6].map(function(){ return document.createElement('tr'); });
+            var d = new Date(start); d.setDate(d.getDate() - d.getDay());
+            while(d <= today) {
+                var dow = d.getDay(); var k = key(d); var count = data.counts[k] || 0;
+                var scheduled = (data.scheduled || []).filter(function(s){ return s[0]===k; });
+                var td = document.createElement('td');
+                td.style.cssText = 'width:14px;height:14px;border-radius:3px;cursor:default;';
+                if (scheduled.length) td.style.background = 'hsl(217 91% 60% / 0.75)';
+                else if (count === 0) td.style.background = 'hsl(var(--muted))';
+                else if (count === 1) td.style.background = 'hsl(142 71% 45% / 0.45)';
+                else if (count <= 3) td.style.background = 'hsl(142 71% 45% / 0.75)';
+                else td.style.background = 'hsl(142 71% 45%)';
+                var schedTitles = scheduled.map(function(s){ return s[1]; }).join(', ');
+                td.title = k + (count ? ' · '+count+' post'+(count>1?'s':'') : '') + (schedTitles ? ' · Scheduled: '+schedTitles : '');
+                rows[dow].appendChild(td);
+                d.setDate(d.getDate() + 1);
+            }
+            var tbody = document.createElement('tbody');
+            rows.forEach(function(r){ tbody.appendChild(r); });
+            table.appendChild(tbody);
+            container.appendChild(table);
+            var legend = document.createElement('p');
+            legend.className = 'text-[10px] text-muted-foreground mt-2';
+            legend.innerHTML = '<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:hsl(142 71% 45% / 0.75);vertical-align:middle"></span> Posted &nbsp;<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:hsl(217 91% 60% / 0.75);vertical-align:middle"></span> Scheduled';
+            container.appendChild(legend);
+        })();
+        </script>
+    </section>
+
     <section id="tab-blocked" class="hidden">
         {% if blocked_users %}
         <div class="grid gap-3">
@@ -973,6 +1078,39 @@
             <input type="text" id="mute-kw-input" placeholder="Add keyword..." class="flex-1 rounded-full border border-border px-3 py-1.5 text-xs bg-background">
             <button onclick="addMutedKeyword()" class="px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold">Mute</button>
         </div>
+    </div>
+
+    <!-- Endorsements Received -->
+    <div class="mt-4 rounded-2xl border border-border/70 bg-card p-4">
+        <h3 class="text-sm font-bold mb-3 text-foreground">Endorsements Received</h3>
+        {% if endorsements_by_topic %}
+        <div class="flex flex-wrap gap-2">
+            {% for e in endorsements_by_topic %}
+            <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border/70 bg-secondary text-xs font-semibold text-foreground cursor-default" title="Endorsed by: {{ e.endorsers|join:', ' }}">
+                {{ e.topic }} <span class="rounded-full bg-primary/15 text-primary px-1.5 text-[10px] font-bold leading-none">{{ e.count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-muted-foreground">No endorsements yet. Other users can endorse skills on your public profile.</p>
+        {% endif %}
+    </div>
+
+    <!-- Followed Categories -->
+    <div class="mt-4 rounded-2xl border border-border/70 bg-card p-4">
+        <h3 class="text-sm font-bold mb-3 text-foreground">Followed Categories</h3>
+        {% if followed_categories %}
+        <div class="flex flex-wrap gap-2">
+            {% for cat in followed_categories %}
+            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                {{ cat }}
+                <button onclick="unfollowCat('{{ cat }}', this)" class="ml-1 hover:text-destructive transition-colors leading-none text-sm">&times;</button>
+            </span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-muted-foreground">Not following any categories. Use the "Follow Category" button on any category page.</p>
+        {% endif %}
     </div>
 
     <!-- Notification Preferences Section -->
@@ -1215,7 +1353,7 @@ function togglePin(postId, btn) {
 }
 
 function switchProfileTab(name) {
-    ['posts', 'reposts', 'debates', 'saved', 'followed', 'followers', 'following', 'reviews', 'questions', 'polls', 'answers', 'drafts', 'series'].forEach(function(t) {
+    ['posts', 'reposts', 'debates', 'saved', 'followed', 'followers', 'following', 'reviews', 'questions', 'polls', 'answers', 'drafts', 'series', 'reactions', 'calendar'].forEach(function(t) {
         var sec = document.getElementById('tab-' + t);
         var btn = document.getElementById('tab-btn-' + t);
         if (sec) {
@@ -1556,6 +1694,33 @@ function removeMutedKeyword(kw, btn) {
         }
     });
 }
+
+function unfollowCat(cat, btn) {
+    fetch('/categories/follow/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'category=' + encodeURIComponent(cat)
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            var pill = btn.closest('span');
+            if (pill) { pill.style.transition = 'opacity 0.3s'; pill.style.opacity = '0'; setTimeout(() => pill.remove(), 300); }
+        }
+    });
+}
+
+function respondCoauthorInvite(postId, action, btn) {
+    fetch('/posts/' + postId + '/coauthor/respond/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'action=' + encodeURIComponent(action)
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            var row = btn.closest('.flex.items-center');
+            if (row) { row.style.transition = 'opacity 0.3s'; row.style.opacity = '0'; setTimeout(() => row.remove(), 300); }
+        }
+    });
+}
+
 function unblockUser(username, btn) {
     var row = document.getElementById('block-row-' + username);
     fetch('/unblock-user/', {

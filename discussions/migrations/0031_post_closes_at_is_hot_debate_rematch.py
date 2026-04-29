@@ -1,0 +1,82 @@
+import django.db.models.deletion
+from django.conf import settings
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ('discussions', '0030_postaction_quote_content'),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ]
+    operations = [
+        migrations.AddField(model_name='post', name='closes_at',
+            field=models.DateTimeField(blank=True, help_text='Lock comments after this time', null=True)),
+        migrations.AddField(model_name='post', name='is_hot',
+            field=models.BooleanField(db_index=True, default=False, help_text='Auto-flagged as rapidly gaining reactions')),
+        migrations.AddField(model_name='debate', name='rematch_of',
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='rematches', to='discussions.debate')),
+        migrations.CreateModel(name='CategoryFollow',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('category', models.CharField(max_length=50)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='category_follows', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={'ordering': ['category']},
+        ),
+        migrations.AddConstraint(model_name='categoryfollow',
+            constraint=models.UniqueConstraint(fields=['user', 'category'], name='unique_category_follow')),
+        migrations.CreateModel(name='PostAppeal',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('reason', models.TextField()),
+                ('status', models.CharField(choices=[('pending', 'Pending'), ('approved', 'Approved'), ('rejected', 'Rejected')], default='pending', max_length=10)),
+                ('moderator_note', models.TextField(blank=True, default='')),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('updated_at', models.DateTimeField(auto_now=True)),
+                ('post', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='appeals', to='discussions.post')),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='post_appeals', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={'ordering': ['-created_at']},
+        ),
+        migrations.CreateModel(name='PostCoAuthor',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('accepted', models.BooleanField(null=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('invited_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='coauthor_invites', to=settings.AUTH_USER_MODEL)),
+                ('post', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='co_authors', to='discussions.post')),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='co_authored_posts', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={'ordering': ['-created_at']},
+        ),
+        migrations.AddConstraint(model_name='postcoauthor',
+            constraint=models.UniqueConstraint(fields=['post', 'user'], name='unique_coauthor')),
+        migrations.CreateModel(name='Challenge',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('title', models.CharField(max_length=100)),
+                ('description', models.TextField()),
+                ('category', models.CharField(blank=True, default='', max_length=50)),
+                ('starts_at', models.DateTimeField()),
+                ('ends_at', models.DateTimeField()),
+                ('is_active', models.BooleanField(default=True)),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('created_by', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='created_challenges', to=settings.AUTH_USER_MODEL)),
+                ('winner', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='won_challenges', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={'ordering': ['-starts_at']},
+        ),
+        migrations.CreateModel(name='ChallengeEntry',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('challenge', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='entries', to='discussions.challenge')),
+                ('post', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='challenge_entries', to='discussions.post')),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='challenge_entries', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={'ordering': ['-created_at']},
+        ),
+        migrations.AddConstraint(model_name='challengeentry',
+            constraint=models.UniqueConstraint(fields=['challenge', 'post'], name='unique_challenge_entry')),
+    ]

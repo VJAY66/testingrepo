@@ -132,4 +132,16 @@ urlpatterns = [
     path('posts/<str:post_id>/reaction-users/', views.post_reaction_users, name='post_reaction_users'),
     path('mentions/suggest/', views.mention_suggestions, name='mention_suggestions'),
     path('debates/inbox/', views.debate_inbox, name='debate_inbox'),
+    # New feature endpoints
+    path('user/<str:username>/endorse/', views.endorse_user, name='endorse_user'),
+    path('categories/follow/', views.follow_category, name='follow_category'),
+    path('posts/<str:post_id>/set-expiry/', views.set_post_expiry, name='set_post_expiry'),
+    path('posts/<str:post_id>/appeal/', views.appeal_post, name='appeal_post'),
+    path('posts/<str:post_id>/coauthor/invite/', views.invite_coauthor, name='invite_coauthor'),
+    path('posts/<str:post_id>/coauthor/respond/', views.respond_coauthor_invite, name='respond_coauthor_invite'),
+    path('debates/<str:debate_id>/rematch/', views.request_rematch, name='request_rematch'),
+    path('appeals/<int:appeal_id>/review/', views.review_appeal, name='review_appeal'),
+    path('challenges/', views.challenges_list, name='challenges_list'),
+    path('challenges/create/', views.create_challenge, name='create_challenge'),
+    path('challenges/<int:challenge_id>/enter/', views.enter_challenge, name='enter_challenge'),
 ]

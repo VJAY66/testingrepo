@@ -1444,6 +1444,82 @@ def profile(request):
     completion_total = len(_completion_steps)
     completion_pct = round(completion_score / completion_total * 100)
 
+    # Reputation score: likes received + 2× best answers
+    _likes_rx = PostAction.objects.filter(post__user=request.user, action='like').count()
+    computed_reputation = _likes_rx
+    if profile_obj and profile_obj.reputation_score != computed_reputation:
+        try:
+            profile_obj.reputation_score = computed_reputation
+            profile_obj.save(update_fields=['reputation_score'])
+        except Exception:
+            pass
+
+    # Streak: consecutive days of activity
+    import datetime as _dt
+    _today = timezone.now().date()
+    current_streak = profile_obj.streak_days if profile_obj else 0
+
+    # Post reactions feed (emoji reactions the user gave)
+    user_reactions_feed = list(
+        PostAction.objects.filter(
+            user=request.user, action__in=['hot', 'debatable', 'agree', 'surprising']
+        ).select_related('post', 'post__user').order_by('-created_at')[:50]
+    )
+
+    # Content calendar: posts per day for last 60 days + scheduled
+    from django.db.models.functions import TruncDate as _TruncDate2
+    _cal_start = _today - _dt.timedelta(days=59)
+    _cal_counts = {
+        str(r['day']): r['n']
+        for r in Post.objects.filter(
+            user=request.user, is_draft=False, created_at__date__gte=_cal_start
+        ).annotate(day=_TruncDate2('created_at')).values('day').annotate(n=Count('id'))
+    }
+    _sched = list(
+        Post.objects.filter(user=request.user, is_draft=True, scheduled_for__isnull=False)
+        .values_list('scheduled_for__date', 'title')
+    )
+    content_calendar_json = json.dumps({
+        'counts': {str(k): v for k, v in _cal_counts.items()},
+        'scheduled': [[str(d), t] for d, t in _sched],
+    })
+
+    # Endorsements received (grouped by topic)
+    from users.models import Endorsement as _Endorsement
+    try:
+        _endorsements = list(
+            _Endorsement.objects.filter(endorsed=request.user)
+            .select_related('endorser').order_by('topic', '-created_at')
+        )
+        _etopics = {}
+        for e in _endorsements:
+            _etopics.setdefault(e.topic, []).append(e.endorser.username)
+        endorsements_by_topic = [
+            {'topic': t, 'endorsers': names, 'count': len(names)}
+            for t, names in _etopics.items()
+        ]
+    except Exception:
+        endorsements_by_topic = []
+
+    # Category follows
+    from discussions.models import CategoryFollow as _CatFollow
+    try:
+        followed_categories = list(
+            _CatFollow.objects.filter(user=request.user).values_list('category', flat=True)
+        )
+    except Exception:
+        followed_categories = []
+
+    # Co-authoring: drafts where user is invited as co-author
+    from discussions.models import PostCoAuthor as _PCA
+    try:
+        coauthor_invites = list(
+            _PCA.objects.filter(user=request.user, accepted__isnull=True)
+            .select_related('post', 'invited_by').order_by('-created_at')
+        )
+    except Exception:
+        coauthor_invites = []
+
     context = {
         'user_posts': user_posts,
         'user_reposts': user_reposts,
@@ -1485,6 +1561,13 @@ def profile(request):
         'completion_score': completion_score,
         'completion_total': completion_total,
         'completion_pct': completion_pct,
+        'computed_reputation': computed_reputation,
+        'current_streak': current_streak,
+        'user_reactions_feed': user_reactions_feed,
+        'content_calendar_json': content_calendar_json,
+        'endorsements_by_topic': endorsements_by_topic,
+        'followed_categories': followed_categories,
+        'coauthor_invites': coauthor_invites,
     }
     return render(request, 'frontend/profile.html', context)
 
@@ -1553,6 +1636,22 @@ def user_profile(request, username):
         is_following = Follow.objects.filter(follower=request.user, following=profile_user).exists()
         is_blocked = UserBlock.objects.filter(blocker=request.user, blocked=profile_user).exists()
 
+    follows_you_back = False
+    user_endorsements = []
+    if request.user.is_authenticated:
+        follows_you_back = Follow.objects.filter(
+            follower=profile_user, following=request.user
+        ).exists()
+        from users.models import Endorsement as _EndQ
+        try:
+            _e = list(_EndQ.objects.filter(endorsed=profile_user).select_related('endorser').order_by('topic', '-created_at'))
+            _et = {}
+            for e in _e:
+                _et.setdefault(e.topic, []).append(e.endorser.username)
+            user_endorsements = [{'topic': t, 'endorsers': ns, 'count': len(ns)} for t, ns in _et.items()]
+        except Exception:
+            user_endorsements = []
+
     user_reviews = Review.objects.filter(user=profile_user, is_deleted_by_moderation=False).order_by('-created_at')
     user_questions = Question.objects.filter(user=profile_user, is_deleted_by_moderation=False).order_by('-created_at')
     user_polls = Poll.objects.filter(user=profile_user).order_by('-created_at')
@@ -1589,6 +1688,8 @@ def user_profile(request, username):
         'is_moderator': is_moderator,
         'user_achievements': up_achievements,
         'achievement_details': up_achievement_details,
+        'follows_you_back': follows_you_back,
+        'user_endorsements': user_endorsements,
     }
     return render(request, 'frontend/user_profile.html', context)
 
@@ -5690,3 +5791,284 @@ def _get_trending_hashtags(limit=10):
     top = [{'tag': tag, 'count': count} for tag, count in Counter(all_tags).most_common(limit) if tag]
     cache.set(cache_key, top, 900)  # 15 min cache
     return top
+
+
+# ─── Endorsements ─────────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def endorse_user(request, username):
+    from users.models import Endorsement as _End
+    target = get_object_or_404(User, username=username)
+    if target == request.user:
+        return JsonResponse({'success': False, 'error': 'Cannot endorse yourself'}, status=400)
+    topic = (request.POST.get('topic') or '').strip()[:60]
+    if not topic:
+        return JsonResponse({'success': False, 'error': 'Topic required'}, status=400)
+    _, created = _End.objects.get_or_create(endorser=request.user, endorsed=target, topic=topic)
+    count = _End.objects.filter(endorsed=target, topic=topic).count()
+    return JsonResponse({'success': True, 'created': created, 'count': count, 'topic': topic})
+
+
+# ─── Category Follows ─────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def follow_category(request):
+    from discussions.models import CategoryFollow as _CF
+    category = (request.POST.get('category') or '').strip()
+    if not category:
+        return JsonResponse({'success': False, 'error': 'category required'}, status=400)
+    obj, created = _CF.objects.get_or_create(user=request.user, category=category)
+    if not created:
+        obj.delete()
+        return JsonResponse({'success': True, 'action': 'unfollowed'})
+    return JsonResponse({'success': True, 'action': 'followed'})
+
+
+# ─── Post Expiry ──────────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def set_post_expiry(request, post_id):
+    post = get_object_or_404(Post, id=post_id, user=request.user)
+    closes_at_raw = (request.POST.get('closes_at') or '').strip()
+    if closes_at_raw:
+        try:
+            from django.utils.dateparse import parse_datetime
+            dt = parse_datetime(closes_at_raw)
+            if dt:
+                post.closes_at = timezone.make_aware(dt) if timezone.is_naive(dt) else dt
+                post.save(update_fields=['closes_at'])
+                return JsonResponse({'success': True})
+        except Exception:
+            pass
+        return JsonResponse({'success': False, 'error': 'Invalid date'}, status=400)
+    post.closes_at = None
+    post.save(update_fields=['closes_at'])
+    return JsonResponse({'success': True})
+
+
+# ─── Debate Rematch ───────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def request_rematch(request, debate_id):
+    original = get_object_or_404(Debate, id=debate_id, status='completed')
+    if request.user not in (original.initiator, original.target):
+        return JsonResponse({'success': False, 'error': 'Not a participant'}, status=403)
+    opponent = original.target if original.initiator == request.user else original.initiator
+    # Check no existing pending rematch
+    existing = Debate.objects.filter(rematch_of=original, status='pending').first()
+    if existing:
+        return JsonResponse({'success': False, 'error': 'Rematch already requested'})
+    import uuid as _uuid
+    new_debate = Debate.objects.create(
+        id=str(_uuid.uuid4()),
+        post=original.post,
+        initiator=request.user,
+        target=opponent,
+        status='pending',
+        rematch_of=original,
+        yes_supporters=original.yes_supporters,
+        no_supporters=original.no_supporters,
+    )
+    # Notify opponent
+    Notification.objects.create(
+        user=opponent,
+        post=original.post,
+        notification_type='author_debate',
+        message=f'@{request.user.username} challenged you to a rematch debate on "{original.post.title}"',
+    )
+    return JsonResponse({'success': True, 'debate_id': new_debate.id})
+
+
+# ─── Post Appeal ──────────────────────────────────────────────────────────────
+
+@login_required
+def appeal_post(request, post_id):
+    from discussions.models import PostAppeal as _Appeal
+    post = get_object_or_404(Post, id=post_id, user=request.user)
+    existing = _Appeal.objects.filter(post=post, user=request.user).first()
+    if request.method == 'POST':
+        if existing and existing.status != 'rejected':
+            return JsonResponse({'success': False, 'error': 'Appeal already submitted'}, status=400)
+        reason = (request.POST.get('reason') or '').strip()
+        if len(reason) < 10:
+            return JsonResponse({'success': False, 'error': 'Please explain your appeal (min 10 chars)'}, status=400)
+        if existing and existing.status == 'rejected':
+            existing.reason = reason
+            existing.status = 'pending'
+            existing.save(update_fields=['reason', 'status', 'updated_at'])
+            appeal = existing
+        else:
+            appeal = _Appeal.objects.create(post=post, user=request.user, reason=reason)
+        return JsonResponse({'success': True, 'appeal_id': appeal.id})
+    return render(request, 'frontend/appeal_post.html', {
+        'post': post, 'existing_appeal': existing
+    })
+
+
+@login_required
+def review_appeal(request, appeal_id):
+    from discussions.models import PostAppeal as _Appeal
+    if not _is_configured_moderator(request.user):
+        return JsonResponse({'success': False, 'error': 'Forbidden'}, status=403)
+    appeal = get_object_or_404(_Appeal, id=appeal_id)
+    if request.method == 'POST':
+        decision = request.POST.get('decision')
+        note = (request.POST.get('note') or '').strip()
+        if decision not in ('approved', 'rejected'):
+            return JsonResponse({'success': False, 'error': 'Invalid decision'}, status=400)
+        appeal.status = decision
+        appeal.moderator_note = note
+        appeal.save(update_fields=['status', 'moderator_note', 'updated_at'])
+        if decision == 'approved':
+            appeal.post.is_deleted_by_moderation = False
+            appeal.post.is_flagged = False
+            appeal.post.save(update_fields=['is_deleted_by_moderation', 'is_flagged'])
+        Notification.objects.create(
+            user=appeal.user,
+            post=appeal.post,
+            notification_type='moderation_warning',
+            message=f'Your appeal for "{appeal.post.title}" was {decision}.{" Moderator note: " + note if note else ""}',
+        )
+        return JsonResponse({'success': True})
+    return render(request, 'frontend/appeal_post.html', {
+        'post': appeal.post, 'existing_appeal': appeal, 'is_moderator_view': True
+    })
+
+
+# ─── Community Challenges ─────────────────────────────────────────────────────
+
+def challenges_list(request):
+    from discussions.models import Challenge as _Ch
+    active = list(_Ch.objects.filter(is_active=True).order_by('-starts_at')[:10])
+    past = list(_Ch.objects.filter(is_active=False).order_by('-ends_at')[:10])
+    user_entries = set()
+    if request.user.is_authenticated:
+        from discussions.models import ChallengeEntry as _CE
+        user_entries = set(
+            _CE.objects.filter(user=request.user).values_list('challenge_id', flat=True)
+        )
+    return render(request, 'frontend/challenges.html', {
+        'active_challenges': active,
+        'past_challenges': past,
+        'user_entries': user_entries,
+    })
+
+
+@login_required
+@require_POST
+def enter_challenge(request, challenge_id):
+    from discussions.models import Challenge as _Ch, ChallengeEntry as _CE
+    challenge = get_object_or_404(_Ch, id=challenge_id, is_active=True)
+    post_id = (request.POST.get('post_id') or '').strip()
+    if not post_id:
+        return JsonResponse({'success': False, 'error': 'post_id required'}, status=400)
+    post = get_object_or_404(Post, id=post_id, user=request.user, is_draft=False)
+    _, created = _CE.objects.get_or_create(challenge=challenge, post=post, user=request.user)
+    return JsonResponse({'success': True, 'created': created})
+
+
+@login_required
+def create_challenge(request):
+    if not _is_configured_moderator(request.user):
+        from django.http import Http404
+        raise Http404
+    from discussions.models import Challenge as _Ch
+    if request.method == 'POST':
+        title = (request.POST.get('title') or '').strip()
+        desc = (request.POST.get('description') or '').strip()
+        starts = request.POST.get('starts_at', '').strip()
+        ends = request.POST.get('ends_at', '').strip()
+        if not all([title, desc, starts, ends]):
+            return render(request, 'frontend/create_challenge.html', {'error': 'All fields required'})
+        from django.utils.dateparse import parse_datetime
+        try:
+            s = timezone.make_aware(parse_datetime(starts))
+            e = timezone.make_aware(parse_datetime(ends))
+            _Ch.objects.create(title=title, description=desc, starts_at=s, ends_at=e,
+                               created_by=request.user, category=request.POST.get('category', ''))
+            return redirect('challenges_list')
+        except Exception as ex:
+            return render(request, 'frontend/create_challenge.html', {'error': str(ex)})
+    return render(request, 'frontend/create_challenge.html', {'categories': get_frontend_categories()})
+
+
+# ─── Co-authoring ─────────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def invite_coauthor(request, post_id):
+    from discussions.models import PostCoAuthor as _PCA
+    post = get_object_or_404(Post, id=post_id, user=request.user, is_draft=True)
+    username = (request.POST.get('username') or '').strip()
+    invitee = get_object_or_404(User, username=username)
+    if invitee == request.user:
+        return JsonResponse({'success': False, 'error': 'Cannot invite yourself'}, status=400)
+    _, created = _PCA.objects.get_or_create(
+        post=post, user=invitee, defaults={'invited_by': request.user}
+    )
+    Notification.objects.create(
+        user=invitee,
+        post=post,
+        notification_type='mention',
+        message=f'@{request.user.username} invited you to co-author the draft "{post.title}"',
+    )
+    return JsonResponse({'success': True, 'created': created})
+
+
+@login_required
+@require_POST
+def respond_coauthor_invite(request, post_id):
+    from discussions.models import PostCoAuthor as _PCA
+    invite = get_object_or_404(_PCA, post_id=post_id, user=request.user, accepted__isnull=True)
+    action = request.POST.get('action')
+    if action == 'accept':
+        invite.accepted = True
+    else:
+        invite.accepted = False
+    invite.save(update_fields=['accepted'])
+    return JsonResponse({'success': True, 'action': action})
+
+
+# ─── Hot posts helper ─────────────────────────────────────────────────────────
+
+def _mark_hot_posts(posts):
+    """Tag posts with is_hot_now=True if they got 10+ reactions in the last hour."""
+    if not posts:
+        return posts
+    cutoff = timezone.now() - timedelta(hours=1)
+    post_ids = [p.id for p in posts]
+    hot_ids = set(
+        PostAction.objects.filter(
+            post_id__in=post_ids,
+            action__in=['like', 'hot', 'agree', 'surprising'],
+            created_at__gte=cutoff,
+        ).values('post_id').annotate(n=Count('id')).filter(n__gte=10).values_list('post_id', flat=True)
+    )
+    for p in posts:
+        p.is_hot_now = p.id in hot_ids
+    return posts
+
+
+# ─── Spam Score (used by moderation dashboard) ────────────────────────────────
+
+def _compute_spam_score(post):
+    """Return 0-100 spam likelihood score based on simple heuristics."""
+    score = 0
+    content = (post.title or '') + ' ' + (post.content or '')
+    import re as _re
+    links = len(_re.findall(r'https?://', content))
+    score += min(links * 15, 45)
+    words = content.split()
+    if words:
+        caps_ratio = sum(1 for w in words if w.isupper() and len(w) > 2) / len(words)
+        score += int(caps_ratio * 30)
+    account_age_days = (timezone.now() - post.user.date_joined).days
+    if account_age_days < 1:
+        score += 25
+    elif account_age_days < 7:
+        score += 10
+    return min(score, 100)

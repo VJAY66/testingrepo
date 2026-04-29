@@ -202,4 +202,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (titleEl) updateCharCount(titleEl, 255, 'title-count');
 });
 </script>
+<script>
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    var t = params.get('ptitle');
+    if (t) {
+        var el = document.getElementById('poll-title');
+        if (el && !el.value.trim()) { el.value = t; if (typeof updateCharCount === 'function') updateCharCount(el, 255, 'title-count'); }
+    }
+})();
+</script>
 {% endblock %}

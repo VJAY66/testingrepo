@@ -44,6 +44,8 @@ class Post(models.Model):
     is_draft = models.BooleanField(default=False, help_text='Saved draft, not yet published')
     is_pinned = models.BooleanField(default=False, help_text='Pinned to top of author profile')
     scheduled_for = models.DateTimeField(null=True, blank=True, help_text='Publish this draft automatically at this time')
+    closes_at = models.DateTimeField(null=True, blank=True, help_text='Lock comments after this time')
+    is_hot = models.BooleanField(default=False, db_index=True, help_text='Auto-flagged as rapidly gaining reactions')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -146,6 +148,7 @@ class Debate(models.Model):
     end_controller_side = models.CharField(max_length=10, choices=Comment.VOTE_CHOICES, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    rematch_of = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='rematches')
 
     @property
     def context_title(self):
@@ -838,3 +841,78 @@ class PostSeriesItem(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['series', 'post'], name='unique_series_post'),
         ]
+
+
+class CategoryFollow(models.Model):
+    """User follows a category to prioritise it in their feed."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='category_follows')
+    category = models.CharField(max_length=50)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['user', 'category'], name='unique_category_follow')]
+        ordering = ['category']
+
+
+class PostAppeal(models.Model):
+    """Author appeals a moderation action on their post."""
+    STATUS_CHOICES = [('pending', 'Pending'), ('approved', 'Approved'), ('rejected', 'Rejected')]
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='appeals')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='post_appeals')
+    reason = models.TextField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    moderator_note = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+
+class PostCoAuthor(models.Model):
+    """Another user invited to co-author a draft post."""
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='co_authors')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='co_authored_posts')
+    invited_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='coauthor_invites')
+    accepted = models.BooleanField(null=True)  # None=pending, True=accepted, False=declined
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['post', 'user'], name='unique_coauthor')]
+        ordering = ['-created_at']
+
+
+class Challenge(models.Model):
+    """Weekly community challenge."""
+    title = models.CharField(max_length=100)
+    description = models.TextField()
+    category = models.CharField(max_length=50, blank=True, default='')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_challenges')
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+    winner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='won_challenges')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-starts_at']
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def is_ongoing(self):
+        from django.utils import timezone
+        return self.starts_at <= timezone.now() <= self.ends_at
+
+
+class ChallengeEntry(models.Model):
+    """A post submitted as an entry to a challenge."""
+    challenge = models.ForeignKey(Challenge, on_delete=models.CASCADE, related_name='entries')
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='challenge_entries')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='challenge_entries')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['challenge', 'post'], name='unique_challenge_entry')]
+        ordering = ['-created_at']

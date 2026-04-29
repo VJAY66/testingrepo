@@ -1,0 +1,154 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}{% if is_moderator_view %}Review Appeal{% else %}Appeal Post{% endif %} — PickASide{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-8">
+  <a href="{% url 'discussion' post.id %}" class="text-sm text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1">
+    ← Back to post
+  </a>
+
+  <div class="card rounded-xl border border-border p-6 mt-4">
+    {% if is_moderator_view %}
+    <h1 class="text-xl font-bold mb-1">Moderator: Review Appeal</h1>
+    <p class="text-sm text-muted-foreground mb-6">Reviewing appeal for post by <strong>{{ existing_appeal.user.username }}</strong></p>
+    {% else %}
+    <h1 class="text-xl font-bold mb-1">Appeal Post Moderation</h1>
+    <p class="text-sm text-muted-foreground mb-6">Submit a request for a moderator to review this decision.</p>
+    {% endif %}
+
+    <div class="bg-muted rounded-lg p-4 mb-6">
+      <p class="text-xs text-muted-foreground uppercase tracking-wide mb-1">Post</p>
+      <p class="font-semibold">{{ post.title }}</p>
+      {% if post.content %}<p class="text-sm text-muted-foreground mt-1 line-clamp-3">{{ post.content }}</p>{% endif %}
+    </div>
+
+    {% if is_moderator_view %}
+    {# Moderator review panel #}
+    <div class="mb-6">
+      <p class="text-sm font-medium mb-1">User's appeal reason:</p>
+      <p class="text-sm bg-muted rounded p-3">{{ existing_appeal.reason }}</p>
+      <p class="text-xs text-muted-foreground mt-2">Status: <strong>{{ existing_appeal.status }}</strong></p>
+    </div>
+
+    {% if existing_appeal.status == 'pending' %}
+    <form id="moderator-review-form">
+      {% csrf_token %}
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1" for="mod-note">Moderator note (optional)</label>
+        <textarea id="mod-note" name="note" rows="3"
+                  class="w-full rounded-lg border border-border bg-background p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Explain your decision to the user…"></textarea>
+      </div>
+      <div class="flex gap-3">
+        <button type="button" onclick="submitReview('approved')"
+                class="btn btn-sm btn-primary">Approve Appeal</button>
+        <button type="button" onclick="submitReview('rejected')"
+                class="btn btn-sm btn-destructive">Reject Appeal</button>
+      </div>
+    </form>
+    {% else %}
+    <p class="text-sm text-green-600 font-medium">This appeal has already been reviewed ({{ existing_appeal.status }}).</p>
+    {% if existing_appeal.moderator_note %}
+    <p class="text-sm text-muted-foreground mt-2">Note: {{ existing_appeal.moderator_note }}</p>
+    {% endif %}
+    {% endif %}
+
+    {% else %}
+    {# User appeal submission panel #}
+    {% if existing_appeal and existing_appeal.status == 'pending' %}
+    <div class="flex items-center gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+      <span class="text-xl">⏳</span>
+      <div>
+        <p class="font-semibold text-sm">Appeal under review</p>
+        <p class="text-xs mt-0.5">A moderator will review your appeal soon.</p>
+      </div>
+    </div>
+    {% elif existing_appeal and existing_appeal.status == 'approved' %}
+    <div class="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
+      <span class="text-xl">✅</span>
+      <div>
+        <p class="font-semibold text-sm">Appeal approved</p>
+        {% if existing_appeal.moderator_note %}
+        <p class="text-xs mt-0.5">{{ existing_appeal.moderator_note }}</p>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    {% if existing_appeal and existing_appeal.status == 'rejected' %}
+    <div class="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 mb-6">
+      <span class="text-xl">❌</span>
+      <div>
+        <p class="font-semibold text-sm">Previous appeal rejected</p>
+        {% if existing_appeal.moderator_note %}
+        <p class="text-xs mt-0.5">{{ existing_appeal.moderator_note }}</p>
+        {% endif %}
+        <p class="text-xs mt-1">You may submit a new appeal below.</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <form id="appeal-form">
+      {% csrf_token %}
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1" for="appeal-reason">Reason for appeal</label>
+        <textarea id="appeal-reason" name="reason" rows="4" required minlength="10"
+                  class="w-full rounded-lg border border-border bg-background p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Explain why you believe this moderation decision should be reconsidered (min 10 characters)…"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary w-full">Submit Appeal</button>
+    </form>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<script>
+{% if not is_moderator_view %}
+document.getElementById('appeal-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const reason = document.getElementById('appeal-reason').value.trim();
+  if (reason.length < 10) { alert('Please provide a more detailed reason (min 10 characters).'); return; }
+  fetch(window.location.pathname, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ''
+    },
+    body: `reason=${encodeURIComponent(reason)}`
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      location.reload();
+    } else {
+      alert(data.error || 'Could not submit appeal.');
+    }
+  })
+  .catch(() => alert('Network error.'));
+});
+{% else %}
+function submitReview(decision) {
+  const note = document.getElementById('mod-note').value.trim();
+  const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  fetch(window.location.pathname, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-CSRFToken': csrf
+    },
+    body: `decision=${encodeURIComponent(decision)}&note=${encodeURIComponent(note)}`
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      location.reload();
+    } else {
+      alert(data.error || 'Could not submit review.');
+    }
+  })
+  .catch(() => alert('Network error.'));
+}
+{% endif %}
+</script>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Create Challenge — PickASide{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto px-4 py-8">
+  <a href="{% url 'challenges_list' %}" class="text-sm text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1">
+    ← Back to Challenges
+  </a>
+
+  <div class="card rounded-xl border border-border p-6 mt-4">
+    <h1 class="text-xl font-bold mb-1">Create Community Challenge</h1>
+    <p class="text-sm text-muted-foreground mb-6">Moderator-only. Challenges appear on the challenges page for all users.</p>
+
+    {% if error %}
+    <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm mb-5">
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'create_challenge' %}">
+      {% csrf_token %}
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1" for="ch-title">Title <span class="text-red-500">*</span></label>
+        <input id="ch-title" type="text" name="title" required maxlength="200"
+               class="w-full rounded-lg border border-border bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+               placeholder="e.g. Best Hot-Take of the Week">
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1" for="ch-desc">Description <span class="text-red-500">*</span></label>
+        <textarea id="ch-desc" name="description" rows="4" required
+                  class="w-full rounded-lg border border-border bg-background p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Describe the challenge rules and what participants should post…"></textarea>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1" for="ch-category">Category (optional)</label>
+        {% if categories %}
+        <select id="ch-category" name="category"
+                class="w-full rounded-lg border border-border bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+          <option value="">— None —</option>
+          {% for cat in categories %}
+          <option value="{{ cat.name }}">{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <input id="ch-category" type="text" name="category" maxlength="100"
+               class="w-full rounded-lg border border-border bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+               placeholder="Optional category name">
+        {% endif %}
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div>
+          <label class="block text-sm font-medium mb-1" for="ch-starts">Start date/time <span class="text-red-500">*</span></label>
+          <input id="ch-starts" type="datetime-local" name="starts_at" required
+                 class="w-full rounded-lg border border-border bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1" for="ch-ends">End date/time <span class="text-red-500">*</span></label>
+          <input id="ch-ends" type="datetime-local" name="ends_at" required
+                 class="w-full rounded-lg border border-border bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-full">Create Challenge</button>
+    </form>
+  </div>
+</div>
+
+<script>
+// Default start to now and end to +7 days
+(function() {
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const now = new Date();
+  const end = new Date(now.getTime() + 7 * 24 * 3600 * 1000);
+  document.getElementById('ch-starts').value = fmt(now);
+  document.getElementById('ch-ends').value = fmt(end);
+})();
+</script>
+{% endblock %}
