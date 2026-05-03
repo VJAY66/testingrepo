@@ -1,128 +1,94 @@
 {% extends 'frontend/base.html' %}
-{% block title %}Leaderboard — Discussion Hub{% endblock %}
+{% block title %}Leaderboard — PickASide{% endblock %}
 
 {% block content %}
 <style>
-.lb-card {
-    background: hsl(var(--card));
-    border: 1px solid hsl(var(--border));
-    border-radius: 1.2rem;
-    transition: border-color 180ms ease, box-shadow 180ms ease;
-}
-.lb-card:hover {
-    border-color: hsl(var(--primary) / 0.4);
-    box-shadow: 0 8px 32px -12px hsl(var(--primary) / 0.2);
-}
-.rank-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.2rem;
-    height: 2.2rem;
-    border-radius: 999px;
-    font-weight: 800;
-    font-size: 0.9rem;
-    flex-shrink: 0;
-}
-.rank-1 { background: linear-gradient(135deg, hsl(38 92% 50%), hsl(44 96% 60%)); color: #fff; box-shadow: 0 4px 12px hsl(38 92% 50% / 0.5); }
-.rank-2 { background: linear-gradient(135deg, hsl(220 14% 72%), hsl(220 14% 80%)); color: #fff; }
-.rank-3 { background: linear-gradient(135deg, hsl(24 68% 56%), hsl(24 68% 66%)); color: #fff; }
-.rank-other { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-size: 0.78rem; }
-.stat-pill {
-    display: inline-flex; align-items: center; gap: 0.3rem;
-    padding: 0.2rem 0.6rem; border-radius: 999px;
-    font-size: 0.72rem; font-weight: 700;
-    background: hsl(var(--secondary)); color: hsl(var(--secondary-foreground));
-    border: 1px solid hsl(var(--border) / 0.6);
-}
-.total-score {
-    font-size: 1.1rem;
-    font-weight: 900;
-    background: var(--float-gradient);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-}
+.lb-card { background:hsl(var(--card)); border:1px solid hsl(var(--border)); border-radius:1.2rem; transition:border-color 180ms,box-shadow 180ms; }
+.lb-card:hover { border-color:hsl(var(--primary)/0.4); box-shadow:0 8px 32px -12px hsl(var(--primary)/0.2); }
+.rank-badge { display:inline-flex;align-items:center;justify-content:center;width:2.2rem;height:2.2rem;border-radius:999px;font-weight:800;font-size:.9rem;flex-shrink:0; }
+.rank-1 { background:linear-gradient(135deg,hsl(38 92% 50%),hsl(44 96% 60%));color:#fff;box-shadow:0 4px 12px hsl(38 92% 50%/0.5); }
+.rank-2 { background:linear-gradient(135deg,hsl(220 14% 72%),hsl(220 14% 80%));color:#fff; }
+.rank-3 { background:linear-gradient(135deg,hsl(24 68% 56%),hsl(24 68% 66%));color:#fff; }
+.rank-other { background:hsl(var(--muted));color:hsl(var(--muted-foreground));font-size:.78rem; }
+.stat-pill { display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .6rem;border-radius:999px;font-size:.72rem;font-weight:700;background:hsl(var(--secondary));color:hsl(var(--secondary-foreground));border:1px solid hsl(var(--border)/0.6); }
+.total-score { font-size:1.1rem;font-weight:900;background:var(--float-gradient,linear-gradient(135deg,hsl(var(--primary)),hsl(var(--primary)/0.6)));-webkit-background-clip:text;background-clip:text;color:transparent; }
+.tab-btn { padding:.4rem .9rem;border-radius:999px;font-size:.8rem;font-weight:700;cursor:pointer;border:1px solid hsl(var(--border));transition:all 150ms; }
+.tab-btn.active { background:hsl(var(--primary));color:hsl(var(--primary-foreground));border-color:transparent; }
+.tab-btn:not(.active) { background:hsl(var(--card));color:hsl(var(--muted-foreground)); }
+.cat-chip { padding:.3rem .75rem;border-radius:999px;font-size:.75rem;font-weight:600;cursor:pointer;border:1px solid hsl(var(--border));white-space:nowrap;transition:all 150ms;background:hsl(var(--card));color:hsl(var(--muted-foreground)); }
+.cat-chip.active { background:hsl(var(--primary)/0.12);border-color:hsl(var(--primary)/0.5);color:hsl(var(--primary)); }
+.cat-chip:not(.active):hover { background:hsl(var(--muted)/0.5); }
 </style>
 
-<div class="max-w-3xl mx-auto px-4 py-6 sm:py-10 space-y-6">
+<div class="max-w-3xl mx-auto px-4 py-6 sm:py-10 space-y-5">
 
-    <!-- Header -->
-    <div class="flex items-center gap-3">
-        <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-100 text-2xl dark:bg-rose-900/40">🏆</span>
-        <div>
-            <h1 class="text-xl font-bold text-foreground">Leaderboard</h1>
-            <p class="text-sm text-muted-foreground">Top contributors across all content types.</p>
+  <!-- Header -->
+  <div class="flex items-center gap-3">
+    <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-100 text-2xl dark:bg-rose-900/40">🏆</span>
+    <div>
+      <h1 class="text-xl font-bold text-foreground">Leaderboard</h1>
+      <p class="text-sm text-muted-foreground">
+        Top contributors {% if active_category %}in <strong>{{ active_category }}</strong>{% else %}across all topics{% endif %} —
+        {% if period == 'week' %}this week{% else %}all time{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <!-- Period tabs -->
+  <div class="flex items-center gap-2 flex-wrap">
+    <a href="?period=alltime{% if active_category %}&category={{ active_category }}{% endif %}" class="tab-btn {% if period == 'alltime' %}active{% endif %}">All Time</a>
+    <a href="?period=week{% if active_category %}&category={{ active_category }}{% endif %}" class="tab-btn {% if period == 'week' %}active{% endif %}">This Week</a>
+  </div>
+
+  <!-- Category chips (horizontal scroll on mobile) -->
+  <div class="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style="scrollbar-width:none">
+    <a href="?period={{ period }}" class="cat-chip {% if not active_category %}active{% endif %}">All</a>
+    {% for val, label in categories %}
+    <a href="?period={{ period }}&category={{ val }}" class="cat-chip {% if active_category == val %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+
+  {% if board %}
+  <div class="space-y-3">
+    {% for entry in board %}
+    <a href="{% url 'user_profile' entry.username %}" class="lb-card flex items-center gap-3 sm:gap-4 p-3 sm:p-4 no-underline block group">
+      <!-- Rank -->
+      <div class="rank-badge {% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
+        {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else %}{{ entry.rank }}{% endif %}
+      </div>
+
+      <!-- Avatar -->
+      {% if entry.avatar_url %}
+      <img src="{{ entry.avatar_url }}" alt="{{ entry.username }}" class="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0">
+      {% else %}
+      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 text-white flex items-center justify-center font-black text-base flex-shrink-0">{{ entry.username|first|upper }}</div>
+      {% endif %}
+
+      <!-- Info -->
+      <div class="flex-1 min-w-0">
+        <p class="font-bold text-foreground group-hover:text-primary transition-colors truncate">{{ entry.username }}</p>
+        <div class="mt-1 flex flex-wrap gap-1.5">
+          <span class="stat-pill">🗳️ {{ entry.post_count }} posts</span>
+          {% if entry.total_likes %}<span class="stat-pill">⭐ {{ entry.total_likes }} likes</span>{% endif %}
+          {% if entry.reputation %}<span class="stat-pill">🌟 {{ entry.reputation }} rep</span>{% endif %}
         </div>
-    </div>
+      </div>
 
-    <!-- Legend -->
-    <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
-        <span class="stat-pill">🗳️ Posts</span>
-        <span class="stat-pill">⭐ Reviews</span>
-        <span class="stat-pill">💬 Questions</span>
-        <span class="stat-pill">✅ Answers</span>
-        <span class="stat-pill">📊 Polls</span>
-    </div>
-
-    {% if board %}
-    <div class="space-y-3">
-        {% for entry in board %}
-        <a href="{% url 'user_profile' entry.username %}" class="lb-card flex items-center gap-4 p-4 no-underline block group">
-            <!-- Rank -->
-            <div class="rank-badge {% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
-                {% if entry.rank <= 3 %}
-                {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% else %}🥉{% endif %}
-                {% else %}{{ entry.rank }}{% endif %}
-            </div>
-
-            <!-- Avatar -->
-            {% if entry.avatar_url %}
-            <img src="{{ entry.avatar_url }}" alt="{{ entry.username }}" class="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0">
-            {% else %}
-            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 text-white flex items-center justify-center font-black text-base flex-shrink-0">
-                {{ entry.username|first|upper }}
-            </div>
-            {% endif %}
-
-            <!-- Info -->
-            <div class="flex-1 min-w-0">
-                <p class="font-bold text-foreground group-hover:text-primary transition-colors truncate">{{ entry.username }}</p>
-                <div class="mt-1 flex flex-wrap gap-1.5">
-                    {% if entry.post_count %}
-                    <span class="stat-pill">🗳️ {{ entry.post_count }}</span>
-                    {% endif %}
-                    {% if entry.review_count %}
-                    <span class="stat-pill">⭐ {{ entry.review_count }}</span>
-                    {% endif %}
-                    {% if entry.question_count %}
-                    <span class="stat-pill">💬 {{ entry.question_count }}</span>
-                    {% endif %}
-                    {% if entry.answer_count %}
-                    <span class="stat-pill">✅ {{ entry.answer_count }}</span>
-                    {% endif %}
-                    {% if entry.poll_count %}
-                    <span class="stat-pill">📊 {{ entry.poll_count }}</span>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Total score -->
-            <div class="text-right flex-shrink-0">
-                <p class="total-score">{{ entry.total }}</p>
-                <p class="text-[10px] text-muted-foreground uppercase tracking-wide">contributions</p>
-            </div>
-        </a>
-        {% endfor %}
-    </div>
-
-    {% else %}
-    <div class="flex flex-col items-center justify-center py-20 text-center space-y-4">
-        <span class="text-5xl">🏆</span>
-        <h2 class="text-lg font-bold text-foreground">No contributors yet</h2>
-        <p class="text-sm text-muted-foreground">Be the first to create content and claim the top spot!</p>
-    </div>
-    {% endif %}
+      <!-- Score -->
+      <div class="text-right flex-shrink-0">
+        <p class="total-score">{{ entry.post_count }}</p>
+        <p class="text-[10px] text-muted-foreground uppercase tracking-wide">posts</p>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="flex flex-col items-center justify-center py-20 text-center space-y-4">
+    <span class="text-5xl">🏆</span>
+    <h2 class="text-lg font-bold text-foreground">No contributors yet</h2>
+    <p class="text-sm text-muted-foreground">Be the first to post{% if active_category %} in {{ active_category }}{% endif %}!</p>
+  </div>
+  {% endif %}
 
 </div>
 {% endblock %}

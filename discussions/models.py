@@ -56,6 +56,7 @@ class Post(models.Model):
     closes_at = models.DateTimeField(null=True, blank=True, help_text='Lock comments after this time')
     is_hot = models.BooleanField(default=False, db_index=True, help_text='Auto-flagged as rapidly gaining reactions')
     audience = models.CharField(max_length=20, choices=AUDIENCE_CHOICES, default=AUDIENCE_PUBLIC, db_index=True)
+    quoted_post = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='quotes')
     reading_time_minutes = models.PositiveSmallIntegerField(default=1)
     word_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -170,6 +171,8 @@ class Debate(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     rematch_of = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='rematches')
+    round_duration_minutes = models.PositiveSmallIntegerField(default=10, help_text='Minutes per debate round')
+    round_ends_at = models.DateTimeField(null=True, blank=True, help_text='When the current round timer expires')
 
     @property
     def context_title(self):

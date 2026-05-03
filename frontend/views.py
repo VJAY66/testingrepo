@@ -1295,6 +1295,20 @@ def discussion(request, post_id):
     else:
         analytics = None
 
+    # Series membership for navigator
+    series_context = None
+    series_item = post.series_items.select_related('series').first()
+    if series_item:
+        all_items = list(series_item.series.items.select_related('post').order_by('order'))
+        current_idx = next((i for i, it in enumerate(all_items) if it.post_id == post.id), None)
+        series_context = {
+            'series': series_item.series,
+            'items': all_items,
+            'current_idx': current_idx,
+            'prev_item': all_items[current_idx - 1] if current_idx and current_idx > 0 else None,
+            'next_item': all_items[current_idx + 1] if current_idx is not None and current_idx < len(all_items) - 1 else None,
+        }
+
     context = {
         'post': post,
         'post_display_content': _normalize_post_content(post.content),
@@ -1320,6 +1334,7 @@ def discussion(request, post_id):
         'views_count': views_count,
         'analytics': analytics,
         'related_posts': _get_related_posts(post),
+        'series_context': series_context,
     }
     return render(request, 'frontend/discussion.html', context)
 
@@ -1665,6 +1680,19 @@ def user_profile(request, username):
         for d in ACHIEVEMENT_DEFS if d[0] in up_achievements_set
     ]
 
+    # Profile highlights
+    from users.models import ProfileHighlight
+    highlights = list(
+        ProfileHighlight.objects.filter(user=profile_user)
+        .select_related('post', 'post__user')
+        .order_by('order', '-created_at')[:6]
+    )
+    user_highlight_post_ids = set()
+    if request.user.is_authenticated:
+        user_highlight_post_ids = set(
+            ProfileHighlight.objects.filter(user=request.user).values_list('post_id', flat=True)
+        )
+
     context = {
         'profile_user': profile_user,
         'user_posts': user_posts,
@@ -1690,6 +1718,8 @@ def user_profile(request, username):
         'achievement_details': up_achievement_details,
         'follows_you_back': follows_you_back,
         'user_endorsements': user_endorsements,
+        'highlights': highlights,
+        'user_highlight_post_ids': user_highlight_post_ids,
     }
     return render(request, 'frontend/user_profile.html', context)
 
@@ -2517,6 +2547,15 @@ def create_post(request):
             except Exception:
                 pass
 
+        # Handle quote post
+        quoted_post_id = (request.POST.get('quoted_post_id') or '').strip()
+        quoted_post_obj = None
+        if quoted_post_id:
+            try:
+                quoted_post_obj = Post.objects.get(id=quoted_post_id)
+            except Post.DoesNotExist:
+                pass
+
         try:
             post = Post.objects.create(
                 id=str(uuid.uuid4()),
@@ -2527,6 +2566,7 @@ def create_post(request):
                 hashtags=processed_hashtags,
                 is_draft=save_as_draft,
                 scheduled_for=scheduled_for_dt,
+                quoted_post=quoted_post_obj,
             )
 
             if not post or not post.id:
@@ -5153,42 +5193,40 @@ def like_review_comment(request):
 
 def leaderboard(request):
     from django.contrib.auth.models import User as AuthUser
-    from django.db.models import Sum, IntegerField
-    from django.db.models.functions import Coalesce
+
+    period = request.GET.get('period', 'alltime')
+    category = request.GET.get('category', '').strip()
+
+    post_filter = Q(posts__is_draft=False, posts__is_deleted_by_moderation=False)
+    if period == 'week':
+        post_filter &= Q(posts__created_at__gte=timezone.now() - timedelta(days=7))
+    if category:
+        post_filter &= Q(posts__category=category)
 
     users = AuthUser.objects.annotate(
-        post_count=Count('posts', distinct=True),
-        review_count=Count('reviews', distinct=True, filter=Q(reviews__is_deleted_by_moderation=False)),
-        question_count=Count('questions', distinct=True, filter=Q(questions__is_deleted_by_moderation=False)),
-        answer_count_ann=Count('answers', distinct=True, filter=Q(answers__is_deleted_by_moderation=False)),
-        poll_count=Count('polls', distinct=True),
-    ).filter(
-        post_count__gt=0
-    ).order_by(
-        '-post_count', '-review_count', '-question_count', '-answer_count_ann', '-poll_count'
-    )[:50]
+        post_count=Count('posts', distinct=True, filter=post_filter),
+        total_likes=Count('post_actions', distinct=True, filter=Q(post_actions__action='like')),
+    ).filter(post_count__gt=0).order_by('-post_count', '-total_likes')[:50]
 
     board = []
     for rank, u in enumerate(users, start=1):
-        total = u.post_count + u.review_count + u.question_count + u.answer_count_ann + u.poll_count
         p = getattr(u, 'profile', None)
         board.append({
             'rank': rank,
             'username': u.username,
             'avatar_url': p.get_picture_url if p else '',
             'post_count': u.post_count,
-            'review_count': u.review_count,
-            'question_count': u.question_count,
-            'answer_count': u.answer_count_ann,
-            'poll_count': u.poll_count,
-            'total': total,
+            'total_likes': u.total_likes,
+            'reputation': getattr(p, 'reputation_score', 0) if p else 0,
+            'trust_level': p.trust_level if p else 'new',
         })
 
-    board.sort(key=lambda x: x['total'], reverse=True)
-    for i, entry in enumerate(board):
-        entry['rank'] = i + 1
-
-    return render(request, 'frontend/leaderboard.html', {'board': board})
+    return render(request, 'frontend/leaderboard.html', {
+        'board': board,
+        'period': period,
+        'active_category': category,
+        'categories': CATEGORY_CHOICES,
+    })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -6570,3 +6608,52 @@ def update_post_audience(request, post_id):
     post.audience = audience
     post.save(update_fields=['audience', 'updated_at'])
     return JsonResponse({'success': True, 'audience': audience})
+
+
+# ─── Profile Highlights ───────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def toggle_highlight(request):
+    from users.models import ProfileHighlight
+    post_id = (request.POST.get('post_id') or '').strip()
+    post_obj = get_object_or_404(Post, id=post_id)
+    hl, created = ProfileHighlight.objects.get_or_create(user=request.user, post=post_obj)
+    if not created:
+        hl.delete()
+        return JsonResponse({'success': True, 'highlighted': False})
+    count = ProfileHighlight.objects.filter(user=request.user).count()
+    if count > 6:
+        hl.delete()
+        return JsonResponse({'success': False, 'error': 'Max 6 highlights allowed'}, status=400)
+    return JsonResponse({'success': True, 'highlighted': True})
+
+
+# ─── Debate Round Timer ───────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def debate_set_timer(request, debate_id):
+    debate = get_object_or_404(Debate, id=debate_id, status='accepted')
+    if request.user not in [debate.initiator, debate.target]:
+        return JsonResponse({'error': 'Not a participant'}, status=403)
+    try:
+        minutes = max(5, min(60, int(request.POST.get('minutes', 10))))
+    except (ValueError, TypeError):
+        minutes = 10
+    debate.round_duration_minutes = minutes
+    debate.round_ends_at = timezone.now() + timedelta(minutes=minutes)
+    debate.save(update_fields=['round_duration_minutes', 'round_ends_at', 'updated_at'])
+    return JsonResponse({'success': True, 'ends_at': debate.round_ends_at.isoformat(), 'minutes': minutes})
+
+
+def debate_timer_status(request, debate_id):
+    debate = get_object_or_404(Debate, id=debate_id)
+    remaining = None
+    if debate.round_ends_at:
+        remaining = max(0, int((debate.round_ends_at - timezone.now()).total_seconds()))
+    return JsonResponse({
+        'round_duration_minutes': debate.round_duration_minutes,
+        'ends_at': debate.round_ends_at.isoformat() if debate.round_ends_at else None,
+        'remaining_seconds': remaining,
+    })

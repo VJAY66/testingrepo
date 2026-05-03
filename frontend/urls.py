@@ -167,4 +167,9 @@ urlpatterns = [
     path('people-you-may-know/', views.people_you_may_know, name='people_you_may_know'),
     # Post audience
     path('posts/<str:post_id>/audience/', views.update_post_audience, name='update_post_audience'),
+    # Profile highlights
+    path('profile/highlights/toggle/', views.toggle_highlight, name='toggle_highlight'),
+    # Debate round timer
+    path('debates/<str:debate_id>/timer/', views.debate_timer_status, name='debate_timer_status'),
+    path('debates/<str:debate_id>/timer/set/', views.debate_set_timer, name='debate_set_timer'),
 ]

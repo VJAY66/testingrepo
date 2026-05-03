@@ -229,6 +229,12 @@
                                         </svg>
                                         <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Share</span>
                                     </button>
+                                    {% if user.is_authenticated %}
+                                    <button type="button" onclick="openQuoteModal('{{ post.id|escapejs }}','{{ post.title|escapejs }}','{{ post.user.username|escapejs }}')"
+                                      class="group relative flex items-center justify-center gap-1 w-auto h-8 px-2 rounded-full transition-all duration-300 pointer-events-auto text-muted-foreground hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 overflow-hidden text-xs font-medium">
+                                      💬 <span class="hidden sm:inline">Quote</span>
+                                    </button>
+                                    {% endif %}
                                     <button type="button" data-action="hot" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_hot %}active text-orange-500 bg-orange-50/60 border-orange-300/60{% else %}text-muted-foreground hover:text-orange-500 hover:bg-orange-50/60{% endif %}">🔥 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','hot')">{{ post.hot_count|default:0 }}</span></button>
                                     <button type="button" data-action="debatable" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_debatable %}active text-purple-500 bg-purple-50/60 border-purple-300/60{% else %}text-muted-foreground hover:text-purple-500 hover:bg-purple-50/60{% endif %}">🤔 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','debatable')">{{ post.debatable_count|default:0 }}</span></button>
                                     <button type="button" data-action="agree" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_agree %}active text-green-600 bg-green-50/60 border-green-300/60{% else %}text-muted-foreground hover:text-green-600 hover:bg-green-50/60{% endif %}">👏 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','agree')">{{ post.agree_count|default:0 }}</span></button>
@@ -401,11 +407,20 @@ function quickFollow(username, btn) {
     <p class="text-xs text-muted-foreground mt-1">Leave blank to save as unscheduled draft.</p>
   </div>
 </div>
+            <!-- Quote post preview (hidden unless quoting) -->
+            <input type="hidden" name="quoted_post_id" id="quoted-post-id-input" value="">
+            <div id="quoted-post-preview" class="hidden mt-3 p-3 rounded-xl border border-primary/30 bg-primary/5">
+              <p class="text-xs text-muted-foreground mb-1">Quoting:</p>
+              <p class="text-sm font-semibold text-foreground truncate" id="quoted-post-title"></p>
+              <p class="text-xs text-muted-foreground" id="quoted-post-author"></p>
+              <button type="button" onclick="clearQuote()" class="text-xs text-rose-500 mt-1 hover:underline">✕ Remove quote</button>
+            </div>
+
             <div class="flex space-x-3 mt-6">
                 <button type="submit" class="flex-1 bg-primary text-primary-foreground py-2 rounded-md hover:bg-primary/90">
                     Create
                 </button>
-                <button type="button" onclick="document.getElementById('create-post-modal').classList.add('hidden')"
+                <button type="button" onclick="document.getElementById('create-post-modal').classList.add('hidden'); clearQuote();"
                         class="flex-1 border border-border py-2 rounded-md hover:bg-accent">
                     Cancel
                 </button>
@@ -1088,6 +1103,35 @@ function closeReactionModal() { document.getElementById('reaction-users-modal').
   if (toggle && row) {
     toggle.addEventListener('change', function() {
       row.classList.toggle('hidden', !this.checked);
+    });
+  }
+})();
+</script>
+<script>
+function openQuoteModal(postId, title, author) {
+  document.getElementById('quoted-post-id-input').value = postId;
+  var titleEl = document.getElementById('quoted-post-title');
+  var authorEl = document.getElementById('quoted-post-author');
+  var preview = document.getElementById('quoted-post-preview');
+  if (titleEl) titleEl.textContent = title;
+  if (authorEl) authorEl.textContent = '@' + author;
+  if (preview) preview.classList.remove('hidden');
+  var modal = document.getElementById('create-post-modal');
+  if (modal) modal.classList.remove('hidden');
+}
+function clearQuote() {
+  var inp = document.getElementById('quoted-post-id-input');
+  var preview = document.getElementById('quoted-post-preview');
+  if (inp) inp.value = '';
+  if (preview) preview.classList.add('hidden');
+}
+// Pre-fill from URL params (redirected from discussion page)
+(function() {
+  var p = new URLSearchParams(location.search);
+  if (p.get('quote_post_id')) {
+    window.addEventListener('DOMContentLoaded', function() {
+      openQuoteModal(p.get('quote_post_id'), p.get('quote_title') || '', p.get('quote_author') || '');
+      history.replaceState({}, '', location.pathname);
     });
   }
 })();

@@ -245,6 +245,24 @@
         </div>
     </section>
 
+    <!-- Profile Highlights -->
+    {% if highlights %}
+    <div class="mb-6">
+      <p class="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-2 px-1">✨ Highlights</p>
+      <div class="flex gap-3 overflow-x-auto pb-2" style="scrollbar-width:none">
+        {% for hl in highlights %}
+        <a href="{% url 'discussion' hl.post.id %}" class="flex-shrink-0 w-40 sm:w-48 rounded-2xl border border-border bg-card p-3 hover:border-primary/40 hover:shadow-sm transition-all group">
+          <p class="text-xs font-bold text-foreground group-hover:text-primary transition-colors line-clamp-3 leading-snug">{{ hl.post.title }}</p>
+          <div class="mt-2 flex items-center gap-1.5 flex-wrap">
+            <span class="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">{{ hl.post.category }}</span>
+            {% if hl.post.reading_time_minutes %}<span class="text-[10px] text-muted-foreground">📖 {{ hl.post.reading_time_minutes }}m</span>{% endif %}
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Tab bar -->
     <div class="flex gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 shadow-sm overflow-x-auto mb-6">
         <button type="button" id="up-tab-btn-posts" onclick="switchUserTab('posts')"
@@ -276,16 +294,24 @@
             {% for post in user_posts %}
             <article class="group rounded-2xl border border-border/70 bg-card p-5 sm:p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
                 <div class="flex items-start justify-between gap-3 mb-2">
-                    <div class="flex-1">
+                    <div class="flex-1 min-w-0">
                         <h3 class="text-lg font-bold text-foreground mb-1">
                             <a href="{% url 'discussion' post.id %}" class="hover:text-primary transition-colors">{{ post.title }}</a>
                         </h3>
                         <p class="text-sm text-muted-foreground mb-2">{{ post.content|truncatechars:150 }}</p>
-                        <div class="flex items-center gap-4 text-xs text-muted-foreground">
+                        <div class="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                             <span>{{ post.created_at|date:"M j, Y" }}</span>
                             <span class="px-2 py-0.5 bg-secondary rounded-full">{{ post.category }}</span>
+                            {% if post.reading_time_minutes %}<span>📖 {{ post.reading_time_minutes }}m</span>{% endif %}
                         </div>
                     </div>
+                    {% if is_own_profile %}
+                    <button onclick="toggleHighlight('{{ post.id }}', this)"
+                      title="{% if post.id in user_highlight_post_ids %}Remove from highlights{% else %}Add to highlights{% endif %}"
+                      class="flex-shrink-0 text-sm px-2.5 py-1.5 rounded-xl border transition-colors {% if post.id in user_highlight_post_ids %}border-amber-400 text-amber-500 bg-amber-50 dark:bg-amber-900/20{% else %}border-border text-muted-foreground hover:border-amber-400 hover:text-amber-500{% endif %}">
+                      {% if post.id in user_highlight_post_ids %}★{% else %}☆{% endif %}
+                    </button>
+                    {% endif %}
                 </div>
             </article>
             {% endfor %}
@@ -664,5 +690,31 @@ function submitEndorsement(username) {
         }
     });
 }
+</script>
+<script>
+function toggleHighlight(postId, btn) {
+  fetch('/profile/highlights/toggle/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'post_id=' + encodeURIComponent(postId)
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      if (d.highlighted) {
+        btn.textContent = '★';
+        btn.classList.add('border-amber-400', 'text-amber-500', 'bg-amber-50');
+        btn.classList.remove('border-border', 'text-muted-foreground');
+        btn.title = 'Remove from highlights';
+      } else {
+        btn.textContent = '☆';
+        btn.classList.remove('border-amber-400', 'text-amber-500', 'bg-amber-50');
+        btn.classList.add('border-border', 'text-muted-foreground');
+        btn.title = 'Add to highlights';
+      }
+    } else {
+      alert(d.error || 'Could not update highlights');
+    }
+  });
+}
+function getCookie(n) { var v = document.cookie.match('(^|;) ?'+n+'=([^;]*)(;|$)'); return v ? v[2] : null; }
 </script>
 {% endblock %}

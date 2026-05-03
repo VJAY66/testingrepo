@@ -243,6 +243,21 @@ class CloseFriend(models.Model):
         ordering = ['-created_at']
 
 
+class ProfileHighlight(models.Model):
+    """A post pinned to the top of a user's public profile as a highlight (max 6)."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='profile_highlights')
+    post = models.ForeignKey('discussions.Post', on_delete=models.CASCADE, related_name='highlighted_by')
+    order = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} highlights post {self.post_id}"
+
+    class Meta:
+        ordering = ['order', '-created_at']
+        constraints = [models.UniqueConstraint(fields=['user', 'post'], name='unique_profile_highlight')]
+
+
 class UserSuggestion(models.Model):
     """Pre-computed 'People You May Know' suggestions."""
     REASON_MUTUAL = 'mutual_follow'

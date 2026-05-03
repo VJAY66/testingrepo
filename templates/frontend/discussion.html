@@ -68,6 +68,14 @@
         </div>
         {% if post.is_edited %}<span id="post-edited-badge" class="inline-block text-[10px] text-muted-foreground mb-3">edited</span>{% else %}<span id="post-edited-badge" class="hidden inline-block text-[10px] text-muted-foreground mb-3">edited</span>{% endif %}
 
+        {% if post.quoted_post %}
+        <div class="mb-4 p-3 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 transition-colors">
+          <p class="text-xs text-muted-foreground mb-1">Quoting <a href="{% url 'user_profile' post.quoted_post.user.username %}" class="font-semibold hover:underline text-primary">@{{ post.quoted_post.user.username }}</a></p>
+          <a href="{% url 'discussion' post.quoted_post.id %}" class="text-sm font-semibold text-foreground hover:text-primary transition-colors block">{{ post.quoted_post.title }}</a>
+          {% if post.quoted_post.content %}<p class="text-xs text-muted-foreground mt-1 line-clamp-2">{{ post.quoted_post.content|truncatechars:140 }}</p>{% endif %}
+        </div>
+        {% endif %}
+
         {% if post_display_content %}
         <div id="post-content-display" class="text-foreground mb-4 whitespace-pre-wrap">{{ post_display_content }}</div>
         {% else %}
@@ -241,6 +249,13 @@
                 </svg>
                 <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Share</span>
             </button>
+            {% if user.is_authenticated %}
+            <button type="button" onclick="openQuoteFromDiscussion('{{ post.id|escapejs }}','{{ post.title|escapejs }}','{{ post.user.username|escapejs }}')"
+              class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced text-muted-foreground hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 hover:shadow-md overflow-hidden">
+              <span class="sm:w-5 sm:h-5 w-4 h-4 relative z-10 text-base leading-none">💬</span>
+              <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Quote</span>
+            </button>
+            {% endif %}
             <button type="button" data-action="hot" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_hot %}active text-orange-500 bg-orange-50/60 border-orange-300/60{% else %}text-muted-foreground hover:text-orange-500 hover:bg-orange-50/60{% endif %}">🔥 <span class="action-count text-xs">{{ post.hot_count|default:0 }}</span></button>
             <button type="button" data-action="debatable" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_debatable %}active text-purple-500 bg-purple-50/60 border-purple-300/60{% else %}text-muted-foreground hover:text-purple-500 hover:bg-purple-50/60{% endif %}">🤔 <span class="action-count text-xs">{{ post.debatable_count|default:0 }}</span></button>
             <button type="button" data-action="agree" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_agree %}active text-green-600 bg-green-50/60 border-green-300/60{% else %}text-muted-foreground hover:text-green-600 hover:bg-green-50/60{% endif %}">👏 <span class="action-count text-xs">{{ post.agree_count|default:0 }}</span></button>
@@ -1554,6 +1569,34 @@ function clearPostExpiry(postId) {
         body: 'closes_at='
     }).then(r => r.json()).then(d => { if (d.success) location.reload(); });
 }
+function openQuoteFromDiscussion(postId, title, author) {
+    window.location.href = '/?quote_post_id=' + encodeURIComponent(postId) + '&quote_title=' + encodeURIComponent(title) + '&quote_author=' + encodeURIComponent(author);
+}
+</script>
+
+<!-- Quote post redirect hint: pre-fill modal on index via URL params -->
+<script>
+(function() {
+  const p = new URLSearchParams(location.search);
+  if (p.get('quote_post_id')) {
+    window.addEventListener('DOMContentLoaded', function() {
+      const qid = p.get('quote_post_id'), qtitle = p.get('quote_title') || '', qauthor = p.get('quote_author') || '';
+      const modal = document.getElementById('create-post-modal');
+      const inp = document.getElementById('quoted-post-id-input');
+      const titleEl = document.getElementById('quoted-post-title');
+      const authorEl = document.getElementById('quoted-post-author');
+      const preview = document.getElementById('quoted-post-preview');
+      if (modal && inp) {
+        inp.value = qid;
+        if (titleEl) titleEl.textContent = qtitle;
+        if (authorEl) authorEl.textContent = '@' + qauthor;
+        if (preview) preview.classList.remove('hidden');
+        modal.classList.remove('hidden');
+        history.replaceState({}, '', location.pathname);
+      }
+    });
+  }
+})();
 </script>
 
 {% if related_posts %}
@@ -1582,6 +1625,53 @@ function clearPostExpiry(postId) {
         </a>
         {% endfor %}
     </div>
+</section>
+{% endif %}
+
+<!-- Series Navigator -->
+{% if series_context %}
+<section class="mt-8 pt-6 border-t border-border/50">
+  <div class="p-4 rounded-2xl border border-border bg-card">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="text-base">📚</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">Part of a Series</p>
+        <p class="text-sm font-bold text-foreground truncate">{{ series_context.series.title }}</p>
+      </div>
+      <a href="{% url 'series_detail' series_context.series.id %}" class="text-xs text-primary hover:underline font-semibold flex-shrink-0">View all →</a>
+    </div>
+    <!-- Part pills -->
+    <div class="flex gap-1.5 overflow-x-auto pb-1 mb-3" style="scrollbar-width:none">
+      {% for item in series_context.items %}
+      <a href="{% url 'discussion' item.post.id %}"
+         class="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors
+                {% if item.post.id == post.id %}border-primary bg-primary/10 text-primary{% else %}border-border text-muted-foreground hover:text-foreground hover:border-primary/40{% endif %}">
+        Part {{ forloop.counter }}
+      </a>
+      {% endfor %}
+    </div>
+    <!-- Prev / Next -->
+    <div class="flex gap-2">
+      {% if series_context.prev_item %}
+      <a href="{% url 'discussion' series_context.prev_item.post.id %}" class="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border border-border hover:border-primary/40 hover:bg-muted/30 transition-colors">
+        <span class="text-muted-foreground text-sm">←</span>
+        <div class="min-w-0">
+          <p class="text-[10px] text-muted-foreground uppercase">Previous</p>
+          <p class="text-xs font-semibold text-foreground truncate">{{ series_context.prev_item.post.title }}</p>
+        </div>
+      </a>
+      {% endif %}
+      {% if series_context.next_item %}
+      <a href="{% url 'discussion' series_context.next_item.post.id %}" class="flex-1 flex items-center justify-end gap-2 px-3 py-2 rounded-xl border border-border hover:border-primary/40 hover:bg-muted/30 transition-colors text-right ml-auto">
+        <div class="min-w-0">
+          <p class="text-[10px] text-muted-foreground uppercase">Next</p>
+          <p class="text-xs font-semibold text-foreground truncate">{{ series_context.next_item.post.title }}</p>
+        </div>
+        <span class="text-muted-foreground text-sm">→</span>
+      </a>
+      {% endif %}
+    </div>
+  </div>
 </section>
 {% endif %}
 {% endblock %}
