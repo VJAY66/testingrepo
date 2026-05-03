@@ -1,0 +1,111 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Close Friends — PickASide{% endblock %}
+
+{% block content %}
+<style>
+.cf-page { max-width: 540px; margin: 0 auto; padding: 24px 16px; }
+.cf-card { border-radius: 1rem; border: 1px solid hsl(var(--border)/0.7); background: hsl(var(--card)); overflow: hidden; margin-bottom: 10px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; }
+.cf-avatar { width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid hsl(var(--border)); overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: hsl(var(--muted)); }
+.cf-ring { padding: 2px; border-radius: 50%; background: linear-gradient(135deg, #22c55e, #16a34a); }
+.cf-toggle { min-width: 64px; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; transition: all .18s; }
+.cf-toggle.active { background: #22c55e; color: #fff; }
+.cf-toggle.inactive { background: hsl(var(--border)); color: hsl(var(--foreground)); }
+</style>
+
+<div class="cf-page">
+  <div class="flex items-center gap-3 mb-2">
+    <a href="{% url 'profile' %}" class="text-muted-foreground hover:text-foreground">←</a>
+    <h1 class="text-xl font-bold text-foreground">Close Friends</h1>
+    <span class="ml-auto text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-semibold px-2 py-0.5 rounded-full">{{ close_friends.count }} selected</span>
+  </div>
+  <p class="text-sm text-muted-foreground mb-6">Posts set to "Close Friends" audience are only visible to people on this list.</p>
+
+  <!-- Tabs -->
+  <div class="flex gap-2 mb-5 border-b border-border">
+    <button class="cf-tab-btn pb-2 px-1 text-sm font-semibold text-primary border-b-2 border-primary" data-tab="close" onclick="switchTab('close',this)">Close Friends ({{ close_friends.count }})</button>
+    <button class="cf-tab-btn pb-2 px-1 text-sm font-semibold text-muted-foreground" data-tab="following" onclick="switchTab('following',this)">Following ({{ following.count }})</button>
+  </div>
+
+  <!-- Close friends tab -->
+  <div id="tab-close">
+    {% if close_friends %}
+    {% for cf in close_friends %}
+    <div class="cf-card">
+      <div class="cf-ring">
+        <div class="cf-avatar">
+          {% if cf.friend.profile.get_picture_url %}
+          <img src="{{ cf.friend.profile.get_picture_url }}" class="w-full h-full object-cover" loading="lazy" alt="">
+          {% else %}
+          <span class="text-sm font-bold text-muted-foreground">{{ cf.friend.username|slice:":1"|upper }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="flex-1 min-w-0">
+        <a href="{% url 'user_profile' cf.friend.username %}" class="text-sm font-semibold text-foreground hover:text-primary block truncate">@{{ cf.friend.username }}</a>
+        {% if cf.friend.profile.bio %}<p class="text-xs text-muted-foreground truncate">{{ cf.friend.profile.bio|truncatechars:50 }}</p>{% endif %}
+      </div>
+      <button class="cf-toggle active" data-uid="{{ cf.friend.id }}" onclick="toggleCF(this, {{ cf.friend.id }})">✓ Close</button>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="text-center py-10 text-muted-foreground text-sm">
+      <div class="text-3xl mb-2">💚</div>
+      <p>No close friends yet. Add from your following list.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Following tab -->
+  <div id="tab-following" style="display:none">
+    {% for follow in following %}
+    {% with f=follow.following %}
+    <div class="cf-card">
+      <div class="cf-avatar">
+        {% if f.profile.get_picture_url %}
+        <img src="{{ f.profile.get_picture_url }}" class="w-full h-full object-cover" loading="lazy" alt="">
+        {% else %}
+        <span class="text-sm font-bold text-muted-foreground">{{ f.username|slice:":1"|upper }}</span>
+        {% endif %}
+      </div>
+      <div class="flex-1 min-w-0">
+        <a href="{% url 'user_profile' f.username %}" class="text-sm font-semibold text-foreground hover:text-primary block truncate">@{{ f.username }}</a>
+        {% if f.profile.bio %}<p class="text-xs text-muted-foreground truncate">{{ f.profile.bio|truncatechars:50 }}</p>{% endif %}
+      </div>
+      <button class="cf-toggle {% if f.id in cf_ids %}active{% else %}inactive{% endif %}" data-uid="{{ f.id }}" onclick="toggleCF(this, {{ f.id }})">
+        {% if f.id in cf_ids %}✓ Close{% else %}+ Add{% endif %}
+      </button>
+    </div>
+    {% endwith %}
+    {% empty %}
+    <div class="text-center py-10 text-muted-foreground text-sm">Follow people to add them as close friends.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+function switchTab(tab, btn) {
+  document.querySelectorAll('.cf-tab-btn').forEach(b => {
+    b.classList.remove('text-primary', 'border-b-2', 'border-primary');
+    b.classList.add('text-muted-foreground');
+  });
+  btn.classList.add('text-primary', 'border-b-2', 'border-primary');
+  btn.classList.remove('text-muted-foreground');
+  document.getElementById('tab-close').style.display = tab === 'close' ? '' : 'none';
+  document.getElementById('tab-following').style.display = tab === 'following' ? '' : 'none';
+}
+
+function toggleCF(btn, uid) {
+  fetch('/close-friends/toggle/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'user_id=' + uid
+  }).then(r => r.json()).then(d => {
+    if (d.action === 'added') {
+      btn.textContent = '✓ Close'; btn.className = 'cf-toggle active';
+    } else {
+      btn.textContent = '+ Add'; btn.className = 'cf-toggle inactive';
+    }
+  });
+}
+</script>
+{% endblock %}

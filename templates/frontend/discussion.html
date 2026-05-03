@@ -22,9 +22,22 @@
                     <p class="text-sm text-muted-foreground">{{ post.created_at|date:"M j, Y g:i A" }}</p>
                 </div>
             </div>
-            <span class="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-sm">
-                {{ post.category }}
-            </span>
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-sm">
+                    {{ post.category }}
+                </span>
+                {% if post.reading_time_minutes %}
+                <span class="px-2.5 py-1 border border-border rounded-full text-xs text-muted-foreground font-medium">📖 {{ post.reading_time_minutes }} min read</span>
+                {% endif %}
+                {% if post.audience == 'close_friends' %}
+                <span class="px-2.5 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-xs font-semibold">💚 Close Friends</span>
+                {% elif post.audience == 'followers' %}
+                <span class="px-2.5 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-full text-xs font-semibold">👥 Followers Only</span>
+                {% endif %}
+                {% if is_post_creator %}
+                <a href="{% url 'creator_analytics' post.id %}" class="px-2.5 py-1 border border-border rounded-full text-xs text-muted-foreground font-medium hover:text-primary hover:border-primary/40 transition-colors ml-auto">📊 Analytics</a>
+                {% endif %}
+            </div>
         </div>
 
         <div class="mb-1 flex items-start justify-between gap-3">
@@ -1549,20 +1562,26 @@ function clearPostExpiry(postId) {
 </script>
 
 {% if related_posts %}
-<section class="mt-8">
-    <h2 class="text-lg font-semibold text-foreground mb-4">You may also like</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<section class="mt-10 pt-8 border-t border-border/50">
+    <div class="flex items-center gap-2 mb-4">
+        <span class="text-base font-bold text-foreground">More in {{ post.category }}</span>
+        <span class="text-xs text-muted-foreground">· You may also like</span>
+        <a href="?category={{ post.category|urlencode }}" class="ml-auto text-xs text-primary hover:underline font-semibold">See all →</a>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {% for related in related_posts %}
-        <a href="{% url 'discussion' related.id %}" class="block rounded-2xl border border-border/70 bg-card p-4 hover:border-primary/50 hover:shadow-sm transition group">
-            <span class="inline-block px-2 py-0.5 bg-secondary text-secondary-foreground rounded-full text-xs mb-2">{{ related.category }}</span>
-            <p class="font-medium text-foreground group-hover:text-primary transition line-clamp-2 mb-2">{{ related.title }}</p>
-            <div class="flex items-center justify-between text-sm text-muted-foreground">
-                <span>{{ related.user.username }}</span>
-                <span class="flex items-center gap-1">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                    </svg>
-                    {{ related.like_count }}
+        <a href="{% url 'discussion' related.id %}" class="block rounded-2xl border border-border/70 bg-card p-4 hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 transition-all group">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="inline-block px-2 py-0.5 bg-secondary text-secondary-foreground rounded-full text-xs font-medium">{{ related.category }}</span>
+                {% if related.reading_time_minutes %}<span class="text-xs text-muted-foreground">📖 {{ related.reading_time_minutes }}m</span>{% endif %}
+                {% if related.is_hot %}<span class="text-xs text-orange-500 font-bold">🔥</span>{% endif %}
+            </div>
+            <p class="font-semibold text-sm text-foreground group-hover:text-primary transition line-clamp-2 mb-2 leading-snug">{{ related.title }}</p>
+            <div class="flex items-center justify-between text-xs text-muted-foreground">
+                <span>@{{ related.user.username }}</span>
+                <span class="flex items-center gap-3">
+                    <span>⭐ {{ related.like_count|default:0 }}</span>
+                    <span>💬 {{ related.comment_count|default:0 }}</span>
                 </span>
             </div>
         </a>

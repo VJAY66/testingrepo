@@ -31,6 +31,15 @@ CATEGORY_CHOICES = [
 
 class Post(models.Model):
     HASHTAG_MAX_LENGTH = 40
+    AUDIENCE_PUBLIC = 'public'
+    AUDIENCE_FOLLOWERS = 'followers'
+    AUDIENCE_CLOSE_FRIENDS = 'close_friends'
+    AUDIENCE_CHOICES = [
+        (AUDIENCE_PUBLIC, 'Public'),
+        (AUDIENCE_FOLLOWERS, 'Followers Only'),
+        (AUDIENCE_CLOSE_FRIENDS, 'Close Friends'),
+    ]
+
     id = models.CharField(max_length=36, primary_key=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
     title = models.CharField(max_length=255)
@@ -46,6 +55,9 @@ class Post(models.Model):
     scheduled_for = models.DateTimeField(null=True, blank=True, help_text='Publish this draft automatically at this time')
     closes_at = models.DateTimeField(null=True, blank=True, help_text='Lock comments after this time')
     is_hot = models.BooleanField(default=False, db_index=True, help_text='Auto-flagged as rapidly gaining reactions')
+    audience = models.CharField(max_length=20, choices=AUDIENCE_CHOICES, default=AUDIENCE_PUBLIC, db_index=True)
+    reading_time_minutes = models.PositiveSmallIntegerField(default=1)
+    word_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -73,6 +85,15 @@ class Post(models.Model):
     def get_hashtags_list(self):
         """Return hashtags as a clean list even for legacy text formats."""
         return Post.parse_hashtags(self.hashtags, max_tags=20)
+
+    def compute_reading_time(self):
+        words = len((self.content or '').split())
+        self.word_count = words
+        self.reading_time_minutes = max(1, round(words / 200))
+
+    def save(self, *args, **kwargs):
+        self.compute_reading_time()
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ['-created_at']
@@ -282,6 +303,7 @@ class Notification(models.Model):
     message = models.TextField()
     is_read = models.BooleanField(default=False)
     count = models.PositiveIntegerField(default=1)
+    actors = models.JSONField(default=list, blank=True, help_text='Usernames of users involved, for batched display')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -937,3 +959,62 @@ class ChallengeEntry(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=['challenge', 'post'], name='unique_challenge_entry')]
         ordering = ['-created_at']
+
+
+class Story(models.Model):
+    """Ephemeral post visible for 24 hours, inspired by Instagram Stories."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='stories')
+    content = models.TextField(blank=True, default='')
+    image = models.ImageField(upload_to='stories/', null=True, blank=True)
+    bg_color = models.CharField(max_length=20, default='#0ea5e9', help_text='Background gradient colour for text stories')
+    expires_at = models.DateTimeField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username}'s story ({self.id})"
+
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() >= self.expires_at
+
+    class Meta:
+        ordering = ['-created_at']
+
+
+class StoryView(models.Model):
+    story = models.ForeignKey(Story, on_delete=models.CASCADE, related_name='views')
+    viewer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='story_views')
+    viewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['story', 'viewer'], name='unique_story_view')]
+        ordering = ['-viewed_at']
+
+
+class FeedScore(models.Model):
+    """Pre-computed personalised feed score for a (user, post) pair."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feed_scores')
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='feed_scores')
+    score = models.FloatField(default=0.0, db_index=True)
+    computed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['user', 'post'], name='unique_feed_score')]
+        ordering = ['-score']
+
+
+class PostInsight(models.Model):
+    """Daily analytics snapshot for a post (creator analytics)."""
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='insights')
+    date = models.DateField(db_index=True)
+    unique_viewers = models.PositiveIntegerField(default=0)
+    total_impressions = models.PositiveIntegerField(default=0)
+    likes_count = models.PositiveIntegerField(default=0)
+    comments_count = models.PositiveIntegerField(default=0)
+    saves_count = models.PositiveIntegerField(default=0)
+    debates_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['post', 'date'], name='unique_post_insight_day')]
+        ordering = ['-date']

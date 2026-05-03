@@ -21,9 +21,9 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight
 from discussions.signals import notify_post_author
-from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS
+from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion
 from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
 from utils.moderation import check_content_moderation
@@ -6215,3 +6215,359 @@ def _compute_spam_score(post):
     elif account_age_days < 7:
         score += 10
     return min(score, 100)
+
+
+# ─── For You Feed (Personalised Algorithm) ────────────────────────────────────
+
+@login_required
+def for_you_feed(request):
+    """Instagram-style personalised feed using pre-computed FeedScore."""
+    scored_post_ids = (
+        FeedScore.objects
+        .filter(user=request.user)
+        .order_by('-score')
+        .values_list('post_id', flat=True)[:100]
+    )
+
+    if scored_post_ids:
+        # Preserve feed score ordering
+        id_list = list(scored_post_ids)
+        annotated = _annotated_feed_posts_queryset().filter(id__in=id_list)
+        id_to_post = {p.id: p for p in annotated}
+        posts_qs = [id_to_post[pid] for pid in id_list if pid in id_to_post]
+    else:
+        # Fallback: interest-based ordering for users without pre-computed scores
+        interests = list(request.user.profile.interested_categories or [])
+        base_qs = _annotated_feed_posts_queryset().filter(is_draft=False, is_deleted_by_moderation=False)
+        if interests:
+            base_qs = base_qs.filter(category__in=interests)
+        posts_qs = list(base_qs.order_by('-created_at')[:50])
+
+    paginator = Paginator(posts_qs, 10)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    posts = list(page_obj.object_list)
+    _enrich_posts_for_feed(posts, request.user)
+    posts = _filter_muted_posts(posts, request.user)
+
+    # Active stories from followed users
+    active_stories = _get_active_stories_for_user(request.user)
+
+    context = {
+        'posts': posts,
+        'page_obj': page_obj,
+        'active_tab': 'for_you',
+        'is_suggested_page': False,
+        'categories': get_frontend_categories(),
+        'active_category': '',
+        'follow_suggestions': _follow_suggestions(request.user),
+        'trending_sidebar': _get_trending_hashtags(),
+        'active_stories': active_stories,
+    }
+    return render(request, 'frontend/index.html', context)
+
+
+# ─── Explore / Discover Page ──────────────────────────────────────────────────
+
+def explore(request):
+    """Discover content outside your network, ranked by engagement."""
+    category_filter = request.GET.get('category', '').strip()
+    search_q = request.GET.get('q', '').strip()
+
+    base_qs = _annotated_feed_posts_queryset().filter(
+        is_draft=False,
+        is_deleted_by_moderation=False,
+        audience='public',
+    )
+
+    if request.user.is_authenticated:
+        # Exclude posts from people you already follow
+        following_ids = list(Follow.objects.filter(follower=request.user).values_list('following_id', flat=True))
+        base_qs = base_qs.exclude(user_id__in=following_ids).exclude(user=request.user)
+
+    if category_filter:
+        base_qs = base_qs.filter(category=category_filter)
+
+    if search_q:
+        base_qs = base_qs.filter(
+            Q(title__icontains=search_q) | Q(content__icontains=search_q) | Q(hashtags__icontains=search_q)
+        )
+
+    # Rank by engagement velocity (hot posts first, then engagement score)
+    explore_posts = base_qs.order_by('-is_hot', '-like_count', '-comment_count', '-created_at')
+
+    paginator = Paginator(explore_posts, 12)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    posts = list(page_obj.object_list)
+    _enrich_posts_for_feed(posts, request.user)
+    posts = _filter_muted_posts(posts, request.user)
+
+    # Rising posts (high engagement in last 2h, not yet hot)
+    two_hours_ago = timezone.now() - timedelta(hours=2)
+    rising_posts = list(
+        _annotated_feed_posts_queryset()
+        .filter(created_at__gte=two_hours_ago, is_hot=False, is_draft=False, audience='public')
+        .order_by('-like_count', '-comment_count')[:6]
+    )
+    _enrich_posts_for_feed(rising_posts, request.user)
+
+    context = {
+        'posts': posts,
+        'page_obj': page_obj,
+        'rising_posts': rising_posts,
+        'categories': get_frontend_categories(),
+        'active_category': category_filter,
+        'search_query': search_q,
+    }
+    return render(request, 'frontend/explore.html', context)
+
+
+# ─── Stories ──────────────────────────────────────────────────────────────────
+
+def _get_active_stories_for_user(user):
+    """Return stories from followed users that haven't expired yet."""
+    now = timezone.now()
+    if not user.is_authenticated:
+        return []
+    following_ids = list(Follow.objects.filter(follower=user).values_list('following_id', flat=True))
+    return list(
+        Story.objects.filter(
+            user_id__in=following_ids + [user.id],
+            expires_at__gt=now,
+        ).select_related('user', 'user__profile').order_by('-created_at')[:30]
+    )
+
+
+def stories_list(request):
+    """Stories page listing active stories from followed users."""
+    now = timezone.now()
+    if request.user.is_authenticated:
+        following_ids = list(Follow.objects.filter(follower=request.user).values_list('following_id', flat=True))
+        stories = Story.objects.filter(
+            user_id__in=following_ids + [request.user.id],
+            expires_at__gt=now,
+        ).select_related('user', 'user__profile').order_by('user_id', '-created_at')
+    else:
+        stories = Story.objects.filter(expires_at__gt=now).select_related('user', 'user__profile').order_by('-created_at')[:30]
+
+    # Group by user
+    from itertools import groupby
+    grouped = []
+    for uid, group in groupby(stories, key=lambda s: s.user_id):
+        group_list = list(group)
+        grouped.append({
+            'user': group_list[0].user,
+            'stories': group_list,
+            'has_unread': request.user.is_authenticated and any(
+                not StoryView.objects.filter(story=s, viewer=request.user).exists()
+                for s in group_list
+            ),
+        })
+
+    context = {'story_groups': grouped}
+    return render(request, 'frontend/stories.html', context)
+
+
+@login_required
+def create_story(request):
+    if request.method == 'POST':
+        content = request.POST.get('content', '').strip()
+        bg_color = request.POST.get('bg_color', '#0ea5e9')
+        image = request.FILES.get('image')
+
+        if not content and not image:
+            return JsonResponse({'error': 'Provide text or an image.'}, status=400)
+
+        story = Story.objects.create(
+            user=request.user,
+            content=content,
+            image=image,
+            bg_color=bg_color,
+            expires_at=timezone.now() + timedelta(hours=24),
+        )
+        return JsonResponse({'success': True, 'story_id': story.id})
+    return JsonResponse({'error': 'POST required'}, status=405)
+
+
+def view_story(request, story_id):
+    story = get_object_or_404(Story, id=story_id)
+    if story.is_expired:
+        return JsonResponse({'error': 'Story has expired'}, status=410)
+    if request.user.is_authenticated:
+        StoryView.objects.get_or_create(story=story, viewer=request.user)
+    data = {
+        'id': story.id,
+        'user': story.user.username,
+        'content': story.content,
+        'bg_color': story.bg_color,
+        'image_url': story.image.url if story.image else '',
+        'expires_at': story.expires_at.isoformat(),
+        'views_count': story.views.count(),
+    }
+    return JsonResponse(data)
+
+
+@login_required
+def delete_story(request, story_id):
+    story = get_object_or_404(Story, id=story_id, user=request.user)
+    story.delete()
+    return JsonResponse({'success': True})
+
+
+# ─── Creator Analytics ────────────────────────────────────────────────────────
+
+@login_required
+def creator_analytics(request, post_id):
+    post = get_object_or_404(Post, id=post_id, user=request.user)
+
+    total_views = PostView.objects.filter(post=post).count()
+    total_likes = PostAction.objects.filter(post=post, action='like').count()
+    total_saves = PostAction.objects.filter(post=post, action='save').count()
+    total_comments = Comment.objects.filter(post=post).count()
+    total_debates = Debate.objects.filter(post=post).count()
+
+    # All-time reaction breakdown
+    reaction_breakdown = {}
+    for action_choice, _ in PostAction.ACTION_CHOICES:
+        reaction_breakdown[action_choice] = PostAction.objects.filter(post=post, action=action_choice).count()
+
+    # Last 7 days daily data
+    daily_data = []
+    for i in range(6, -1, -1):
+        day = (timezone.now() - timedelta(days=i)).date()
+        insight = PostInsight.objects.filter(post=post, date=day).first()
+        daily_data.append({
+            'date': day.strftime('%b %d'),
+            'views': insight.unique_viewers if insight else 0,
+            'likes': insight.likes_count if insight else 0,
+            'saves': insight.saves_count if insight else 0,
+        })
+
+    # Engagement rate = (likes + comments + saves) / views * 100
+    total_engagements = total_likes + total_comments + total_saves
+    engagement_rate = round((total_engagements / total_views * 100), 1) if total_views > 0 else 0
+
+    context = {
+        'post': post,
+        'total_views': total_views,
+        'total_likes': total_likes,
+        'total_saves': total_saves,
+        'total_comments': total_comments,
+        'total_debates': total_debates,
+        'reaction_breakdown': reaction_breakdown,
+        'daily_data': daily_data,
+        'daily_data_json': json.dumps(daily_data),
+        'engagement_rate': engagement_rate,
+        'reading_time': post.reading_time_minutes,
+        'word_count': post.word_count,
+    }
+    return render(request, 'frontend/creator_analytics.html', context)
+
+
+@login_required
+def refresh_post_insight(request, post_id):
+    """Recalculate and store today's PostInsight for a post (called on-demand)."""
+    post = get_object_or_404(Post, id=post_id, user=request.user)
+    today = timezone.now().date()
+    insight, _ = PostInsight.objects.get_or_create(post=post, date=today)
+    insight.unique_viewers = PostView.objects.filter(post=post).count()
+    insight.likes_count = PostAction.objects.filter(post=post, action='like').count()
+    insight.saves_count = PostAction.objects.filter(post=post, action='save').count()
+    insight.comments_count = Comment.objects.filter(post=post).count()
+    insight.debates_count = Debate.objects.filter(post=post).count()
+    insight.save()
+    return JsonResponse({'success': True})
+
+
+# ─── Close Friends ────────────────────────────────────────────────────────────
+
+@login_required
+def close_friends_list_view(request):
+    """Manage close friends list."""
+    close_friends = CloseFriend.objects.filter(user=request.user).select_related('friend', 'friend__profile')
+    following = Follow.objects.filter(follower=request.user).select_related('following', 'following__profile')
+    cf_ids = set(close_friends.values_list('friend_id', flat=True))
+
+    context = {
+        'close_friends': close_friends,
+        'following': following,
+        'cf_ids': cf_ids,
+    }
+    return render(request, 'frontend/close_friends.html', context)
+
+
+@login_required
+def toggle_close_friend(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    friend_id = request.POST.get('user_id')
+    try:
+        friend = User.objects.get(id=friend_id)
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+
+    if friend == request.user:
+        return JsonResponse({'error': 'Cannot add yourself'}, status=400)
+
+    cf, created = CloseFriend.objects.get_or_create(user=request.user, friend=friend)
+    if not created:
+        cf.delete()
+        return JsonResponse({'action': 'removed', 'username': friend.username})
+    return JsonResponse({'action': 'added', 'username': friend.username})
+
+
+# ─── User Suggestions (People You May Know) ───────────────────────────────────
+
+@login_required
+def people_you_may_know(request):
+    """People You May Know page using pre-computed UserSuggestion."""
+    suggestions = (
+        UserSuggestion.objects
+        .filter(user=request.user)
+        .select_related('suggested_user', 'suggested_user__profile')
+        .order_by('-score')[:30]
+    )
+
+    # Fallback: 2nd-degree follows if no pre-computed data
+    if not suggestions.exists():
+        following_ids = set(Follow.objects.filter(follower=request.user).values_list('following_id', flat=True))
+        candidates = (
+            Follow.objects.filter(follower_id__in=following_ids)
+            .exclude(following=request.user)
+            .exclude(following_id__in=following_ids)
+            .select_related('following', 'following__profile')
+            .values('following_id', 'following__username')
+            .annotate(c=Count('id'))
+            .order_by('-c')[:20]
+        )
+        suggestions = None
+        context = {
+            'suggestions': None,
+            'fallback_candidates': candidates,
+        }
+    else:
+        context = {
+            'suggestions': suggestions,
+            'fallback_candidates': None,
+        }
+
+    # Enrich with follow state
+    if request.user.is_authenticated:
+        followed_ids = set(Follow.objects.filter(follower=request.user).values_list('following_id', flat=True))
+        context['followed_ids'] = followed_ids
+
+    return render(request, 'frontend/people_you_may_know.html', context)
+
+
+# ─── Post Audience Update ─────────────────────────────────────────────────────
+
+@login_required
+def update_post_audience(request, post_id):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    post = get_object_or_404(Post, id=post_id, user=request.user)
+    audience = request.POST.get('audience', 'public')
+    if audience not in ('public', 'followers', 'close_friends'):
+        return JsonResponse({'error': 'Invalid audience'}, status=400)
+    post.audience = audience
+    post.save(update_fields=['audience', 'updated_at'])
+    return JsonResponse({'success': True, 'audience': audience})

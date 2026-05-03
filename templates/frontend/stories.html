@@ -1,0 +1,211 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Stories — PickASide{% endblock %}
+
+{% block content %}
+<style>
+.stories-page { max-width: 540px; margin: 0 auto; padding: 24px 16px; }
+.story-group { border-radius: 1.2rem; border: 1px solid hsl(var(--border)/0.7); background: hsl(var(--card)); overflow: hidden; margin-bottom: 14px; }
+.story-group-header { display:flex; align-items:center; gap:12px; padding: 14px 16px 10px; }
+.story-avatar-ring { border-radius:999px; padding:2.5px; background: linear-gradient(135deg,#f97316,#e11d48,#8b5cf6); display:inline-block; }
+.story-avatar-ring.read { background: hsl(var(--border)); }
+.story-avatar { width:44px; height:44px; border-radius:999px; border:2px solid hsl(var(--background)); background:hsl(var(--muted)); display:flex; align-items:center; justify-content:center; overflow:hidden; }
+.story-row { display:flex; gap:8px; overflow-x:auto; padding: 0 16px 14px; scrollbar-width:none; }
+.story-row::-webkit-scrollbar { display:none; }
+.story-bubble { flex-shrink:0; width:72px; cursor:pointer; }
+.story-thumb { width:72px; height:92px; border-radius:.8rem; object-fit:cover; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.4); position:relative; overflow:hidden; }
+.story-thumb-text { font-size:10px; font-weight:600; line-clamp:4; text-align:center; padding:4px; word-break:break-word; }
+.story-bubble p { font-size:11px; text-align:center; margin-top:4px; color:hsl(var(--muted-foreground)); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Story viewer modal */
+.story-modal { display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.92); align-items:center; justify-content:center; }
+.story-modal.open { display:flex; }
+.story-viewer { width:min(360px,100vw); border-radius:1.2rem; overflow:hidden; position:relative; background:#000; max-height:90vh; }
+.story-progress { display:flex; gap:4px; padding:10px 12px 4px; position:absolute; top:0; left:0; right:0; z-index:2; }
+.story-prog-bar { height:3px; flex:1; border-radius:99px; background:rgba(255,255,255,.35); overflow:hidden; }
+.story-prog-fill { height:100%; background:#fff; width:0%; transition:width 5s linear; }
+.story-inner { display:flex; align-items:center; justify-content:center; width:100%; height:520px; position:relative; }
+.story-content-bg { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
+.story-content-text { color:#fff; font-size:18px; font-weight:700; text-align:center; text-shadow:0 2px 8px rgba(0,0,0,.5); word-break:break-word; }
+.story-header { position:absolute; top:28px; left:0; right:0; z-index:3; display:flex; align-items:center; gap:10px; padding:0 14px; }
+.story-close { position:absolute; top:10px; right:14px; z-index:4; cursor:pointer; color:#fff; background:rgba(0,0,0,.4); border-radius:999px; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border:none; }
+.story-nav { position:absolute; inset-y-0; top:50%; width:40%; height:100%; z-index:3; cursor:pointer; background:transparent; border:none; }
+.story-nav-prev { left:0; }
+.story-nav-next { right:0; }
+
+/* Create story button */
+.create-story-btn { display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; flex-shrink:0; }
+.create-story-ring { width:56px; height:56px; border-radius:999px; border:2px dashed hsl(var(--primary)/0.6); display:flex; align-items:center; justify-content:center; background:hsl(var(--primary)/0.08); transition:background .18s; }
+.create-story-ring:hover { background:hsl(var(--primary)/0.15); }
+</style>
+
+<div class="stories-page">
+  <div class="flex items-center justify-between mb-5">
+    <h1 class="text-xl font-bold text-foreground">Stories</h1>
+    {% if user.is_authenticated %}
+    <button onclick="document.getElementById('create-story-modal').classList.add('open')"
+      class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold shadow-sm hover:bg-primary/90 transition-colors">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      Add Story
+    </button>
+    {% endif %}
+  </div>
+
+  {% if not story_groups %}
+  <div class="text-center py-20">
+    <div class="text-5xl mb-3">📖</div>
+    <p class="font-semibold text-foreground mb-1">No stories yet</p>
+    <p class="text-sm text-muted-foreground mb-4">Stories from people you follow appear here</p>
+    {% if user.is_authenticated %}
+    <button onclick="document.getElementById('create-story-modal').classList.add('open')"
+      class="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold">
+      Be the first — Add a Story
+    </button>
+    {% endif %}
+  </div>
+  {% else %}
+
+  {% for group in story_groups %}
+  <div class="story-group">
+    <div class="story-group-header">
+      <div class="story-avatar-ring {% if not group.has_unread %}read{% endif %}">
+        <div class="story-avatar">
+          {% if group.user.profile.get_picture_url %}
+          <img src="{{ group.user.profile.get_picture_url }}" class="w-full h-full object-cover" loading="lazy" alt="">
+          {% else %}
+          <span class="text-base font-bold text-muted-foreground">{{ group.user.username|slice:":1"|upper }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div>
+        <a href="{% url 'user_profile' group.user.username %}" class="text-sm font-semibold text-foreground hover:text-primary">@{{ group.user.username }}</a>
+        <p class="text-xs text-muted-foreground">{{ group.stories|length }} stor{{ group.stories|length|pluralize:"y,ies" }}</p>
+      </div>
+      {% if group.has_unread %}<span class="ml-auto w-2 h-2 rounded-full bg-primary"></span>{% endif %}
+    </div>
+    <div class="story-row">
+      {% for story in group.stories %}
+      <div class="story-bubble" onclick="openStory({{ story.id }}, '{{ story.content|escapejs }}', '{{ story.bg_color }}', '{{ story.image.url|default:'' }}', '{{ group.user.username }}', {{ story.views.count }})">
+        <div class="story-thumb" style="background:{{ story.bg_color }}">
+          {% if story.image %}
+          <img src="{{ story.image.url }}" class="absolute inset-0 w-full h-full object-cover" loading="lazy" alt="">
+          {% else %}
+          <span class="story-thumb-text">{{ story.content|truncatechars:60 }}</span>
+          {% endif %}
+        </div>
+        <p>{{ story.created_at|timesince }} ago</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+</div>
+
+<!-- Story viewer modal -->
+<div class="story-modal" id="story-modal">
+  <button class="story-close" onclick="closeStory()">✕</button>
+  <div class="story-viewer">
+    <div class="story-progress" id="story-progress"></div>
+    <div class="story-inner" id="story-inner">
+      <div class="story-content-bg" id="story-content-bg">
+        <div class="story-header" id="story-user-header" style="position:relative; padding:0; margin-bottom:16px; justify-content:center;">
+          <span id="story-username" class="text-white text-sm font-semibold opacity-80"></span>
+        </div>
+        <p class="story-content-text" id="story-text"></p>
+        <img id="story-img" src="" alt="" class="max-w-full max-h-64 rounded-lg mt-3 object-contain" style="display:none">
+      </div>
+    </div>
+    <div class="flex items-center justify-between px-3 py-2 bg-black/40 text-white text-xs">
+      <span id="story-views">👁 0 views</span>
+      {% if user.is_authenticated %}<span id="story-exp" class="opacity-60"></span>{% endif %}
+    </div>
+    <button class="story-nav story-nav-prev" onclick="prevStory()"></button>
+    <button class="story-nav story-nav-next" onclick="nextStory()"></button>
+  </div>
+</div>
+
+<!-- Create Story Modal -->
+{% if user.is_authenticated %}
+<div class="story-modal" id="create-story-modal">
+  <div style="width:min(400px,96vw); border-radius:1.2rem; overflow:hidden; background:hsl(var(--card)); border:1px solid hsl(var(--border))">
+    <div class="flex items-center justify-between p-4 border-b border-border">
+      <h2 class="font-bold text-foreground">Create Story</h2>
+      <button onclick="document.getElementById('create-story-modal').classList.remove('open')" class="text-muted-foreground hover:text-foreground">✕</button>
+    </div>
+    <div class="p-4">
+      <div class="mb-3">
+        <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">Background Colour</label>
+        <div class="flex gap-2 flex-wrap">
+          {% for color in "#0ea5e9,#8b5cf6,#10b981,#f97316,#ef4444,#ec4899,#f59e0b,#1e293b" %}
+          <button type="button" onclick="document.getElementById('story-bg').value='{{ color }}'; this.parentElement.querySelectorAll('button').forEach(b=>b.style.outline=''); this.style.outline='3px solid hsl(var(--primary))';"
+            style="width:28px;height:28px;border-radius:50%;background:{{ color }};border:none;cursor:pointer;"></button>
+          {% endfor %}
+        </div>
+        <input type="hidden" id="story-bg" value="#0ea5e9">
+      </div>
+      <textarea id="story-text-input" placeholder="What's on your mind? (max 280 chars)" maxlength="280"
+        class="w-full text-sm rounded-xl border border-border bg-background/60 p-3 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30" rows="4"></textarea>
+      <div class="mt-3">
+        <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 block">Or add an image</label>
+        <input type="file" id="story-file" accept="image/*" class="text-sm text-muted-foreground">
+      </div>
+      <button onclick="submitStory()" class="w-full mt-4 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors">
+        Share Story (24 hrs)
+      </button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+let currentStoryId = null;
+
+function openStory(id, content, bg, imgUrl, username, views) {
+  currentStoryId = id;
+  document.getElementById('story-modal').classList.add('open');
+  document.getElementById('story-content-bg').style.background = bg;
+  document.getElementById('story-text').textContent = content;
+  document.getElementById('story-username').textContent = '@' + username;
+  document.getElementById('story-views').textContent = '👁 ' + views + ' view' + (views !== 1 ? 's' : '');
+  const img = document.getElementById('story-img');
+  if (imgUrl) { img.src = imgUrl; img.style.display = 'block'; } else { img.style.display = 'none'; }
+  // auto-progress bar
+  const prog = document.getElementById('story-progress');
+  prog.innerHTML = '<div class="story-prog-bar"><div class="story-prog-fill" id="spf"></div></div>';
+  setTimeout(() => { const spf = document.getElementById('spf'); if (spf) spf.style.width = '100%'; }, 50);
+  setTimeout(closeStory, 5200);
+  // mark viewed via API
+  fetch('/stories/' + id + '/').catch(()=>{});
+}
+
+function closeStory() {
+  document.getElementById('story-modal').classList.remove('open');
+  currentStoryId = null;
+}
+
+function prevStory() { /* navigate prev — simplified */ }
+function nextStory() { closeStory(); }
+
+// Close on backdrop click
+document.getElementById('story-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeStory();
+});
+
+{% if user.is_authenticated %}
+function submitStory() {
+  const content = document.getElementById('story-text-input').value.trim();
+  const bg = document.getElementById('story-bg').value;
+  const file = document.getElementById('story-file').files[0];
+  if (!content && !file) { alert('Add text or an image.'); return; }
+  const fd = new FormData();
+  fd.append('content', content);
+  fd.append('bg_color', bg);
+  if (file) fd.append('image', file);
+  fd.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+  fetch('/stories/create/', { method:'POST', body:fd })
+    .then(r => r.json())
+    .then(d => { if (d.success) { document.getElementById('create-story-modal').classList.remove('open'); location.reload(); } else { alert(d.error || 'Failed.'); } });
+}
+{% endif %}
+</script>
+{% endblock %}

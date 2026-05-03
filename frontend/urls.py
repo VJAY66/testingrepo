@@ -148,4 +148,23 @@ urlpatterns = [
     path('challenges/', views.challenges_list, name='challenges_list'),
     path('challenges/create/', views.create_challenge, name='create_challenge'),
     path('challenges/<int:challenge_id>/enter/', views.enter_challenge, name='enter_challenge'),
+    # For You feed (personalised algorithm)
+    path('for-you/', views.for_you_feed, name='for_you_feed'),
+    # Explore / Discover
+    path('explore/', views.explore, name='explore'),
+    # Stories
+    path('stories/', views.stories_list, name='stories_list'),
+    path('stories/create/', views.create_story, name='create_story'),
+    path('stories/<int:story_id>/', views.view_story, name='view_story'),
+    path('stories/<int:story_id>/delete/', views.delete_story, name='delete_story'),
+    # Creator Analytics
+    path('posts/<str:post_id>/analytics/', views.creator_analytics, name='creator_analytics'),
+    path('posts/<str:post_id>/analytics/refresh/', views.refresh_post_insight, name='refresh_post_insight'),
+    # Close Friends
+    path('close-friends/', views.close_friends_list_view, name='close_friends_list'),
+    path('close-friends/toggle/', views.toggle_close_friend, name='toggle_close_friend'),
+    # People You May Know
+    path('people-you-may-know/', views.people_you_may_know, name='people_you_may_know'),
+    # Post audience
+    path('posts/<str:post_id>/audience/', views.update_post_audience, name='update_post_audience'),
 ]

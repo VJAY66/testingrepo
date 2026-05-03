@@ -227,3 +227,43 @@ class LoginAttempt(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+
+class CloseFriend(models.Model):
+    """User marks another user as a Close Friend — they see close_friends audience posts."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='close_friends_list')
+    friend = models.ForeignKey(User, on_delete=models.CASCADE, related_name='in_close_friends_of')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} → {self.friend.username} (close friend)"
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['user', 'friend'], name='unique_close_friend')]
+        ordering = ['-created_at']
+
+
+class UserSuggestion(models.Model):
+    """Pre-computed 'People You May Know' suggestions."""
+    REASON_MUTUAL = 'mutual_follow'
+    REASON_INTEREST = 'shared_interest'
+    REASON_HASHTAG = 'shared_hashtag'
+    REASON_CHOICES = [
+        (REASON_MUTUAL, 'Mutual Follows'),
+        (REASON_INTEREST, 'Shared Interests'),
+        (REASON_HASHTAG, 'Shared Hashtags'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='suggestions_for')
+    suggested_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='suggested_to')
+    reason = models.CharField(max_length=20, choices=REASON_CHOICES, default=REASON_MUTUAL)
+    reason_detail = models.CharField(max_length=120, blank=True, default='')
+    score = models.FloatField(default=0.0)
+    computed_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Suggest {self.suggested_user.username} to {self.user.username}"
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['user', 'suggested_user'], name='unique_user_suggestion')]
+        ordering = ['-score']

@@ -1,0 +1,177 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Analytics — {{ post.title|truncatechars:40 }}{% endblock %}
+
+{% block content %}
+<style>
+.analytics-page { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; }
+.stat-card { border-radius: 1rem; border: 1px solid hsl(var(--border)/0.7); background: hsl(var(--card)); padding: 16px 18px; }
+.stat-num { font-size: 1.8rem; font-weight: 800; line-height: 1; }
+.stat-label { font-size: 12px; color: hsl(var(--muted-foreground)); font-weight: 600; margin-top: 4px; }
+.stat-icon { font-size: 1.4rem; margin-bottom: 6px; }
+.chart-bar-wrap { display:flex; flex-direction:column; gap:6px; }
+.chart-bar-row { display:flex; align-items:center; gap:8px; }
+.chart-bar-label { width: 44px; text-align:right; font-size:11px; color:hsl(var(--muted-foreground)); flex-shrink:0; }
+.chart-bar-track { flex:1; height:10px; border-radius:999px; background:hsl(var(--border)/0.5); overflow:hidden; }
+.chart-bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,hsl(var(--primary)),hsl(var(--primary)/0.6)); transition:width 0.6s cubic-bezier(0.34,1.56,0.64,1); }
+.chart-bar-val { width: 32px; font-size:11px; color:hsl(var(--foreground)); font-weight:600; }
+.reaction-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-b border-border; }
+.reaction-row:last-child { border-b:none; }
+.eng-ring { width:80px; height:80px; border-radius:50%; border: 5px solid hsl(var(--primary)/0.15); display:flex; align-items:center; justify-content:center; position:relative; }
+.eng-ring-fill { position:absolute; inset:0; border-radius:50%; border:5px solid hsl(var(--primary)); clip-path:inset(0 0 0 0); }
+.audience-badge { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:600; border:1px solid hsl(var(--border)); }
+.audience-public { background:hsl(217 91% 50%/0.1); color:hsl(217 91% 50%); border-color:hsl(217 91% 50%/0.3); }
+.audience-followers { background:hsl(272 68% 50%/0.1); color:hsl(272 68% 50%); border-color:hsl(272 68% 50%/0.3); }
+.audience-close_friends { background:#dcfce7; color:#16a34a; border-color:#86efac; }
+.dark .audience-close_friends { background:rgba(22,163,74,.15); border-color:rgba(134,239,172,.3); }
+</style>
+
+<div class="analytics-page">
+  <!-- Back + title -->
+  <div class="flex items-center gap-3 mb-5">
+    <a href="{% url 'discussion' post.id %}" class="text-muted-foreground hover:text-foreground text-lg">←</a>
+    <div class="flex-1 min-w-0">
+      <p class="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Post Analytics</p>
+      <h1 class="text-base font-bold text-foreground truncate">{{ post.title }}</h1>
+    </div>
+    <button onclick="refreshInsight()" class="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-primary transition-colors" id="refresh-btn">
+      ↻ Refresh
+    </button>
+  </div>
+
+  <!-- Audience + reading time row -->
+  <div class="flex items-center gap-3 mb-6 flex-wrap">
+    <span class="audience-badge audience-{{ post.audience }}">
+      {% if post.audience == 'public' %}🌍 Public{% elif post.audience == 'followers' %}👥 Followers{% else %}💚 Close Friends{% endif %}
+    </span>
+    <span class="text-xs text-muted-foreground">📖 {{ reading_time }} min read · {{ word_count }} words</span>
+    <a href="{% url 'discussion' post.id %}" class="ml-auto text-xs text-primary hover:underline">View post →</a>
+  </div>
+
+  <!-- Headline stats grid -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+    <div class="stat-card">
+      <div class="stat-icon">👁</div>
+      <div class="stat-num text-foreground">{{ total_views }}</div>
+      <div class="stat-label">Total Views</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">⭐</div>
+      <div class="stat-num text-foreground">{{ total_likes }}</div>
+      <div class="stat-label">Likes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🔖</div>
+      <div class="stat-num text-foreground">{{ total_saves }}</div>
+      <div class="stat-label">Saves</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">💬</div>
+      <div class="stat-num text-foreground">{{ total_comments }}</div>
+      <div class="stat-label">Comments</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">⚔️</div>
+      <div class="stat-num text-foreground">{{ total_debates }}</div>
+      <div class="stat-label">Debates</div>
+    </div>
+    <div class="stat-card flex flex-col items-center justify-center">
+      <div class="eng-ring mb-2">
+        <span class="text-lg font-bold text-primary z-10">{{ engagement_rate }}%</span>
+      </div>
+      <div class="stat-label">Engagement Rate</div>
+    </div>
+  </div>
+
+  <!-- 7-day chart -->
+  <div class="stat-card mb-6">
+    <h2 class="font-bold text-foreground text-sm mb-4">Last 7 Days — Views</h2>
+    {% with max_views=daily_data.0.views %}
+    <div class="chart-bar-wrap" id="daily-chart">
+      {% for day in daily_data %}
+      <div class="chart-bar-row">
+        <span class="chart-bar-label">{{ day.date }}</span>
+        <div class="chart-bar-track">
+          <div class="chart-bar-fill" style="width:0%" data-target="{% if total_views > 0 %}{{ day.views }}{% else %}0{% endif %}" data-max="{{ total_views }}"></div>
+        </div>
+        <span class="chart-bar-val">{{ day.views }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endwith %}
+  </div>
+
+  <!-- Reaction breakdown -->
+  <div class="stat-card mb-6">
+    <h2 class="font-bold text-foreground text-sm mb-3">Reaction Breakdown</h2>
+    {% for action, count in reaction_breakdown.items %}
+    {% if count > 0 %}
+    <div class="reaction-row">
+      <span class="text-sm text-foreground font-medium capitalize">
+        {% if action == 'like' %}⭐ Like{% elif action == 'save' %}🔖 Save{% elif action == 'hot' %}🔥 Hot{% elif action == 'debatable' %}🤔 Debatable{% elif action == 'agree' %}👏 Agree{% elif action == 'surprising' %}😮 Surprising{% else %}{{ action }}{% endif %}
+      </span>
+      <div class="flex items-center gap-3">
+        <div class="h-2 rounded-full bg-primary/20 overflow-hidden" style="width:80px">
+          <div class="h-full rounded-full bg-primary" style="width:{% widthratio count total_views 100 %}%"></div>
+        </div>
+        <span class="text-sm font-bold text-foreground">{{ count }}</span>
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+
+  <!-- Audience control -->
+  <div class="stat-card">
+    <h2 class="font-bold text-foreground text-sm mb-3">Audience Control</h2>
+    <p class="text-xs text-muted-foreground mb-3">Control who can see this post</p>
+    <div class="flex flex-col gap-2">
+      {% for value, label in post.AUDIENCE_CHOICES %}
+      <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors {% if post.audience == value %}border-primary bg-primary/5{% else %}border-border hover:bg-muted/30{% endif %}">
+        <input type="radio" name="audience" value="{{ value }}" {% if post.audience == value %}checked{% endif %}
+          onchange="updateAudience('{{ value }}')" class="accent-primary">
+        <span class="text-sm font-semibold text-foreground">
+          {% if value == 'public' %}🌍 {{ label }}{% elif value == 'followers' %}👥 {{ label }}{% else %}💚 {{ label }}{% endif %}
+        </span>
+        <span class="ml-auto text-xs text-muted-foreground">
+          {% if value == 'public' %}Everyone{% elif value == 'followers' %}Only followers{% else %}Close friends only{% endif %}
+        </span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+// Animate bar chart on load
+window.addEventListener('DOMContentLoaded', () => {
+  const bars = document.querySelectorAll('.chart-bar-fill');
+  const maxVal = Math.max(...Array.from(bars).map(b => parseInt(b.dataset.target) || 0), 1);
+  setTimeout(() => {
+    bars.forEach(bar => {
+      const val = parseInt(bar.dataset.target) || 0;
+      bar.style.width = (val / maxVal * 100) + '%';
+    });
+  }, 100);
+});
+
+function updateAudience(value) {
+  fetch('/posts/{{ post.id }}/audience/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'audience=' + value
+  }).then(r => r.json()).then(d => {
+    if (!d.success) alert('Failed to update audience.');
+  });
+}
+
+function refreshInsight() {
+  const btn = document.getElementById('refresh-btn');
+  btn.textContent = '…';
+  btn.disabled = true;
+  fetch('/posts/{{ post.id }}/analytics/refresh/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') }
+  }).then(r => r.json()).then(() => location.reload());
+}
+</script>
+{% endblock %}
