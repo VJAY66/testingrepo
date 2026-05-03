@@ -125,39 +125,6 @@
 
 <div style="max-width:48rem;margin:0 auto;padding:1.5rem 1rem 2rem;" id="posts-section">
 
-  <!-- Stories strip -->
-  {% if user.is_authenticated and active_stories %}
-  <div class="mb-5">
-    <div class="flex items-center justify-between mb-2">
-      <span class="text-xs font-bold text-muted-foreground uppercase tracking-wide">Stories</span>
-      <a href="{% url 'stories_list' %}" class="text-xs text-primary font-semibold hover:underline">See all</a>
-    </div>
-    <div class="flex gap-3 overflow-x-auto pb-1" style="scrollbar-width:none">
-      <!-- Add story bubble -->
-      <a href="{% url 'stories_list' %}" class="flex flex-col items-center gap-1.5 flex-shrink-0" style="text-decoration:none">
-        <div style="width:52px;height:52px;border-radius:50%;background:hsl(var(--primary)/0.12);border:2px dashed hsl(var(--primary)/0.5);display:flex;align-items:center;justify-content:center;">
-          <span style="font-size:18px;color:hsl(var(--primary))">+</span>
-        </div>
-        <span style="font-size:10px;color:hsl(var(--muted-foreground));white-space:nowrap">Add Story</span>
-      </a>
-      {% for story in active_stories %}
-      <a href="{% url 'stories_list' %}" class="flex flex-col items-center gap-1.5 flex-shrink-0 story-strip-item" style="text-decoration:none">
-        <div style="padding:2.5px;border-radius:50%;background:linear-gradient(135deg,#f97316,#e11d48,#8b5cf6);display:inline-block">
-          <div style="width:48px;height:48px;border-radius:50%;border:2px solid hsl(var(--background));overflow:hidden;display:flex;align-items:center;justify-content:center;background:hsl(var(--muted))">
-            {% if story.user.profile.get_picture_url %}
-            <img src="{{ story.user.profile.get_picture_url }}" style="width:100%;height:100%;object-fit:cover" loading="lazy" alt="">
-            {% else %}
-            <span style="font-size:14px;font-weight:700;color:hsl(var(--muted-foreground))">{{ story.user.username|slice:":1"|upper }}</span>
-            {% endif %}
-          </div>
-        </div>
-        <span style="font-size:10px;color:hsl(var(--foreground));white-space:nowrap;max-width:52px;overflow:hidden;text-overflow:ellipsis">{{ story.user.username }}</span>
-      </a>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
-
   <!-- Quick navigation row -->
   {% if user.is_authenticated %}
   <div class="flex gap-2 mb-5 overflow-x-auto pb-1" style="scrollbar-width:none">
@@ -166,12 +133,6 @@
     </a>
     <a href="{% url 'people_you_may_know' %}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-card/70 text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors flex-shrink-0">
       👥 People You May Know
-    </a>
-    <a href="{% url 'stories_list' %}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-card/70 text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors flex-shrink-0">
-      📖 Stories
-    </a>
-    <a href="{% url 'close_friends_list' %}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-card/70 text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors flex-shrink-0">
-      💚 Close Friends
     </a>
   </div>
   {% endif %}
@@ -188,8 +149,6 @@
                                     {{ post.title }}
                                 </a>
                                 {% if post.is_hot_now %}<span class="ml-1 inline-flex items-center rounded-full bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 text-[10px] font-bold text-orange-600 dark:text-orange-400">🔥 Hot</span>{% endif %}
-                                {% if post.audience == 'close_friends' %}<span class="ml-1 inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-[10px] font-bold text-green-700 dark:text-green-400">💚 Close Friends</span>{% endif %}
-                                {% if post.audience == 'followers' %}<span class="ml-1 inline-flex items-center rounded-full bg-purple-100 dark:bg-purple-900/30 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-400">👥 Followers</span>{% endif %}
                             </h3>
                             <div class="flex items-center gap-2 mb-2">
                                 <a href="{% url 'user_profile' post.user.username %}" class="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border bg-background/70">

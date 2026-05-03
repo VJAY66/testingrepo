@@ -2577,14 +2577,6 @@
                                     </div>
                                     <svg class="hub-item-arrow w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
                                 </a>
-                                <a href="{% url 'stories_list' %}" class="hub-item">
-                                    <span class="hub-item-icon" style="background:linear-gradient(135deg,#fdf4ff,#e9d5ff); color:#7c3aed;">📖</span>
-                                    <div class="hub-item-text">
-                                        <div class="hub-item-title">Stories</div>
-                                        <div class="hub-item-desc">24-hour posts from people you follow</div>
-                                    </div>
-                                    <svg class="hub-item-arrow w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-                                </a>
                                 <a href="{% url 'people_you_may_know' %}" class="hub-item">
                                     <span class="hub-item-icon" style="background:linear-gradient(135deg,#f0fdf4,#bbf7d0); color:#15803d;">👥</span>
                                     <div class="hub-item-text">
@@ -2643,7 +2635,6 @@
                         </a>
                         <a href="{% url 'for_you_feed' %}" class="nav-quick-link nav-quick-link-desktop">🎯 For You</a>
                         <a href="{% url 'explore' %}" class="nav-quick-link nav-quick-link-desktop">🔭 Explore</a>
-                        <a href="{% url 'stories_list' %}" class="nav-quick-link nav-quick-link-desktop">📖 Stories</a>
                         <a href="{% url 'suggested' %}" class="nav-quick-link nav-quick-link-desktop">Suggested for You</a>
                         <a href="{% url 'debate_inbox' %}" class="nav-quick-link nav-quick-link-desktop">Debates</a>
                         {% endif %}

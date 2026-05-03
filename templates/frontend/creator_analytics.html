@@ -18,11 +18,6 @@
 .reaction-row:last-child { border-b:none; }
 .eng-ring { width:80px; height:80px; border-radius:50%; border: 5px solid hsl(var(--primary)/0.15); display:flex; align-items:center; justify-content:center; position:relative; }
 .eng-ring-fill { position:absolute; inset:0; border-radius:50%; border:5px solid hsl(var(--primary)); clip-path:inset(0 0 0 0); }
-.audience-badge { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:600; border:1px solid hsl(var(--border)); }
-.audience-public { background:hsl(217 91% 50%/0.1); color:hsl(217 91% 50%); border-color:hsl(217 91% 50%/0.3); }
-.audience-followers { background:hsl(272 68% 50%/0.1); color:hsl(272 68% 50%); border-color:hsl(272 68% 50%/0.3); }
-.audience-close_friends { background:#dcfce7; color:#16a34a; border-color:#86efac; }
-.dark .audience-close_friends { background:rgba(22,163,74,.15); border-color:rgba(134,239,172,.3); }
 </style>
 
 <div class="analytics-page">
@@ -38,11 +33,8 @@
     </button>
   </div>
 
-  <!-- Audience + reading time row -->
+  <!-- Reading time row -->
   <div class="flex items-center gap-3 mb-6 flex-wrap">
-    <span class="audience-badge audience-{{ post.audience }}">
-      {% if post.audience == 'public' %}🌍 Public{% elif post.audience == 'followers' %}👥 Followers{% else %}💚 Close Friends{% endif %}
-    </span>
     <span class="text-xs text-muted-foreground">📖 {{ reading_time }} min read · {{ word_count }} words</span>
     <a href="{% url 'discussion' post.id %}" class="ml-auto text-xs text-primary hover:underline">View post →</a>
   </div>
@@ -120,25 +112,6 @@
     {% endfor %}
   </div>
 
-  <!-- Audience control -->
-  <div class="stat-card">
-    <h2 class="font-bold text-foreground text-sm mb-3">Audience Control</h2>
-    <p class="text-xs text-muted-foreground mb-3">Control who can see this post</p>
-    <div class="flex flex-col gap-2">
-      {% for value, label in post.AUDIENCE_CHOICES %}
-      <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors {% if post.audience == value %}border-primary bg-primary/5{% else %}border-border hover:bg-muted/30{% endif %}">
-        <input type="radio" name="audience" value="{{ value }}" {% if post.audience == value %}checked{% endif %}
-          onchange="updateAudience('{{ value }}')" class="accent-primary">
-        <span class="text-sm font-semibold text-foreground">
-          {% if value == 'public' %}🌍 {{ label }}{% elif value == 'followers' %}👥 {{ label }}{% else %}💚 {{ label }}{% endif %}
-        </span>
-        <span class="ml-auto text-xs text-muted-foreground">
-          {% if value == 'public' %}Everyone{% elif value == 'followers' %}Only followers{% else %}Close friends only{% endif %}
-        </span>
-      </label>
-      {% endfor %}
-    </div>
-  </div>
 </div>
 
 <script>
@@ -153,16 +126,6 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }, 100);
 });
-
-function updateAudience(value) {
-  fetch('/posts/{{ post.id }}/audience/', {
-    method: 'POST',
-    headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'audience=' + value
-  }).then(r => r.json()).then(d => {
-    if (!d.success) alert('Failed to update audience.');
-  });
-}
 
 function refreshInsight() {
   const btn = document.getElementById('refresh-btn');

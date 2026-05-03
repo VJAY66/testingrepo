@@ -6276,7 +6276,6 @@ def explore(request):
     base_qs = _annotated_feed_posts_queryset().filter(
         is_draft=False,
         is_deleted_by_moderation=False,
-        audience='public',
     )
 
     if request.user.is_authenticated:
@@ -6305,7 +6304,7 @@ def explore(request):
     two_hours_ago = timezone.now() - timedelta(hours=2)
     rising_posts = list(
         _annotated_feed_posts_queryset()
-        .filter(created_at__gte=two_hours_ago, is_hot=False, is_draft=False, audience='public')
+        .filter(created_at__gte=two_hours_ago, is_hot=False, is_draft=False)
         .order_by('-like_count', '-comment_count')[:6]
     )
     _enrich_posts_for_feed(rising_posts, request.user)
