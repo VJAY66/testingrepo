@@ -21,7 +21,7 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater
 from discussions.signals import notify_post_author
 from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion
 from users.security import is_login_rate_limited, record_login_attempt
@@ -806,6 +806,10 @@ def _enrich_posts_for_feed(posts, user):
             elif item['action'] == 'surprising':
                 surprising_post_ids.add(item['post_id'])
 
+    read_later_ids = set(
+        ReadLater.objects.filter(user=user, post__in=post_ids).values_list('post_id', flat=True)
+    ) if post_ids else set()
+
     for post in posts:
         post.is_liked = post.id in liked_post_ids
         post.is_saved = post.id in saved_post_ids
@@ -814,6 +818,7 @@ def _enrich_posts_for_feed(posts, user):
         post.is_debatable = post.id in debatable_post_ids
         post.is_agree = post.id in agree_post_ids
         post.is_surprising = post.id in surprising_post_ids
+        post.is_read_later = post.id in read_later_ids
 
 
 def _build_suggested_posts_for_user(user, annotated_posts):
@@ -2497,6 +2502,10 @@ def create_post(request):
         hashtags = request.POST.get('hashtags', '').strip()
         accepted_rules = request.POST.get('accepted_rules', '0').strip()
         save_as_draft = request.POST.get('save_draft') == '1'
+        mood = request.POST.get('mood', '').strip()
+        valid_moods = [m[0] for m in Post.MOOD_CHOICES]
+        if mood not in valid_moods:
+            mood = ''
 
         if not title or not category:
             messages.error(request, 'Title and category are required')
@@ -2567,6 +2576,7 @@ def create_post(request):
                 is_draft=save_as_draft,
                 scheduled_for=scheduled_for_dt,
                 quoted_post=quoted_post_obj,
+                mood=mood,
             )
 
             if not post or not post.id:
@@ -6657,3 +6667,79 @@ def debate_timer_status(request, debate_id):
         'ends_at': debate.round_ends_at.isoformat() if debate.round_ends_at else None,
         'remaining_seconds': remaining,
     })
+
+
+# ─── Read Later Queue ─────────────────────────────────────────────────────────
+
+@login_required
+def read_later_list(request):
+    items = ReadLater.objects.filter(user=request.user).select_related(
+        'post', 'post__user', 'post__user__profile'
+    )
+    unread = items.filter(is_read=False)
+    done = items.filter(is_read=True)
+    return render(request, 'frontend/read_later.html', {
+        'unread': unread,
+        'done': done,
+    })
+
+
+@login_required
+@require_POST
+def toggle_read_later(request):
+    post_id = (request.POST.get('post_id') or '').strip()
+    post_obj = get_object_or_404(Post, id=post_id)
+    rl, created = ReadLater.objects.get_or_create(user=request.user, post=post_obj)
+    if not created:
+        rl.delete()
+        return JsonResponse({'success': True, 'saved': False})
+    return JsonResponse({'success': True, 'saved': True})
+
+
+@login_required
+@require_POST
+def mark_read_later_done(request):
+    post_id = (request.POST.get('post_id') or '').strip()
+    ReadLater.objects.filter(user=request.user, post_id=post_id).update(is_read=True)
+    return JsonResponse({'success': True})
+
+
+# ─── Mutual Draw (Agree to Disagree) ─────────────────────────────────────────
+
+@login_required
+@require_POST
+def debate_propose_draw(request, debate_id):
+    debate = get_object_or_404(Debate, id=debate_id, status='accepted')
+    if request.user not in [debate.initiator, debate.target]:
+        return JsonResponse({'error': 'Not a participant'}, status=403)
+    if debate.outcome == 'draw':
+        return JsonResponse({'success': True, 'already_draw': True})
+    if debate.draw_proposed_by_id and debate.draw_proposed_by_id != request.user.id:
+        # Other side already proposed — auto-accept
+        debate.outcome = 'draw'
+        debate.status = 'completed'
+        debate.draw_proposed_by = None
+        debate.save(update_fields=['outcome', 'status', 'draw_proposed_by', 'updated_at'])
+        return JsonResponse({'success': True, 'draw_accepted': True})
+    debate.draw_proposed_by = request.user
+    debate.save(update_fields=['draw_proposed_by', 'updated_at'])
+    return JsonResponse({'success': True, 'draw_proposed': True})
+
+
+# ─── Reaction Insights (also used in discussion page) ────────────────────────
+
+def post_reaction_insights(request, post_id):
+    """Same as post_reaction_users but accessible from discussion page."""
+    action = request.GET.get('action', '')
+    if action not in ['hot', 'debatable', 'agree', 'surprising', 'like']:
+        return JsonResponse({'success': False, 'error': 'Invalid action'}, status=400)
+    post = get_object_or_404(Post, id=post_id)
+    actions = PostAction.objects.filter(post=post, action=action).select_related(
+        'user', 'user__profile'
+    ).order_by('-created_at')[:50]
+    users = []
+    for a in actions:
+        p = getattr(a.user, 'profile', None)
+        users.append({'username': a.user.username, 'avatar_url': p.get_picture_url if p else ''})
+    return JsonResponse({'success': True, 'users': users, 'action': action,
+                         'label': dict(Post.MOOD_CHOICES).get(action, action)})

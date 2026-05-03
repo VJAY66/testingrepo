@@ -1222,6 +1222,13 @@
       if (xlb) xlb.remove();
     }
 
+    if (canSend && debateStatus === 'accepted') {
+      ensureOverflowActionButton('mc-draw-btn', '⚖️ Agree to Disagree', function() { proposeMutualDraw(); }, 'draw');
+    } else {
+      const db = document.getElementById('mc-draw-btn');
+      if (db) db.remove();
+    }
+
     if (canEnd && canSend && debateStatus === 'accepted') {
       ensureActionButton('mc-end-btn', 'End', function() { mcEndConversation(); });
     } else {
@@ -1412,6 +1419,26 @@
       })
       .catch(() => window.showToast('Unable to end conversation.', 'error'));
   };
+
+  // ── Mutual Draw ────────────────────────────────────────────────────────────
+  {% if user == debate.initiator or user == debate.target %}
+  window.proposeMutualDraw = function() {
+    if (!confirm('Propose a mutual draw? If your opponent also agrees, the debate ends as ⚖️ Agree to Disagree.')) return;
+    fetch('{% url "debate_propose_draw" debate.id %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCookie('csrftoken') }
+    }).then(r => r.json()).then(d => {
+      if (d.draw_accepted || d.already_draw) {
+        window.showToast('⚖️ Both sides agreed — debate ended as a draw!', 'success');
+        setTimeout(() => { window.location.reload(); }, 1200);
+      } else if (d.draw_proposed) {
+        window.showToast('Draw proposed — waiting for your opponent to agree.', 'info');
+        var btn = document.getElementById('mc-draw-btn');
+        if (btn) { btn.textContent = '⚖️ Waiting…'; btn.disabled = true; }
+      }
+    }).catch(() => window.showToast('Could not propose draw.', 'error'));
+  };
+  {% endif %}
 
   function mcAskLimitUpdate(currentYes, currentNo) {
     return new Promise((resolve) => {

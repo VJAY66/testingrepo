@@ -180,6 +180,7 @@
                                 <span class="trend-pill">
                                     {{ post.category }}
                                 </span>
+                                {% if post.mood %}<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border border-border/60 bg-secondary/60">{{ post.get_mood_display }}</span>{% endif %}
                                 <span>{{ post.created_at|date:"M j, Y" }}</span>
                                 {% if post.reading_time_minutes %}<span class="inline-flex items-center gap-1">📖 {{ post.reading_time_minutes }}m</span>{% endif %}
                                 {% if post.view_count %}
@@ -219,6 +220,14 @@
                                         </svg>
                                         <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.save_count|default:0 }}</span>
                                     </button>
+                                    {% if user.is_authenticated %}
+                                    <button type="button" onclick="toggleReadLater('{{ post.id|escapejs }}', this)"
+                                      title="{% if post.is_read_later %}Remove from Read Later{% else %}Read Later{% endif %}"
+                                      class="group relative flex items-center justify-center gap-1 w-auto h-8 sm:px-2.5 px-2 rounded-full transition-all pointer-events-auto text-xs font-medium
+                                        {% if post.is_read_later %}text-teal-600 bg-teal-50 dark:bg-teal-900/20 border border-teal-300{% else %}text-muted-foreground border border-transparent hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20{% endif %}">
+                                      {% if post.is_read_later %}🕐{% else %}🕐{% endif %}
+                                    </button>
+                                    {% endif %}
                                     <button type="button" onclick="openSharePanel(this)" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced text-muted-foreground hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/20 hover:shadow-md overflow-hidden">
                                         <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <circle cx="18" cy="5" r="3"></circle>
@@ -393,6 +402,34 @@ function quickFollow(username, btn) {
                     <label class="block text-sm font-medium mb-1">Content (Optional)</label>
                     <textarea name="content" rows="4"
                               class="w-full px-3 py-2 border border-border rounded-md bg-background"></textarea>
+                </div>
+                <!-- Mood / Tone tag -->
+                <div>
+                  <label class="block text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Mood <span class="normal-case font-normal">(optional)</span></label>
+                  <div class="flex flex-wrap gap-1.5" id="mood-chips">
+                    <button type="button" onclick="selectMood('')" data-mood="" class="mood-select-btn active px-2.5 py-1 rounded-full text-xs font-semibold border border-border bg-secondary text-secondary-foreground">None</button>
+                    <button type="button" onclick="selectMood('controversial')" data-mood="controversial" class="mood-select-btn px-2.5 py-1 rounded-full text-xs font-semibold border border-border text-muted-foreground hover:bg-orange-50 hover:border-orange-300 hover:text-orange-600">🔥 Controversial</button>
+                    <button type="button" onclick="selectMood('educational')" data-mood="educational" class="mood-select-btn px-2.5 py-1 rounded-full text-xs font-semibold border border-border text-muted-foreground hover:bg-yellow-50 hover:border-yellow-300 hover:text-yellow-600">💡 Educational</button>
+                    <button type="button" onclick="selectMood('funny')" data-mood="funny" class="mood-select-btn px-2.5 py-1 rounded-full text-xs font-semibold border border-border text-muted-foreground hover:bg-green-50 hover:border-green-300 hover:text-green-600">😂 Funny</button>
+                    <button type="button" onclick="selectMood('mindblowing')" data-mood="mindblowing" class="mood-select-btn px-2.5 py-1 rounded-full text-xs font-semibold border border-border text-muted-foreground hover:bg-purple-50 hover:border-purple-300 hover:text-purple-600">🤯 Mind-blowing</button>
+                    <button type="button" onclick="selectMood('emotional')" data-mood="emotional" class="mood-select-btn px-2.5 py-1 rounded-full text-xs font-semibold border border-border text-muted-foreground hover:bg-rose-50 hover:border-rose-300 hover:text-rose-600">💔 Emotional</button>
+                    <button type="button" onclick="selectMood('news')" data-mood="news" class="mood-select-btn px-2.5 py-1 rounded-full text-xs font-semibold border border-border text-muted-foreground hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600">📰 News</button>
+                    <button type="button" onclick="selectMood('unpopular')" data-mood="unpopular" class="mood-select-btn px-2.5 py-1 rounded-full text-xs font-semibold border border-border text-muted-foreground hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600">🙃 Unpopular Opinion</button>
+                    <button type="button" onclick="selectMood('hottake')" data-mood="hottake" class="mood-select-btn px-2.5 py-1 rounded-full text-xs font-semibold border border-border text-muted-foreground hover:bg-red-50 hover:border-red-300 hover:text-red-600">☄️ Hot Take</button>
+                  </div>
+                  <input type="hidden" name="mood" id="mood-input" value="">
+                </div>
+                <!-- Post Templates -->
+                <div>
+                  <label class="block text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Quick Templates</label>
+                  <div class="flex flex-wrap gap-1.5">
+                    <button type="button" onclick="applyTemplate('hottake')" class="px-2.5 py-1 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">☄️ Hot Take</button>
+                    <button type="button" onclick="applyTemplate('wouldyourather')" class="px-2.5 py-1 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">🤔 Would You Rather</button>
+                    <button type="button" onclick="applyTemplate('unpopular')" class="px-2.5 py-1 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">🙃 Unpopular Opinion</button>
+                    <button type="button" onclick="applyTemplate('factcheck')" class="px-2.5 py-1 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">🔍 Fact Check</button>
+                    <button type="button" onclick="applyTemplate('changemymind')" class="px-2.5 py-1 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">💬 Change My Mind</button>
+                    <button type="button" onclick="applyTemplate('ratedebate')" class="px-2.5 py-1 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">⭐ Rate & Debate</button>
+                  </div>
                 </div>
             </div>
             <div class="border-t border-border pt-3 mt-1">
@@ -1108,6 +1145,58 @@ function closeReactionModal() { document.getElementById('reaction-users-modal').
 })();
 </script>
 <script>
+// ── Mood chip selection ────────────────────────────────────────────
+function selectMood(mood) {
+  document.getElementById('mood-input').value = mood;
+  document.querySelectorAll('.mood-select-btn').forEach(function(btn) {
+    var isActive = btn.dataset.mood === mood;
+    btn.classList.toggle('active', isActive);
+    btn.classList.toggle('bg-primary', isActive);
+    btn.classList.toggle('text-primary-foreground', isActive);
+    btn.classList.toggle('border-primary', isActive);
+    btn.classList.toggle('bg-secondary', !isActive);
+    btn.classList.toggle('text-secondary-foreground', !isActive);
+    btn.classList.toggle('border-border', !isActive);
+  });
+}
+
+// ── Post templates ─────────────────────────────────────────────────
+const TEMPLATES = {
+  hottake: { title: '☄️ Hot take: [your opinion here]', content: 'I believe [your hot take]. Here\'s why:\n\n1.\n2.\n3.\n\nFight me.' },
+  wouldyourather: { title: 'Would you rather: [Option A] vs [Option B]?', content: 'Option A: [describe it]\n\nOption B: [describe it]\n\nWhich would you choose and why?' },
+  unpopular: { title: '🙃 Unpopular opinion: [topic]', content: 'Here\'s my unpopular take on [topic]:\n\n[Your opinion]\n\nI know most people think [common view], but I disagree because...' },
+  factcheck: { title: '🔍 Fact check: Is it true that [claim]?', content: 'The claim: [state the claim clearly]\n\nWhat the evidence says:\n\nYES side:\n- \n\nNO side:\n- \n\nVerdict:' },
+  changemymind: { title: '💬 Change my mind: [your position]', content: 'My position: [state your stance clearly]\n\nI\'ve considered the other side, but I believe [position] because:\n\n1.\n2.\n\nConvince me I\'m wrong.' },
+  ratedebate: { title: '⭐ Rate & debate: [subject]', content: 'Rating: [X]/10\n\nWhat I love:\n- \n\nWhat I don\'t love:\n- \n\nOverall: [summary verdict]\n\nDo you agree with my rating?' },
+};
+function applyTemplate(key) {
+  var t = TEMPLATES[key];
+  if (!t) return;
+  var titleInput = document.querySelector('#create-post-modal input[name="title"]');
+  var contentInput = document.querySelector('#create-post-modal textarea[name="content"]');
+  if (titleInput) titleInput.value = t.title;
+  if (contentInput) contentInput.value = t.content;
+  if (titleInput) titleInput.focus();
+}
+
+// ── Read Later toggle ──────────────────────────────────────────────
+function toggleReadLater(postId, btn) {
+  fetch('/read-later/toggle/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'post_id=' + encodeURIComponent(postId)
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      var active = d.saved;
+      btn.classList.toggle('text-teal-600', active);
+      btn.classList.toggle('bg-teal-50', active);
+      btn.classList.toggle('border-teal-300', active);
+      btn.classList.toggle('text-muted-foreground', !active);
+      btn.title = active ? 'Remove from Read Later' : 'Read Later';
+    }
+  });
+}
+
 function openQuoteModal(postId, title, author) {
   document.getElementById('quoted-post-id-input').value = postId;
   var titleEl = document.getElementById('quoted-post-title');

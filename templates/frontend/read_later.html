@@ -1,0 +1,102 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Read Later — PickASide{% endblock %}
+
+{% block content %}
+<style>
+.rl-card { background:hsl(var(--card)); border:1px solid hsl(var(--border)); border-radius:1.1rem; padding:14px 16px; transition:border-color 150ms,box-shadow 150ms; }
+.rl-card:hover { border-color:hsl(var(--primary)/0.4); box-shadow:0 6px 24px -8px hsl(var(--primary)/0.15); }
+.rl-done { opacity:.55; }
+.mood-chip { display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:hsl(var(--secondary));color:hsl(var(--secondary-foreground));border:1px solid hsl(var(--border)/0.5); }
+</style>
+
+<div class="max-w-2xl mx-auto px-4 py-6 space-y-6">
+  <!-- Header -->
+  <div class="flex items-center gap-3">
+    <span class="text-2xl">📚</span>
+    <div>
+      <h1 class="text-xl font-bold text-foreground">Read Later</h1>
+      <p class="text-sm text-muted-foreground">{{ unread.count }} unread · {{ done.count }} done</p>
+    </div>
+    {% if done %}
+    <form method="post" action="{% url 'read_later' %}" class="ml-auto">
+      {% csrf_token %}
+      <input type="hidden" name="clear_done" value="1">
+      <button type="submit" class="text-xs text-muted-foreground hover:text-rose-500 border border-border rounded-lg px-3 py-1.5 hover:border-rose-400 transition-colors">Clear done</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if not unread and not done %}
+  <div class="flex flex-col items-center justify-center py-24 text-center gap-4">
+    <span class="text-5xl">📚</span>
+    <h2 class="text-lg font-bold text-foreground">Nothing saved yet</h2>
+    <p class="text-sm text-muted-foreground">Tap the 🕐 button on any post card to queue it for later.</p>
+    <a href="{% url 'index' %}" class="mt-2 px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">Browse posts</a>
+  </div>
+  {% endif %}
+
+  {% if unread %}
+  <div class="space-y-3">
+    {% for item in unread %}
+    <div class="rl-card flex gap-3 items-start">
+      <div class="flex-1 min-w-0">
+        <a href="{% url 'discussion' item.post.id %}" class="text-sm font-bold text-foreground hover:text-primary transition-colors line-clamp-2">{{ item.post.title }}</a>
+        <div class="flex items-center gap-2 mt-1 flex-wrap">
+          <span class="text-xs text-muted-foreground">@{{ item.post.user.username }}</span>
+          <span class="text-xs text-muted-foreground">·</span>
+          <span class="text-xs text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">{{ item.post.category }}</span>
+          {% if item.post.reading_time_minutes %}<span class="text-xs text-muted-foreground">📖 {{ item.post.reading_time_minutes }}m</span>{% endif %}
+          {% if item.post.mood %}<span class="mood-chip">{{ item.post.get_mood_display }}</span>{% endif %}
+          <span class="text-xs text-muted-foreground">· saved {{ item.added_at|timesince }} ago</span>
+        </div>
+      </div>
+      <div class="flex gap-1.5 flex-shrink-0 pt-0.5">
+        <button onclick="markDone('{{ item.post.id }}', this.closest('.rl-card'))"
+          title="Mark as read"
+          class="text-xs px-2 py-1.5 rounded-lg border border-border text-muted-foreground hover:border-green-400 hover:text-green-600 transition-colors">✓</button>
+        <button onclick="removeReadLater('{{ item.post.id }}', this.closest('.rl-card'))"
+          title="Remove"
+          class="text-xs px-2 py-1.5 rounded-lg border border-border text-muted-foreground hover:border-rose-400 hover:text-rose-500 transition-colors">✕</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if done %}
+  <div>
+    <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">✅ Done</p>
+    <div class="space-y-2">
+      {% for item in done %}
+      <div class="rl-card rl-done flex gap-3 items-center">
+        <div class="flex-1 min-w-0">
+          <a href="{% url 'discussion' item.post.id %}" class="text-sm font-semibold text-foreground hover:text-primary transition-colors line-clamp-1">{{ item.post.title }}</a>
+          <p class="text-xs text-muted-foreground mt-0.5">{{ item.post.category }} · {{ item.added_at|date:"M j" }}</p>
+        </div>
+        <button onclick="removeReadLater('{{ item.post.id }}', this.closest('.rl-card'))"
+          class="text-xs px-2 py-1 rounded-lg border border-border text-muted-foreground hover:border-rose-400 hover:text-rose-500 transition-colors flex-shrink-0">✕</button>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function getCookie(n){var v=document.cookie.match('(^|;) ?'+n+'=([^;]*)(;|$)');return v?v[2]:null;}
+function removeReadLater(postId, card) {
+  fetch('/read-later/toggle/', {
+    method:'POST',
+    headers:{'X-CSRFToken':getCookie('csrftoken'),'Content-Type':'application/x-www-form-urlencoded'},
+    body:'post_id='+encodeURIComponent(postId)
+  }).then(r=>r.json()).then(d=>{if(d.success&&card)card.remove();});
+}
+function markDone(postId, card) {
+  fetch('/read-later/mark-done/', {
+    method:'POST',
+    headers:{'X-CSRFToken':getCookie('csrftoken'),'Content-Type':'application/x-www-form-urlencoded'},
+    body:'post_id='+encodeURIComponent(postId)
+  }).then(r=>r.json()).then(d=>{if(d.success&&card){card.classList.add('rl-done');const btns=card.querySelectorAll('button');btns.forEach(b=>b.remove());}});
+}
+</script>
+{% endblock %}

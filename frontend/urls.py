@@ -172,4 +172,12 @@ urlpatterns = [
     # Debate round timer
     path('debates/<str:debate_id>/timer/', views.debate_timer_status, name='debate_timer_status'),
     path('debates/<str:debate_id>/timer/set/', views.debate_set_timer, name='debate_set_timer'),
+    # Mutual draw
+    path('debates/<str:debate_id>/propose-draw/', views.debate_propose_draw, name='debate_propose_draw'),
+    # Read Later
+    path('read-later/', views.read_later_list, name='read_later'),
+    path('read-later/toggle/', views.toggle_read_later, name='toggle_read_later'),
+    path('read-later/mark-done/', views.mark_read_later_done, name='mark_read_later_done'),
+    # Reaction insights (discussion page)
+    path('posts/<str:post_id>/reaction-insights/', views.post_reaction_insights, name='post_reaction_insights'),
 ]

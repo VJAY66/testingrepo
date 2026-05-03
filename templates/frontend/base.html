@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}PickASide{% endblock %}</title>
+    <!-- Default Open Graph / Twitter Card -->
+    <meta property="og:site_name" content="PickASide">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    {% block og_meta %}
+    <meta property="og:title" content="PickASide — Pick a side, share your view">
+    <meta property="og:description" content="Debate, discuss and explore every side of every topic.">
+    <meta name="twitter:title" content="PickASide — Pick a side, share your view">
+    <meta name="twitter:description" content="Debate, discuss and explore every side of every topic.">
+    {% endblock %}
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#0ea5e9">
     <meta name="apple-mobile-web-app-capable" content="yes">

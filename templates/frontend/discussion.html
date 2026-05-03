@@ -1,6 +1,19 @@
 {% extends 'frontend/base.html' %}
 
-{% block title %}{{ post.title }} - Discussion Hub{% endblock %}
+{% block title %}{{ post.title }} - PickASide{% endblock %}
+
+{% block og_meta %}
+<meta property="og:title" content="{{ post.title|truncatechars:70 }}">
+<meta property="og:description" content="{% if post.content %}{{ post.content|truncatechars:160 }}{% else %}Join the debate on PickASide.{% endif %}">
+<meta property="og:type" content="article">
+<meta property="og:url" content="{{ request.build_absolute_uri }}">
+<meta property="article:author" content="{{ post.user.username }}">
+<meta property="article:section" content="{{ post.category }}">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ post.title|truncatechars:70 }}">
+<meta name="twitter:description" content="{% if post.content %}{{ post.content|truncatechars:160 }}{% else %}Join the debate on PickASide.{% endif %}">
+<meta name="description" content="{% if post.content %}{{ post.content|truncatechars:160 }}{% else %}{{ post.title }} — debate on PickASide{% endif %}">
+{% endblock %}
 
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-8">
@@ -26,6 +39,9 @@
                 <span class="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-sm">
                     {{ post.category }}
                 </span>
+                {% if post.mood %}
+                <span class="px-2.5 py-1 border border-border rounded-full text-xs font-semibold bg-secondary/60 text-secondary-foreground">{{ post.get_mood_display }}</span>
+                {% endif %}
                 {% if post.reading_time_minutes %}
                 <span class="px-2.5 py-1 border border-border rounded-full text-xs text-muted-foreground font-medium">📖 {{ post.reading_time_minutes }} min read</span>
                 {% endif %}
@@ -256,10 +272,17 @@
               <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Quote</span>
             </button>
             {% endif %}
-            <button type="button" data-action="hot" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_hot %}active text-orange-500 bg-orange-50/60 border-orange-300/60{% else %}text-muted-foreground hover:text-orange-500 hover:bg-orange-50/60{% endif %}">🔥 <span class="action-count text-xs">{{ post.hot_count|default:0 }}</span></button>
-            <button type="button" data-action="debatable" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_debatable %}active text-purple-500 bg-purple-50/60 border-purple-300/60{% else %}text-muted-foreground hover:text-purple-500 hover:bg-purple-50/60{% endif %}">🤔 <span class="action-count text-xs">{{ post.debatable_count|default:0 }}</span></button>
-            <button type="button" data-action="agree" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_agree %}active text-green-600 bg-green-50/60 border-green-300/60{% else %}text-muted-foreground hover:text-green-600 hover:bg-green-50/60{% endif %}">👏 <span class="action-count text-xs">{{ post.agree_count|default:0 }}</span></button>
-            <button type="button" data-action="surprising" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_surprising %}active text-blue-500 bg-blue-50/60 border-blue-300/60{% else %}text-muted-foreground hover:text-blue-500 hover:bg-blue-50/60{% endif %}">😮 <span class="action-count text-xs">{{ post.surprising_count|default:0 }}</span></button>
+            {% if user.is_authenticated %}
+            <button type="button" onclick="toggleReadLaterDiscussion('{{ post.id|escapejs }}', this)"
+              title="Read Later"
+              class="flex items-center gap-1 h-8 px-2 rounded-full border text-xs font-medium transition-all pointer-events-auto border-border text-muted-foreground hover:text-teal-600 hover:bg-teal-50 hover:border-teal-300">
+              🕐 <span class="hidden sm:inline">Later</span>
+            </button>
+            {% endif %}
+            <button type="button" data-action="hot" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_hot %}active text-orange-500 bg-orange-50/60 border-orange-300/60{% else %}text-muted-foreground hover:text-orange-500 hover:bg-orange-50/60{% endif %}">🔥 <span class="action-count text-xs" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','hot')">{{ post.hot_count|default:0 }}</span></button>
+            <button type="button" data-action="debatable" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_debatable %}active text-purple-500 bg-purple-50/60 border-purple-300/60{% else %}text-muted-foreground hover:text-purple-500 hover:bg-purple-50/60{% endif %}">🤔 <span class="action-count text-xs" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','debatable')">{{ post.debatable_count|default:0 }}</span></button>
+            <button type="button" data-action="agree" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_agree %}active text-green-600 bg-green-50/60 border-green-300/60{% else %}text-muted-foreground hover:text-green-600 hover:bg-green-50/60{% endif %}">👏 <span class="action-count text-xs" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','agree')">{{ post.agree_count|default:0 }}</span></button>
+            <button type="button" data-action="surprising" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_surprising %}active text-blue-500 bg-blue-50/60 border-blue-300/60{% else %}text-muted-foreground hover:text-blue-500 hover:bg-blue-50/60{% endif %}">😮 <span class="action-count text-xs" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','surprising')">{{ post.surprising_count|default:0 }}</span></button>
         </div>
         {% else %}
         <div class="mb-1 flex items-center sm:gap-6 gap-3">
@@ -1674,4 +1697,56 @@ function openQuoteFromDiscussion(postId, title, author) {
   </div>
 </section>
 {% endif %}
+
+<!-- Reaction Insights Modal (discussion page) -->
+<div id="disc-reaction-modal" class="hidden fixed inset-0 z-[9000] flex items-center justify-center bg-black/50 px-4" onclick="if(event.target===this)closeDiscReactionModal()">
+  <div class="w-full max-w-xs rounded-2xl border border-border bg-card shadow-2xl overflow-hidden">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-border">
+      <p class="font-bold text-foreground text-sm" id="disc-reaction-title">Reactions</p>
+      <button onclick="closeDiscReactionModal()" class="text-muted-foreground hover:text-foreground text-lg leading-none">✕</button>
+    </div>
+    <div id="disc-reaction-list" class="max-h-64 overflow-y-auto divide-y divide-border/50">
+      <div class="p-4 text-center text-sm text-muted-foreground">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showDiscussionReactions(postId, action) {
+  var labels = {hot:'🔥 Hot',debatable:'🤔 Debatable',agree:'👏 Agree',surprising:'😮 Surprising',like:'⭐ Like'};
+  document.getElementById('disc-reaction-title').textContent = (labels[action] || action) + ' — who reacted';
+  document.getElementById('disc-reaction-list').innerHTML = '<div class="p-4 text-center text-sm text-muted-foreground">Loading…</div>';
+  document.getElementById('disc-reaction-modal').classList.remove('hidden');
+  fetch('/posts/' + postId + '/reaction-insights/?action=' + action)
+    .then(r => r.json())
+    .then(d => {
+      var list = document.getElementById('disc-reaction-list');
+      if (!d.success || !d.users.length) { list.innerHTML = '<div class="p-4 text-center text-sm text-muted-foreground">No reactions yet.</div>'; return; }
+      list.innerHTML = d.users.map(function(u) {
+        return '<a href="/user/' + u.username + '/" class="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors">'
+          + (u.avatar_url ? '<img src="'+u.avatar_url+'" class="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0">'
+            : '<div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">'+u.username[0].toUpperCase()+'</div>')
+          + '<span class="text-sm font-semibold text-foreground">@' + u.username + '</span></a>';
+      }).join('');
+    }).catch(function() {
+      document.getElementById('disc-reaction-list').innerHTML = '<div class="p-4 text-center text-sm text-muted-foreground">Could not load.</div>';
+    });
+}
+function closeDiscReactionModal() { document.getElementById('disc-reaction-modal').classList.add('hidden'); }
+
+function toggleReadLaterDiscussion(postId, btn) {
+  fetch('/read-later/toggle/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'post_id=' + encodeURIComponent(postId)
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      btn.classList.toggle('text-teal-600', d.saved);
+      btn.classList.toggle('bg-teal-50', d.saved);
+      btn.classList.toggle('border-teal-300', d.saved);
+      btn.title = d.saved ? 'Remove from Read Later' : 'Read Later';
+    }
+  });
+}
+</script>
 {% endblock %}

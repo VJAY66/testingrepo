@@ -54,7 +54,19 @@ class Post(models.Model):
     is_pinned = models.BooleanField(default=False, help_text='Pinned to top of author profile')
     scheduled_for = models.DateTimeField(null=True, blank=True, help_text='Publish this draft automatically at this time')
     closes_at = models.DateTimeField(null=True, blank=True, help_text='Lock comments after this time')
+    MOOD_CHOICES = [
+        ('controversial', '🔥 Controversial'),
+        ('educational',   '💡 Educational'),
+        ('funny',         '😂 Funny'),
+        ('mindblowing',   '🤯 Mind-blowing'),
+        ('emotional',     '💔 Emotional'),
+        ('news',          '📰 News'),
+        ('unpopular',     '🙃 Unpopular Opinion'),
+        ('hottake',       '☄️ Hot Take'),
+    ]
+
     is_hot = models.BooleanField(default=False, db_index=True, help_text='Auto-flagged as rapidly gaining reactions')
+    mood = models.CharField(max_length=20, choices=MOOD_CHOICES, blank=True, default='', db_index=True)
     audience = models.CharField(max_length=20, choices=AUDIENCE_CHOICES, default=AUDIENCE_PUBLIC, db_index=True)
     quoted_post = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='quotes')
     reading_time_minutes = models.PositiveSmallIntegerField(default=1)
@@ -173,6 +185,8 @@ class Debate(models.Model):
     rematch_of = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='rematches')
     round_duration_minutes = models.PositiveSmallIntegerField(default=10, help_text='Minutes per debate round')
     round_ends_at = models.DateTimeField(null=True, blank=True, help_text='When the current round timer expires')
+    outcome = models.CharField(max_length=10, blank=True, default='', help_text="'draw' if both agreed to mutual draw")
+    draw_proposed_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='draw_proposals')
 
     @property
     def context_title(self):
@@ -1021,3 +1035,18 @@ class PostInsight(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=['post', 'date'], name='unique_post_insight_day')]
         ordering = ['-date']
+
+
+class ReadLater(models.Model):
+    """Post queued for reading later by a user."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='read_later')
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='read_later_by')
+    is_read = models.BooleanField(default=False)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} → read later: {self.post_id}"
+
+    class Meta:
+        ordering = ['-added_at']
+        constraints = [models.UniqueConstraint(fields=['user', 'post'], name='unique_read_later')]
