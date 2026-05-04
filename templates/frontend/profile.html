@@ -1066,7 +1066,10 @@
 
     <!-- Muted Keywords Section -->
     <div class="mt-4 rounded-2xl border border-border/70 bg-card p-4">
-        <h3 class="text-sm font-bold mb-3">Muted Keywords</h3>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-bold">Muted Keywords</h3>
+          <a href="{% url 'muted_keywords_page' %}" class="text-xs text-muted-foreground hover:text-primary transition">Manage →</a>
+        </div>
         <div id="muted-keywords-list" class="flex flex-wrap gap-2 mb-3">
             {% for kw in muted_keywords %}
             <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted text-muted-foreground text-xs font-medium">
@@ -1115,7 +1118,10 @@
 
     <!-- Notification Preferences Section -->
     <div class="mt-4 rounded-2xl border border-border/70 bg-card p-4">
-        <h3 class="text-sm font-bold mb-3">Notification Preferences</h3>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-bold">Notification Preferences</h3>
+          <a href="{% url 'notification_prefs_page' %}" class="text-xs text-muted-foreground hover:text-primary transition">Full page →</a>
+        </div>
         <div class="overflow-x-auto">
             <table class="w-full text-xs">
                 <thead>

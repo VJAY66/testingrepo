@@ -21,7 +21,7 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest, PostReport
 from discussions.signals import notify_post_author
 from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription, UserBan
 from users.security import is_login_rate_limited, record_login_attempt
@@ -778,6 +778,11 @@ def _enrich_posts_for_feed(posts, user):
         ReadLater.objects.filter(user=user, post__in=post_ids).values_list('post_id', flat=True)
     ) if post_ids else set()
 
+    author_ids = {post.user_id for post in posts if post.user_id != user.id}
+    followed_author_ids = set(
+        Follow.objects.filter(follower=user, following_id__in=author_ids).values_list('following_id', flat=True)
+    ) if author_ids else set()
+
     for post in posts:
         post.is_liked = post.id in liked_post_ids
         post.is_saved = post.id in saved_post_ids
@@ -787,6 +792,7 @@ def _enrich_posts_for_feed(posts, user):
         post.is_agree = post.id in agree_post_ids
         post.is_surprising = post.id in surprising_post_ids
         post.is_read_later = post.id in read_later_ids
+        post.is_followed_author = post.user_id in followed_author_ids
 
 
 def _build_suggested_posts_for_user(user, annotated_posts):
@@ -1041,6 +1047,10 @@ def discussion(request, post_id):
     if request.user.is_authenticated:
         PostView.objects.get_or_create(user=request.user, post=post)
 
+    comment_sort = request.GET.get('sort', 'top')
+    if comment_sort not in ('top', 'newest', 'oldest'):
+        comment_sort = 'top'
+
     comments = Comment.objects.filter(post=post).select_related('user', 'user__profile', 'reply_to', 'reply_to__user').annotate(
         reaction_score=ExpressionWrapper(F('likes') - F('dislikes'), output_field=IntegerField())
     )
@@ -1049,8 +1059,14 @@ def discussion(request, post_id):
     no_vote_count = comments.filter(vote_type='no').count()
 
     visible_comments = comments.exclude(content='')
-    yes_comments = visible_comments.filter(vote_type='yes').order_by('-reaction_score', '-likes', 'created_at')
-    no_comments = visible_comments.filter(vote_type='no').order_by('-reaction_score', '-likes', 'created_at')
+    if comment_sort == 'newest':
+        _comment_order = ('-created_at',)
+    elif comment_sort == 'oldest':
+        _comment_order = ('created_at',)
+    else:
+        _comment_order = ('-reaction_score', '-likes', 'created_at')
+    yes_comments = visible_comments.filter(vote_type='yes').order_by(*_comment_order)
+    no_comments = visible_comments.filter(vote_type='no').order_by(*_comment_order)
 
     # Only award top badges when a comment has a positive net reaction.
     top_yes_comment = yes_comments.filter(reaction_score__gt=0).first()
@@ -1308,6 +1324,9 @@ def discussion(request, post_id):
         'analytics': analytics,
         'related_posts': _get_related_posts(post),
         'series_context': series_context,
+        'comment_sort': comment_sort,
+        'post_report_reasons': PostReport.REASON_CHOICES,
+        'user_has_reported_post': PostReport.objects.filter(post=post, reporter=request.user).exists() if request.user.is_authenticated else False,
     }
     return render(request, 'frontend/discussion.html', context)
 
@@ -2478,6 +2497,10 @@ def create_post(request):
         valid_moods = [m[0] for m in Post.MOOD_CHOICES]
         if mood not in valid_moods:
             mood = ''
+        reply_restriction = request.POST.get('reply_restriction', Post.REPLY_EVERYONE).strip()
+        valid_restrictions = [r[0] for r in Post.REPLY_CHOICES]
+        if reply_restriction not in valid_restrictions:
+            reply_restriction = Post.REPLY_EVERYONE
 
         if not title or not category:
             messages.error(request, 'Title and category are required')
@@ -2549,6 +2572,7 @@ def create_post(request):
                 scheduled_for=scheduled_for_dt,
                 quoted_post=quoted_post_obj,
                 mood=mood,
+                reply_restriction=reply_restriction,
             )
 
             if not post or not post.id:
@@ -2728,6 +2752,20 @@ def create_comment(request, post_id):
 
         if not vote_type or vote_type not in ['yes', 'no']:
             return handle_error('Invalid vote type')
+
+        # Enforce reply_restriction
+        restriction = getattr(post, 'reply_restriction', Post.REPLY_EVERYONE)
+        if restriction != Post.REPLY_EVERYONE and request.user != post.user:
+            if restriction == Post.REPLY_NOBODY:
+                return handle_error('The author has disabled replies on this post.')
+            elif restriction == Post.REPLY_FOLLOWERS:
+                is_follower = Follow.objects.filter(follower=request.user, following=post.user).exists()
+                if not is_follower:
+                    return handle_error('Only followers of this author can reply.')
+            elif restriction == Post.REPLY_CLOSE_FRIENDS:
+                is_close_friend = CloseFriend.objects.filter(user=post.user, friend=request.user).exists()
+                if not is_close_friend:
+                    return handle_error('Only close friends of this author can reply.')
 
         # Enforce a single comment per user per post.
         existing_comment = Comment.objects.filter(post=post, user=request.user).first()
@@ -5840,8 +5878,22 @@ def remove_from_series(request, series_id):
 
 @login_required
 @require_POST
+@login_required
+def notification_prefs_page(request):
+    """Render the notification preferences settings page."""
+    profile = Profile.objects.filter(user=request.user).first()
+    current_prefs = profile.notification_prefs if profile else {}
+    return render(request, 'frontend/notification_prefs.html', {
+        'current_prefs': current_prefs,
+        'default_prefs': DEFAULT_NOTIFICATION_PREFS,
+    })
+
+
+@login_required
 def update_notification_prefs(request):
     """Update the authenticated user's notification preferences."""
+    if request.method == 'GET':
+        return notification_prefs_page(request)
     try:
         data = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
@@ -7234,3 +7286,41 @@ def notification_stream_v2(request):
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
     return response
+
+# ─── Blocked Users Management ─────────────────────────────────────────────────
+
+@login_required
+def blocked_users_list(request):
+    blocks = UserBlock.objects.filter(blocker=request.user).select_related('blocked', 'blocked__profile').order_by('-created_at')
+    return render(request, 'frontend/blocked_users.html', {'blocks': blocks})
+
+
+# ─── Muted Keywords Management ────────────────────────────────────────────────
+
+@login_required
+def muted_keywords_page(request):
+    keywords = MutedKeyword.objects.filter(user=request.user).order_by('keyword')
+    return render(request, 'frontend/muted_keywords.html', {'keywords': keywords})
+
+
+# ─── Post Report ──────────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def report_post(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    if post.user == request.user:
+        return JsonResponse({'error': 'Cannot report your own post'}, status=400)
+    reason = request.POST.get('reason', 'spam').strip()
+    valid_reasons = [r[0] for r in PostReport.REASON_CHOICES]
+    if reason not in valid_reasons:
+        reason = 'spam'
+    details = request.POST.get('details', '').strip()[:500]
+    _, created = PostReport.objects.get_or_create(
+        post=post,
+        reporter=request.user,
+        defaults={'reason': reason, 'details': details},
+    )
+    if not created:
+        return JsonResponse({'success': False, 'already_reported': True})
+    return JsonResponse({'success': True})

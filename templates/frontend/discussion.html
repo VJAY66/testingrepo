@@ -453,6 +453,15 @@
             <div>
                 <h2 class="text-xl font-bold text-foreground">Discussion</h2>
                 <p class="text-sm text-muted-foreground">Vote in one direction and watch the community split into Yes and No.</p>
+                {% if post.reply_restriction != 'everyone' %}
+                <span class="mt-1 inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 font-medium">
+                  🔒
+                  {% if post.reply_restriction == 'followers' %}Followers only can reply
+                  {% elif post.reply_restriction == 'close_friends' %}Close friends only can reply
+                  {% elif post.reply_restriction == 'nobody' %}Replies are disabled
+                  {% endif %}
+                </span>
+                {% endif %}
             </div>
             <div class="flex flex-wrap gap-3 justify-start md:justify-end">
                 <span id="discussion-yes-count-chip" class="inline-flex items-center rounded-full border border-green-500/20 bg-slate-900/90 px-3 py-1 text-sm font-semibold text-green-300 shadow-sm">
@@ -469,6 +478,38 @@
                 </span>
             </div>
         </div>
+
+        <!-- Comment sort tabs -->
+        <div class="flex items-center gap-1 flex-wrap">
+          <span class="text-xs text-muted-foreground mr-2">Sort:</span>
+          <a href="?sort=top" class="px-3 py-1 rounded-full text-xs font-semibold transition {% if comment_sort == 'top' %}bg-primary text-primary-foreground{% else %}border border-border text-muted-foreground hover:border-primary/40 hover:text-foreground{% endif %}">Top</a>
+          <a href="?sort=newest" class="px-3 py-1 rounded-full text-xs font-semibold transition {% if comment_sort == 'newest' %}bg-primary text-primary-foreground{% else %}border border-border text-muted-foreground hover:border-primary/40 hover:text-foreground{% endif %}">Newest</a>
+          <a href="?sort=oldest" class="px-3 py-1 rounded-full text-xs font-semibold transition {% if comment_sort == 'oldest' %}bg-primary text-primary-foreground{% else %}border border-border text-muted-foreground hover:border-primary/40 hover:text-foreground{% endif %}">Oldest</a>
+          {% if user.is_authenticated and not is_post_creator %}
+          <span class="ml-auto flex items-center gap-2">
+            {% if user_has_reported_post %}
+            <span class="text-xs text-muted-foreground italic">✓ Reported</span>
+            {% else %}
+            <button onclick="document.getElementById('report-post-panel').classList.toggle('hidden')" class="text-xs text-muted-foreground hover:text-red-500 transition">⚑ Report post</button>
+            {% endif %}
+          </span>
+          {% endif %}
+        </div>
+
+        <!-- Report post panel -->
+        {% if user.is_authenticated and not is_post_creator and not user_has_reported_post %}
+        <div id="report-post-panel" class="hidden bg-card border border-border rounded-2xl p-4 space-y-3">
+          <p class="text-sm font-semibold text-foreground">Report this post</p>
+          <select id="report-reason-select" class="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
+            {% for val, label in post_report_reasons %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+          </select>
+          <textarea id="report-details-input" maxlength="500" rows="2" placeholder="Optional details…" class="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"></textarea>
+          <div class="flex gap-2">
+            <button onclick="submitPostReport('{{ post.id }}')" class="px-4 py-2 rounded-xl bg-red-500 text-white text-xs font-semibold hover:bg-red-600 transition">Submit report</button>
+            <button onclick="document.getElementById('report-post-panel').classList.add('hidden')" class="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:text-foreground transition">Cancel</button>
+          </div>
+        </div>
+        {% endif %}
 
         {% if user.is_authenticated and not is_post_creator %}
             {% if not user_has_voted or not user_has_commented %}
@@ -1685,6 +1726,22 @@ function clearPostExpiry(postId) {
 }
 function openQuoteFromDiscussion(postId, title, author) {
     window.location.href = '/?quote_post_id=' + encodeURIComponent(postId) + '&quote_title=' + encodeURIComponent(title) + '&quote_author=' + encodeURIComponent(author);
+}
+function submitPostReport(postId) {
+    var reason = document.getElementById('report-reason-select').value;
+    var details = document.getElementById('report-details-input').value;
+    fetch('/posts/' + postId + '/report/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'reason=' + encodeURIComponent(reason) + '&details=' + encodeURIComponent(details)
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            document.getElementById('report-post-panel').outerHTML = '<span class="text-xs text-muted-foreground italic">✓ Reported</span>';
+            window.showToast && window.showToast('Report submitted. Thank you.', 'success');
+        } else if (d.already_reported) {
+            window.showToast && window.showToast('You already reported this post.', 'error');
+        }
+    });
 }
 </script>
 

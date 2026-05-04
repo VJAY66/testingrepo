@@ -1,0 +1,97 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Notification Preferences — PickASide{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6 space-y-5">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold text-foreground">Notification Preferences</h1>
+    <a href="{% url 'profile' %}" class="text-sm text-muted-foreground hover:text-primary">← Back to profile</a>
+  </div>
+
+  <div class="bg-card border border-border rounded-2xl divide-y divide-border" id="prefs-container">
+    {% for type_key, channels in default_prefs.items %}
+    <div class="flex items-center justify-between px-5 py-4 gap-4">
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-foreground capitalize">{{ type_key|cut:"_" }}</p>
+      </div>
+      <div class="flex items-center gap-5 shrink-0">
+        {% if 'inapp' in channels %}
+        <label class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+          <input type="checkbox" class="pref-toggle rounded" data-type="{{ type_key }}" data-channel="inapp"
+            {% if current_prefs|default:default_prefs %}
+              {% with cp=current_prefs %}
+                {% if cp %}{% if type_key in cp %}{% if 'inapp' in cp|default:dict %}{% if cp|default:dict %}checked{% endif %}{% endif %}{% endif %}{% endif %}
+              {% endwith %}
+            {% endif %}
+            {% with merged=current_prefs %}
+              {% if merged and type_key in merged and 'inapp' in merged|default:'' %}{% else %}{% if channels.inapp %}checked{% endif %}{% endif %}
+            {% endwith %}
+          >
+          In-app
+        </label>
+        {% endif %}
+        {% if 'email' in channels %}
+        <label class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+          <input type="checkbox" class="pref-toggle rounded" data-type="{{ type_key }}" data-channel="email"
+            {% with merged=current_prefs %}
+              {% if merged and type_key in merged %}{% else %}{% if channels.email %}checked{% endif %}{% endif %}
+            {% endwith %}
+          >
+          Email
+        </label>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div id="save-status" class="text-sm text-muted-foreground text-center hidden">Saving…</div>
+</div>
+
+<script>
+(function() {
+  var currentPrefs = {{ current_prefs|default:"{}" }};
+  var defaultPrefs = {{ default_prefs|default:"{}" }};
+
+  // Initialise checkboxes from real saved prefs
+  document.querySelectorAll('.pref-toggle').forEach(function(cb) {
+    var type = cb.dataset.type;
+    var channel = cb.dataset.channel;
+    var saved = currentPrefs[type];
+    if (saved && channel in saved) {
+      cb.checked = !!saved[channel];
+    } else if (defaultPrefs[type] && channel in defaultPrefs[type]) {
+      cb.checked = !!defaultPrefs[type][channel];
+    }
+  });
+
+  var saveTimer;
+  document.querySelectorAll('.pref-toggle').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+      clearTimeout(saveTimer);
+      var status = document.getElementById('save-status');
+      status.classList.remove('hidden');
+      status.textContent = 'Saving…';
+      saveTimer = setTimeout(function() {
+        var prefs = {};
+        document.querySelectorAll('.pref-toggle').forEach(function(c) {
+          var t = c.dataset.type;
+          if (!prefs[t]) prefs[t] = {};
+          prefs[t][c.dataset.channel] = c.checked;
+        });
+        fetch('{% url "update_notification_prefs" %}', {
+          method: 'POST',
+          headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json'},
+          body: JSON.stringify({prefs: prefs})
+        }).then(r => r.json()).then(d => {
+          status.textContent = d.success ? '✓ Saved' : '✗ Error saving';
+          setTimeout(function() { status.classList.add('hidden'); }, 2000);
+        }).catch(function() {
+          status.textContent = '✗ Error saving';
+          setTimeout(function() { status.classList.add('hidden'); }, 2000);
+        });
+      }, 600);
+    });
+  });
+})();
+</script>
+{% endblock %}

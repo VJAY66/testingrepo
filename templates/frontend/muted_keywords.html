@@ -1,0 +1,66 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Muted Keywords — PickASide{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6 space-y-4">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold text-foreground">Muted Keywords</h1>
+    <a href="{% url 'profile' %}" class="text-sm text-muted-foreground hover:text-primary">← Back to profile</a>
+  </div>
+  <p class="text-sm text-muted-foreground">Posts containing these words will be hidden from your feeds.</p>
+
+  <form id="add-keyword-form" class="flex gap-2">
+    {% csrf_token %}
+    <input type="text" id="new-keyword-input" name="keyword" maxlength="50" placeholder="Add a keyword…"
+           class="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
+    <button type="submit" class="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition">Add</button>
+  </form>
+
+  <div id="keyword-list" class="flex flex-wrap gap-2">
+    {% for kw in keywords %}
+    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-card text-sm font-medium text-foreground" id="kw-{{ kw.id }}">
+      {{ kw.keyword }}
+      <button onclick="removeKeyword('{{ kw.keyword }}', {{ kw.id }})" class="ml-1 text-muted-foreground hover:text-red-500 transition leading-none">✕</button>
+    </span>
+    {% empty %}
+    <p class="text-sm text-muted-foreground" id="empty-msg">No muted keywords yet.</p>
+    {% endfor %}
+  </div>
+</div>
+<script>
+document.getElementById('add-keyword-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var input = document.getElementById('new-keyword-input');
+  var keyword = input.value.trim();
+  if (!keyword) return;
+  fetch('{% url "add_muted_keyword" %}', {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'keyword=' + encodeURIComponent(keyword)
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      var empty = document.getElementById('empty-msg');
+      if (empty) empty.remove();
+      var list = document.getElementById('keyword-list');
+      var span = document.createElement('span');
+      span.id = 'kw-' + (d.id || Date.now());
+      span.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-card text-sm font-medium text-foreground';
+      span.innerHTML = keyword + ' <button onclick="removeKeyword(\'' + keyword.replace(/'/g,"\\'")+'\', this.parentElement)" class="ml-1 text-muted-foreground hover:text-red-500 transition leading-none">✕</button>';
+      list.appendChild(span);
+      input.value = '';
+    }
+  });
+});
+function removeKeyword(keyword, idOrEl) {
+  fetch('{% url "remove_muted_keyword" %}', {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'keyword=' + encodeURIComponent(keyword)
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      var el = typeof idOrEl === 'number' ? document.getElementById('kw-' + idOrEl) : idOrEl;
+      if (el) el.remove();
+    }
+  });
+}
+</script>
+{% endblock %}

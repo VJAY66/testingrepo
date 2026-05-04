@@ -215,4 +215,12 @@ urlpatterns = [
     path('posts/<str:post_id>/related/', views.related_posts_api, name='related_posts_api'),
     # SSE v2 (notifications + DM count)
     path('notifications/stream/v2/', views.notification_stream_v2, name='notification_stream_v2'),
+    # Blocked users management
+    path('profile/blocked/', views.blocked_users_list, name='blocked_users'),
+    # Muted keywords management
+    path('profile/muted-keywords/', views.muted_keywords_page, name='muted_keywords_page'),
+    # Post report
+    path('posts/<str:post_id>/report/', views.report_post, name='report_post'),
+    # Notification preferences page (GET)
+    path('profile/notification-prefs/page/', views.notification_prefs_page, name='notification_prefs_page'),
 ]

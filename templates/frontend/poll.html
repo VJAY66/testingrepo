@@ -115,6 +115,32 @@
             <span class="text-base">⏰</span>
             <p class="text-sm font-semibold text-amber-700 dark:text-amber-300">This poll has closed. Voting is no longer available.</p>
         </div>
+        {% elif poll.expires_at %}
+        <div id="poll-countdown" class="mb-4 flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 dark:border-blue-700/40 dark:bg-blue-900/20">
+            <span class="text-base">⏱</span>
+            <p class="text-sm font-semibold text-blue-700 dark:text-blue-300">Closes in <span id="countdown-text">…</span></p>
+        </div>
+        <script>
+        (function() {
+            var end = new Date("{{ poll.expires_at.isoformat }}");
+            function update() {
+                var diff = end - Date.now();
+                if (diff <= 0) { document.getElementById('poll-countdown').innerHTML = '<span class="text-base">⏰</span><p class="text-sm font-semibold text-amber-700 dark:text-amber-300">Poll has just closed.</p>'; return; }
+                var d = Math.floor(diff / 86400000);
+                var h = Math.floor((diff % 86400000) / 3600000);
+                var m = Math.floor((diff % 3600000) / 60000);
+                var s = Math.floor((diff % 60000) / 1000);
+                var parts = [];
+                if (d) parts.push(d + 'd');
+                if (h) parts.push(h + 'h');
+                if (m || d) parts.push(m + 'm');
+                parts.push(s + 's');
+                document.getElementById('countdown-text').textContent = parts.join(' ');
+            }
+            update();
+            setInterval(update, 1000);
+        })();
+        </script>
         {% endif %}
         <div id="vote-section">
         {% if poll.is_expired %}

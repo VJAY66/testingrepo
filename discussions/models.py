@@ -68,6 +68,17 @@ class Post(models.Model):
     is_hot = models.BooleanField(default=False, db_index=True, help_text='Auto-flagged as rapidly gaining reactions')
     mood = models.CharField(max_length=20, choices=MOOD_CHOICES, blank=True, default='', db_index=True)
     audience = models.CharField(max_length=20, choices=AUDIENCE_CHOICES, default=AUDIENCE_PUBLIC, db_index=True)
+    REPLY_EVERYONE = 'everyone'
+    REPLY_FOLLOWERS = 'followers'
+    REPLY_CLOSE_FRIENDS = 'close_friends'
+    REPLY_NOBODY = 'nobody'
+    REPLY_CHOICES = [
+        (REPLY_EVERYONE, 'Everyone'),
+        (REPLY_FOLLOWERS, 'Followers'),
+        (REPLY_CLOSE_FRIENDS, 'Close Friends'),
+        (REPLY_NOBODY, 'Nobody'),
+    ]
+    reply_restriction = models.CharField(max_length=20, choices=REPLY_CHOICES, default=REPLY_EVERYONE)
     quoted_post = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='quotes')
     reading_time_minutes = models.PositiveSmallIntegerField(default=1)
     word_count = models.PositiveIntegerField(default=0)
@@ -1118,3 +1129,32 @@ class DMRequest(models.Model):
 
     def __str__(self):
         return f"DMRequest {self.sender_id} -> {self.recipient_id} [{self.status}]"
+
+
+class PostReport(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('dismissed', 'Dismissed'),
+        ('actioned', 'Actioned'),
+    ]
+    REASON_CHOICES = [
+        ('spam', 'Spam or misleading'),
+        ('misinformation', 'Misinformation'),
+        ('harassment', 'Harassment'),
+        ('hate_speech', 'Hate speech'),
+        ('other', 'Other'),
+    ]
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='reports')
+    reporter = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='post_reports_submitted')
+    reason = models.CharField(max_length=30, choices=REASON_CHOICES, default='spam')
+    details = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [models.UniqueConstraint(fields=['post', 'reporter'], name='unique_post_report_per_reporter')]
+
+    def __str__(self):
+        return f"PostReport #{self.id} on {self.post_id} by {self.reporter_id} ({self.status})"
