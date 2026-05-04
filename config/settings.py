@@ -58,9 +58,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sitemaps',
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
+    'django_celery_beat',
     'users',
     'discussions',
     'frontend',
@@ -123,6 +125,24 @@ CACHES = {
     }
 }
 
+# Celery
+CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TIMEZONE = os.getenv('TIME_ZONE', 'UTC')
+CELERY_TASK_ALWAYS_EAGER = _env_bool('CELERY_TASK_ALWAYS_EAGER', default=True)  # runs synchronously unless Redis available
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# Elasticsearch
+ELASTICSEARCH_URL = os.getenv('ELASTICSEARCH_URL', '')  # empty = disabled, fall back to DB search
+ELASTICSEARCH_INDEX_PREFIX = os.getenv('ELASTICSEARCH_INDEX_PREFIX', 'pickside')
+
+# Push Notifications (VAPID)
+VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY', '')
+VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY', '')
+VAPID_ADMIN_EMAIL = os.getenv('VAPID_ADMIN_EMAIL', os.getenv('DEFAULT_FROM_EMAIL', 'PickASide <noreply@pickside.app>'))
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -139,7 +159,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'UTC'  # defined here; referenced above in CELERY_TIMEZONE
 USE_I18N = True
 USE_TZ = True
 

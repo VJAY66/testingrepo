@@ -21,12 +21,14 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview
 from discussions.signals import notify_post_author
-from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion
+from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription
 from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
 from utils.moderation import check_content_moderation
+import markdown as _markdown
+from django.utils.safestring import mark_safe
 
 
 _EMOJI_TOKEN_RE = re.compile(r'__EMJ__([0-9A-F]{5,6})__')
@@ -1282,7 +1284,7 @@ def discussion(request, post_id):
 
     context = {
         'post': post,
-        'post_display_content': _normalize_post_content(post.content),
+        'post_display_content': _render_markdown(_normalize_post_content(post.content)),
         'yes_comments': yes_comments,
         'no_comments': no_comments,
         'yes_vote_count': yes_vote_count,
@@ -6729,3 +6731,272 @@ def post_reaction_insights(request, post_id):
         users.append({'username': a.user.username, 'avatar_url': p.get_picture_url if p else ''})
     return JsonResponse({'success': True, 'users': users, 'action': action,
                          'label': dict(Post.MOOD_CHOICES).get(action, action)})
+
+
+# ── Account Deletion ────────────────────────────────────────────────────────
+
+@login_required
+def account_delete(request):
+    if request.method == 'POST':
+        confirm = request.POST.get('confirm_username', '').strip()
+        if confirm != request.user.username:
+            messages.error(request, 'Username did not match. Account not deleted.')
+            return redirect('account_delete')
+        try:
+            profile = request.user.profile
+            profile.deletion_requested_at = timezone.now()
+            profile.save(update_fields=['deletion_requested_at'])
+        except Exception:
+            pass
+        logout(request)
+        messages.success(request, 'Your account has been scheduled for deletion. You have 30 days to log back in and cancel.')
+        return redirect('index')
+    return render(request, 'frontend/account_delete.html')
+
+
+@login_required
+@require_POST
+def account_delete_cancel(request):
+    try:
+        profile = request.user.profile
+        profile.deletion_requested_at = None
+        profile.save(update_fields=['deletion_requested_at'])
+        messages.success(request, 'Account deletion cancelled. Welcome back!')
+    except Exception:
+        pass
+    return redirect('profile')
+
+
+# ── Password Change ──────────────────────────────────────────────────────────
+
+from django.contrib.auth import update_session_auth_hash
+
+@login_required
+def password_change(request):
+    if request.method == 'POST':
+        current = request.POST.get('current_password', '')
+        new_pw = request.POST.get('new_password', '')
+        confirm = request.POST.get('confirm_password', '')
+        if not request.user.check_password(current):
+            messages.error(request, 'Current password is incorrect.')
+            return redirect('password_change')
+        if len(new_pw) < 8:
+            messages.error(request, 'New password must be at least 8 characters.')
+            return redirect('password_change')
+        if new_pw != confirm:
+            messages.error(request, 'Passwords do not match.')
+            return redirect('password_change')
+        request.user.set_password(new_pw)
+        request.user.save()
+        update_session_auth_hash(request, request.user)
+        messages.success(request, 'Password changed successfully.')
+        return redirect('profile')
+    return render(request, 'frontend/password_change.html')
+
+
+# ── Private DMs ──────────────────────────────────────────────────────────────
+
+@login_required
+def dm_list(request):
+    from django.db.models import Max, Subquery, OuterRef
+    # Get the latest message per conversation partner
+    user = request.user
+    sent = DirectMessage.objects.filter(sender=user).values('recipient').annotate(last=Max('created_at'))
+    received = DirectMessage.objects.filter(recipient=user).values('sender').annotate(last=Max('created_at'))
+    partner_ids = set()
+    for r in sent:
+        partner_ids.add(r['recipient'])
+    for r in received:
+        partner_ids.add(r['sender'])
+    conversations = []
+    for pid in partner_ids:
+        partner = User.objects.filter(id=pid).select_related('profile').first()
+        if not partner:
+            continue
+        last_msg = DirectMessage.objects.filter(
+            Q(sender=user, recipient=partner) | Q(sender=partner, recipient=user)
+        ).order_by('-created_at').first()
+        unread = DirectMessage.objects.filter(sender=partner, recipient=user, is_read=False).count()
+        conversations.append({'partner': partner, 'last_msg': last_msg, 'unread': unread})
+    conversations.sort(key=lambda x: x['last_msg'].created_at if x['last_msg'] else timezone.now(), reverse=True)
+    return render(request, 'frontend/dm_list.html', {'conversations': conversations})
+
+
+@login_required
+def dm_thread(request, username):
+    partner = get_object_or_404(User, username=username)
+    if partner == request.user:
+        return redirect('dm_list')
+    if request.method == 'POST':
+        content = request.POST.get('content', '').strip()[:2000]
+        if content:
+            DirectMessage.objects.create(sender=request.user, recipient=partner, content=content)
+        return redirect('dm_thread', username=username)
+    messages_qs = DirectMessage.objects.filter(
+        Q(sender=request.user, recipient=partner) | Q(sender=partner, recipient=request.user)
+    ).order_by('created_at')
+    # Mark received messages as read
+    DirectMessage.objects.filter(sender=partner, recipient=request.user, is_read=False).update(is_read=True)
+    return render(request, 'frontend/dm_thread.html', {
+        'partner': partner,
+        'messages': messages_qs,
+    })
+
+
+@login_required
+@require_POST
+def dm_delete(request):
+    msg_id = request.POST.get('message_id')
+    msg = get_object_or_404(DirectMessage, id=msg_id, sender=request.user)
+    msg.delete()
+    return JsonResponse({'success': True})
+
+
+@login_required
+def dm_unread_count(request):
+    count = DirectMessage.objects.filter(recipient=request.user, is_read=False).count()
+    return JsonResponse({'count': count})
+
+
+# ── Push Notifications ───────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def push_subscribe(request):
+    try:
+        data = json.loads(request.body)
+        endpoint = data.get('endpoint', '').strip()
+        p256dh = data.get('keys', {}).get('p256dh', '').strip()
+        auth = data.get('keys', {}).get('auth', '').strip()
+        if not (endpoint and p256dh and auth):
+            return JsonResponse({'error': 'Invalid subscription data'}, status=400)
+        ua = request.META.get('HTTP_USER_AGENT', '')[:300]
+        PushSubscription.objects.update_or_create(
+            endpoint=endpoint,
+            defaults={'user': request.user, 'p256dh': p256dh, 'auth': auth, 'user_agent': ua},
+        )
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@login_required
+@require_POST
+def push_unsubscribe(request):
+    try:
+        data = json.loads(request.body)
+        endpoint = data.get('endpoint', '')
+        PushSubscription.objects.filter(user=request.user, endpoint=endpoint).delete()
+        return JsonResponse({'success': True})
+    except Exception:
+        return JsonResponse({'success': False})
+
+
+def push_vapid_public_key(request):
+    return JsonResponse({'publicKey': getattr(settings, 'VAPID_PUBLIC_KEY', '')})
+
+
+# ── Link Preview ─────────────────────────────────────────────────────────────
+
+def link_preview(request):
+    url = request.GET.get('url', '').strip()
+    if not url:
+        return JsonResponse({'error': 'No URL'}, status=400)
+    try:
+        preview = LinkPreview.objects.filter(url=url, fetch_failed=False).first()
+        if preview and (timezone.now() - preview.fetched_at).days < 7:
+            return JsonResponse({
+                'title': preview.title,
+                'description': preview.description,
+                'image': preview.image_url,
+                'site_name': preview.site_name,
+            })
+        import requests as _req
+        from bs4 import BeautifulSoup as _BS
+        resp = _req.get(url, timeout=5, headers={'User-Agent': 'PickAsideBot/1.0'}, allow_redirects=True)
+        soup = _BS(resp.text, 'html.parser')
+        def og(prop):
+            t = soup.find('meta', property=prop) or soup.find('meta', attrs={'name': prop})
+            return (t.get('content') or '') if t else ''
+        title = og('og:title') or og('twitter:title') or (soup.title.string if soup.title else '') or ''
+        desc = og('og:description') or og('twitter:description') or og('description') or ''
+        image = og('og:image') or og('twitter:image') or ''
+        site_name = og('og:site_name') or ''
+        LinkPreview.objects.update_or_create(url=url, defaults={
+            'title': title[:300], 'description': desc[:500],
+            'image_url': image[:500], 'site_name': site_name[:100], 'fetch_failed': False,
+        })
+        return JsonResponse({'title': title, 'description': desc, 'image': image, 'site_name': site_name})
+    except Exception:
+        LinkPreview.objects.update_or_create(url=url, defaults={'fetch_failed': True})
+        return JsonResponse({'error': 'Could not fetch preview'}, status=200)
+
+
+# ── Trending Categories ───────────────────────────────────────────────────────
+
+def trending_categories(request):
+    from django.utils import timezone as _tz
+    since = _tz.now() - timedelta(days=7)
+    rows = (
+        Post.objects.filter(created_at__gte=since, is_draft=False, is_deleted_by_moderation=False)
+        .values('category')
+        .annotate(
+            post_count=Count('id'),
+            total_likes=Count('actions', filter=Q(actions__action='like')),
+            total_comments=Count('comments'),
+        )
+        .order_by('-total_likes', '-total_comments', '-post_count')[:20]
+    )
+    results = []
+    for r in rows:
+        score = r['total_likes'] * 3 + r['total_comments'] * 2 + r['post_count']
+        results.append({'category': r['category'], 'post_count': r['post_count'], 'score': score})
+    results.sort(key=lambda x: x['score'], reverse=True)
+    cache.set('trending_categories', results, 3600)
+    return JsonResponse({'trending': results})
+
+
+# ── Report Outcome Notifications ──────────────────────────────────────────────
+
+def _notify_report_outcome(reporter, outcome, content_type='content'):
+    """Send in-app notification to the reporter about the outcome of their report."""
+    if outcome == 'upheld':
+        msg = f'Your report on a {content_type} was reviewed and action was taken. Thank you for keeping PickASide safe.'
+    else:
+        msg = f'Your report on a {content_type} was reviewed. No action was taken at this time.'
+    Notification.objects.create(
+        user=reporter,
+        notification_type='moderation_warning',
+        message=msg,
+    )
+
+
+# ── Cookie Consent ────────────────────────────────────────────────────────────
+
+@require_POST
+def cookie_consent(request):
+    response = JsonResponse({'success': True})
+    response.set_cookie('cookie_consent', 'accepted', max_age=365*24*3600, httponly=False, samesite='Lax')
+    return response
+
+
+# ── Privacy Policy ────────────────────────────────────────────────────────────
+
+def privacy_policy(request):
+    return render(request, 'frontend/privacy_policy.html')
+
+
+# ── Markdown Post Rendering ──────────────────────────────────────────────────
+
+def _render_markdown(content):
+    """Convert markdown content to safe HTML."""
+    if not content:
+        return ''
+    html = _markdown.markdown(
+        content,
+        extensions=['fenced_code', 'codehilite', 'tables', 'nl2br', 'toc'],
+        extension_configs={
+            'codehilite': {'css_class': 'highlight', 'guess_lang': False},
+        },
+    )
+    return mark_safe(html)

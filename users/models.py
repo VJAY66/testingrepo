@@ -40,6 +40,7 @@ class Profile(models.Model):
     reputation_score = models.IntegerField(default=0, db_index=True, help_text='Computed reputation from likes, answers, debates')
     streak_days = models.PositiveIntegerField(default=0, help_text='Current consecutive days of activity')
     last_activity_date = models.DateField(null=True, blank=True, help_text='Last date the user posted or commented')
+    deletion_requested_at = models.DateTimeField(null=True, blank=True, help_text='If set, account will be hard-deleted 30 days after this date')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -283,3 +284,19 @@ class UserSuggestion(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=['user', 'suggested_user'], name='unique_user_suggestion')]
         ordering = ['-score']
+
+
+class PushSubscription(models.Model):
+    """Browser/mobile push notification subscription (Web Push API)."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='push_subscriptions')
+    endpoint = models.URLField(max_length=800, unique=True)
+    p256dh = models.TextField()
+    auth = models.TextField()
+    user_agent = models.CharField(max_length=300, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Push({self.user.username}) {self.endpoint[:60]}"

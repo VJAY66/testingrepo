@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /profile/
+Disallow: /notifications/
+Disallow: /chats/
+Disallow: /dm/
+
+Sitemap: https://pickside.app/sitemap.xml

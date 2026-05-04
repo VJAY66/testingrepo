@@ -1050,3 +1050,40 @@ class ReadLater(models.Model):
     class Meta:
         ordering = ['-added_at']
         constraints = [models.UniqueConstraint(fields=['user', 'post'], name='unique_read_later')]
+
+
+class DirectMessage(models.Model):
+    """Private 1-to-1 message between two users."""
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_messages')
+    content = models.TextField(max_length=2000)
+    is_read = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['sender', 'recipient']),
+            models.Index(fields=['recipient', 'is_read']),
+        ]
+
+    def __str__(self):
+        return f"DM {self.sender.username}→{self.recipient.username}: {self.content[:40]}"
+
+
+class LinkPreview(models.Model):
+    """Cached OG/meta preview for a URL found in a post."""
+    url = models.URLField(max_length=500, unique=True)
+    title = models.CharField(max_length=300, blank=True, default='')
+    description = models.TextField(blank=True, default='')
+    image_url = models.URLField(max_length=500, blank=True, default='')
+    site_name = models.CharField(max_length=100, blank=True, default='')
+    fetched_at = models.DateTimeField(auto_now=True)
+    fetch_failed = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-fetched_at']
+
+    def __str__(self):
+        return f"Preview: {self.url[:60]}"

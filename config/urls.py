@@ -2,11 +2,27 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib.sitemaps.views import sitemap
+from django.views.generic import TemplateView
+from frontend.sitemaps import PostSitemap, StaticSitemap, CategorySitemap
+from frontend.feeds import LatestPostsFeed, CategoryFeed
+
+sitemaps = {
+    'posts': PostSitemap,
+    'static': StaticSitemap,
+    'categories': CategorySitemap,
+}
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('api.urls')),
     path('', include('frontend.urls')),
+    # Sitemap & robots
+    path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
+    path('robots.txt', TemplateView.as_view(template_name='robots.txt', content_type='text/plain')),
+    # RSS feeds
+    path('feed/', LatestPostsFeed(), name='feed_latest'),
+    path('feed/<str:category_name>/', CategoryFeed(), name='feed_category'),
 ]
 
 if settings.DEBUG:

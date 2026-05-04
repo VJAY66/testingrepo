@@ -1,0 +1,37 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Messages — PickASide{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6">
+  <div class="flex items-center gap-3 mb-6">
+    <span class="text-2xl">💬</span>
+    <h1 class="text-xl font-bold text-foreground">Messages</h1>
+  </div>
+  {% if not conversations %}
+  <div class="text-center py-24 text-muted-foreground">
+    <span class="text-4xl">💬</span>
+    <p class="mt-4 font-semibold">No messages yet</p>
+    <p class="text-sm mt-1">Visit a user's profile to start a conversation.</p>
+  </div>
+  {% else %}
+  <div class="space-y-2">
+    {% for conv in conversations %}
+    <a href="{% url 'dm_thread' conv.partner.username %}" class="flex items-center gap-3 p-4 bg-card border border-border rounded-2xl hover:border-primary/30 transition-colors">
+      {% if conv.partner.profile.get_picture_url %}
+      <img src="{{ conv.partner.profile.get_picture_url }}" class="w-10 h-10 rounded-full object-cover border border-border" loading="lazy">
+      {% else %}
+      <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold">{{ conv.partner.username|first|upper }}</div>
+      {% endif %}
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <p class="font-semibold text-foreground text-sm">{{ conv.partner.username }}</p>
+          {% if conv.unread %}<span class="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">{{ conv.unread }}</span>{% endif %}
+        </div>
+        {% if conv.last_msg %}<p class="text-xs text-muted-foreground truncate mt-0.5">{% if conv.last_msg.sender == request.user %}You: {% endif %}{{ conv.last_msg.content|truncatechars:60 }}</p>{% endif %}
+      </div>
+      {% if conv.last_msg %}<span class="text-xs text-muted-foreground shrink-0">{{ conv.last_msg.created_at|timesince }} ago</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

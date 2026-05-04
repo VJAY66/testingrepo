@@ -180,4 +180,25 @@ urlpatterns = [
     path('read-later/mark-done/', views.mark_read_later_done, name='mark_read_later_done'),
     # Reaction insights (discussion page)
     path('posts/<str:post_id>/reaction-insights/', views.post_reaction_insights, name='post_reaction_insights'),
+    # Account management
+    path('account/delete/', views.account_delete, name='account_delete'),
+    path('account/delete/cancel/', views.account_delete_cancel, name='account_delete_cancel'),
+    path('account/password/', views.password_change, name='password_change'),
+    # Private DMs
+    path('dm/', views.dm_list, name='dm_list'),
+    path('dm/<str:username>/', views.dm_thread, name='dm_thread'),
+    path('dm/delete/', views.dm_delete, name='dm_delete'),
+    path('dm/unread/', views.dm_unread_count, name='dm_unread_count'),
+    # Push notifications
+    path('push/subscribe/', views.push_subscribe, name='push_subscribe'),
+    path('push/unsubscribe/', views.push_unsubscribe, name='push_unsubscribe'),
+    path('push/vapid-key/', views.push_vapid_public_key, name='push_vapid_key'),
+    # Link preview
+    path('link-preview/', views.link_preview, name='link_preview'),
+    # Trending categories
+    path('trending-categories/', views.trending_categories, name='trending_categories'),
+    # Cookie consent
+    path('cookie-consent/', views.cookie_consent, name='cookie_consent'),
+    # Privacy policy
+    path('privacy/', views.privacy_policy, name='privacy_policy'),
 ]

@@ -14,6 +14,7 @@
     <meta name="twitter:title" content="PickASide — Pick a side, share your view">
     <meta name="twitter:description" content="Debate, discuss and explore every side of every topic.">
     {% endblock %}
+    {% block jsonld %}{% endblock %}
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#0ea5e9">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2362,6 +2363,22 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 </head>
 <body class="bg-background text-foreground min-h-screen {% if request.resolver_match.url_name == 'index' %}home-bg{% endif %}">
+<!-- Cookie Consent Banner -->
+{% if not request.COOKIES.cookie_consent %}
+<div id="cookie-banner" class="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-2xl px-4 py-3 flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
+  <p class="text-sm text-foreground flex-1">🍪 We use cookies to improve your experience. <a href="{% url 'privacy_policy' %}" class="text-primary underline">Privacy Policy</a></p>
+  <div class="flex gap-2 shrink-0">
+    <button onclick="acceptCookies()" class="px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition">Accept</button>
+    <button onclick="document.getElementById('cookie-banner').remove()" class="px-4 py-1.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary transition">Dismiss</button>
+  </div>
+</div>
+<script>
+function acceptCookies() {
+  fetch('/cookie-consent/', {method:'POST', headers:{'X-CSRFToken':document.cookie.match(/csrftoken=([^;]+)/)?.[1]||''}})
+    .then(function(){document.getElementById('cookie-banner').remove();});
+}
+</script>
+{% endif %}
     <div id="reading-progress-bar" style="position:fixed;top:0;left:0;width:0%;height:3px;background:hsl(var(--primary));z-index:99999;transition:width 0.1s linear;pointer-events:none;"></div>
     <script>
     (function() {
@@ -5768,6 +5785,52 @@
   // Re-run when new textareas appear (modals, etc.)
   var obs = new MutationObserver(initAll);
   obs.observe(document.body, { childList: true, subtree: true });
+})();
+
+<!-- highlight.js for code syntax highlighting -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css" class="hljs-theme-dark" disabled>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" class="hljs-theme-light">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  hljs.highlightAll();
+  // sync theme
+  function syncHljsTheme() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    document.querySelectorAll('.hljs-theme-dark').forEach(function(el){ el.disabled = !dark; });
+    document.querySelectorAll('.hljs-theme-light').forEach(function(el){ el.disabled = dark; });
+  }
+  syncHljsTheme();
+  var themeObs = new MutationObserver(syncHljsTheme);
+  themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+});
+</script>
+
+<!-- Push Notification Registration -->
+<script>
+(function(){
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+  window.registerPushNotifications = function() {
+    Notification.requestPermission().then(function(perm) {
+      if (perm !== 'granted') return;
+      fetch('/push/vapid-key/').then(r=>r.json()).then(function(d) {
+        if (!d.publicKey) return;
+        navigator.serviceWorker.ready.then(function(reg) {
+          reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: d.publicKey
+          }).then(function(sub) {
+            fetch('/push/subscribe/', {
+              method:'POST',
+              headers:{'Content-Type':'application/json','X-CSRFToken':document.cookie.match(/csrftoken=([^;]+)/)?.[1]||''},
+              body: JSON.stringify(sub.toJSON())
+            });
+          });
+        });
+      });
+    });
+  };
+  navigator.serviceWorker.register('/static/sw.js').catch(function(){});
 })();
 </script>
 </body>

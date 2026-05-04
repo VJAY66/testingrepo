@@ -1,0 +1,23 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Privacy Policy — PickASide{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-10 space-y-6 text-sm leading-relaxed">
+  <div>
+    <h1 class="text-3xl font-bold text-foreground mb-1">Privacy Policy</h1>
+    <p class="text-muted-foreground">Last updated: May 2026</p>
+  </div>
+  {% for title, body in sections %}
+  <section>
+    <h2 class="text-lg font-bold text-foreground mb-2">{{ title }}</h2>
+    <p class="text-muted-foreground">{{ body|safe }}</p>
+  </section>
+  {% endfor %}
+  <section><h2 class="text-lg font-bold text-foreground mb-2">1. Information We Collect</h2><p class="text-muted-foreground">We collect information you provide directly: username, password (hashed), email, profile picture, bio, and content you create. We also collect usage data such as pages visited.</p></section>
+  <section><h2 class="text-lg font-bold text-foreground mb-2">2. How We Use Your Information</h2><p class="text-muted-foreground">We use your data to operate PickASide, send opted-in notifications, detect abuse, and comply with legal obligations.</p></section>
+  <section><h2 class="text-lg font-bold text-foreground mb-2">3. Cookies</h2><p class="text-muted-foreground">We use essential cookies for sessions and optional cookies for preferences (dark mode, etc). No third-party advertising cookies.</p></section>
+  <section><h2 class="text-lg font-bold text-foreground mb-2">4. Data Sharing</h2><p class="text-muted-foreground">We do not sell your data. Service providers (hosting, email) process data under strict agreements.</p></section>
+  <section><h2 class="text-lg font-bold text-foreground mb-2">5. Your Rights</h2><p class="text-muted-foreground">You can access, correct, or delete your data. Delete your account from <a href="{% url 'account_delete' %}" class="text-primary underline">Account Settings</a>. Email <a href="mailto:privacy@pickside.app" class="text-primary underline">privacy@pickside.app</a> for other requests.</p></section>
+  <section><h2 class="text-lg font-bold text-foreground mb-2">6. Data Retention</h2><p class="text-muted-foreground">Data is retained while your account is active. After deletion, personal data is removed within 30 days.</p></section>
+  <section><h2 class="text-lg font-bold text-foreground mb-2">7. Push Notifications</h2><p class="text-muted-foreground">Push subscription endpoints are stored securely. You can revoke them from your browser or profile settings at any time.</p></section>
+</div>
+{% endblock %}
