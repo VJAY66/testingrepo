@@ -68,6 +68,7 @@ class BanMiddleware:
                             msg = f'Your account has been permanently banned. Reason: {active_ban.reason}'
                         _msgs.error(request, msg)
                         return redirect('/login/')
-                except Exception:
-                    pass
+                except (ImportError, AttributeError, Exception) as e:
+                    import logging
+                    logging.getLogger(__name__).error('BanMiddleware error: %s', e)
         return self.get_response(request)

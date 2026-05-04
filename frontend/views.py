@@ -4303,11 +4303,9 @@ def polls_list(request):
     })
 
 
+@login_required
 def create_poll(request):
     """Poll creation page."""
-    if not request.user.is_authenticated:
-        from django.urls import reverse
-        return redirect(f"{reverse('login')}?next={request.path}")
 
     categories = [{'name': c[0]} for c in CATEGORY_CHOICES]
 
@@ -4978,11 +4976,8 @@ def reviews_list(request):
     })
 
 
+@login_required
 def create_review(request):
-    if not request.user.is_authenticated:
-        from django.urls import reverse
-        return redirect(f"{reverse('login')}?next={request.path}")
-
     subject_types = Review.SUBJECT_TYPE_CHOICES
     categories = [{'name': c[0]} for c in CATEGORY_CHOICES]
 
@@ -6856,13 +6851,19 @@ def ban_user(request, username):
     reason = request.POST.get('reason', '').strip()
     if not reason:
         return JsonResponse({'error': 'Reason required'}, status=400)
+    if len(reason) > 1000:
+        return JsonResponse({'error': 'Reason must be under 1000 characters'}, status=400)
+    if ban_type not in {UserBan.BAN_TYPE_WARNING, UserBan.BAN_TYPE_TEMPORARY, UserBan.BAN_TYPE_PERMANENT}:
+        return JsonResponse({'error': 'Invalid ban type'}, status=400)
     expires_at = None
     if ban_type == UserBan.BAN_TYPE_TEMPORARY:
         try:
             days = int(request.POST.get('days', 7))
+            if not (1 <= days <= 3650):
+                return JsonResponse({'error': 'Days must be between 1 and 3650'}, status=400)
         except (ValueError, TypeError):
             days = 7
-        expires_at = timezone.now() + timedelta(days=max(1, days))
+        expires_at = timezone.now() + timedelta(days=days)
     UserBan.objects.filter(user=target, is_active=True).update(is_active=False)
     ban = UserBan.objects.create(
         user=target,

@@ -184,11 +184,14 @@ urlpatterns = [
     path('account/delete/', views.account_delete, name='account_delete'),
     path('account/delete/cancel/', views.account_delete_cancel, name='account_delete_cancel'),
     path('account/password/', views.password_change, name='password_change'),
-    # Private DMs
+    # Private DMs — fixed paths must come before the parametric dm/<str:username>/
     path('dm/', views.dm_list, name='dm_list'),
-    path('dm/<str:username>/', views.dm_thread, name='dm_thread'),
     path('dm/delete/', views.dm_delete, name='dm_delete'),
     path('dm/unread/', views.dm_unread_count, name='dm_unread_count'),
+    path('dm/requests/', views.dm_requests_list, name='dm_requests_list'),
+    path('dm/request/<str:username>/', views.dm_request_send, name='dm_request_send'),
+    path('dm/request/<int:request_id>/respond/', views.dm_request_respond, name='dm_request_respond'),
+    path('dm/<str:username>/', views.dm_thread, name='dm_thread'),
     # Push notifications
     path('push/subscribe/', views.push_subscribe, name='push_subscribe'),
     path('push/unsubscribe/', views.push_unsubscribe, name='push_unsubscribe'),
@@ -206,10 +209,6 @@ urlpatterns = [
     path('user/<str:username>/unban/', views.unban_user, name='unban_user'),
     # Post embed
     path('posts/<str:post_id>/embed/', views.post_embed, name='post_embed'),
-    # DM Requests
-    path('dm/requests/', views.dm_requests_list, name='dm_requests_list'),
-    path('dm/request/<str:username>/', views.dm_request_send, name='dm_request_send'),
-    path('dm/request/<int:request_id>/respond/', views.dm_request_respond, name='dm_request_respond'),
     # Advanced search
     path('search/advanced/', views.search_advanced, name='search_advanced'),
     # Related posts API

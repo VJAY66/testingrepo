@@ -300,3 +300,29 @@ class PushSubscription(models.Model):
 
     def __str__(self):
         return f"Push({self.user.username}) {self.endpoint[:60]}"
+
+
+class UserBan(models.Model):
+    BAN_TYPE_WARNING = 'warning'
+    BAN_TYPE_TEMPORARY = 'temporary'
+    BAN_TYPE_PERMANENT = 'permanent'
+    BAN_TYPE_CHOICES = [
+        (BAN_TYPE_WARNING, 'Warning'),
+        (BAN_TYPE_TEMPORARY, 'Temporary Ban'),
+        (BAN_TYPE_PERMANENT, 'Permanent Ban'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bans')
+    banned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='issued_bans')
+    ban_type = models.CharField(max_length=20, choices=BAN_TYPE_CHOICES, default=BAN_TYPE_TEMPORARY, db_index=True)
+    reason = models.TextField()
+    expires_at = models.DateTimeField(null=True, blank=True, help_text='Null = permanent')
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['user', 'is_active'])]
+
+    def __str__(self):
+        return f"Ban on {self.user.username} ({self.ban_type})"
