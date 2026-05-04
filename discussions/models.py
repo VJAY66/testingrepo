@@ -1018,3 +1018,34 @@ class PostInsight(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=['post', 'date'], name='unique_post_insight_day')]
         ordering = ['-date']
+
+
+class DMRequest(models.Model):
+    """Message request from a user to a non-follower."""
+    STATUS_PENDING = 'pending'
+    STATUS_ACCEPTED = 'accepted'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_ACCEPTED, 'Accepted'),
+        (STATUS_REJECTED, 'Rejected'),
+    ]
+
+    sender = models.ForeignKey(
+        'auth.User', on_delete=models.CASCADE, related_name='sent_dm_requests'
+    )
+    recipient = models.ForeignKey(
+        'auth.User', on_delete=models.CASCADE, related_name='received_dm_requests'
+    )
+    message = models.CharField(max_length=300, blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['recipient', 'status'])]
+        constraints = [models.UniqueConstraint(fields=['sender', 'recipient'], name='unique_dm_request')]
+
+    def __str__(self):
+        return f"DMRequest {self.sender_id} -> {self.recipient_id} [{self.status}]"

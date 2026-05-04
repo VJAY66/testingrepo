@@ -35,3 +35,39 @@ class UpdateLastSeenMiddleware:
 
         response = self.get_response(request)
         return response
+
+
+class BanMiddleware:
+    """Block banned users from accessing the site (except logout/login)."""
+    ALLOWED_PATHS = {'/logout/', '/login/', '/privacy/', '/static/'}
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        user = getattr(request, 'user', None)
+        if user and user.is_authenticated:
+            for p in self.ALLOWED_PATHS:
+                if request.path.startswith(p):
+                    break
+            else:
+                try:
+                    from users.models import UserBan
+                    from django.utils import timezone as tz
+                    now = tz.now()
+                    UserBan.objects.filter(user=user, is_active=True, expires_at__lt=now).update(is_active=False)
+                    active_ban = UserBan.objects.filter(user=user, is_active=True).first()
+                    if active_ban:
+                        from django.contrib.auth import logout
+                        from django.shortcuts import redirect
+                        from django.contrib import messages as _msgs
+                        logout(request)
+                        if active_ban.expires_at:
+                            msg = f'Your account is suspended until {active_ban.expires_at.strftime("%b %d, %Y")}. Reason: {active_ban.reason}'
+                        else:
+                            msg = f'Your account has been permanently banned. Reason: {active_ban.reason}'
+                        _msgs.error(request, msg)
+                        return redirect('/login/')
+                except Exception:
+                    pass
+        return self.get_response(request)
