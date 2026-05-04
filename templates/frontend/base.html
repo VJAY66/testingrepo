@@ -2769,6 +2769,7 @@ function acceptCookies() {
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                             </svg>
+                            <span id="dm-count-badge" class="nav-counter-badge absolute -right-2 -top-2 inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground" style="display:none"></span>
                         </a>
                         <div class="user-menu-wrap">
                             <button type="button" id="mobile-user-menu-toggle" class="nav-icon-pill" aria-label="Profile" aria-expanded="false">
@@ -3469,9 +3470,19 @@ function acceptCookies() {
             }
 
             {% if user.is_authenticated %}
+            function _showToast(msg, type) {
+                var c = document.getElementById('toast-container');
+                if (!c) return;
+                var t = document.createElement('div');
+                t.className = 'pointer-events-auto flex items-start gap-2 px-4 py-3 rounded-2xl shadow-lg text-sm font-medium ' +
+                    (type === 'dm' ? 'bg-primary text-primary-foreground' : 'bg-card border border-border text-foreground');
+                t.textContent = (type === 'dm' ? '💬 ' : '🔔 ') + msg;
+                c.appendChild(t);
+                setTimeout(function(){ t.style.opacity='0'; t.style.transition='opacity .4s'; setTimeout(function(){ t.remove(); }, 400); }, 4000);
+            }
+            var _lastNotifCount = -1, _lastDmCount = -1;
             function startNotificationStream() {
                 if (!window.EventSource) {
-                    // Fallback to polling for old browsers
                     window.setInterval(function() {
                         fetch('{% url "notification_count" %}', {method:'GET', credentials:'same-origin'})
                             .then(r => r.json()).then(d => updateNotificationBadge(d.pending_notifications_count || 0))
@@ -3479,12 +3490,29 @@ function acceptCookies() {
                     }, 15000);
                     return;
                 }
-                var src = new EventSource('{% url "notification_stream" %}');
+                var src = new EventSource('{% url "notification_stream_v2" %}');
                 src.onmessage = function(e) {
                     try {
                         var d = JSON.parse(e.data);
                         if (d.reconnect) { src.close(); setTimeout(startNotificationStream, 1000); return; }
-                        if (typeof d.count === 'number') updateNotificationBadge(d.count);
+                        if (typeof d.notifications === 'number') {
+                            updateNotificationBadge(d.notifications);
+                            if (_lastNotifCount >= 0 && d.notifications > _lastNotifCount) {
+                                _showToast('You have ' + d.notifications + ' new notification' + (d.notifications !== 1 ? 's' : ''), 'notif');
+                            }
+                            _lastNotifCount = d.notifications;
+                        }
+                        if (typeof d.dms === 'number') {
+                            var dmBadge = document.getElementById('dm-count-badge');
+                            if (dmBadge) {
+                                dmBadge.textContent = d.dms > 0 ? String(d.dms) : '';
+                                dmBadge.style.display = d.dms > 0 ? '' : 'none';
+                            }
+                            if (_lastDmCount >= 0 && d.dms > _lastDmCount) {
+                                _showToast('New message request', 'dm');
+                            }
+                            _lastDmCount = d.dms;
+                        }
                     } catch(_) {}
                 };
                 src.onerror = function() { src.close(); setTimeout(startNotificationStream, 10000); };
@@ -5833,5 +5861,6 @@ document.addEventListener('DOMContentLoaded', function() {
   navigator.serviceWorker.register('/static/sw.js').catch(function(){});
 })();
 </script>
+<div id="toast-container" class="fixed top-4 right-4 z-[999] flex flex-col gap-2 pointer-events-none" style="max-width:320px"></div>
 </body>
 </html>

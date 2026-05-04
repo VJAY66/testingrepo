@@ -21,9 +21,9 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest
 from discussions.signals import notify_post_author
-from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription
+from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription, UserBan
 from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
 from utils.moderation import check_content_moderation
@@ -6843,6 +6843,107 @@ def dm_thread(request, username):
     })
 
 
+# ─── Ban / Unban User ─────────────────────────────────────────────────────────
+
+@login_required
+def ban_user(request, username):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    if not _is_configured_moderator(request.user):
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+    target = get_object_or_404(User, username=username)
+    ban_type = request.POST.get('ban_type', UserBan.BAN_TYPE_TEMPORARY)
+    reason = request.POST.get('reason', '').strip()
+    if not reason:
+        return JsonResponse({'error': 'Reason required'}, status=400)
+    expires_at = None
+    if ban_type == UserBan.BAN_TYPE_TEMPORARY:
+        try:
+            days = int(request.POST.get('days', 7))
+        except (ValueError, TypeError):
+            days = 7
+        expires_at = timezone.now() + timedelta(days=max(1, days))
+    UserBan.objects.filter(user=target, is_active=True).update(is_active=False)
+    ban = UserBan.objects.create(
+        user=target,
+        banned_by=request.user,
+        ban_type=ban_type,
+        reason=reason,
+        expires_at=expires_at,
+        is_active=True,
+    )
+    return JsonResponse({'success': True, 'ban_id': ban.id})
+
+
+@login_required
+def unban_user(request, username):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    if not _is_configured_moderator(request.user):
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+    target = get_object_or_404(User, username=username)
+    updated = UserBan.objects.filter(user=target, is_active=True).update(is_active=False)
+    return JsonResponse({'success': True, 'deactivated': updated})
+
+
+# ─── Post Embed ───────────────────────────────────────────────────────────────
+
+def post_embed(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    post.like_count = PostAction.objects.filter(post=post, action='like').count()
+    post.comment_count = Comment.objects.filter(post=post).count()
+    return render(request, 'frontend/post_embed.html', {'post': post})
+
+
+# ─── DM Requests ─────────────────────────────────────────────────────────────
+
+@login_required
+def dm_requests_list(request):
+    """List pending DM requests for the current user."""
+    requests_qs = (
+        DMRequest.objects
+        .filter(recipient=request.user, status=DMRequest.STATUS_PENDING)
+        .select_related('sender', 'sender__profile')
+        .order_by('-created_at')
+    )
+    return render(request, 'frontend/dm_requests.html', {'requests': requests_qs})
+
+
+@login_required
+def dm_request_send(request, username):
+    """Send (or display) a DM request to a user you don't mutually follow."""
+    partner = get_object_or_404(User, username=username)
+    if partner == request.user:
+        return JsonResponse({'error': 'Cannot message yourself'}, status=400)
+
+    # Check if they already mutually follow each other — no request needed
+    follows_them = Follow.objects.filter(follower=request.user, following=partner).exists()
+    follows_back = Follow.objects.filter(follower=partner, following=request.user).exists()
+    if follows_them and follows_back:
+        return redirect('chats')
+
+    existing = DMRequest.objects.filter(sender=request.user, recipient=partner).first()
+
+    if request.method == 'POST':
+        if existing and existing.status == DMRequest.STATUS_ACCEPTED:
+            return JsonResponse({'success': True})
+        msg_text = request.POST.get('message', '').strip()[:300]
+        if existing:
+            existing.message = msg_text
+            existing.status = DMRequest.STATUS_PENDING
+            existing.save(update_fields=['message', 'status', 'updated_at'])
+        else:
+            DMRequest.objects.create(sender=request.user, recipient=partner, message=msg_text)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'json' in request.headers.get('Accept', ''):
+            return JsonResponse({'success': True})
+        return redirect('chats')
+
+    return render(request, 'frontend/dm_request_needed.html', {
+        'partner': partner,
+        'existing_request': existing,
+    })
+
+
 @login_required
 @require_POST
 def dm_delete(request):
@@ -7000,3 +7101,135 @@ def _render_markdown(content):
         },
     )
     return mark_safe(html)
+
+
+def dm_request_respond(request, request_id):
+    """Accept or reject a DM request."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    dm_req = get_object_or_404(DMRequest, id=request_id, recipient=request.user)
+    action = request.POST.get('action', '')
+    if action == 'accept':
+        dm_req.status = DMRequest.STATUS_ACCEPTED
+    elif action == 'reject':
+        dm_req.status = DMRequest.STATUS_REJECTED
+    else:
+        return JsonResponse({'error': 'Invalid action'}, status=400)
+    dm_req.save(update_fields=['status', 'updated_at'])
+    return JsonResponse({'success': True, 'status': dm_req.status})
+
+
+# ─── Advanced Search ──────────────────────────────────────────────────────────
+
+def search_advanced(request):
+    query = request.GET.get('q', '').strip()
+    category = request.GET.get('category', '').strip()
+    sort = request.GET.get('sort', 'newest')
+    date_range = request.GET.get('date_range', '')
+    min_likes = request.GET.get('min_likes', '')
+    has_debate = bool(request.GET.get('has_debate'))
+
+    results = []
+    total = 0
+
+    if query or category:
+        qs = Post.objects.filter(is_draft=False)
+        if query:
+            qs = qs.filter(Q(title__icontains=query) | Q(content__icontains=query))
+        if category:
+            qs = qs.filter(category=category)
+        if date_range:
+            now = timezone.now()
+            if date_range == 'today':
+                qs = qs.filter(created_at__date=now.date())
+            elif date_range == 'week':
+                qs = qs.filter(created_at__gte=now - timedelta(days=7))
+            elif date_range == 'month':
+                qs = qs.filter(created_at__gte=now - timedelta(days=30))
+            elif date_range == 'year':
+                qs = qs.filter(created_at__gte=now - timedelta(days=365))
+        qs = qs.annotate(
+            like_count=Count('actions', filter=Q(actions__action='like'), distinct=True),
+            comment_count=Count('comments', distinct=True),
+            debate_count=Count('debates', filter=Q(debates__status='accepted'), distinct=True),
+        )
+        if min_likes:
+            try:
+                qs = qs.filter(like_count__gte=int(min_likes))
+            except ValueError:
+                pass
+        if has_debate:
+            qs = qs.filter(debate_count__gt=0)
+        sort_map = {
+            'newest': '-created_at',
+            'oldest': 'created_at',
+            'most_liked': '-like_count',
+            'most_discussed': '-comment_count',
+        }
+        qs = qs.order_by(sort_map.get(sort, '-created_at'))
+        qs = qs.select_related('user', 'user__profile')
+        total = qs.count()
+        results = qs[:50]
+
+    return render(request, 'frontend/search_advanced.html', {
+        'query': query,
+        'category': category,
+        'sort': sort,
+        'date_range': date_range,
+        'min_likes': min_likes,
+        'has_debate': has_debate,
+        'results': results,
+        'total': total,
+        'categories': CATEGORY_CHOICES,
+    })
+
+
+# ─── Related Posts ────────────────────────────────────────────────────────────
+
+def related_posts_api(request, post_id):
+    """Return up to 5 related posts (same category, exclude current)."""
+    post = get_object_or_404(Post, id=post_id)
+    qs = (
+        Post.objects
+        .filter(category=post.category, is_draft=False)
+        .exclude(id=post.id)
+        .annotate(like_count=Count('actions', filter=Q(actions__action='like'), distinct=True))
+        .order_by('-created_at')
+        .select_related('user')[:5]
+    )
+    data = [{'id': str(p.id), 'title': p.title, 'username': p.user.username, 'like_count': p.like_count} for p in qs]
+    return JsonResponse({'related': data})
+
+
+# ─── SSE v2 (notifications + DM count) ───────────────────────────────────────
+
+def notification_stream_v2(request):
+    """SSE endpoint that streams both notification count and pending DM request count."""
+    if not request.user.is_authenticated:
+        from django.http import HttpResponse
+        return HttpResponse(status=401)
+
+    import time as _time
+
+    def _event_gen(user):
+        last_notifs = -1
+        last_dms = -1
+        for _ in range(60):
+            try:
+                notifs = Notification.objects.filter(user=user, is_read=False).count()
+                dms = DMRequest.objects.filter(recipient=user, status=DMRequest.STATUS_PENDING).count()
+                if notifs != last_notifs or dms != last_dms:
+                    last_notifs = notifs
+                    last_dms = dms
+                    import json as _json
+                    yield f'data: {_json.dumps({"notifications": notifs, "dms": dms})}\n\n'
+                _time.sleep(5)
+            except Exception:
+                break
+        yield 'data: {"reconnect":true}\n\n'
+
+    from django.http import StreamingHttpResponse
+    response = StreamingHttpResponse(_event_gen(request.user), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    return response

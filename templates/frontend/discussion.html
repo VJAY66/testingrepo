@@ -431,6 +431,22 @@
         </div>
     </div>
 
+    <!-- Embed Code -->
+    <div class="mt-4 pt-3 border-t border-border">
+      <button onclick="document.getElementById('embed-panel-{{ post.id }}').classList.toggle('hidden')"
+        class="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+        Embed this post
+      </button>
+      <div id="embed-panel-{{ post.id }}" class="hidden mt-2 space-y-2">
+        <p class="text-xs text-muted-foreground">Copy this code to embed the post on any website:</p>
+        <textarea readonly onclick="this.select()"
+          class="w-full rounded-xl border border-border bg-muted/30 px-3 py-2 text-xs text-foreground font-mono resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+          rows="3">&lt;iframe src="{{ request.scheme }}://{{ request.get_host }}{% url 'post_embed' post.id %}" width="100%" height="200" frameborder="0" style="border-radius:12px;border:1px solid #e2e8f0"&gt;&lt;/iframe&gt;</textarea>
+        <a href="{% url 'post_embed' post.id %}" target="_blank" class="text-xs text-primary hover:underline">Preview embed →</a>
+      </div>
+    </div>
+
     <!-- Comments Section -->
     <div id="discussion-comments-section" class="space-y-6">
         <div class="grid gap-4 md:grid-cols-[1fr_auto] items-center">

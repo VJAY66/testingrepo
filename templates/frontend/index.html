@@ -385,7 +385,7 @@ function quickFollow(username, btn) {
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">Title</label>
-                    <input type="text" name="title" required
+                    <input type="text" id="create-post-title" name="title" required
                            class="w-full px-3 py-2 border border-border rounded-md bg-background">
                 </div>
                 <div>
@@ -400,7 +400,7 @@ function quickFollow(username, btn) {
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">Content (Optional)</label>
-                    <textarea name="content" rows="4"
+                    <textarea id="create-post-content" name="content" rows="4"
                               class="w-full px-3 py-2 border border-border rounded-md bg-background"></textarea>
                 </div>
                 <!-- Mood / Tone tag -->
@@ -1223,6 +1223,62 @@ function clearQuote() {
       history.replaceState({}, '', location.pathname);
     });
   }
+})();
+</script>
+
+<script>
+(function(){
+  var DRAFT_KEY = 'pickside_draft';
+  function saveDraft() {
+    var titleEl = document.getElementById('create-post-title');
+    var contentEl = document.getElementById('create-post-content');
+    if (!contentEl) return;
+    var draft = { title: titleEl ? titleEl.value : '', content: contentEl.value, ts: Date.now() };
+    if (draft.content.trim() || draft.title.trim()) {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    }
+  }
+  function restoreDraft() {
+    try {
+      var raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      var draft = JSON.parse(raw);
+      if (Date.now() - draft.ts > 7 * 24 * 3600 * 1000) { localStorage.removeItem(DRAFT_KEY); return; }
+      var titleEl = document.getElementById('create-post-title');
+      var contentEl = document.getElementById('create-post-content');
+      if (contentEl && draft.content && !contentEl.value) { contentEl.value = draft.content; }
+      if (titleEl && draft.title && !titleEl.value) { titleEl.value = draft.title; }
+      if (draft.content || draft.title) {
+        var note = document.createElement('p');
+        note.className = 'text-xs text-amber-600 mt-1';
+        note.textContent = '✏️ Draft restored from ' + new Date(draft.ts).toLocaleTimeString();
+        if (contentEl) contentEl.parentNode.insertBefore(note, contentEl.nextSibling);
+      }
+    } catch(e){}
+  }
+  function clearDraft() { localStorage.removeItem(DRAFT_KEY); }
+  var _saveTimer;
+  document.addEventListener('input', function(e) {
+    if (e.target.id === 'create-post-title' || e.target.id === 'create-post-content') {
+      clearTimeout(_saveTimer);
+      _saveTimer = setTimeout(saveDraft, 2000);
+    }
+  });
+  var modal = document.getElementById('create-post-modal');
+  if (modal) {
+    var observer = new MutationObserver(function(muts) {
+      muts.forEach(function(m) {
+        if (m.attributeName === 'class' && !modal.classList.contains('hidden')) {
+          setTimeout(restoreDraft, 50);
+        }
+      });
+    });
+    observer.observe(modal, { attributes: true });
+  }
+  var form = document.querySelector('#create-post-modal form');
+  if (form) form.addEventListener('submit', clearDraft);
+  window._clearPostDraft = clearDraft;
+  window._restorePostDraft = restoreDraft;
 })();
 </script>
 {% endblock %}

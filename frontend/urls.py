@@ -201,4 +201,19 @@ urlpatterns = [
     path('cookie-consent/', views.cookie_consent, name='cookie_consent'),
     # Privacy policy
     path('privacy/', views.privacy_policy, name='privacy_policy'),
+    # Ban / Unban
+    path('user/<str:username>/ban/', views.ban_user, name='ban_user'),
+    path('user/<str:username>/unban/', views.unban_user, name='unban_user'),
+    # Post embed
+    path('posts/<str:post_id>/embed/', views.post_embed, name='post_embed'),
+    # DM Requests
+    path('dm/requests/', views.dm_requests_list, name='dm_requests_list'),
+    path('dm/request/<str:username>/', views.dm_request_send, name='dm_request_send'),
+    path('dm/request/<int:request_id>/respond/', views.dm_request_respond, name='dm_request_respond'),
+    # Advanced search
+    path('search/advanced/', views.search_advanced, name='search_advanced'),
+    # Related posts API
+    path('posts/<str:post_id>/related/', views.related_posts_api, name='related_posts_api'),
+    # SSE v2 (notifications + DM count)
+    path('notifications/stream/v2/', views.notification_stream_v2, name='notification_stream_v2'),
 ]
