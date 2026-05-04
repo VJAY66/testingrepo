@@ -522,6 +522,20 @@ def post_reaction_users(request, post_id):
 
 
 @login_required
+def _post_action_counts(post):
+    rows = PostAction.objects.filter(post=post).values('action').annotate(n=Count('id'))
+    result = {row['action']: row['n'] for row in rows}
+    return {
+        'like': result.get('like', 0),
+        'save': result.get('save', 0),
+        'repost': result.get('repost', 0),
+        'hot': result.get('hot', 0),
+        'debatable': result.get('debatable', 0),
+        'agree': result.get('agree', 0),
+        'surprising': result.get('surprising', 0),
+    }
+
+
 @require_POST
 def post_action(request, post_id):
     action = request.POST.get('action')
@@ -542,27 +556,11 @@ def post_action(request, post_id):
             except IntegrityError:
                 status = 'added'
 
-        like_count = PostAction.objects.filter(post=post, action='like').count()
-        save_count = PostAction.objects.filter(post=post, action='save').count()
-        repost_count = PostAction.objects.filter(post=post, action='repost').count()
-        hot_count = PostAction.objects.filter(post=post, action='hot').count()
-        debatable_count = PostAction.objects.filter(post=post, action='debatable').count()
-        agree_count = PostAction.objects.filter(post=post, action='agree').count()
-        surprising_count = PostAction.objects.filter(post=post, action='surprising').count()
-
         return JsonResponse({
             'success': True,
             'action': action,
             'status': status,
-            'counts': {
-                'like': like_count,
-                'save': save_count,
-                'repost': repost_count,
-                'hot': hot_count,
-                'debatable': debatable_count,
-                'agree': agree_count,
-                'surprising': surprising_count,
-            }
+            'counts': _post_action_counts(post),
         })
 
     if action in ['like', 'save']:
@@ -580,20 +578,11 @@ def post_action(request, post_id):
                 # If two add requests race, keep it liked/saved instead of crashing.
                 status = 'added'
 
-        # Get updated counts
-        like_count = PostAction.objects.filter(post=post, action='like').count()
-        save_count = PostAction.objects.filter(post=post, action='save').count()
-        repost_count = PostAction.objects.filter(post=post, action='repost').count()
-
         return JsonResponse({
             'success': True,
             'action': action,
             'status': status,
-            'counts': {
-                'like': like_count,
-                'save': save_count,
-                'repost': repost_count
-            }
+            'counts': _post_action_counts(post),
         })
 
     if action == 'repost':
@@ -602,18 +591,11 @@ def post_action(request, post_id):
             existing_action.delete()
             _remove_repost_copy_for_user(request.user, post)
 
-            like_count = PostAction.objects.filter(post=post, action='like').count()
-            save_count = PostAction.objects.filter(post=post, action='save').count()
-            repost_count = PostAction.objects.filter(post=post, action='repost').count()
             return JsonResponse({
                 'success': True,
                 'action': action,
                 'status': 'removed',
-                'counts': {
-                    'like': like_count,
-                    'save': save_count,
-                    'repost': repost_count
-                }
+                'counts': _post_action_counts(post),
             })
 
         quote_content = request.POST.get('quote_content', '').strip()[:500]
@@ -621,19 +603,11 @@ def post_action(request, post_id):
             PostAction.objects.create(user=request.user, post=post, action=action, quote_content=quote_content)
             notify_post_author(post, 'author_repost', request.user)
         except IntegrityError:
-            # Another request already created the repost action; return current counters.
-            like_count = PostAction.objects.filter(post=post, action='like').count()
-            save_count = PostAction.objects.filter(post=post, action='save').count()
-            repost_count = PostAction.objects.filter(post=post, action='repost').count()
             return JsonResponse({
                 'success': True,
                 'action': action,
                 'status': 'added',
-                'counts': {
-                    'like': like_count,
-                    'save': save_count,
-                    'repost': repost_count
-                }
+                'counts': _post_action_counts(post),
             })
         new_post = Post.objects.create(
             id=str(uuid.uuid4()),
@@ -644,21 +618,13 @@ def post_action(request, post_id):
             hashtags=post.hashtags,
         )
 
-        like_count = PostAction.objects.filter(post=post, action='like').count()
-        save_count = PostAction.objects.filter(post=post, action='save').count()
-        repost_count = PostAction.objects.filter(post=post, action='repost').count()
-
         return JsonResponse({
             'success': True,
             'action': action,
             'status': 'reposted',
             'repost_id': new_post.id,
             'quote_content': quote_content,
-            'counts': {
-                'like': like_count,
-                'save': save_count,
-                'repost': repost_count
-            }
+            'counts': _post_action_counts(post),
         })
 
 
@@ -1414,33 +1380,37 @@ def profile(request):
         for d in ACHIEVEMENT_DEFS if d[0] in user_achievements_set
     ]
 
-    # Activity heatmap: count posts+comments per day for last 364 days
+    # Activity heatmap: count posts+comments per day for last 364 days (cached 1 hour)
+    from django.core.cache import cache as _cache
     from django.db.models.functions import TruncDate as _TruncDate
-    from collections import defaultdict as _defaultdict
-    _heatmap_start = timezone.now().date() - timedelta(days=363)
-    _post_counts = {
-        str(r['day']): r['n']
-        for r in Post.objects.filter(
-            user=request.user, is_draft=False,
-            created_at__date__gte=_heatmap_start
-        ).annotate(day=_TruncDate('created_at')).values('day').annotate(n=Count('id'))
-    }
-    _comment_counts = {
-        str(r['day']): r['n']
-        for r in Comment.objects.filter(
-            user=request.user,
-            created_at__date__gte=_heatmap_start
-        ).annotate(day=_TruncDate('created_at')).values('day').annotate(n=Count('id'))
-    }
     import json as _json
-    _all_days = {}
-    _d = _heatmap_start
     import datetime as _dt
-    while _d <= timezone.now().date():
-        key = str(_d)
-        _all_days[key] = _post_counts.get(key, 0) + _comment_counts.get(key, 0)
-        _d += _dt.timedelta(days=1)
-    activity_heatmap_json = _json.dumps(_all_days)
+    _heatmap_cache_key = f'heatmap:{request.user.id}'
+    activity_heatmap_json = _cache.get(_heatmap_cache_key)
+    if activity_heatmap_json is None:
+        _heatmap_start = timezone.now().date() - timedelta(days=363)
+        _post_counts = {
+            str(r['day']): r['n']
+            for r in Post.objects.filter(
+                user=request.user, is_draft=False,
+                created_at__date__gte=_heatmap_start
+            ).annotate(day=_TruncDate('created_at')).values('day').annotate(n=Count('id'))
+        }
+        _comment_counts = {
+            str(r['day']): r['n']
+            for r in Comment.objects.filter(
+                user=request.user,
+                created_at__date__gte=_heatmap_start
+            ).annotate(day=_TruncDate('created_at')).values('day').annotate(n=Count('id'))
+        }
+        _all_days = {}
+        _d = _heatmap_start
+        while _d <= timezone.now().date():
+            key = str(_d)
+            _all_days[key] = _post_counts.get(key, 0) + _comment_counts.get(key, 0)
+            _d += _dt.timedelta(days=1)
+        activity_heatmap_json = _json.dumps(_all_days)
+        _cache.set(_heatmap_cache_key, activity_heatmap_json, 3600)
 
     blocked_users = list(
         UserBlock.objects.filter(blocker=request.user)
@@ -4281,15 +4251,30 @@ def polls_list(request):
     repost_counts = {r['poll_id']: r['c'] for r in PollAction.objects.filter(poll_id__in=poll_ids, action='repost').values('poll_id').annotate(c=_Count('id'))}
     follow_counts = {r['poll_id']: r['c'] for r in PollFollow.objects.filter(poll_id__in=poll_ids).values('poll_id').annotate(c=_Count('id'))}
 
+    # Pre-fetch all option vote counts in one query to avoid N+1
+    _poll_ids_page = [p.id for p in page_obj]
+    _opt_vote_counts = {
+        row['id']: row['vc']
+        for row in PollOption.objects.filter(poll_id__in=_poll_ids_page)
+        .annotate(vc=Count('votes'))
+        .values('id', 'vc')
+    }
+    _poll_total_votes = {
+        row['poll_id']: row['tv']
+        for row in PollVote.objects.filter(poll_id__in=_poll_ids_page)
+        .values('poll_id')
+        .annotate(tv=Count('id'))
+    }
+
     polls_data = []
     for poll in page_obj:
         opts = list(poll.options.all())
-        total = poll.votes.count()
+        total = _poll_total_votes.get(poll.id, 0)
         user_vote = user_poll_votes.get(poll.id)
         u_actions = user_poll_actions.get(poll.id, set())
         opt_data = []
         for opt in opts:
-            cnt = opt.votes.count()
+            cnt = _opt_vote_counts.get(opt.id, 0)
             pct = round(cnt / total * 100, 1) if total > 0 else 0
             opt_data.append({'option': opt, 'vote_count': cnt, 'percentage': pct})
         polls_data.append({
@@ -4391,8 +4376,8 @@ def create_poll(request):
 def poll_detail(request, poll_id):
     """Poll detail page with vote chart and side comments."""
     poll = get_object_or_404(Poll, id=poll_id, is_deleted_by_moderation=False)
-    options = list(poll.options.all())
-    total_votes = poll.votes.count()
+    options = list(poll.options.annotate(vote_count=Count('votes')))
+    total_votes = sum(opt.vote_count for opt in options)
 
     user_vote = None
     if request.user.is_authenticated:
@@ -4468,7 +4453,7 @@ def poll_detail(request, poll_id):
 
     option_data = []
     for opt in options:
-        cnt = opt.votes.count()
+        cnt = opt.vote_count
         pct = round(cnt / total_votes * 100, 1) if total_votes > 0 else 0
         comments = opt.comments.filter(is_deleted_by_moderation=False).select_related('user', 'user__profile')
         comments_with_reaction = []
@@ -4567,10 +4552,11 @@ def poll_vote(request, poll_id):
 
     PollVote.objects.create(user=request.user, poll=poll, option=option)
 
-    total = poll.votes.count()
+    opts_annotated = list(poll.options.annotate(vote_count=Count('votes')))
+    total = sum(o.vote_count for o in opts_annotated)
     options_out = []
-    for opt in poll.options.all():
-        cnt = opt.votes.count()
+    for opt in opts_annotated:
+        cnt = opt.vote_count
         pct = round(cnt / total * 100, 1) if total > 0 else 0
         options_out.append({'id': opt.id, 'text': opt.text, 'vote_count': cnt, 'percentage': pct})
 

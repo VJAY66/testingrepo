@@ -108,8 +108,19 @@ import dj_database_url
 
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.getenv('DATABASE_URL', 'sqlite:///db.sqlite3')
+        default=os.getenv('DATABASE_URL', 'sqlite:///db.sqlite3'),
+        conn_max_age=int(os.getenv('DB_CONN_MAX_AGE', '600')),
     )
+}
+
+_cache_backend = os.getenv('CACHE_BACKEND', 'django.core.cache.backends.locmem.LocMemCache')
+CACHES = {
+    'default': {
+        'BACKEND': _cache_backend,
+        'LOCATION': os.getenv('CACHE_LOCATION', 'pickside-default'),
+        'TIMEOUT': int(os.getenv('CACHE_TIMEOUT', '300')),
+        **({'OPTIONS': {'CLIENT_CLASS': 'django_redis.client.DefaultClient'}} if 'redis' in _cache_backend else {}),
+    }
 }
 
 AUTH_PASSWORD_VALIDATORS = [

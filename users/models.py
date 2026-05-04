@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from functools import cached_property
 
 TRUST_BADGE_MAP = {
     'verified': ('✓', '#0ea5e9', 'Verified'),
@@ -52,23 +53,23 @@ class Profile(models.Model):
             return self.profile_picture.url
         return self.avatar_url or ''
 
-    @property
+    @cached_property
     def followers_count(self):
         return self.user.follower_links.count()
 
-    @property
+    @cached_property
     def following_count(self):
         return self.user.following_links.count()
 
-    @property
+    @cached_property
     def posts_count(self):
         return self.user.posts.count()
 
-    @property
+    @cached_property
     def trust_level(self):
         if self.is_verified:
             return 'verified'
-        posts = self.user.posts.count()
+        posts = self.posts_count
         debates = self.user.debate_participations.filter(debate__status='completed').count()
         if posts >= 50 or debates >= 20:
             return 'expert'
