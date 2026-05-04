@@ -1072,6 +1072,9 @@ def discussion(request, post_id):
     top_yes_comment = yes_comments.filter(reaction_score__gt=0).first()
     top_no_comment = no_comments.filter(reaction_score__gt=0).first()
 
+    # Pinned comment for this post (only one can be pinned at a time)
+    pinned_comment = Comment.objects.filter(post=post, is_pinned=True).select_related('user', 'user__profile').first()
+
     total_votes = yes_vote_count + no_vote_count
     yes_percentage = (yes_vote_count / total_votes * 100) if total_votes > 0 else 0
     no_percentage = (no_vote_count / total_votes * 100) if total_votes > 0 else 0
@@ -1317,6 +1320,7 @@ def discussion(request, post_id):
         'can_delete_post': can_manage_post_today,
         'post_has_comments': post_has_comments,
         'post_change_locked_message': 'This account can only edit or delete posts created today.' if is_post_creator and not can_manage_post_today else '',
+        'pinned_comment': pinned_comment,
         'top_yes_comment_id': top_yes_comment.id if top_yes_comment else '',
         'top_no_comment_id': top_no_comment.id if top_no_comment else '',
         'is_following_post': is_following_post,
@@ -2328,6 +2332,14 @@ def login_view(request):
 
         if user is not None:
             record_login_attempt(request, user.username, successful=True, source='web')
+            try:
+                _profile = user.profile
+                if _profile.totp_enabled and _profile.totp_secret:
+                    request.session['totp_pending_user_id'] = user.id
+                    _redir = next_url or '/'
+                    return redirect(f'/account/2fa/login/?next={_redir}')
+            except Exception:
+                pass
             login(request, user)
             Profile.objects.update_or_create(
                 user=user,
@@ -7324,3 +7336,288 @@ def report_post(request, post_id):
     if not created:
         return JsonResponse({'success': False, 'already_reported': True})
     return JsonResponse({'success': True})
+
+
+# ─── Pinned Comments ──────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def pin_comment(request, comment_id):
+    comment = get_object_or_404(Comment, id=comment_id)
+    if comment.post.user != request.user:
+        return JsonResponse({'error': 'Only the post author can pin comments'}, status=403)
+    Comment.objects.filter(post=comment.post, is_pinned=True).update(is_pinned=False)
+    comment.is_pinned = True
+    comment.save(update_fields=['is_pinned'])
+    return JsonResponse({'success': True, 'pinned': True})
+
+
+@login_required
+@require_POST
+def unpin_comment(request, comment_id):
+    comment = get_object_or_404(Comment, id=comment_id)
+    if comment.post.user != request.user:
+        return JsonResponse({'error': 'Only the post author can unpin comments'}, status=403)
+    comment.is_pinned = False
+    comment.save(update_fields=['is_pinned'])
+    return JsonResponse({'success': True, 'pinned': False})
+
+
+# ─── Trending Debates Page ────────────────────────────────────────────────────
+
+def trending_debates(request):
+    from django.db.models import Sum
+    cutoff = timezone.now() - timedelta(hours=48)
+    posts = (
+        Post.objects
+        .filter(is_draft=False, is_deleted_by_moderation=False, created_at__gte=cutoff)
+        .annotate(
+            comment_count=Count('comments', distinct=True),
+            like_count=Count('actions', filter=Q(actions__action='like'), distinct=True),
+        )
+        .order_by('-comment_count', '-like_count', '-created_at')
+        .select_related('user', 'user__profile')[:30]
+    )
+    if request.user.is_authenticated:
+        _enrich_posts_for_feed(list(posts), request.user)
+    return render(request, 'frontend/trending_debates.html', {'posts': posts})
+
+
+# ─── "What You Missed" API ────────────────────────────────────────────────────
+
+@login_required
+def what_you_missed(request):
+    profile = request.user.profile
+    last_seen = profile.last_seen
+    if not last_seen:
+        return JsonResponse({'posts': []})
+    posts = (
+        Post.objects
+        .filter(is_draft=False, is_deleted_by_moderation=False, created_at__gt=last_seen)
+        .annotate(like_count=Count('actions', filter=Q(actions__action='like'), distinct=True))
+        .order_by('-like_count', '-created_at')
+        .select_related('user')[:5]
+    )
+    data = [{'id': str(p.id), 'title': p.title, 'username': p.user.username, 'like_count': p.like_count} for p in posts]
+    return JsonResponse({'posts': data, 'since': last_seen.isoformat()})
+
+
+# ─── Share Post to DM ─────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def share_post_to_dm(request, post_id):
+    post = get_object_or_404(Post, id=post_id, is_draft=False)
+    recipient_username = request.POST.get('recipient', '').strip()
+    if not recipient_username:
+        return JsonResponse({'error': 'Recipient required'}, status=400)
+    recipient = get_object_or_404(User, username=recipient_username)
+    if recipient == request.user:
+        return JsonResponse({'error': 'Cannot share to yourself'}, status=400)
+    share_text = f"[Shared post] {post.title} — /discussion/{post.id}/"
+    dm = DirectMessage.objects.create(
+        sender=request.user,
+        recipient=recipient,
+        content=share_text,
+    )
+    return JsonResponse({'success': True, 'dm_id': dm.id})
+
+
+# ─── User Activity Heatmap API ────────────────────────────────────────────────
+
+def user_activity_heatmap(request, username):
+    target_user = get_object_or_404(User, username=username)
+    from django.db.models.functions import TruncDate
+    cutoff = timezone.now().date() - timedelta(days=364)
+    post_counts = (
+        Post.objects
+        .filter(user=target_user, is_draft=False, created_at__date__gte=cutoff)
+        .annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(count=Count('id'))
+    )
+    comment_counts = (
+        Comment.objects
+        .filter(user=target_user, created_at__date__gte=cutoff)
+        .annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(count=Count('id'))
+    )
+    day_map = {}
+    for row in post_counts:
+        key = row['day'].isoformat()
+        day_map[key] = day_map.get(key, 0) + row['count']
+    for row in comment_counts:
+        key = row['day'].isoformat()
+        day_map[key] = day_map.get(key, 0) + row['count']
+    return JsonResponse({'heatmap': day_map})
+
+
+# ─── Bulk Notification Management ─────────────────────────────────────────────
+
+@login_required
+@require_POST
+def bulk_notifications(request):
+    action = request.POST.get('action', '')
+    notif_type = request.POST.get('type', '')
+    qs = Notification.objects.filter(user=request.user)
+    if notif_type:
+        qs = qs.filter(notification_type=notif_type)
+    if action == 'mark_all_read':
+        updated = qs.update(is_read=True)
+        return JsonResponse({'success': True, 'updated': updated})
+    elif action == 'delete_all':
+        deleted, _ = qs.delete()
+        return JsonResponse({'success': True, 'deleted': deleted})
+    return JsonResponse({'error': 'Unknown action'}, status=400)
+
+
+# ─── Export My Data ───────────────────────────────────────────────────────────
+
+@login_required
+def export_my_data(request):
+    import zipfile, io
+    user = request.user
+    profile = user.profile
+
+    profile_data = {
+        'username': user.username,
+        'email': user.email,
+        'bio': profile.bio,
+        'website': profile.website,
+        'joined': user.date_joined.isoformat(),
+        'reputation': profile.reputation_score,
+    }
+
+    posts_data = list(
+        Post.objects.filter(user=user, is_draft=False)
+        .values('id', 'title', 'content', 'category', 'created_at')
+        .order_by('-created_at')
+    )
+    for p in posts_data:
+        p['id'] = str(p['id'])
+        p['created_at'] = p['created_at'].isoformat()
+
+    comments_data = list(
+        Comment.objects.filter(user=user)
+        .values('id', 'post_id', 'content', 'vote_type', 'created_at')
+        .order_by('-created_at')
+    )
+    for c in comments_data:
+        c['id'] = str(c['id'])
+        c['post_id'] = str(c['post_id'])
+        c['created_at'] = c['created_at'].isoformat()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr('profile.json', json.dumps(profile_data, indent=2))
+        zf.writestr('posts.json', json.dumps(posts_data, indent=2))
+        zf.writestr('comments.json', json.dumps(comments_data, indent=2))
+    buf.seek(0)
+
+    from django.http import HttpResponse
+    response = HttpResponse(buf.read(), content_type='application/zip')
+    response['Content-Disposition'] = f'attachment; filename="pickaside-data-{user.username}.zip"'
+    return response
+
+
+# ─── Two-Factor Authentication (TOTP) ────────────────────────────────────────
+
+@login_required
+def totp_setup(request):
+    import pyotp, qrcode, io, base64
+    profile = request.user.profile
+    if not profile.totp_secret:
+        profile.totp_secret = pyotp.random_base32()
+        profile.save(update_fields=['totp_secret'])
+    totp = pyotp.TOTP(profile.totp_secret)
+    provisioning_uri = totp.provisioning_uri(
+        name=request.user.email or request.user.username,
+        issuer_name='PickASide',
+    )
+    img = qrcode.make(provisioning_uri)
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    qr_b64 = base64.b64encode(buf.getvalue()).decode()
+    return render(request, 'frontend/totp_setup.html', {
+        'qr_b64': qr_b64,
+        'secret': profile.totp_secret,
+        'enabled': profile.totp_enabled,
+    })
+
+
+@login_required
+@require_POST
+def totp_verify_setup(request):
+    import pyotp
+    profile = request.user.profile
+    code = request.POST.get('code', '').strip().replace(' ', '')
+    if not profile.totp_secret:
+        return JsonResponse({'error': 'No secret generated'}, status=400)
+    totp = pyotp.TOTP(profile.totp_secret)
+    if totp.verify(code, valid_window=1):
+        profile.totp_enabled = True
+        profile.save(update_fields=['totp_enabled'])
+        return JsonResponse({'success': True})
+    return JsonResponse({'error': 'Invalid code'}, status=400)
+
+
+@login_required
+@require_POST
+def totp_disable(request):
+    import pyotp
+    profile = request.user.profile
+    code = request.POST.get('code', '').strip().replace(' ', '')
+    if profile.totp_enabled and profile.totp_secret:
+        totp = pyotp.TOTP(profile.totp_secret)
+        if not totp.verify(code, valid_window=1):
+            return JsonResponse({'error': 'Invalid code'}, status=400)
+    profile.totp_enabled = False
+    profile.totp_secret = ''
+    profile.save(update_fields=['totp_enabled', 'totp_secret'])
+    return JsonResponse({'success': True})
+
+
+def totp_login_verify(request):
+    """Shown after normal login when 2FA is enabled. Verifies TOTP then completes login."""
+    import pyotp
+    pending_user_id = request.session.get('totp_pending_user_id')
+    if not pending_user_id:
+        return redirect('login')
+    pending_user = get_object_or_404(User, id=pending_user_id)
+    if request.method == 'POST':
+        code = request.POST.get('code', '').strip().replace(' ', '')
+        try:
+            profile = pending_user.profile
+        except Exception:
+            return redirect('login')
+        totp = pyotp.TOTP(profile.totp_secret)
+        if totp.verify(code, valid_window=1):
+            del request.session['totp_pending_user_id']
+            login(request, pending_user, backend='django.contrib.auth.backends.ModelBackend')
+            return redirect(request.POST.get('next', '/'))
+        messages.error(request, 'Invalid authenticator code.')
+    return render(request, 'frontend/totp_login.html', {'next': request.GET.get('next', '/')})
+
+
+# ─── Post Similarity Check API ────────────────────────────────────────────────
+
+def post_similarity_check(request):
+    title = request.GET.get('title', '').strip()
+    if len(title) < 10:
+        return JsonResponse({'similar': []})
+    words = [w for w in re.split(r'\W+', title.lower()) if len(w) > 3]
+    if not words:
+        return JsonResponse({'similar': []})
+    q = Q()
+    for w in words[:6]:
+        q |= Q(title__icontains=w)
+    similar = (
+        Post.objects
+        .filter(q, is_draft=False, is_deleted_by_moderation=False)
+        .exclude(user=request.user if request.user.is_authenticated else None)
+        .values('id', 'title', 'user__username')
+        .order_by('-created_at')[:5]
+    )
+    data = [{'id': str(p['id']), 'title': p['title'], 'username': p['user__username']} for p in similar]
+    return JsonResponse({'similar': data})

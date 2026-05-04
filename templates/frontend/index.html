@@ -137,6 +137,16 @@
   </div>
   {% endif %}
 
+        {% if user.is_authenticated %}
+        <div id="what-you-missed-banner" class="hidden rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-2">
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-semibold text-foreground">📬 Since you were last here…</p>
+            <button onclick="document.getElementById('what-you-missed-banner').classList.add('hidden')" class="text-muted-foreground hover:text-foreground text-base leading-none">&times;</button>
+          </div>
+          <ul id="what-you-missed-list" class="space-y-1"></ul>
+        </div>
+        {% endif %}
+
         <div class="space-y-4" id="posts-list">
             {% for post in posts %}
                 {% if post.id %}
@@ -461,6 +471,11 @@ function toggleFollowAuthor(username, btn) {
                     <button type="button" onclick="applyTemplate('ratedebate')" class="px-2.5 py-1 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">⭐ Rate & Debate</button>
                   </div>
                 </div>
+            </div>
+            <!-- Similarity warning -->
+            <div id="similarity-warning" class="hidden mt-2 p-2.5 rounded-xl border border-amber-300/60 bg-amber-50/70 dark:bg-amber-900/20 dark:border-amber-500/30 text-xs text-amber-700 dark:text-amber-400">
+              <p class="font-semibold mb-1">⚠ Similar posts already exist:</p>
+              <ul id="similarity-list" class="space-y-0.5 list-disc list-inside"></ul>
             </div>
             <div class="border-t border-border pt-3 mt-1 space-y-3">
               <div>
@@ -1319,5 +1334,62 @@ function clearQuote() {
   window._clearPostDraft = clearDraft;
   window._restorePostDraft = restoreDraft;
 })();
+</script>
+
+<script>
+// Post similarity check
+(function() {
+  var titleInput = document.getElementById('create-post-title');
+  if (!titleInput) return;
+  var timer;
+  var warning = document.getElementById('similarity-warning');
+  var list = document.getElementById('similarity-list');
+  titleInput.addEventListener('input', function() {
+    clearTimeout(timer);
+    var val = titleInput.value.trim();
+    if (val.length < 10) { warning && warning.classList.add('hidden'); return; }
+    timer = setTimeout(function() {
+      fetch('/posts/similarity-check/?title=' + encodeURIComponent(val))
+        .then(r => r.json())
+        .then(d => {
+          if (!warning || !list) return;
+          if (d.similar && d.similar.length > 0) {
+            list.innerHTML = '';
+            d.similar.forEach(function(p) {
+              var li = document.createElement('li');
+              li.innerHTML = '<a href="/discussion/' + p.id + '/" target="_blank" class="underline hover:text-amber-800">' + p.title.substring(0,60) + '…</a> <span class="text-amber-600">by @' + p.username + '</span>';
+              list.appendChild(li);
+            });
+            warning.classList.remove('hidden');
+          } else {
+            warning.classList.add('hidden');
+          }
+        }).catch(function(){});
+    }, 800);
+  });
+})();
+
+// What you missed banner
+{% if user.is_authenticated %}
+(function() {
+  var banner = document.getElementById('what-you-missed-banner');
+  var list = document.getElementById('what-you-missed-list');
+  if (!banner || !list) return;
+  fetch('/what-you-missed/')
+    .then(r => r.json())
+    .then(d => {
+      if (d.posts && d.posts.length > 0) {
+        list.innerHTML = '';
+        d.posts.forEach(function(p) {
+          var li = document.createElement('li');
+          li.className = 'text-xs';
+          li.innerHTML = '<a href="/discussion/' + p.id + '/" class="font-medium text-foreground hover:text-primary underline">' + p.title.substring(0,60) + '</a> <span class="text-muted-foreground">· ' + p.like_count + ' likes</span>';
+          list.appendChild(li);
+        });
+        banner.classList.remove('hidden');
+      }
+    }).catch(function(){});
+})();
+{% endif %}
 </script>
 {% endblock %}

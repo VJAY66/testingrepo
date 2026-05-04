@@ -427,9 +427,27 @@
                 <button type="button" onclick="shareToPlatform('gmail')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-300/60 hover:bg-card/80 hover:text-foreground" aria-label="Share via Gmail" title="Gmail">Gmail</button>
                 <button type="button" onclick="shareToPlatform('instagram')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-fuchsia-300/60 hover:bg-card/80 hover:text-foreground" aria-label="Share to Instagram" title="Instagram">Instagram</button>
                 <button type="button" onclick="shareToPlatform('x')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300/70 hover:bg-card/80 hover:text-foreground" aria-label="Share to X" title="X">X</button>
+                {% if user.is_authenticated %}
+                <button type="button" onclick="openShareDM('{{ post.id }}')" class="group flex h-12 items-center justify-center rounded-2xl border border-border/70 bg-card/55 text-muted-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-card/80 hover:text-foreground" aria-label="Share via DM" title="Send via DM">💬 DM</button>
+                {% endif %}
             </div>
         </div>
     </div>
+
+    <!-- Share to DM modal -->
+    {% if user.is_authenticated %}
+    <div id="share-dm-modal" class="hidden fixed inset-0 z-[7700] flex items-center justify-center bg-black/45 px-4">
+      <div class="w-full max-w-sm bg-card border border-border rounded-2xl p-5 space-y-4 shadow-xl">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-foreground">Send via DM</h3>
+          <button onclick="document.getElementById('share-dm-modal').classList.add('hidden')" class="text-muted-foreground hover:text-foreground text-lg leading-none">&times;</button>
+        </div>
+        <input id="share-dm-recipient" type="text" placeholder="Username" class="w-full px-3 py-2 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30">
+        <button onclick="sendShareDM('{{ post.id }}')" class="w-full py-2 text-sm font-semibold rounded-xl bg-primary text-white hover:bg-primary/80 transition-colors">Send</button>
+        <p id="share-dm-msg" class="text-xs text-center text-muted-foreground hidden"></p>
+      </div>
+    </div>
+    {% endif %}
 
     <!-- Embed Code -->
     <div class="mt-4 pt-3 border-t border-border">
@@ -478,6 +496,24 @@
                 </span>
             </div>
         </div>
+
+        <!-- Pinned comment -->
+        {% if pinned_comment %}
+        <div class="bg-yellow-50/70 dark:bg-yellow-900/20 border border-yellow-300/60 dark:border-yellow-500/30 rounded-2xl p-3 flex gap-2 items-start">
+          <span class="text-base shrink-0">📌</span>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-0.5">
+              <span class="text-xs font-semibold text-yellow-700 dark:text-yellow-400">Pinned comment</span>
+              <span class="text-xs text-muted-foreground">@{{ pinned_comment.user.username }}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded-full {% if pinned_comment.vote_type == 'yes' %}bg-green-500/10 text-green-700 dark:text-green-300{% else %}bg-red-500/10 text-red-700 dark:text-red-300{% endif %}">{{ pinned_comment.vote_type|capfirst }}</span>
+            </div>
+            <p class="text-xs text-foreground leading-relaxed">{{ pinned_comment.content }}</p>
+            {% if is_post_creator %}
+            <button onclick="unpinComment('{{ pinned_comment.id }}')" class="mt-1 text-[9px] text-muted-foreground hover:text-red-500 transition">Unpin</button>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
 
         <!-- Comment sort tabs -->
         <div class="flex items-center gap-1 flex-wrap">
@@ -649,6 +685,13 @@
                                 {% if user == comment.user %}
                                 <button onclick="openCommentEditor('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Edit</button>
                                 {% endif %}
+                                {% if is_post_creator %}
+                                {% if comment.is_pinned %}
+                                <button onclick="unpinComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-yellow-400/60 bg-yellow-50 dark:bg-yellow-900/20 text-[9px] px-1.5 py-0.5 text-yellow-700 dark:text-yellow-400 hover:border-yellow-500">📌 Unpin</button>
+                                {% else %}
+                                <button onclick="pinComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-yellow-400/60 hover:text-yellow-600 transition">📌 Pin</button>
+                                {% endif %}
+                                {% endif %}
                                 <button onclick="reportComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Report</button>
                             </div>
                             {% if user == comment.user %}
@@ -726,6 +769,13 @@
                                 {% endif %}
                                 {% if user == comment.user %}
                                 <button onclick="openCommentEditor('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Edit</button>
+                                {% endif %}
+                                {% if is_post_creator %}
+                                {% if comment.is_pinned %}
+                                <button onclick="unpinComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-yellow-400/60 bg-yellow-50 dark:bg-yellow-900/20 text-[9px] px-1.5 py-0.5 text-yellow-700 dark:text-yellow-400 hover:border-yellow-500">📌 Unpin</button>
+                                {% else %}
+                                <button onclick="pinComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-yellow-400/60 hover:text-yellow-600 transition">📌 Pin</button>
+                                {% endif %}
                                 {% endif %}
                                 <button onclick="reportComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Report</button>
                             </div>
@@ -1743,6 +1793,77 @@ function submitPostReport(postId) {
         }
     });
 }
+
+function pinComment(commentId) {
+    fetch('/comments/' + commentId + '/pin/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+    }).then(r => r.json()).then(d => {
+        if (d.success) { location.reload(); }
+        else { window.showToast && window.showToast(d.error || 'Error', 'error'); }
+    });
+}
+
+function unpinComment(commentId) {
+    fetch('/comments/' + commentId + '/unpin/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+    }).then(r => r.json()).then(d => {
+        if (d.success) { location.reload(); }
+        else { window.showToast && window.showToast(d.error || 'Error', 'error'); }
+    });
+}
+
+function openShareDM(postId) {
+    document.getElementById('share-dm-modal').classList.remove('hidden');
+    document.getElementById('share-dm-modal').style.display = 'flex';
+    document.getElementById('share-dm-recipient').focus();
+}
+
+function sendShareDM(postId) {
+    var recipient = document.getElementById('share-dm-recipient').value.trim();
+    var msg = document.getElementById('share-dm-msg');
+    if (!recipient) { msg.textContent = 'Enter a username.'; msg.classList.remove('hidden'); return; }
+    var fd = new FormData();
+    fd.append('recipient', recipient);
+    fetch('/posts/' + postId + '/share-dm/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+        body: fd,
+    }).then(r => r.json()).then(d => {
+        msg.classList.remove('hidden');
+        if (d.success) {
+            msg.textContent = '✓ Sent!';
+            setTimeout(() => { document.getElementById('share-dm-modal').classList.add('hidden'); }, 1200);
+        } else {
+            msg.textContent = '✗ ' + (d.error || 'Error');
+        }
+    }).catch(() => { msg.textContent = '✗ Error'; msg.classList.remove('hidden'); });
+}
+
+// Comment collapse: hide replies beyond depth 2
+(function() {
+  document.addEventListener('DOMContentLoaded', function() {
+    var replyLists = document.querySelectorAll('[data-reply-depth]');
+    replyLists.forEach(function(el) {
+      var depth = parseInt(el.dataset.replyDepth || '0');
+      if (depth >= 2) {
+        el.classList.add('hidden');
+        el.dataset.collapsed = '1';
+        var btn = document.createElement('button');
+        btn.className = 'text-[9px] text-primary hover:underline mt-0.5';
+        btn.textContent = 'Show ' + el.children.length + ' more repl' + (el.children.length === 1 ? 'y' : 'ies');
+        btn.onclick = function() {
+          el.classList.toggle('hidden');
+          btn.textContent = el.classList.contains('hidden')
+            ? ('Show ' + el.children.length + ' more repl' + (el.children.length === 1 ? 'y' : 'ies'))
+            : 'Collapse';
+        };
+        el.parentNode.insertBefore(btn, el);
+      }
+    });
+  });
+})();
 </script>
 
 <!-- Quote post redirect hint: pre-fill modal on index via URL params -->

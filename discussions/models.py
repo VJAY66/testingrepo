@@ -137,6 +137,7 @@ class Comment(models.Model):
     likes = models.IntegerField(default=0)
     dislikes = models.IntegerField(default=0)
     is_edited = models.BooleanField(default=False)
+    is_pinned = models.BooleanField(default=False, db_index=True, help_text='Post author pinned this comment')
     is_deleted_by_moderation = models.BooleanField(default=False, help_text='Automatically deleted by moderation')
     is_flagged = models.BooleanField(default=False, help_text='Flagged by moderation system')
     moderation_reason = models.TextField(blank=True, default='', help_text='Reason for moderation action')

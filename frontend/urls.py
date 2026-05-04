@@ -223,4 +223,26 @@ urlpatterns = [
     path('posts/<str:post_id>/report/', views.report_post, name='report_post'),
     # Notification preferences page (GET)
     path('profile/notification-prefs/page/', views.notification_prefs_page, name='notification_prefs_page'),
+    # Pinned comments
+    path('comments/<str:comment_id>/pin/', views.pin_comment, name='pin_comment'),
+    path('comments/<str:comment_id>/unpin/', views.unpin_comment, name='unpin_comment'),
+    # Trending debates
+    path('trending/', views.trending_debates, name='trending_debates'),
+    # What you missed
+    path('what-you-missed/', views.what_you_missed, name='what_you_missed'),
+    # Share post to DM
+    path('posts/<str:post_id>/share-dm/', views.share_post_to_dm, name='share_post_to_dm'),
+    # User activity heatmap
+    path('profile/<str:username>/heatmap/', views.user_activity_heatmap, name='user_activity_heatmap'),
+    # Bulk notification management
+    path('notifications/bulk/', views.bulk_notifications, name='bulk_notifications'),
+    # Export my data
+    path('account/export/', views.export_my_data, name='export_my_data'),
+    # Two-factor authentication
+    path('account/2fa/', views.totp_setup, name='totp_setup'),
+    path('account/2fa/verify-setup/', views.totp_verify_setup, name='totp_verify_setup'),
+    path('account/2fa/disable/', views.totp_disable, name='totp_disable'),
+    path('account/2fa/login/', views.totp_login_verify, name='totp_login_verify'),
+    # Post similarity check
+    path('posts/similarity-check/', views.post_similarity_check, name='post_similarity_check'),
 ]

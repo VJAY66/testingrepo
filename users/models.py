@@ -41,6 +41,8 @@ class Profile(models.Model):
     streak_days = models.PositiveIntegerField(default=0, help_text='Current consecutive days of activity')
     last_activity_date = models.DateField(null=True, blank=True, help_text='Last date the user posted or commented')
     deletion_requested_at = models.DateTimeField(null=True, blank=True, help_text='If set, account will be hard-deleted 30 days after this date')
+    totp_secret = models.CharField(max_length=64, blank=True, default='', help_text='TOTP secret for 2FA (empty = disabled)')
+    totp_enabled = models.BooleanField(default=False, db_index=True, help_text='True when 2FA is fully set up and active')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

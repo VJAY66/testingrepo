@@ -1,0 +1,34 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Verify Identity — PickASide{% endblock %}
+{% block content %}
+<div class="min-h-[70vh] flex items-center justify-center px-4">
+  <div class="w-full max-w-sm space-y-6">
+    <div class="text-center space-y-1">
+      <div class="text-4xl">🔐</div>
+      <h1 class="text-xl font-bold text-foreground">Two-Factor Verification</h1>
+      <p class="text-sm text-muted-foreground">Enter the 6-digit code from your authenticator app.</p>
+    </div>
+
+    {% if messages %}
+    {% for message in messages %}
+    <div class="text-sm text-center text-destructive">{{ message }}</div>
+    {% endfor %}
+    {% endif %}
+
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <input name="code" type="text" maxlength="6" inputmode="numeric" pattern="[0-9]*" autofocus
+        placeholder="000000"
+        class="w-full px-4 py-3 text-center text-2xl tracking-[0.5em] font-mono bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40">
+      <button type="submit" class="w-full py-3 text-sm font-semibold rounded-xl bg-primary text-white hover:bg-primary/80 transition-colors">
+        Verify
+      </button>
+    </form>
+
+    <p class="text-center text-xs text-muted-foreground">
+      Lost access? <a href="{% url 'login' %}" class="underline hover:text-foreground">Back to login</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

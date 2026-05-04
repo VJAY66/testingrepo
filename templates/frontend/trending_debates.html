@@ -1,0 +1,38 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Trending Debates — PickASide{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6 space-y-5">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold text-foreground">🔥 Trending Debates</h1>
+    <span class="text-xs text-muted-foreground">Last 48 hours</span>
+  </div>
+
+  {% if posts %}
+  <div class="space-y-4">
+    {% for post in posts %}
+    <a href="{% url 'discussion' post.id %}" class="block bg-card border border-border rounded-2xl p-4 hover:border-primary/50 transition-colors">
+      <div class="flex items-start gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">{{ post.category }}</span>
+            {% if post.mood %}<span class="text-xs text-muted-foreground">{{ post.get_mood_display }}</span>{% endif %}
+          </div>
+          <h2 class="text-sm font-semibold text-foreground line-clamp-2">{{ post.title }}</h2>
+          <div class="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+            <span>@{{ post.user.username }}</span>
+            <span>{{ post.comment_count }} comments</span>
+            <span>{{ post.like_count }} likes</span>
+          </div>
+        </div>
+        <div class="shrink-0 text-2xl font-bold text-primary/30 tabular-nums">
+          #{{ forloop.counter }}
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-16 text-muted-foreground text-sm">No trending debates in the last 48 hours yet.</div>
+  {% endif %}
+</div>
+{% endblock %}
