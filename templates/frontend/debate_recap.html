@@ -1,0 +1,271 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Debate Recap — {{ debate.initiator.username }} vs {{ debate.target.username }}{% endblock %}
+
+{% block og_meta %}
+<meta property="og:title" content="Debate Recap: @{{ debate.initiator.username }} vs @{{ debate.target.username }}">
+<meta property="og:description" content="{{ og_description }}">
+<meta property="og:type" content="article">
+<meta property="og:url" content="{{ request.build_absolute_uri }}">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Debate Recap: @{{ debate.initiator.username }} vs @{{ debate.target.username }}">
+<meta name="twitter:description" content="{{ og_description }}">
+{% endblock %}
+
+{% block content %}
+<style>
+.recap-page { max-width: 560px; margin: 0 auto; padding: 24px 16px 56px; }
+.recap-card {
+  border-radius: 1.25rem;
+  border: 1px solid hsl(var(--border)/0.8);
+  background: hsl(var(--card));
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+}
+.recap-header {
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary)/0.7) 100%);
+  padding: 24px 24px 20px;
+  color: hsl(var(--primary-foreground));
+}
+.vs-row { display:flex; align-items:center; gap:12px; margin-top:12px; }
+.debater-block { flex:1; text-align:center; }
+.debater-avatar {
+  width:52px; height:52px; border-radius:50%;
+  object-fit:cover; border:2px solid rgba(255,255,255,0.4);
+  display:inline-flex; align-items:center; justify-content:center;
+  background:rgba(255,255,255,0.2); font-size:20px; font-weight:800;
+  color:#fff;
+}
+.debater-name { font-size:13px; font-weight:700; margin-top:6px; opacity:0.95; }
+.debater-side { font-size:11px; font-weight:600; opacity:0.75; margin-top:2px; }
+.vs-badge { font-size:18px; font-weight:900; opacity:0.6; flex-shrink:0; }
+.winner-crown { font-size:18px; }
+.recap-body { padding:20px 24px; }
+.stat-row { display:flex; gap:12px; margin-bottom:16px; }
+.stat-box {
+  flex:1; text-align:center; padding:12px 8px;
+  border-radius:0.75rem; background:hsl(var(--muted)/0.4);
+  border:1px solid hsl(var(--border)/0.5);
+}
+.stat-box .num { font-size:1.5rem; font-weight:800; color:hsl(var(--foreground)); line-height:1; }
+.stat-box .lbl { font-size:11px; color:hsl(var(--muted-foreground)); font-weight:600; margin-top:3px; }
+.vote-bar-wrap { margin:16px 0; }
+.vote-bar-track { height:10px; border-radius:999px; background:hsl(var(--border)/0.4); overflow:hidden; display:flex; }
+.vote-bar-yes { height:100%; background:#10b981; border-radius:999px 0 0 999px; transition:width 0.7s ease; }
+.vote-bar-no  { height:100%; background:#ef4444; border-radius:0 999px 999px 0; transition:width 0.7s ease; flex:1; }
+.vote-labels { display:flex; justify-content:space-between; margin-top:5px; font-size:12px; font-weight:600; }
+.winner-banner {
+  display:flex; align-items:center; gap:10px;
+  padding:12px 16px; border-radius:0.875rem;
+  background:linear-gradient(90deg, hsl(var(--primary)/0.1), transparent);
+  border:1px solid hsl(var(--primary)/0.25);
+  margin-bottom:16px;
+}
+.winner-banner .name { font-size:15px; font-weight:800; color:hsl(var(--foreground)); }
+.winner-banner .sub  { font-size:12px; color:hsl(var(--muted-foreground)); }
+.msg-row { display:flex; gap:8px; align-items:center; padding:8px 0; border-bottom:1px solid hsl(var(--border)/0.3); }
+.msg-row:last-child { border-bottom:none; }
+.msg-avatar {
+  width:28px; height:28px; border-radius:50%; object-fit:cover;
+  background:hsl(var(--muted)); display:inline-flex; align-items:center;
+  justify-content:center; font-size:11px; font-weight:700;
+  color:hsl(var(--muted-foreground)); flex-shrink:0;
+}
+.share-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:20px; }
+.share-btn {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:8px 14px; border-radius:999px; font-size:12px; font-weight:600;
+  border:1px solid hsl(var(--border)); cursor:pointer; transition:background 0.15s;
+  text-decoration:none; color:hsl(var(--foreground));
+}
+.share-btn:hover { background:hsl(var(--muted)/0.5); }
+.section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:hsl(var(--muted-foreground)); margin-bottom:10px; }
+</style>
+
+<div class="recap-page">
+  <!-- Back -->
+  <div class="flex items-center gap-2 mb-5">
+    <a href="{% url 'debate_inbox' %}" class="text-muted-foreground hover:text-foreground text-sm">← Debate Inbox</a>
+    <span class="text-muted-foreground text-sm">·</span>
+    <a href="{% url 'debate_transcript' debate.id %}" class="text-sm text-primary hover:underline">Full Transcript</a>
+  </div>
+
+  <div class="recap-card">
+    <!-- Header -->
+    <div class="recap-header">
+      <p style="font-size:11px;font-weight:700;opacity:0.7;text-transform:uppercase;letter-spacing:0.06em;">Debate Recap</p>
+      <h1 style="font-size:16px;font-weight:800;margin-top:4px;line-height:1.3;">
+        {{ context_title|truncatechars:80 }}
+      </h1>
+      <p style="font-size:12px;opacity:0.7;margin-top:2px;">{{ debate.created_at|date:"F j, Y" }}</p>
+
+      <div class="vs-row">
+        <!-- Initiator -->
+        <div class="debater-block">
+          {% if debate.initiator.profile.get_picture_url %}
+            <img class="debater-avatar" src="{{ debate.initiator.profile.get_picture_url }}" alt="">
+          {% else %}
+            <span class="debater-avatar">{{ debate.initiator.username|slice:":1"|upper }}</span>
+          {% endif %}
+          <div class="debater-name">
+            @{{ debate.initiator.username }}
+            {% if winner_user == debate.initiator %}<span class="winner-crown">🏆</span>{% endif %}
+          </div>
+          <div class="debater-side">
+            {% with side=side_map|default:'' %}
+            {% for p in participants %}{% if p.user == debate.initiator %}
+              <span style="color:{% if p.side == 'yes' %}#86efac{% else %}#fca5a5{% endif %}">{{ p.side|upper }}</span>
+            {% endif %}{% endfor %}
+            {% endwith %}
+          </div>
+        </div>
+
+        <div class="vs-badge">VS</div>
+
+        <!-- Target -->
+        <div class="debater-block">
+          {% if debate.target.profile.get_picture_url %}
+            <img class="debater-avatar" src="{{ debate.target.profile.get_picture_url }}" alt="">
+          {% else %}
+            <span class="debater-avatar">{{ debate.target.username|slice:":1"|upper }}</span>
+          {% endif %}
+          <div class="debater-name">
+            @{{ debate.target.username }}
+            {% if winner_user == debate.target %}<span class="winner-crown">🏆</span>{% endif %}
+          </div>
+          <div class="debater-side">
+            {% for p in participants %}{% if p.user == debate.target %}
+              <span style="color:{% if p.side == 'yes' %}#86efac{% else %}#fca5a5{% endif %}">{{ p.side|upper }}</span>
+            {% endif %}{% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="recap-body">
+
+      <!-- Winner banner -->
+      {% if winner_user %}
+      <div class="winner-banner">
+        <span style="font-size:24px;">🏆</span>
+        <div>
+          <div class="name">@{{ winner_user.username }} won</div>
+          <div class="sub">by spectator vote — argued the {{ winner_side|upper }} side</div>
+        </div>
+      </div>
+      {% elif total_votes > 0 %}
+      <div class="winner-banner" style="background:hsl(var(--muted)/0.3);border-color:hsl(var(--border));">
+        <span style="font-size:24px;">🤝</span>
+        <div>
+          <div class="name">It's a draw</div>
+          <div class="sub">Spectators split evenly — no majority winner</div>
+        </div>
+      </div>
+      {% else %}
+      <div class="winner-banner" style="background:hsl(var(--muted)/0.3);border-color:hsl(var(--border));">
+        <span style="font-size:24px;">⚔️</span>
+        <div>
+          <div class="name">No spectator votes yet</div>
+          <div class="sub"><a href="{% url 'debate_transcript' debate.id %}" class="text-primary hover:underline">Read the transcript and vote →</a></div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Stats row -->
+      <div class="stat-row">
+        <div class="stat-box">
+          <div class="num">{{ total_messages }}</div>
+          <div class="lbl">Messages</div>
+        </div>
+        <div class="stat-box">
+          <div class="num">{{ total_votes }}</div>
+          <div class="lbl">Spectator Votes</div>
+        </div>
+        {% if duration_minutes %}
+        <div class="stat-box">
+          <div class="num">{{ duration_minutes }}</div>
+          <div class="lbl">Minutes</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Spectator vote bar -->
+      {% if total_votes > 0 %}
+      <div class="vote-bar-wrap">
+        <p class="section-label">Spectator Vote</p>
+        <div class="vote-bar-track">
+          <div class="vote-bar-yes" id="yes-bar" style="width:0%"></div>
+          <div class="vote-bar-no"  id="no-bar"  style="width:0%"></div>
+        </div>
+        <div class="vote-labels">
+          <span class="text-emerald-600">YES {{ yes_votes }}</span>
+          <span class="text-rose-500">NO {{ no_votes }}</span>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Messages per participant -->
+      {% if participants %}
+      <div style="margin-top:16px;">
+        <p class="section-label">Messages Sent</p>
+        {% for p in participants %}
+        <div class="msg-row">
+          {% if p.user.profile.get_picture_url %}
+            <img class="msg-avatar" src="{{ p.user.profile.get_picture_url }}" alt="">
+          {% else %}
+            <span class="msg-avatar">{{ p.user.username|slice:":1"|upper }}</span>
+          {% endif %}
+          <span class="text-sm font-semibold text-foreground flex-1">@{{ p.user.username }}</span>
+          <span class="text-xs font-bold px-2 py-0.5 rounded-full {% if p.side == 'yes' %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400{% else %}bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400{% endif %}">{{ p.side|upper }}</span>
+          <span class="text-sm font-bold text-foreground ml-3">{{ msg_counts|default_if_none:0 }}
+            {% for uid, cnt in msg_counts.items %}{% if uid == p.user_id %}{{ cnt }}{% endif %}{% endfor %}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Share row -->
+      <div class="share-row">
+        <button onclick="copyLink()" class="share-btn" id="copy-btn">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          Copy Link
+        </button>
+        <a href="{% url 'debate_transcript' debate.id %}" class="share-btn">
+          📄 Full Transcript
+        </a>
+        {% if debate.post_id %}
+        <a href="{% url 'discussion' debate.post.id %}" class="share-btn">
+          💬 View Post
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Animate vote bar on load
+window.addEventListener('DOMContentLoaded', function() {
+  var total = {{ total_votes }};
+  var yes = {{ yes_votes }};
+  var no = {{ no_votes }};
+  if (total > 0) {
+    setTimeout(function() {
+      var yesBar = document.getElementById('yes-bar');
+      var noBar  = document.getElementById('no-bar');
+      if (yesBar) yesBar.style.width = (yes / total * 100) + '%';
+      if (noBar)  noBar.style.width  = (no  / total * 100) + '%';
+    }, 150);
+  }
+});
+
+function copyLink() {
+  var btn = document.getElementById('copy-btn');
+  navigator.clipboard.writeText(window.location.href).then(function() {
+    btn.textContent = '✓ Copied!';
+    setTimeout(function() { btn.innerHTML = '<svg class="w-3.5 h-3.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy Link'; }, 2000);
+  });
+}
+</script>
+{% endblock %}

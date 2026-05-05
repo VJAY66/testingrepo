@@ -5863,5 +5863,186 @@ document.addEventListener('DOMContentLoaded', function() {
 })();
 </script>
 <div id="toast-container" class="fixed top-4 right-4 z-[999] flex flex-col gap-2 pointer-events-none" style="max-width:320px"></div>
+
+<!-- Global @mention autocomplete widget -->
+<div id="mention-dropdown" style="
+  display:none;position:fixed;z-index:9999;
+  background:hsl(var(--card));border:1px solid hsl(var(--border));
+  border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);
+  min-width:180px;max-width:260px;overflow:hidden;
+  font-family:inherit;
+"></div>
+<style>
+.mention-item {
+  display:flex;align-items:center;gap:9px;
+  padding:8px 12px;cursor:pointer;font-size:13px;
+  color:hsl(var(--foreground));transition:background 0.1s;
+}
+.mention-item:hover,.mention-item.active {
+  background:hsl(var(--primary)/0.1);
+}
+.mention-avatar {
+  width:26px;height:26px;border-radius:50%;object-fit:cover;
+  background:hsl(var(--muted));flex-shrink:0;font-size:11px;
+  display:flex;align-items:center;justify-content:center;
+  color:hsl(var(--muted-foreground));font-weight:700;
+}
+.mention-username { font-weight:600; }
+.mention-at { color:hsl(var(--primary)); margin-right:1px; }
+</style>
+<script>
+(function() {
+  var dropdown = document.getElementById('mention-dropdown');
+  var activeInput = null;
+  var mentionStart = -1;
+  var items = [];
+  var selectedIdx = -1;
+  var fetchTimer = null;
+
+  function hide() {
+    dropdown.style.display = 'none';
+    items = [];
+    selectedIdx = -1;
+    mentionStart = -1;
+    activeInput = null;
+  }
+
+  function position(el) {
+    // Place dropdown just below the cursor in the input
+    var rect = el.getBoundingClientRect();
+    var spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < 180) {
+      dropdown.style.top = '';
+      dropdown.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+    } else {
+      dropdown.style.bottom = '';
+      dropdown.style.top = (rect.bottom + 4) + 'px';
+    }
+    dropdown.style.left = Math.min(rect.left, window.innerWidth - 280) + 'px';
+  }
+
+  function render(users) {
+    if (!users.length) { hide(); return; }
+    items = users;
+    selectedIdx = 0;
+    dropdown.innerHTML = users.map(function(u, i) {
+      var avatarHtml = u.avatar
+        ? '<img class="mention-avatar" src="' + u.avatar + '" alt="">'
+        : '<span class="mention-avatar">' + u.username.slice(0,1).toUpperCase() + '</span>';
+      return '<div class="mention-item' + (i===0?' active':'') + '" data-idx="' + i + '">'
+        + avatarHtml
+        + '<span class="mention-username"><span class="mention-at">@</span>' + u.username + '</span>'
+        + '</div>';
+    }).join('');
+    dropdown.querySelectorAll('.mention-item').forEach(function(el) {
+      el.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        insertMention(parseInt(el.dataset.idx));
+      });
+    });
+    dropdown.style.display = 'block';
+    position(activeInput);
+  }
+
+  function setActive(idx) {
+    dropdown.querySelectorAll('.mention-item').forEach(function(el, i) {
+      el.classList.toggle('active', i === idx);
+    });
+    selectedIdx = idx;
+  }
+
+  function getCurrentQuery(el) {
+    var val = el.value !== undefined ? el.value : el.innerText;
+    var pos = el.selectionStart !== undefined ? el.selectionStart : getCursorPos(el);
+    var text = val.slice(0, pos);
+    var match = text.match(/@(\w*)$/);
+    if (!match) return null;
+    return { query: match[1], atPos: pos - match[0].length };
+  }
+
+  function insertMention(idx) {
+    if (!activeInput || idx < 0 || idx >= items.length) return;
+    var username = items[idx].username;
+    var info = getCurrentQuery(activeInput);
+    if (!info) { hide(); return; }
+    var val = activeInput.value;
+    var before = val.slice(0, info.atPos);
+    var after = val.slice(activeInput.selectionStart);
+    activeInput.value = before + '@' + username + ' ' + after;
+    var newPos = (before + '@' + username + ' ').length;
+    activeInput.setSelectionRange(newPos, newPos);
+    activeInput.dispatchEvent(new Event('input'));
+    hide();
+    activeInput.focus();
+  }
+
+  function fetchSuggestions(q) {
+    clearTimeout(fetchTimer);
+    fetchTimer = setTimeout(function() {
+      fetch('/mentions/suggest/?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(d) { if (activeInput) render(d.users || []); })
+        .catch(function() { hide(); });
+    }, 120);
+  }
+
+  function onInput(e) {
+    var el = e.target;
+    var info = getCurrentQuery(el);
+    if (!info) { hide(); return; }
+    activeInput = el;
+    mentionStart = info.atPos;
+    fetchSuggestions(info.query);
+  }
+
+  function onKeydown(e) {
+    if (dropdown.style.display === 'none') return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActive((selectedIdx + 1) % items.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActive((selectedIdx - 1 + items.length) % items.length);
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      if (selectedIdx >= 0) {
+        e.preventDefault();
+        insertMention(selectedIdx);
+      }
+    } else if (e.key === 'Escape') {
+      hide();
+    }
+  }
+
+  function onBlur() {
+    // Delay hide so mousedown on item can fire first
+    setTimeout(hide, 180);
+  }
+
+  // Attach to all current and future inputs/textareas
+  function attach(el) {
+    if (el._mentionWired) return;
+    el._mentionWired = true;
+    el.addEventListener('input', onInput);
+    el.addEventListener('keydown', onKeydown);
+    el.addEventListener('blur', onBlur);
+  }
+
+  function attachAll() {
+    document.querySelectorAll('textarea, input[type="text"]').forEach(attach);
+  }
+
+  document.addEventListener('DOMContentLoaded', attachAll);
+
+  // Watch for dynamically added inputs (reply forms, etc.)
+  var observer = new MutationObserver(function() { attachAll(); });
+  document.addEventListener('DOMContentLoaded', function() {
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!dropdown.contains(e.target)) hide();
+  });
+})();
+</script>
 </body>
 </html>

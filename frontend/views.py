@@ -1602,6 +1602,8 @@ def profile(request):
         'endorsements_by_topic': endorsements_by_topic,
         'followed_categories': followed_categories,
         'coauthor_invites': coauthor_invites,
+        'allow_mentions_from': profile_obj.allow_mentions_from if profile_obj else 'everyone',
+        'mention_allow_choices': Profile.MENTION_ALLOW_CHOICES,
     }
     return render(request, 'frontend/profile.html', context)
 
@@ -1997,9 +1999,74 @@ def mention_suggestions(request):
     q = request.GET.get('q', '').strip().lstrip('@')
     if len(q) < 1:
         return JsonResponse({'users': []})
+
     from django.contrib.auth.models import User as _User
-    users = _User.objects.filter(username__istartswith=q).values_list('username', flat=True)[:8]
-    return JsonResponse({'users': list(users)})
+
+    # Priority tiers: 3 = following, 2 = follower, 1 = debated, 0 = everyone
+    following_ids = set()
+    follower_ids = set()
+    interacted_ids = set()
+
+    if request.user.is_authenticated:
+        following_ids = set(
+            Follow.objects.filter(follower=request.user).values_list('following_id', flat=True)
+        )
+        follower_ids = set(
+            Follow.objects.filter(following=request.user).values_list('follower_id', flat=True)
+        )
+        debate_qs = Debate.objects.filter(Q(initiator=request.user) | Q(target=request.user))
+        for d in debate_qs.values('initiator_id', 'target_id'):
+            interacted_ids.add(d['initiator_id'])
+            interacted_ids.add(d['target_id'])
+        interacted_ids.discard(request.user.id)
+
+    candidates = list(
+        _User.objects.filter(username__icontains=q, is_active=True)
+        .exclude(id=request.user.id if request.user.is_authenticated else 0)
+        .select_related('profile')[:40]
+    )
+
+    # Filter by each candidate's allow_mentions_from setting
+    def _allowed(u):
+        try:
+            setting = u.profile.allow_mentions_from
+        except Exception:
+            return True
+        if setting == 'nobody':
+            return False
+        if setting == 'followers':
+            # The candidate allows only people they follow (i.e. requester must be in their following list)
+            return u.id in following_ids or (request.user.is_authenticated and u.id in follower_ids)
+        return True  # 'everyone'
+
+    def _priority(uid):
+        if uid in following_ids:
+            return 3
+        if uid in follower_ids:
+            return 2
+        if uid in interacted_ids:
+            return 1
+        return 0
+
+    scored = sorted(
+        [u for u in candidates if _allowed(u)],
+        key=lambda u: (
+            -_priority(u.id),
+            not u.username.lower().startswith(q.lower()),
+            u.username.lower(),
+        )
+    )[:8]
+
+    result = []
+    for u in scored:
+        avatar = ''
+        try:
+            avatar = u.profile.get_picture_url or ''
+        except Exception:
+            pass
+        result.append({'username': u.username, 'avatar': avatar})
+
+    return JsonResponse({'users': result})
 
 
 @login_required
@@ -5609,6 +5676,91 @@ def debate_transcript(request, debate_id):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Debate Recap Card
+# ─────────────────────────────────────────────────────────────────────────────
+
+def debate_recap(request, debate_id):
+    """Shareable recap card for a completed debate."""
+    debate = get_object_or_404(
+        Debate.objects.select_related(
+            'initiator', 'initiator__profile',
+            'target', 'target__profile',
+            'post', 'poll',
+        ),
+        id=debate_id,
+        status='completed',
+    )
+
+    participants = list(
+        DebateParticipant.objects.filter(debate=debate)
+        .select_related('user', 'user__profile')
+    )
+    side_map = {p.user_id: p.side for p in participants}
+
+    yes_votes = ObserverVote.objects.filter(debate=debate, winner_side='yes').count()
+    no_votes = ObserverVote.objects.filter(debate=debate, winner_side='no').count()
+    total_votes = yes_votes + no_votes
+
+    # Determine winner side by observer vote majority
+    if yes_votes > no_votes:
+        winner_side = 'yes'
+    elif no_votes > yes_votes:
+        winner_side = 'no'
+    else:
+        winner_side = None  # draw or no votes
+
+    # Identify winner user
+    winner_user = None
+    if winner_side:
+        for p in participants:
+            if p.side == winner_side:
+                winner_user = p.user
+                break
+
+    # Message stats
+    msg_counts = {}
+    total_messages = 0
+    for p in participants:
+        c = DebateMessage.objects.filter(debate=debate, sender=p.user, is_system=False).count()
+        msg_counts[p.user_id] = c
+        total_messages += c
+
+    # Duration
+    first_msg = DebateMessage.objects.filter(debate=debate).order_by('created_at').first()
+    last_msg = DebateMessage.objects.filter(debate=debate).order_by('created_at').last()
+    duration_minutes = None
+    if first_msg and last_msg and first_msg != last_msg:
+        delta = last_msg.created_at - first_msg.created_at
+        duration_minutes = max(1, int(delta.total_seconds() / 60))
+
+    context_title = debate.context_title or 'a discussion'
+
+    # Open Graph image description (text-based since no image rendering)
+    og_description = (
+        f"Debate recap: {debate.initiator.username} vs {debate.target.username} "
+        f"on '{context_title}'. "
+        + (f"Winner: @{winner_user.username}. " if winner_user else "No majority winner. ")
+        + f"{total_votes} spectator vote{'s' if total_votes != 1 else ''}."
+    )
+
+    return render(request, 'frontend/debate_recap.html', {
+        'debate': debate,
+        'participants': participants,
+        'side_map': side_map,
+        'yes_votes': yes_votes,
+        'no_votes': no_votes,
+        'total_votes': total_votes,
+        'winner_side': winner_side,
+        'winner_user': winner_user,
+        'msg_counts': msg_counts,
+        'total_messages': total_messages,
+        'duration_minutes': duration_minutes,
+        'context_title': context_title,
+        'og_description': og_description,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Observer Vote
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -6084,6 +6236,8 @@ def notification_prefs_page(request):
         'default_prefs': DEFAULT_NOTIFICATION_PREFS,
         'quiet_hours_start': quiet_start,
         'quiet_hours_end': quiet_end,
+        'allow_mentions_from': profile.allow_mentions_from if profile else 'everyone',
+        'mention_allow_choices': Profile.MENTION_ALLOW_CHOICES,
     })
 
 
@@ -6163,6 +6317,22 @@ def update_quiet_hours(request):
         'quiet_hours_start': profile.quiet_hours_start.strftime('%H:%M') if profile.quiet_hours_start else '',
         'quiet_hours_end': profile.quiet_hours_end.strftime('%H:%M') if profile.quiet_hours_end else '',
     })
+
+
+@login_required
+@require_POST
+def update_mention_setting(request):
+    """Update the authenticated user's @mention permission setting."""
+    profile = Profile.objects.filter(user=request.user).first()
+    if not profile:
+        return JsonResponse({'success': False, 'error': 'Profile not found.'}, status=404)
+    value = (request.POST.get('allow_mentions_from') or '').strip()
+    valid = {c[0] for c in Profile.MENTION_ALLOW_CHOICES}
+    if value not in valid:
+        return JsonResponse({'success': False, 'error': 'Invalid value.'}, status=400)
+    profile.allow_mentions_from = value
+    profile.save(update_fields=['allow_mentions_from', 'updated_at'])
+    return JsonResponse({'success': True, 'allow_mentions_from': value})
 
 
 # ─── Achievement Badges ───────────────────────────────────────────────────────

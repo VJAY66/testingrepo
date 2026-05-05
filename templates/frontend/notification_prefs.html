@@ -90,6 +90,38 @@
       {% endif %}
     </div>
   </div>
+
+  <!-- @Mention Privacy -->
+  <div>
+    <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">@Mention Privacy</h2>
+    <div class="bg-card border border-border rounded-2xl p-5 space-y-4">
+      <p class="text-sm text-muted-foreground">
+        Control who can @mention you in comments and debate messages.
+        Users not allowed to tag you will still see the autocomplete but your name won't appear for them.
+      </p>
+      <div class="space-y-2">
+        {% for value, label in mention_allow_choices %}
+        <label class="flex items-center gap-3 cursor-pointer group">
+          <input type="radio" name="allow_mentions_from" value="{{ value }}"
+            class="accent-primary"
+            {% if allow_mentions_from == value %}checked{% endif %}
+            onchange="saveMentionSetting('{{ value }}')">
+          <div>
+            <span class="text-sm font-semibold text-foreground">{{ label }}</span>
+            {% if value == 'everyone' %}
+              <p class="text-xs text-muted-foreground">Anyone on PickASide can tag you</p>
+            {% elif value == 'followers' %}
+              <p class="text-xs text-muted-foreground">Only people you follow can tag you</p>
+            {% else %}
+              <p class="text-xs text-muted-foreground">No one can tag you in posts or debates</p>
+            {% endif %}
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+      <div id="mention-status" class="text-sm font-medium h-5"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -194,6 +226,24 @@ function clearQuietHours() {
   document.getElementById('quiet-start').value = '';
   document.getElementById('quiet-end').value = '';
   saveQuietHours();
+}
+
+function saveMentionSetting(value) {
+  var status = document.getElementById('mention-status');
+  status.textContent = 'Saving…';
+  status.className = 'text-sm font-medium h-5 text-muted-foreground';
+  fetch('{% url "update_mention_setting" %}', {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'allow_mentions_from=' + encodeURIComponent(value),
+  }).then(r => r.json()).then(d => {
+    status.textContent = d.success ? '✓ Saved' : '✗ ' + (d.error || 'Error');
+    status.className = 'text-sm font-medium h-5 ' + (d.success ? 'text-emerald-600' : 'text-destructive');
+    setTimeout(function() { status.textContent = ''; }, 2500);
+  }).catch(function() {
+    status.textContent = '✗ Network error';
+    status.className = 'text-sm font-medium h-5 text-destructive';
+  });
 }
 
 function getCookie(n) { var v = document.cookie.match('(^|;) ?'+n+'=([^;]*)(;|$)'); return v ? v[2] : null; }

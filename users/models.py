@@ -45,6 +45,20 @@ class Profile(models.Model):
     totp_enabled = models.BooleanField(default=False, db_index=True, help_text='True when 2FA is fully set up and active')
     quiet_hours_start = models.TimeField(null=True, blank=True, help_text='No notification emails sent after this time')
     quiet_hours_end = models.TimeField(null=True, blank=True, help_text='Notification emails resume at this time')
+    MENTION_ALLOW_EVERYONE = 'everyone'
+    MENTION_ALLOW_FOLLOWERS = 'followers'
+    MENTION_ALLOW_NOBODY = 'nobody'
+    MENTION_ALLOW_CHOICES = [
+        (MENTION_ALLOW_EVERYONE,  'Everyone'),
+        (MENTION_ALLOW_FOLLOWERS, 'People I follow'),
+        (MENTION_ALLOW_NOBODY,    'Nobody'),
+    ]
+    allow_mentions_from = models.CharField(
+        max_length=10,
+        choices=MENTION_ALLOW_CHOICES,
+        default=MENTION_ALLOW_EVERYONE,
+        help_text='Who is allowed to @mention this user',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

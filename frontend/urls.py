@@ -95,6 +95,7 @@ urlpatterns = [
     path('activity/', views.activity_feed, name='activity_feed'),
     # Debate transcript (public)
     path('debates/<str:debate_id>/transcript/', views.debate_transcript, name='debate_transcript'),
+    path('debates/<str:debate_id>/recap/', views.debate_recap, name='debate_recap'),
     # Observer voting
     path('debates/<str:debate_id>/observer-vote/', views.observer_vote, name='observer_vote'),
     # User blocking
@@ -106,6 +107,7 @@ urlpatterns = [
     # Notification preferences
     path('profile/notification-prefs/', views.update_notification_prefs, name='update_notification_prefs'),
     path('profile/quiet-hours/', views.update_quiet_hours, name='update_quiet_hours'),
+    path('profile/mention-setting/', views.update_mention_setting, name='update_mention_setting'),
     # Comment reporting
     path('report-post-comment/', views.report_post_comment, name='report_post_comment'),
     # Debate stats JSON

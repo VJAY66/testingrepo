@@ -18,4 +18,14 @@ class Migration(migrations.Migration):
             name='quiet_hours_end',
             field=models.TimeField(blank=True, help_text='Notification emails resume at this time', null=True),
         ),
+        migrations.AddField(
+            model_name='profile',
+            name='allow_mentions_from',
+            field=models.CharField(
+                choices=[('everyone', 'Everyone'), ('followers', 'People I follow'), ('nobody', 'Nobody')],
+                default='everyone',
+                help_text='Who is allowed to @mention this user',
+                max_length=10,
+            ),
+        ),
     ]
