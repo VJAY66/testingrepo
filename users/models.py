@@ -43,6 +43,8 @@ class Profile(models.Model):
     deletion_requested_at = models.DateTimeField(null=True, blank=True, help_text='If set, account will be hard-deleted 30 days after this date')
     totp_secret = models.CharField(max_length=64, blank=True, default='', help_text='TOTP secret for 2FA (empty = disabled)')
     totp_enabled = models.BooleanField(default=False, db_index=True, help_text='True when 2FA is fully set up and active')
+    quiet_hours_start = models.TimeField(null=True, blank=True, help_text='No notification emails sent after this time')
+    quiet_hours_end = models.TimeField(null=True, blank=True, help_text='Notification emails resume at this time')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

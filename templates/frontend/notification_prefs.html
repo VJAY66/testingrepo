@@ -1,50 +1,95 @@
 {% extends 'frontend/base.html' %}
 {% block title %}Notification Preferences — PickASide{% endblock %}
 {% block content %}
-<div class="max-w-2xl mx-auto px-4 py-6 space-y-5">
+<div class="max-w-2xl mx-auto px-4 py-6 space-y-6">
   <div class="flex items-center justify-between">
     <h1 class="text-xl font-bold text-foreground">Notification Preferences</h1>
     <a href="{% url 'profile' %}" class="text-sm text-muted-foreground hover:text-primary">← Back to profile</a>
   </div>
 
-  <div class="bg-card border border-border rounded-2xl divide-y divide-border" id="prefs-container">
-    {% for type_key, channels in default_prefs.items %}
-    <div class="flex items-center justify-between px-5 py-4 gap-4">
-      <div class="flex-1 min-w-0">
-        <p class="text-sm font-semibold text-foreground capitalize">{{ type_key|cut:"_" }}</p>
+  <!-- Per-type toggles -->
+  <div>
+    <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">Notification types</h2>
+    <div class="bg-card border border-border rounded-2xl divide-y divide-border" id="prefs-container">
+      {% for type_key, channels in default_prefs.items %}
+      <div class="flex items-center justify-between px-5 py-4 gap-4">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-foreground capitalize">
+            {% if type_key == 'follow' %}Follow
+            {% elif type_key == 'mention' %}Mention
+            {% elif type_key == 'reply' %}Reply
+            {% elif type_key == 'debate_request' %}Debate Request
+            {% elif type_key == 'poll_closed' %}Poll Closed
+            {% elif type_key == 'weekly_digest' %}Weekly Digest
+            {% elif type_key == 'moderation_warning' %}Moderation Warning
+            {% else %}{{ type_key|cut:"_"|capfirst }}{% endif %}
+          </p>
+        </div>
+        <div class="flex items-center gap-5 shrink-0">
+          {% if 'inapp' in channels %}
+          <label class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+            <input type="checkbox" class="pref-toggle rounded" data-type="{{ type_key }}" data-channel="inapp">
+            In-app
+          </label>
+          {% endif %}
+          {% if 'email' in channels %}
+          <label class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+            <input type="checkbox" class="pref-toggle rounded" data-type="{{ type_key }}" data-channel="email">
+            Email
+          </label>
+          {% endif %}
+        </div>
       </div>
-      <div class="flex items-center gap-5 shrink-0">
-        {% if 'inapp' in channels %}
-        <label class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-          <input type="checkbox" class="pref-toggle rounded" data-type="{{ type_key }}" data-channel="inapp"
-            {% if current_prefs|default:default_prefs %}
-              {% with cp=current_prefs %}
-                {% if cp %}{% if type_key in cp %}{% if 'inapp' in cp|default:dict %}{% if cp|default:dict %}checked{% endif %}{% endif %}{% endif %}{% endif %}
-              {% endwith %}
-            {% endif %}
-            {% with merged=current_prefs %}
-              {% if merged and type_key in merged and 'inapp' in merged|default:'' %}{% else %}{% if channels.inapp %}checked{% endif %}{% endif %}
-            {% endwith %}
-          >
-          In-app
-        </label>
-        {% endif %}
-        {% if 'email' in channels %}
-        <label class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-          <input type="checkbox" class="pref-toggle rounded" data-type="{{ type_key }}" data-channel="email"
-            {% with merged=current_prefs %}
-              {% if merged and type_key in merged %}{% else %}{% if channels.email %}checked{% endif %}{% endif %}
-            {% endwith %}
-          >
-          Email
-        </label>
-        {% endif %}
-      </div>
+      {% endfor %}
     </div>
-    {% endfor %}
+    <div id="save-status" class="text-sm text-muted-foreground text-center mt-2 h-5"></div>
   </div>
 
-  <div id="save-status" class="text-sm text-muted-foreground text-center hidden">Saving…</div>
+  <!-- Quiet Hours -->
+  <div>
+    <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">Quiet Hours</h2>
+    <div class="bg-card border border-border rounded-2xl p-5 space-y-4">
+      <p class="text-sm text-muted-foreground">
+        During quiet hours, email notifications are held and not delivered. Useful for uninterrupted sleep or focused work.
+        Overnight ranges (e.g. 10 PM – 8 AM) are supported.
+      </p>
+
+      <div class="flex flex-wrap items-end gap-4">
+        <div class="flex flex-col gap-1">
+          <label for="quiet-start" class="text-xs font-semibold text-foreground">Start time</label>
+          <input type="time" id="quiet-start" value="{{ quiet_hours_start }}"
+            class="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 w-36">
+        </div>
+        <div class="flex flex-col gap-1">
+          <label for="quiet-end" class="text-xs font-semibold text-foreground">End time</label>
+          <input type="time" id="quiet-end" value="{{ quiet_hours_end }}"
+            class="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 w-36">
+        </div>
+        <button onclick="saveQuietHours()" id="quiet-save-btn"
+          class="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
+          Save
+        </button>
+        <button onclick="clearQuietHours()" id="quiet-clear-btn"
+          class="px-4 py-2 rounded-lg border border-border text-sm font-semibold text-muted-foreground hover:text-destructive hover:border-destructive transition-colors {% if not quiet_hours_start %}hidden{% endif %}"
+          title="Remove quiet hours">
+          Clear
+        </button>
+      </div>
+
+      <div id="quiet-status" class="text-sm font-medium h-5"></div>
+
+      {% if quiet_hours_start and quiet_hours_end %}
+      <div class="flex items-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-4 py-3" id="quiet-active-banner">
+        <span class="text-lg">🌙</span>
+        <span class="text-sm text-foreground">
+          Quiet hours active: <strong>{{ quiet_hours_start }}</strong> – <strong>{{ quiet_hours_end }}</strong>
+        </span>
+      </div>
+      {% else %}
+      <div class="flex items-center gap-2 rounded-xl bg-muted/40 border border-border px-4 py-3" id="quiet-active-banner" style="display:none!important"></div>
+      {% endif %}
+    </div>
+  </div>
 </div>
 
 <script>
@@ -52,7 +97,6 @@
   var currentPrefs = {{ current_prefs|default:"{}" }};
   var defaultPrefs = {{ default_prefs|default:"{}" }};
 
-  // Initialise checkboxes from real saved prefs
   document.querySelectorAll('.pref-toggle').forEach(function(cb) {
     var type = cb.dataset.type;
     var channel = cb.dataset.channel;
@@ -69,8 +113,8 @@
     cb.addEventListener('change', function() {
       clearTimeout(saveTimer);
       var status = document.getElementById('save-status');
-      status.classList.remove('hidden');
       status.textContent = 'Saving…';
+      status.className = 'text-sm text-muted-foreground text-center mt-2 h-5';
       saveTimer = setTimeout(function() {
         var prefs = {};
         document.querySelectorAll('.pref-toggle').forEach(function(c) {
@@ -84,14 +128,74 @@
           body: JSON.stringify({prefs: prefs})
         }).then(r => r.json()).then(d => {
           status.textContent = d.success ? '✓ Saved' : '✗ Error saving';
-          setTimeout(function() { status.classList.add('hidden'); }, 2000);
+          status.className = 'text-sm text-center mt-2 h-5 ' + (d.success ? 'text-emerald-600' : 'text-destructive');
+          setTimeout(function() { status.textContent = ''; }, 3000);
         }).catch(function() {
           status.textContent = '✗ Error saving';
-          setTimeout(function() { status.classList.add('hidden'); }, 2000);
+          status.className = 'text-sm text-center mt-2 h-5 text-destructive';
+          setTimeout(function() { status.textContent = ''; }, 3000);
         });
       }, 600);
     });
   });
 })();
+
+function saveQuietHours() {
+  var start = document.getElementById('quiet-start').value;
+  var end = document.getElementById('quiet-end').value;
+  var status = document.getElementById('quiet-status');
+  var clearBtn = document.getElementById('quiet-clear-btn');
+  var banner = document.getElementById('quiet-active-banner');
+
+  if (start && !end || !start && end) {
+    status.textContent = 'Please set both start and end times.';
+    status.className = 'text-sm font-medium h-5 text-destructive';
+    return;
+  }
+  if (start && end && start === end) {
+    status.textContent = 'Start and end time cannot be the same.';
+    status.className = 'text-sm font-medium h-5 text-destructive';
+    return;
+  }
+
+  status.textContent = 'Saving…';
+  status.className = 'text-sm font-medium h-5 text-muted-foreground';
+
+  var body = 'quiet_hours_start=' + encodeURIComponent(start) + '&quiet_hours_end=' + encodeURIComponent(end);
+  fetch('{% url "update_quiet_hours" %}', {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+    body: body,
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      status.textContent = '✓ Quiet hours saved';
+      status.className = 'text-sm font-medium h-5 text-emerald-600';
+      if (d.quiet_hours_start && d.quiet_hours_end) {
+        clearBtn.classList.remove('hidden');
+        banner.style.removeProperty('display');
+        banner.className = 'flex items-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-4 py-3';
+        banner.innerHTML = '<span class="text-lg">🌙</span><span class="text-sm text-foreground">Quiet hours active: <strong>' + d.quiet_hours_start + '</strong> – <strong>' + d.quiet_hours_end + '</strong></span>';
+      } else {
+        clearBtn.classList.add('hidden');
+        banner.style.display = 'none';
+      }
+    } else {
+      status.textContent = '✗ ' + (d.error || 'Error saving');
+      status.className = 'text-sm font-medium h-5 text-destructive';
+    }
+    setTimeout(function() { if (status.textContent.startsWith('✓')) status.textContent = ''; }, 3000);
+  }).catch(function() {
+    status.textContent = '✗ Network error';
+    status.className = 'text-sm font-medium h-5 text-destructive';
+  });
+}
+
+function clearQuietHours() {
+  document.getElementById('quiet-start').value = '';
+  document.getElementById('quiet-end').value = '';
+  saveQuietHours();
+}
+
+function getCookie(n) { var v = document.cookie.match('(^|;) ?'+n+'=([^;]*)(;|$)'); return v ? v[2] : null; }
 </script>
 {% endblock %}

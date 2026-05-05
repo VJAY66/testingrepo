@@ -175,11 +175,12 @@ class CommentReaction(models.Model):
 class Debate(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
+        ('countered', 'Counter Proposed'),
         ('accepted', 'Accepted'),
         ('rejected', 'Rejected'),
         ('completed', 'Completed'),
     ]
-    
+
     id = models.CharField(max_length=36, primary_key=True)
     comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='debates', null=True, blank=True)
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='debates', null=True, blank=True)
@@ -199,6 +200,8 @@ class Debate(models.Model):
     round_ends_at = models.DateTimeField(null=True, blank=True, help_text='When the current round timer expires')
     outcome = models.CharField(max_length=10, blank=True, default='', help_text="'draw' if both agreed to mutual draw")
     draw_proposed_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='draw_proposals')
+    counter_topic = models.CharField(max_length=200, blank=True, default='', help_text='Alternative topic proposed by the challenged user')
+    counter_side = models.CharField(max_length=10, blank=True, default='', help_text='Side the challenger wants in the counter-proposal')
 
     @property
     def context_title(self):

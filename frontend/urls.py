@@ -45,6 +45,8 @@ urlpatterns = [
     path('update-comment/', views.update_comment, name='update_comment'),
     path('accept-debate/<str:debate_id>/', views.accept_debate, name='accept_debate'),
     path('reject-debate/<str:debate_id>/', views.reject_debate, name='reject_debate'),
+    path('counter-debate/<str:debate_id>/', views.counter_debate, name='counter_debate'),
+    path('accept-counter-debate/<str:debate_id>/', views.accept_counter_debate, name='accept_counter_debate'),
     path('debates/<str:debate_id>/chat/', views.debate_chat, name='debate_chat'),
     path('debates/<str:debate_id>/messages/', views.send_debate_message, name='send_debate_message'),
     path('debates/<str:debate_id>/messages/<int:message_id>/update/', views.update_debate_message, name='update_debate_message'),
@@ -103,6 +105,7 @@ urlpatterns = [
     path('profile/theme/', views.save_theme_preference, name='save_theme_preference'),
     # Notification preferences
     path('profile/notification-prefs/', views.update_notification_prefs, name='update_notification_prefs'),
+    path('profile/quiet-hours/', views.update_quiet_hours, name='update_quiet_hours'),
     # Comment reporting
     path('report-post-comment/', views.report_post_comment, name='report_post_comment'),
     # Debate stats JSON

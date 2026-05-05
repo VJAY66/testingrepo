@@ -20,15 +20,16 @@
   <div class="space-y-3">
     {% for item in debates %}
     {% with d=item.debate %}
-    <div class="rounded-2xl border border-border/70 bg-card p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow">
+    <div class="rounded-2xl border border-border/70 bg-card p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow" id="debate-card-{{ d.id }}">
       <div class="flex items-start justify-between gap-3 mb-2">
         <a href="{% url 'discussion' d.post.id %}" class="text-sm font-bold text-foreground hover:text-primary transition-colors line-clamp-2 flex-1">{{ d.post.title }}</a>
         <span class="shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full
           {% if d.status == 'pending' %}bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400
+          {% elif d.status == 'countered' %}bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400
           {% elif d.status == 'accepted' %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400
           {% elif d.status == 'completed' %}bg-secondary text-muted-foreground
           {% else %}bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400{% endif %}">
-          {{ d.status|title }}
+          {% if d.status == 'countered' %}↩ Counter Proposed{% else %}{{ d.status|title }}{% endif %}
         </span>
       </div>
       <div class="flex items-center gap-2 text-xs text-muted-foreground mb-3">
@@ -38,42 +39,133 @@
         <span>·</span>
         <span>{{ d.created_at|date:"M j, Y" }}</span>
       </div>
-      <div class="flex gap-2">
+
+      <!-- Counter-proposal details banner -->
+      {% if d.status == 'countered' %}
+      <div class="mb-3 rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 px-4 py-3">
+        <p class="text-xs font-semibold text-violet-700 dark:text-violet-400 mb-1">↩ Counter-proposal from @{{ item.opponent.username }}</p>
+        <p class="text-sm text-foreground font-medium">{{ d.counter_topic }}</p>
+        {% if d.counter_side %}
+        <p class="text-xs text-muted-foreground mt-1">Requested side: <strong class="{% if d.counter_side == 'yes' %}text-emerald-600{% else %}text-rose-600{% endif %}">{{ d.counter_side|upper }}</strong></p>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="flex flex-wrap gap-2">
         {% if d.status == 'accepted' %}
-        <a href="{% url 'debate_chat' d.id %}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-          Open Chat
-        </a>
+          <a href="{% url 'debate_chat' d.id %}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            Open Chat
+          </a>
+
         {% elif d.status == 'pending' and d.target == request.user %}
-        <a href="{% url 'accept_debate' d.id %}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition">Accept</a>
-        <a href="{% url 'reject_debate' d.id %}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:text-destructive hover:border-destructive transition">Reject</a>
+          <a href="{% url 'accept_debate' d.id %}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition">Accept</a>
+          <button onclick="showCounterForm('{{ d.id }}')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-violet-500 text-white text-xs font-semibold hover:bg-violet-600 transition">↩ Counter</button>
+          <form method="post" action="{% url 'reject_debate' d.id %}" class="inline">{% csrf_token %}
+            <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:text-destructive hover:border-destructive transition">Reject</button>
+          </form>
+
+        {% elif d.status == 'countered' and d.initiator == request.user %}
+          <button onclick="acceptCounter('{{ d.id }}')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition">Accept Counter</button>
+          <form method="post" action="{% url 'reject_debate' d.id %}" class="inline">{% csrf_token %}
+            <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:text-destructive hover:border-destructive transition">Reject</button>
+          </form>
+
         {% elif d.status == 'completed' %}
-        <a href="{% url 'debate_transcript' d.id %}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-foreground hover:bg-muted/60 transition">View Transcript</a>
-        {% if d.status == 'completed' %}
-        <button onclick="requestRematch('{{ d.id }}', this)"
-            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-amber-300 text-amber-600 dark:border-amber-700 dark:text-amber-400 text-xs font-semibold hover:bg-amber-50 dark:hover:bg-amber-950/30 transition">
-            ⚔️ Rematch
-        </button>
+          <a href="{% url 'debate_transcript' d.id %}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-foreground hover:bg-muted/60 transition">View Transcript</a>
+          <button onclick="requestRematch('{{ d.id }}', this)"
+              class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-amber-300 text-amber-600 dark:border-amber-700 dark:text-amber-400 text-xs font-semibold hover:bg-amber-50 dark:hover:bg-amber-950/30 transition">
+              ⚔️ Rematch
+          </button>
         {% endif %}
-        {% endif %}
+
         <a href="{% url 'discussion' d.post.id %}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:bg-muted/60 transition">View Post</a>
       </div>
+
+      <!-- Counter-proposal inline form (hidden by default) -->
+      {% if d.status == 'pending' and d.target == request.user %}
+      <div id="counter-form-{{ d.id }}" class="hidden mt-3 rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/20 p-4 space-y-3">
+        <p class="text-xs font-semibold text-violet-700 dark:text-violet-400">Propose a counter-topic</p>
+        <input type="text" id="counter-topic-{{ d.id }}" maxlength="200" placeholder="Alternative debate topic…"
+          class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-400">
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-1.5 text-xs font-medium text-foreground cursor-pointer">
+            <input type="radio" name="counter-side-{{ d.id }}" value="yes" class="accent-emerald-500"> I'll argue <strong class="text-emerald-600">YES</strong>
+          </label>
+          <label class="flex items-center gap-1.5 text-xs font-medium text-foreground cursor-pointer">
+            <input type="radio" name="counter-side-{{ d.id }}" value="no" class="accent-rose-500"> I'll argue <strong class="text-rose-600">NO</strong>
+          </label>
+          <label class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground cursor-pointer">
+            <input type="radio" name="counter-side-{{ d.id }}" value="" checked> No preference
+          </label>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="submitCounter('{{ d.id }}')" class="px-4 py-1.5 rounded-full bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 transition">Send Counter</button>
+          <button onclick="hideCounterForm('{{ d.id }}')" class="px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:bg-muted/60 transition">Cancel</button>
+        </div>
+        <p id="counter-error-{{ d.id }}" class="text-xs text-destructive hidden"></p>
+      </div>
+      {% endif %}
     </div>
     {% endwith %}
     {% endfor %}
   </div>
   {% endif %}
 </div>
+
 <script>
+function showCounterForm(id) {
+  document.getElementById('counter-form-' + id).classList.remove('hidden');
+}
+function hideCounterForm(id) {
+  document.getElementById('counter-form-' + id).classList.add('hidden');
+}
+
+function submitCounter(id) {
+  var topic = document.getElementById('counter-topic-' + id).value.trim();
+  var sideEl = document.querySelector('input[name="counter-side-' + id + '"]:checked');
+  var side = sideEl ? sideEl.value : '';
+  var errEl = document.getElementById('counter-error-' + id);
+  errEl.classList.add('hidden');
+
+  if (!topic) { errEl.textContent = 'Please enter a counter-topic.'; errEl.classList.remove('hidden'); return; }
+
+  fetch('/counter-debate/' + id + '/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'counter_topic=' + encodeURIComponent(topic) + '&counter_side=' + encodeURIComponent(side),
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      location.reload();
+    } else {
+      errEl.textContent = d.error || 'Could not send counter.';
+      errEl.classList.remove('hidden');
+    }
+  });
+}
+
+function acceptCounter(id) {
+  fetch('/accept-counter-debate/' + id + '/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCookie('csrftoken')},
+  }).then(r => r.json()).then(d => {
+    if (d.success && d.redirect_url) {
+      window.location.href = d.redirect_url;
+    } else {
+      alert(d.error || 'Could not accept counter.');
+    }
+  });
+}
+
 function requestRematch(debateId, btn) {
-    btn.disabled = true; btn.textContent = 'Requesting…';
-    fetch('/debates/' + debateId + '/rematch/', {
-        method: 'POST',
-        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'}
-    }).then(r => r.json()).then(d => {
-        if (d.success) { btn.textContent = '✓ Requested'; }
-        else { btn.textContent = '⚔️ Rematch'; btn.disabled = false; alert(d.error || 'Could not request rematch.'); }
-    });
+  btn.disabled = true; btn.textContent = 'Requesting…';
+  fetch('/debates/' + debateId + '/rematch/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'}
+  }).then(r => r.json()).then(d => {
+    if (d.success) { btn.textContent = '✓ Requested'; }
+    else { btn.textContent = '⚔️ Rematch'; btn.disabled = false; alert(d.error || 'Could not request rematch.'); }
+  });
 }
 function getCookie(n) { var v = document.cookie.match('(^|;) ?'+n+'=([^;]*)(;|$)'); return v ? v[2] : null; }
 </script>

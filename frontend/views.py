@@ -48,11 +48,30 @@ def _notif_pref(user, notif_type, channel):
     return bool(default_type_prefs.get(channel, True))
 
 
+def _in_quiet_hours(profile):
+    """Return True if current local time falls within the user's configured quiet hours."""
+    if not profile or not profile.quiet_hours_start or not profile.quiet_hours_end:
+        return False
+    now_time = timezone.localtime(timezone.now()).time().replace(second=0, microsecond=0)
+    start = profile.quiet_hours_start
+    end = profile.quiet_hours_end
+    if start <= end:
+        return start <= now_time < end
+    # Overnight range e.g. 22:00 – 08:00
+    return now_time >= start or now_time < end
+
+
 def _send_notification_email(user, subject, body, notif_type='mention'):
-    """Fire-and-forget notification email; skips silently if no address or send fails."""
+    """Fire-and-forget notification email; skips silently if no address, opted out, or quiet hours."""
     if not getattr(user, 'email', None):
         return
     if not _notif_pref(user, notif_type, 'email'):
+        return
+    try:
+        profile = user.profile
+    except Exception:
+        profile = None
+    if _in_quiet_hours(profile):
         return
     try:
         send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
@@ -3407,16 +3426,93 @@ def accept_debate(request, debate_id):
 @login_required
 @require_POST
 def reject_debate(request, debate_id):
-    """Reject a debate request"""
+    """Reject a debate request (or reject a counter-proposal as the initiator)."""
     try:
-        debate = Debate.objects.get(id=debate_id, target=request.user)
-        debate.status = 'rejected'
-        debate.save()
-        messages.success(request, 'Debate rejected!')
+        debate = Debate.objects.get(id=debate_id)
+        if debate.status == 'countered' and debate.initiator == request.user:
+            debate.status = 'rejected'
+            debate.save()
+        elif debate.target == request.user and debate.status in ('pending', 'countered'):
+            debate.status = 'rejected'
+            debate.save()
+        else:
+            messages.error(request, 'You cannot reject this debate.')
+            return redirect('debate_inbox')
+        messages.success(request, 'Debate rejected.')
     except Debate.DoesNotExist:
-        messages.error(request, 'Debate not found')
+        messages.error(request, 'Debate not found.')
+    return redirect('debate_inbox')
 
-    return redirect('notifications')
+
+@login_required
+@require_POST
+def counter_debate(request, debate_id):
+    """Target user proposes a counter-topic/side instead of accepting or rejecting."""
+    try:
+        debate = Debate.objects.get(id=debate_id, target=request.user, status='pending')
+    except Debate.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Debate not found or already actioned.'}, status=404)
+
+    counter_topic = (request.POST.get('counter_topic') or '').strip()[:200]
+    counter_side = (request.POST.get('counter_side') or '').strip()
+    if not counter_topic:
+        return JsonResponse({'success': False, 'error': 'A counter-topic is required.'}, status=400)
+    if counter_side not in ('yes', 'no', ''):
+        return JsonResponse({'success': False, 'error': 'Invalid side.'}, status=400)
+
+    debate.counter_topic = counter_topic
+    debate.counter_side = counter_side
+    debate.status = 'countered'
+    debate.save(update_fields=['counter_topic', 'counter_side', 'status', 'updated_at'])
+
+    # Notify the initiator
+    Notification.objects.create(
+        user=debate.initiator,
+        notif_type='debate_request',
+        message=f"@{request.user.username} sent a counter-proposal for your debate challenge.",
+        related_user=request.user,
+    )
+    _send_notification_email(
+        debate.initiator,
+        f"Counter-proposal from @{request.user.username}",
+        f"@{request.user.username} wants to debate a different topic: \"{counter_topic}\".\n"
+        f"Visit your debate inbox to accept or reject.",
+        notif_type='debate_request',
+    )
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_POST
+def accept_counter_debate(request, debate_id):
+    """Initiator accepts the counter-proposal, turning it into a full debate."""
+    try:
+        debate = Debate.objects.get(id=debate_id, initiator=request.user, status='countered')
+    except Debate.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Debate not found.'}, status=404)
+
+    debate.status = 'accepted'
+    debate.save(update_fields=['status', 'updated_at'])
+
+    _ensure_debate_core_participants(debate)
+    if not debate.end_controller_id:
+        preferred = debate.comment.vote_type if debate.comment_id else 'yes'
+        _set_end_controller_with_fallback(debate, preferred_side=preferred)
+
+    if not debate.messages.exists():
+        DebateMessage.objects.create(
+            debate=debate,
+            sender=request.user,
+            content=f"Counter-proposal accepted. New topic: {debate.counter_topic}",
+        )
+
+    Notification.objects.create(
+        user=debate.target,
+        notif_type='debate_request',
+        message=f"@{request.user.username} accepted your counter-proposal!",
+        related_user=request.user,
+    )
+    return JsonResponse({'success': True, 'redirect_url': f'/debates/{debate.id}/chat/'})
 
 
 @login_required
@@ -5981,9 +6077,13 @@ def notification_prefs_page(request):
     """Render the notification preferences settings page."""
     profile = Profile.objects.filter(user=request.user).first()
     current_prefs = profile.notification_prefs if profile else {}
+    quiet_start = profile.quiet_hours_start.strftime('%H:%M') if profile and profile.quiet_hours_start else ''
+    quiet_end = profile.quiet_hours_end.strftime('%H:%M') if profile and profile.quiet_hours_end else ''
     return render(request, 'frontend/notification_prefs.html', {
         'current_prefs': current_prefs,
         'default_prefs': DEFAULT_NOTIFICATION_PREFS,
+        'quiet_hours_start': quiet_start,
+        'quiet_hours_end': quiet_end,
     })
 
 
@@ -6022,6 +6122,47 @@ def update_notification_prefs(request):
     profile.notification_prefs = current
     profile.save(update_fields=['notification_prefs', 'updated_at'])
     return JsonResponse({'success': True, 'prefs': current})
+
+
+@login_required
+@require_POST
+def update_quiet_hours(request):
+    """Save or clear the user's quiet-hours window."""
+    profile = Profile.objects.filter(user=request.user).first()
+    if not profile:
+        return JsonResponse({'success': False, 'error': 'Profile not found.'}, status=404)
+
+    raw_start = (request.POST.get('quiet_hours_start') or '').strip()
+    raw_end = (request.POST.get('quiet_hours_end') or '').strip()
+
+    import datetime as _dt
+    def _parse_time(s):
+        if not s:
+            return None
+        try:
+            return _dt.datetime.strptime(s, '%H:%M').time()
+        except ValueError:
+            return None
+
+    if raw_start == '' and raw_end == '':
+        profile.quiet_hours_start = None
+        profile.quiet_hours_end = None
+    else:
+        t_start = _parse_time(raw_start)
+        t_end = _parse_time(raw_end)
+        if t_start is None or t_end is None:
+            return JsonResponse({'success': False, 'error': 'Invalid time format. Use HH:MM.'}, status=400)
+        if t_start == t_end:
+            return JsonResponse({'success': False, 'error': 'Start and end time cannot be the same.'}, status=400)
+        profile.quiet_hours_start = t_start
+        profile.quiet_hours_end = t_end
+
+    profile.save(update_fields=['quiet_hours_start', 'quiet_hours_end', 'updated_at'])
+    return JsonResponse({
+        'success': True,
+        'quiet_hours_start': profile.quiet_hours_start.strftime('%H:%M') if profile.quiet_hours_start else '',
+        'quiet_hours_end': profile.quiet_hours_end.strftime('%H:%M') if profile.quiet_hours_end else '',
+    })
 
 
 # ─── Achievement Badges ───────────────────────────────────────────────────────
@@ -6598,6 +6739,7 @@ def delete_story(request, story_id):
 @login_required
 def creator_analytics(request, post_id):
     post = get_object_or_404(Post, id=post_id, user=request.user)
+    now = timezone.now()
 
     total_views = PostView.objects.filter(post=post).count()
     total_likes = PostAction.objects.filter(post=post, action='like').count()
@@ -6610,17 +6752,52 @@ def creator_analytics(request, post_id):
     for action_choice, _ in PostAction.ACTION_CHOICES:
         reaction_breakdown[action_choice] = PostAction.objects.filter(post=post, action=action_choice).count()
 
-    # Last 7 days daily data
+    # Last 30 days daily data (multi-series: views, likes, comments)
+    insights_by_date = {
+        ins.date: ins
+        for ins in PostInsight.objects.filter(post=post, date__gte=(now - timedelta(days=29)).date())
+    }
     daily_data = []
-    for i in range(6, -1, -1):
-        day = (timezone.now() - timedelta(days=i)).date()
-        insight = PostInsight.objects.filter(post=post, date=day).first()
+    for i in range(29, -1, -1):
+        day = (now - timedelta(days=i)).date()
+        ins = insights_by_date.get(day)
         daily_data.append({
             'date': day.strftime('%b %d'),
-            'views': insight.unique_viewers if insight else 0,
-            'likes': insight.likes_count if insight else 0,
-            'saves': insight.saves_count if insight else 0,
+            'views': ins.unique_viewers if ins else 0,
+            'likes': ins.likes_count if ins else 0,
+            'comments': ins.comments_count if ins else 0,
+            'saves': ins.saves_count if ins else 0,
         })
+
+    # Week-over-week comparison (last 7 days vs prior 7 days)
+    this_week_views = sum(d['views'] for d in daily_data[-7:])
+    prev_week_views = sum(d['views'] for d in daily_data[-14:-7])
+    this_week_likes = sum(d['likes'] for d in daily_data[-7:])
+    prev_week_likes = sum(d['likes'] for d in daily_data[-14:-7])
+
+    def _pct_change(cur, prev):
+        if prev == 0:
+            return None
+        return round((cur - prev) / prev * 100, 1)
+
+    views_wow = _pct_change(this_week_views, prev_week_views)
+    likes_wow = _pct_change(this_week_likes, prev_week_likes)
+
+    # Best hour to post: group all PostActions on this post by hour-of-day
+    from django.db.models.functions import ExtractHour
+    hour_counts = (
+        PostAction.objects.filter(post=post, action='like')
+        .annotate(hour=ExtractHour('created_at'))
+        .values('hour')
+        .annotate(cnt=Count('id'))
+        .order_by('-cnt')
+    )
+    best_hour = None
+    if hour_counts:
+        best_h = hour_counts[0]['hour']
+        period = 'AM' if best_h < 12 else 'PM'
+        display_h = best_h % 12 or 12
+        best_hour = f"{display_h} {period}"
 
     # Engagement rate = (likes + comments + saves) / views * 100
     total_engagements = total_likes + total_comments + total_saves
@@ -6639,6 +6816,9 @@ def creator_analytics(request, post_id):
         'engagement_rate': engagement_rate,
         'reading_time': post.reading_time_minutes,
         'word_count': post.word_count,
+        'views_wow': views_wow,
+        'likes_wow': likes_wow,
+        'best_hour': best_hour,
     }
     return render(request, 'frontend/creator_analytics.html', context)
 

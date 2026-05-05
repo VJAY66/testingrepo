@@ -3,25 +3,28 @@
 
 {% block content %}
 <style>
-.analytics-page { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; }
+.analytics-page { max-width: 700px; margin: 0 auto; padding: 24px 16px 48px; }
 .stat-card { border-radius: 1rem; border: 1px solid hsl(var(--border)/0.7); background: hsl(var(--card)); padding: 16px 18px; }
 .stat-num { font-size: 1.8rem; font-weight: 800; line-height: 1; }
 .stat-label { font-size: 12px; color: hsl(var(--muted-foreground)); font-weight: 600; margin-top: 4px; }
 .stat-icon { font-size: 1.4rem; margin-bottom: 6px; }
-.chart-bar-wrap { display:flex; flex-direction:column; gap:6px; }
-.chart-bar-row { display:flex; align-items:center; gap:8px; }
-.chart-bar-label { width: 44px; text-align:right; font-size:11px; color:hsl(var(--muted-foreground)); flex-shrink:0; }
-.chart-bar-track { flex:1; height:10px; border-radius:999px; background:hsl(var(--border)/0.5); overflow:hidden; }
-.chart-bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,hsl(var(--primary)),hsl(var(--primary)/0.6)); transition:width 0.6s cubic-bezier(0.34,1.56,0.64,1); }
-.chart-bar-val { width: 32px; font-size:11px; color:hsl(var(--foreground)); font-weight:600; }
-.reaction-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-b border-border; }
-.reaction-row:last-child { border-b:none; }
-.eng-ring { width:80px; height:80px; border-radius:50%; border: 5px solid hsl(var(--primary)/0.15); display:flex; align-items:center; justify-content:center; position:relative; }
-.eng-ring-fill { position:absolute; inset:0; border-radius:50%; border:5px solid hsl(var(--primary)); clip-path:inset(0 0 0 0); }
+.wow-badge { font-size: 11px; font-weight: 700; margin-top: 4px; }
+.wow-up { color: #16a34a; }
+.wow-down { color: #dc2626; }
+.chart-wrap { overflow-x: auto; }
+.chart-canvas-wrap { min-width: 480px; }
+.legend-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; }
+.reaction-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom: 1px solid hsl(var(--border)/0.4); }
+.reaction-row:last-child { border-bottom: none; }
+.tab-btn { padding: 5px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid hsl(var(--border)); cursor: pointer; transition: background 0.15s, color 0.15s; }
+.tab-btn.active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: transparent; }
+.tab-btn:not(.active) { background: transparent; color: hsl(var(--muted-foreground)); }
+.tab-btn:not(.active):hover { background: hsl(var(--muted)/0.5); color: hsl(var(--foreground)); }
+.insight-pill { display:flex; align-items:center; gap:8px; padding:10px 14px; border-radius:0.75rem; background:hsl(var(--muted)/0.4); font-size:13px; }
 </style>
 
 <div class="analytics-page">
-  <!-- Back + title -->
+  <!-- Header -->
   <div class="flex items-center gap-3 mb-5">
     <a href="{% url 'discussion' post.id %}" class="text-muted-foreground hover:text-foreground text-lg">←</a>
     <div class="flex-1 min-w-0">
@@ -33,7 +36,7 @@
     </button>
   </div>
 
-  <!-- Reading time row -->
+  <!-- Meta row -->
   <div class="flex items-center gap-3 mb-6 flex-wrap">
     <span class="text-xs text-muted-foreground">📖 {{ reading_time }} min read · {{ word_count }} words</span>
     <a href="{% url 'discussion' post.id %}" class="ml-auto text-xs text-primary hover:underline">View post →</a>
@@ -45,11 +48,21 @@
       <div class="stat-icon">👁</div>
       <div class="stat-num text-foreground">{{ total_views }}</div>
       <div class="stat-label">Total Views</div>
+      {% if views_wow is not None %}
+      <div class="wow-badge {% if views_wow >= 0 %}wow-up{% else %}wow-down{% endif %}">
+        {% if views_wow >= 0 %}↑{% else %}↓{% endif %} {{ views_wow|floatformat:1 }}% vs last week
+      </div>
+      {% endif %}
     </div>
     <div class="stat-card">
       <div class="stat-icon">⭐</div>
       <div class="stat-num text-foreground">{{ total_likes }}</div>
       <div class="stat-label">Likes</div>
+      {% if likes_wow is not None %}
+      <div class="wow-badge {% if likes_wow >= 0 %}wow-up{% else %}wow-down{% endif %}">
+        {% if likes_wow >= 0 %}↑{% else %}↓{% endif %} {{ likes_wow|floatformat:1 }}% vs last week
+      </div>
+      {% endif %}
     </div>
     <div class="stat-card">
       <div class="stat-icon">🔖</div>
@@ -66,30 +79,39 @@
       <div class="stat-num text-foreground">{{ total_debates }}</div>
       <div class="stat-label">Debates</div>
     </div>
-    <div class="stat-card flex flex-col items-center justify-center">
-      <div class="eng-ring mb-2">
-        <span class="text-lg font-bold text-primary z-10">{{ engagement_rate }}%</span>
-      </div>
+    <div class="stat-card flex flex-col items-start">
+      <div class="stat-icon">📊</div>
+      <div class="stat-num text-foreground">{{ engagement_rate }}%</div>
       <div class="stat-label">Engagement Rate</div>
     </div>
   </div>
 
-  <!-- 7-day chart -->
+  <!-- Best posting hour insight -->
+  {% if best_hour %}
+  <div class="insight-pill mb-5">
+    <span class="text-lg">⏰</span>
+    <span class="text-foreground font-semibold">Best time to post:</span>
+    <span class="text-primary font-bold">{{ best_hour }}</span>
+    <span class="text-muted-foreground text-xs">— based on when you get the most likes</span>
+  </div>
+  {% endif %}
+
+  <!-- 30-day multi-series chart -->
   <div class="stat-card mb-6">
-    <h2 class="font-bold text-foreground text-sm mb-4">Last 7 Days — Views</h2>
-    {% with max_views=daily_data.0.views %}
-    <div class="chart-bar-wrap" id="daily-chart">
-      {% for day in daily_data %}
-      <div class="chart-bar-row">
-        <span class="chart-bar-label">{{ day.date }}</span>
-        <div class="chart-bar-track">
-          <div class="chart-bar-fill" style="width:0%" data-target="{% if total_views > 0 %}{{ day.views }}{% else %}0{% endif %}" data-max="{{ total_views }}"></div>
-        </div>
-        <span class="chart-bar-val">{{ day.views }}</span>
+    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+      <h2 class="font-bold text-foreground text-sm">Last 30 Days</h2>
+      <div class="flex items-center gap-2">
+        <button class="tab-btn active" onclick="setMetric('views', this)">Views</button>
+        <button class="tab-btn" onclick="setMetric('likes', this)">Likes</button>
+        <button class="tab-btn" onclick="setMetric('comments', this)">Comments</button>
+        <button class="tab-btn" onclick="setMetric('saves', this)">Saves</button>
       </div>
-      {% endfor %}
     </div>
-    {% endwith %}
+    <div class="chart-wrap">
+      <div class="chart-canvas-wrap">
+        <canvas id="trendChart" height="180"></canvas>
+      </div>
+    </div>
   </div>
 
   <!-- Reaction breakdown -->
@@ -103,7 +125,7 @@
       </span>
       <div class="flex items-center gap-3">
         <div class="h-2 rounded-full bg-primary/20 overflow-hidden" style="width:80px">
-          <div class="h-full rounded-full bg-primary" style="width:{% widthratio count total_views 100 %}%"></div>
+          <div class="h-full rounded-full bg-primary" style="width:{% if total_views > 0 %}{% widthratio count total_views 100 %}{% else %}0{% endif %}%"></div>
         </div>
         <span class="text-sm font-bold text-foreground">{{ count }}</span>
       </div>
@@ -115,20 +137,102 @@
 </div>
 
 <script>
-// Animate bar chart on load
-window.addEventListener('DOMContentLoaded', () => {
-  const bars = document.querySelectorAll('.chart-bar-fill');
-  const maxVal = Math.max(...Array.from(bars).map(b => parseInt(b.dataset.target) || 0), 1);
-  setTimeout(() => {
-    bars.forEach(bar => {
-      const val = parseInt(bar.dataset.target) || 0;
-      bar.style.width = (val / maxVal * 100) + '%';
-    });
-  }, 100);
-});
+var dailyData = {{ daily_data_json|safe }};
+var currentMetric = 'views';
+var chartColors = { views: '#6366f1', likes: '#f59e0b', comments: '#10b981', saves: '#8b5cf6' };
+
+function buildChart(metric) {
+  var canvas = document.getElementById('trendChart');
+  var ctx = canvas.getContext('2d');
+  var w = canvas.parentElement.offsetWidth || 480;
+  var h = 180;
+  canvas.width = w;
+  canvas.height = h;
+
+  var vals = dailyData.map(function(d) { return d[metric] || 0; });
+  var maxVal = Math.max.apply(null, vals.concat([1]));
+  var labels = dailyData.map(function(d) { return d.date; });
+  var padL = 32, padR = 12, padT = 16, padB = 28;
+  var plotW = w - padL - padR;
+  var plotH = h - padT - padB;
+  var step = plotW / (vals.length - 1);
+  var color = chartColors[metric] || '#6366f1';
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(128,128,128,0.12)';
+  ctx.lineWidth = 1;
+  [0, 0.25, 0.5, 0.75, 1].forEach(function(frac) {
+    var y = padT + plotH * (1 - frac);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+    if (frac > 0) {
+      ctx.fillStyle = 'rgba(128,128,128,0.55)';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(Math.round(maxVal * frac), padL - 4, y + 3);
+    }
+  });
+
+  // Area fill
+  ctx.beginPath();
+  vals.forEach(function(v, i) {
+    var x = padL + i * step;
+    var y = padT + plotH * (1 - v / maxVal);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.lineTo(padL + (vals.length - 1) * step, padT + plotH);
+  ctx.lineTo(padL, padT + plotH);
+  ctx.closePath();
+  ctx.fillStyle = color + '22';
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  vals.forEach(function(v, i) {
+    var x = padL + i * step;
+    var y = padT + plotH * (1 - v / maxVal);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // X-axis labels (every ~5 days)
+  ctx.fillStyle = 'rgba(128,128,128,0.7)';
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'center';
+  vals.forEach(function(v, i) {
+    if (i % 5 === 0 || i === vals.length - 1) {
+      var x = padL + i * step;
+      ctx.fillText(labels[i], x, h - 6);
+    }
+  });
+
+  // Dots at endpoints
+  [0, vals.length - 1].forEach(function(i) {
+    var x = padL + i * step;
+    var y = padT + plotH * (1 - vals[i] / maxVal);
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  });
+}
+
+function setMetric(metric, btn) {
+  currentMetric = metric;
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  buildChart(metric);
+}
+
+window.addEventListener('DOMContentLoaded', function() { buildChart('views'); });
+window.addEventListener('resize', function() { buildChart(currentMetric); });
 
 function refreshInsight() {
-  const btn = document.getElementById('refresh-btn');
+  var btn = document.getElementById('refresh-btn');
   btn.textContent = '…';
   btn.disabled = true;
   fetch('/posts/{{ post.id }}/analytics/refresh/', {
@@ -136,5 +240,6 @@ function refreshInsight() {
     headers: { 'X-CSRFToken': getCookie('csrftoken') }
   }).then(r => r.json()).then(() => location.reload());
 }
+function getCookie(n) { var v = document.cookie.match('(^|;) ?'+n+'=([^;]*)(;|$)'); return v ? v[2] : null; }
 </script>
 {% endblock %}
