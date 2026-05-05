@@ -1,0 +1,22 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Live Debates — Coming Soon{% endblock %}
+{% block content %}
+<div class="min-h-[60vh] flex items-center justify-center px-4">
+  <div class="text-center space-y-5 max-w-sm">
+    <div class="text-6xl">⚔️</div>
+    <h1 class="text-2xl font-bold text-foreground">Live Debates</h1>
+    <p class="text-sm text-muted-foreground leading-relaxed">
+      Real-time head-to-head debates with community voting are on the way.
+      We're launching this once we have enough active debaters to make it worthwhile.
+    </p>
+    <div class="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+      <a href="{% url 'debate_inbox' %}" class="px-5 py-2.5 text-sm font-semibold rounded-xl bg-primary text-white hover:bg-primary/80 transition-colors">
+        ⚔️ Start a Debate now
+      </a>
+      <a href="{% url 'index' %}" class="px-5 py-2.5 text-sm font-semibold rounded-xl border border-border text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors">
+        Browse discussions
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
