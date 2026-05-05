@@ -1,0 +1,38 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Who Viewed Your Profile — PickASide{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6 space-y-4">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold text-foreground">Who Viewed Your Profile</h1>
+    <a href="{% url 'profile' %}" class="text-sm text-muted-foreground hover:text-primary">← Back to profile</a>
+  </div>
+
+  {% if hidden %}
+  <div class="bg-card border border-border rounded-2xl p-6 text-center text-muted-foreground">
+    <p class="text-sm">Profile view tracking is disabled. Enable it in your privacy settings to see who visited your profile.</p>
+    <a href="{% url 'profile' %}" class="mt-3 inline-block text-sm text-primary hover:underline">Go to settings</a>
+  </div>
+  {% elif views %}
+  <p class="text-sm text-muted-foreground">People who viewed your profile in the last 30 days.</p>
+  <div class="space-y-3">
+    {% for pv in views %}
+    <div class="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
+      {% if pv.viewer.profile.get_picture_url %}
+      <img src="{{ pv.viewer.profile.get_picture_url }}" class="w-10 h-10 rounded-full object-cover border border-border flex-shrink-0">
+      {% else %}
+      <div class="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">{{ pv.viewer.username|first|upper }}</div>
+      {% endif %}
+      <div class="flex-1 min-w-0">
+        <a href="{% url 'user_profile' pv.viewer.username %}" class="font-semibold text-sm text-foreground hover:underline">@{{ pv.viewer.username }}</a>
+        <p class="text-xs text-muted-foreground">{{ pv.viewed_at|timesince }} ago</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="bg-card border border-border rounded-2xl p-6 text-center text-muted-foreground">
+    <p class="text-sm">No profile views in the last 30 days.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -23,7 +23,7 @@ import uuid
 
 from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest, PostReport, LiveDebateRoom, LiveDebateMessage, LiveDebateVote, PollPrediction
 from discussions.signals import notify_post_author
-from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription, UserBan
+from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription, UserBan, ProfileView
 from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
 from utils.moderation import check_content_moderation
@@ -608,6 +608,20 @@ def _post_action_counts(post):
     }
 
 
+_LIKE_MILESTONES = [10, 50, 100, 500]
+
+def _check_like_milestone(post):
+    like_count = PostAction.objects.filter(post=post, action='like').count()
+    if like_count not in _LIKE_MILESTONES:
+        return
+    message = f'Your post "{post.title[:60]}" reached {like_count} likes!'
+    Notification.objects.get_or_create(
+        user=post.user,
+        notification_type='author_like_milestone',
+        message=message,
+    )
+
+
 @require_POST
 def post_action(request, post_id):
     action = request.POST.get('action')
@@ -644,6 +658,8 @@ def post_action(request, post_id):
             try:
                 PostAction.objects.create(user=request.user, post=post, action=action)
                 status = 'added'
+                if action == 'like':
+                    _check_like_milestone(post)
                 if action == 'save':
                     notify_post_author(post, 'author_save', request.user)
             except IntegrityError:
@@ -1740,6 +1756,23 @@ def user_profile(request, username):
         except Exception:
             user_endorsements = []
 
+    # Record profile view (skip self-views, unauthenticated, and opted-out profiles)
+    if (request.user.is_authenticated
+            and request.user != profile_user
+            and profile_obj
+            and not profile_obj.hide_profile_views):
+        ProfileView.objects.update_or_create(
+            viewer=request.user,
+            viewed=profile_user,
+            defaults={},
+        )
+        # Notify the viewed user (once per viewer — deduped by unique constraint)
+        Notification.objects.get_or_create(
+            user=profile_user,
+            notification_type='profile_view',
+            message=f'{request.user.username} viewed your profile.',
+        )
+
     user_reviews = Review.objects.filter(user=profile_user, is_deleted_by_moderation=False).order_by('-created_at')
     user_questions = Question.objects.filter(user=profile_user, is_deleted_by_moderation=False).order_by('-created_at')
     user_polls = Poll.objects.filter(user=profile_user).order_by('-created_at')
@@ -1793,6 +1826,12 @@ def user_profile(request, username):
         'user_endorsements': user_endorsements,
         'highlights': highlights,
         'user_highlight_post_ids': user_highlight_post_ids,
+        'hide_profile_views': profile_obj.hide_profile_views if profile_obj else False,
+        'profile_views_count': (
+            ProfileView.objects.filter(viewed=profile_user).count()
+            if profile_obj and not profile_obj.hide_profile_views and request.user == profile_user
+            else None
+        ),
     }
     return render(request, 'frontend/user_profile.html', context)
 
@@ -8248,3 +8287,22 @@ join_live_debate_room    = _live_debate_coming_soon
 live_debate_send_message = _live_debate_coming_soon
 live_debate_poll_messages = _live_debate_coming_soon
 live_debate_vote         = _live_debate_coming_soon
+
+
+@login_required
+def who_viewed_profile(request):
+    """Show the current user a list of people who viewed their profile in the last 30 days."""
+    profile_obj = Profile.objects.filter(user=request.user).first()
+    if profile_obj and profile_obj.hide_profile_views:
+        return render(request, 'frontend/who_viewed_profile.html', {'hidden': True})
+
+    cutoff = timezone.now() - timedelta(days=30)
+    views = (
+        ProfileView.objects.filter(viewed=request.user, viewed_at__gte=cutoff)
+        .select_related('viewer__profile')
+        .order_by('-viewed_at')
+    )
+    return render(request, 'frontend/who_viewed_profile.html', {
+        'views': views,
+        'hidden': False,
+    })

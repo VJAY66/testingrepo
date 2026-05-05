@@ -8,6 +8,7 @@ urlpatterns = [
     path('discussion/<str:post_id>/', views.discussion, name='discussion'),
     path('profile/', views.profile, name='profile'),
     path('profile/upload-picture/', views.upload_profile_picture, name='upload_profile_picture'),
+    path('profile/who-viewed/', views.who_viewed_profile, name='who_viewed_profile'),
     path('user/<str:username>/', views.user_profile, name='user_profile'),
     path('user/<str:username>/report/', views.report_user_profile, name='report_user_profile'),
     path('search/', views.search, name='search'),

@@ -46,6 +46,7 @@ class Profile(models.Model):
     quiet_hours_start = models.TimeField(null=True, blank=True, help_text='No notification emails sent after this time')
     quiet_hours_end = models.TimeField(null=True, blank=True, help_text='Notification emails resume at this time')
     streak_grace_used_at = models.DateField(null=True, blank=True, help_text='Date the weekly streak grace day was last used')
+    hide_profile_views = models.BooleanField(default=False, help_text='When True, this user\'s profile visits are not recorded and they cannot see who viewed them')
     MENTION_ALLOW_EVERYONE = 'everyone'
     MENTION_ALLOW_FOLLOWERS = 'followers'
     MENTION_ALLOW_NOBODY = 'nobody'
@@ -345,3 +346,19 @@ class UserBan(models.Model):
 
     def __str__(self):
         return f"Ban on {self.user.username} ({self.ban_type})"
+
+
+class ProfileView(models.Model):
+    """Records when one user views another user's public profile."""
+    viewer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='profiles_viewed')
+    viewed = models.ForeignKey(User, on_delete=models.CASCADE, related_name='profile_views_received')
+    viewed_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.viewer.username} viewed {self.viewed.username}"
+
+    class Meta:
+        # One row per viewer-viewed pair; auto_now updates the timestamp on re-visit
+        ordering = ['-viewed_at']
+        constraints = [models.UniqueConstraint(fields=['viewer', 'viewed'], name='unique_profile_view')]
+        indexes = [models.Index(fields=['viewed', 'viewed_at'])]

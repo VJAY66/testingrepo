@@ -326,7 +326,9 @@ class Notification(models.Model):
         ('author_debate', 'New Debate on Your Post'),
         ('author_repost', 'Your Post was Reposted'),
         ('author_save', 'Your Post was Saved'),
+        ('author_like_milestone', 'Your Post Hit a Like Milestone'),
         ('mention', 'You Were Mentioned'),
+        ('profile_view', 'Someone Viewed Your Profile'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
