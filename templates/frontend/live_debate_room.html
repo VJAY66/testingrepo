@@ -1,0 +1,287 @@
+{% extends 'frontend/base.html' %}
+{% block title %}{{ room.title }} — Live Debate{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6 space-y-4">
+
+  <!-- Header -->
+  <div class="rounded-2xl border border-border bg-card p-5 space-y-3">
+    <div class="flex items-start justify-between gap-3">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-1">
+          <a href="{% url 'live_debate_rooms' %}" class="text-xs text-muted-foreground hover:text-primary">← All Rooms</a>
+          <span class="text-xs px-2 py-0.5 rounded-full font-bold uppercase tracking-wide
+            {% if room.status == 'live' %}bg-red-500/15 text-red-600 dark:text-red-400
+            {% elif room.status == 'voting' %}bg-amber-500/15 text-amber-600 dark:text-amber-400
+            {% elif room.status == 'open' %}bg-primary/10 text-primary
+            {% else %}bg-muted text-muted-foreground{% endif %}">
+            {% if room.status == 'live' %}🔴 Live{% elif room.status == 'voting' %}🗳️ Voting{% elif room.status == 'open' %}🔓 Open{% else %}Closed{% endif %}
+          </span>
+        </div>
+        <h1 class="text-base font-bold text-foreground leading-snug">{{ room.title }}</h1>
+        {% if room.description %}<p class="text-xs text-muted-foreground mt-1">{{ room.description }}</p>{% endif %}
+      </div>
+    </div>
+
+    <!-- Debaters row -->
+    <div class="flex items-center gap-3">
+      <div class="flex-1 rounded-xl border-2 {% if room.status == 'live' %}border-green-400/50{% else %}border-border{% endif %} bg-green-50/40 dark:bg-green-900/10 p-3 text-center">
+        {% if room.yes_debater %}
+        <p class="text-xs font-bold text-green-700 dark:text-green-400">✅ Yes / For</p>
+        <p class="text-sm font-semibold text-foreground mt-0.5">@{{ room.yes_debater.username }}</p>
+        {% else %}
+        <p class="text-xs font-bold text-muted-foreground">✅ Yes / For</p>
+        <p class="text-xs text-muted-foreground mt-0.5">Waiting…</p>
+        {% endif %}
+      </div>
+      <span class="text-lg font-black text-muted-foreground">VS</span>
+      <div class="flex-1 rounded-xl border-2 {% if room.status == 'live' %}border-red-400/50{% else %}border-border{% endif %} bg-red-50/40 dark:bg-red-900/10 p-3 text-center">
+        {% if room.no_debater %}
+        <p class="text-xs font-bold text-red-700 dark:text-red-400">❌ No / Against</p>
+        <p class="text-sm font-semibold text-foreground mt-0.5">@{{ room.no_debater.username }}</p>
+        {% else %}
+        <p class="text-xs font-bold text-muted-foreground">❌ No / Against</p>
+        <p class="text-xs text-muted-foreground mt-0.5">Waiting…</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Timer -->
+    {% if room.status == 'live' and room.ends_at %}
+    <div class="text-center">
+      <p class="text-xs text-muted-foreground">Time remaining: <span id="room-countdown" class="font-bold text-foreground tabular-nums">…</span></p>
+    </div>
+    {% endif %}
+
+    <!-- Join button (open room, user not in it yet) -->
+    {% if can_join %}
+    <button onclick="joinRoom('{{ room.id }}')"
+      class="w-full py-2.5 text-sm font-semibold rounded-xl bg-primary text-white hover:bg-primary/80 transition-colors">
+      Join as {% if not room.yes_debater %}Yes / For{% else %}No / Against{% endif %}
+    </button>
+    <p id="join-msg" class="text-xs text-center text-muted-foreground hidden"></p>
+    {% endif %}
+
+    <!-- Result banner -->
+    {% if room.status == 'closed' %}
+    <div class="rounded-xl p-3 text-center {% if room.winner_side == 'yes' %}bg-green-500/10 border border-green-400/40{% elif room.winner_side == 'no' %}bg-red-500/10 border border-red-400/40{% else %}bg-muted border border-border{% endif %}">
+      {% if room.winner_side == 'yes' %}
+      <p class="text-sm font-bold text-green-700 dark:text-green-300">🏆 Yes / For wins!</p>
+      <p class="text-xs text-muted-foreground mt-0.5">Community voted: {{ room.yes_votes }}–{{ room.no_votes }}</p>
+      {% elif room.winner_side == 'no' %}
+      <p class="text-sm font-bold text-red-700 dark:text-red-300">🏆 No / Against wins!</p>
+      <p class="text-xs text-muted-foreground mt-0.5">Community voted: {{ room.no_votes }}–{{ room.yes_votes }}</p>
+      {% else %}
+      <p class="text-sm font-bold text-muted-foreground">🤝 Draw — too close to call</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Voting panel -->
+  {% if room.status == 'voting' and user.is_authenticated and not user_is_debater %}
+  <div class="rounded-2xl border border-amber-300/50 bg-amber-50/40 dark:bg-amber-900/10 p-4 space-y-3">
+    <p class="text-sm font-bold text-foreground text-center">Who argued better?</p>
+    <div id="vote-counts" class="flex gap-3 justify-center text-xs text-muted-foreground">
+      <span>✅ Yes: <strong id="yes-vote-count">{{ room.yes_votes }}</strong></span>
+      <span>❌ No: <strong id="no-vote-count">{{ room.no_votes }}</strong></span>
+    </div>
+    {% if user_vote %}
+    <p class="text-xs text-center text-muted-foreground">✓ You voted for <strong>{{ user_vote }}</strong></p>
+    {% else %}
+    <div class="flex gap-3">
+      <button onclick="voteWinner('{{ room.id }}','yes')"
+        class="flex-1 py-2 text-sm font-semibold rounded-xl border-2 border-green-400/50 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
+        ✅ Yes / For
+      </button>
+      <button onclick="voteWinner('{{ room.id }}','no')"
+        class="flex-1 py-2 text-sm font-semibold rounded-xl border-2 border-red-400/50 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
+        ❌ No / Against
+      </button>
+    </div>
+    <p id="vote-msg" class="text-xs text-center text-muted-foreground hidden"></p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Chat area -->
+  {% if room.status in 'live,voting,closed' or messages %}
+  <div class="rounded-2xl border border-border bg-card overflow-hidden flex flex-col" style="height:420px">
+    <div class="px-4 py-2.5 border-b border-border bg-muted/30 flex items-center justify-between">
+      <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Debate Chat</p>
+      {% if room.status == 'live' and user_is_debater %}
+      <span class="text-[10px] text-green-600 dark:text-green-400 font-medium">● You are a debater</span>
+      {% elif room.status == 'live' %}
+      <span class="text-[10px] text-muted-foreground">Spectator view — live updates every 3s</span>
+      {% endif %}
+    </div>
+
+    <!-- Messages -->
+    <div id="chat-messages" class="flex-1 overflow-y-auto p-3 space-y-2">
+      {% for msg in messages %}
+      <div class="flex {% if msg.is_system %}justify-center{% elif msg.sender == room.yes_debater %}justify-start{% else %}justify-end{% endif %}">
+        {% if msg.is_system %}
+        <div class="px-3 py-1 rounded-full bg-muted/60 text-[11px] text-muted-foreground text-center max-w-xs">{{ msg.content }}</div>
+        {% else %}
+        <div class="max-w-[75%] px-3 py-2 rounded-2xl text-sm {% if msg.sender == room.yes_debater %}bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-100 rounded-tl-sm{% else %}bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-100 rounded-tr-sm{% endif %}">
+          <p class="text-[10px] font-bold mb-0.5 {% if msg.sender == room.yes_debater %}text-green-700 dark:text-green-400{% else %}text-red-700 dark:text-red-400{% endif %}">
+            @{{ msg.sender.username }}
+          </p>
+          <p class="leading-snug break-words">{{ msg.content }}</p>
+        </div>
+        {% endif %}
+      </div>
+      {% empty %}
+      <div class="flex items-center justify-center h-full text-muted-foreground text-sm">
+        {% if room.status == 'open' %}Waiting for both debaters to join…{% else %}No messages yet.{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Input (debaters only, live status) -->
+    {% if room.status == 'live' and user_is_debater %}
+    <div class="border-t border-border p-3 flex gap-2">
+      <input id="chat-input" type="text" maxlength="1000" placeholder="Make your argument…"
+        class="flex-1 px-3 py-2 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg();}">
+      <button onclick="sendMsg()" class="px-4 py-2 text-sm font-semibold rounded-xl bg-primary text-white hover:bg-primary/80 transition-colors">Send</button>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+var ROOM_ID = '{{ room.id }}';
+var ROOM_STATUS = '{{ room.status }}';
+var lastMsgId = {{ messages|last|default:0 }};
+
+// Auto-scroll to bottom of chat
+(function() {
+  var el = document.getElementById('chat-messages');
+  if (el) el.scrollTop = el.scrollHeight;
+})();
+
+// Countdown timer
+{% if room.status == 'live' and room.ends_at %}
+(function() {
+  var endsAt = new Date("{{ room.ends_at.isoformat }}Z");
+  function updateTimer() {
+    var left = Math.max(0, Math.floor((endsAt - Date.now()) / 1000));
+    var m = Math.floor(left / 60), s = left % 60;
+    var el = document.getElementById('room-countdown');
+    if (el) el.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+    if (left === 0) { clearInterval(timerInterval); location.reload(); }
+  }
+  updateTimer();
+  var timerInterval = setInterval(updateTimer, 1000);
+})();
+{% endif %}
+
+// Poll for new messages (spectators and debaters during live/voting)
+{% if room.status == 'live' or room.status == 'voting' %}
+(function() {
+  var sinceId = {% if messages %}{{ messages|last|default:0 }}{% else %}0{% endif %};
+  // get last message id
+  var allMsgs = document.querySelectorAll('#chat-messages [data-msg-id]');
+  if (allMsgs.length) sinceId = parseInt(allMsgs[allMsgs.length-1].dataset.msgId) || sinceId;
+
+  function poll() {
+    fetch('/live-debates/' + ROOM_ID + '/messages/?since=' + sinceId)
+      .then(r => r.json())
+      .then(d => {
+        // Append new messages
+        var container = document.getElementById('chat-messages');
+        if (d.messages && d.messages.length) {
+          d.messages.forEach(function(m) {
+            sinceId = Math.max(sinceId, m.id);
+            var wrap = document.createElement('div');
+            wrap.dataset.msgId = m.id;
+            if (m.is_system) {
+              wrap.className = 'flex justify-center';
+              wrap.innerHTML = '<div class="px-3 py-1 rounded-full bg-muted/60 text-[11px] text-muted-foreground text-center max-w-xs">' + escHtml(m.content) + '</div>';
+            } else {
+              var isYes = m.side === 'yes';
+              wrap.className = 'flex ' + (isYes ? 'justify-start' : 'justify-end');
+              wrap.innerHTML = '<div class="max-w-[75%] px-3 py-2 rounded-2xl text-sm ' +
+                (isYes ? 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-100 rounded-tl-sm' :
+                         'bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-100 rounded-tr-sm') + '">' +
+                '<p class="text-[10px] font-bold mb-0.5 ' + (isYes ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400') + '">@' + escHtml(m.username) + '</p>' +
+                '<p class="leading-snug break-words">' + escHtml(m.content) + '</p></div>';
+            }
+            if (container) { container.appendChild(wrap); container.scrollTop = container.scrollHeight; }
+          });
+        }
+        // Update vote counts during voting
+        if (d.status === 'voting' || d.status === 'closed') {
+          var yv = document.getElementById('yes-vote-count');
+          var nv = document.getElementById('no-vote-count');
+          if (yv) yv.textContent = d.yes_votes;
+          if (nv) nv.textContent = d.no_votes;
+        }
+        // Reload if status changed (e.g. open→live, live→voting)
+        if (d.status && d.status !== ROOM_STATUS) { location.reload(); }
+      }).catch(function(){});
+  }
+  setInterval(poll, 3000);
+})();
+{% endif %}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function sendMsg() {
+  var inp = document.getElementById('chat-input');
+  var content = inp ? inp.value.trim() : '';
+  if (!content) return;
+  inp.disabled = true;
+  var fd = new FormData();
+  fd.append('content', content);
+  fetch('/live-debates/' + ROOM_ID + '/send/', {
+    method: 'POST', headers: {'X-CSRFToken': getCookie('csrftoken')}, body: fd,
+  }).then(r => r.json()).then(d => {
+    if (d.success) { inp.value = ''; }
+    else { window.showToast && window.showToast(d.error || 'Error', 'error'); }
+    inp.disabled = false; inp.focus();
+  }).catch(() => { inp.disabled = false; });
+}
+
+function joinRoom(roomId) {
+  var btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Joining…';
+  fetch('/live-debates/' + roomId + '/join/', {
+    method: 'POST', headers: {'X-CSRFToken': getCookie('csrftoken')},
+  }).then(r => r.json()).then(d => {
+    if (d.success) { location.reload(); }
+    else {
+      var msg = document.getElementById('join-msg');
+      if (msg) { msg.textContent = d.error || 'Error'; msg.classList.remove('hidden'); }
+      btn.disabled = false; btn.textContent = 'Join';
+    }
+  }).catch(() => { btn.disabled = false; btn.textContent = 'Join'; });
+}
+
+function voteWinner(roomId, side) {
+  var fd = new FormData();
+  fd.append('side', side);
+  fetch('/live-debates/' + roomId + '/vote/', {
+    method: 'POST', headers: {'X-CSRFToken': getCookie('csrftoken')}, body: fd,
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      var yv = document.getElementById('yes-vote-count');
+      var nv = document.getElementById('no-vote-count');
+      if (yv) yv.textContent = d.yes_votes;
+      if (nv) nv.textContent = d.no_votes;
+      var msg = document.getElementById('vote-msg');
+      if (msg) { msg.textContent = '✓ Vote recorded!'; msg.classList.remove('hidden'); }
+      document.querySelectorAll('[onclick^="voteWinner"]').forEach(b => b.disabled = true);
+    } else {
+      var msg = document.getElementById('vote-msg');
+      if (msg) { msg.textContent = d.error || 'Error'; msg.classList.remove('hidden'); }
+    }
+  }).catch(() => {});
+}
+</script>
+{% endblock %}

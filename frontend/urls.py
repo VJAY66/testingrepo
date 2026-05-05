@@ -245,4 +245,12 @@ urlpatterns = [
     path('account/2fa/login/', views.totp_login_verify, name='totp_login_verify'),
     # Post similarity check
     path('posts/similarity-check/', views.post_similarity_check, name='post_similarity_check'),
+    # Live Debate Rooms
+    path('live-debates/', views.live_debate_rooms, name='live_debate_rooms'),
+    path('live-debates/create/', views.create_live_debate_room, name='create_live_debate_room'),
+    path('live-debates/<str:room_id>/', views.live_debate_room_detail, name='live_debate_room_detail'),
+    path('live-debates/<str:room_id>/join/', views.join_live_debate_room, name='join_live_debate_room'),
+    path('live-debates/<str:room_id>/messages/', views.live_debate_poll_messages, name='live_debate_poll_messages'),
+    path('live-debates/<str:room_id>/send/', views.live_debate_send_message, name='live_debate_send_message'),
+    path('live-debates/<str:room_id>/vote/', views.live_debate_vote, name='live_debate_vote'),
 ]

@@ -1,0 +1,161 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Live Debate Rooms — PickASide{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-6 space-y-6">
+
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-100 text-2xl dark:bg-red-900/30">⚔️</span>
+      <div>
+        <h1 class="text-xl font-bold text-foreground">Live Debate Rooms</h1>
+        <p class="text-sm text-muted-foreground">Join or host a real-time debate — spectators vote the winner</p>
+      </div>
+    </div>
+    {% if user.is_authenticated %}
+    <button onclick="document.getElementById('create-room-modal').classList.remove('hidden')"
+      class="px-4 py-2 text-sm font-semibold rounded-xl bg-primary text-white hover:bg-primary/80 transition-colors">
+      + New Room
+    </button>
+    {% endif %}
+  </div>
+
+  <!-- Live now -->
+  {% if live_rooms %}
+  <section class="space-y-3">
+    <h2 class="text-sm font-bold text-foreground flex items-center gap-2">
+      <span class="h-2 w-2 rounded-full bg-red-500 animate-pulse"></span> Live Now
+    </h2>
+    {% for room in live_rooms %}
+    <a href="{% url 'live_debate_room_detail' room.id %}"
+       class="flex items-center gap-4 p-4 rounded-2xl border border-red-300/50 bg-red-50/40 dark:bg-red-900/10 dark:border-red-500/20 hover:border-red-400/70 transition-colors block">
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold text-foreground text-sm line-clamp-1">{{ room.title }}</p>
+        <div class="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
+          <span class="text-green-600 dark:text-green-400 font-medium">✅ {{ room.yes_debater.username }}</span>
+          <span>vs</span>
+          <span class="text-red-600 dark:text-red-400 font-medium">❌ {{ room.no_debater.username }}</span>
+        </div>
+      </div>
+      <span class="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-500/15 text-red-600 dark:text-red-400 uppercase tracking-wide">Live</span>
+    </a>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <!-- Voting open -->
+  {% if voting_rooms %}
+  <section class="space-y-3">
+    <h2 class="text-sm font-bold text-foreground">🗳️ Voting Open</h2>
+    {% for room in voting_rooms %}
+    <a href="{% url 'live_debate_room_detail' room.id %}"
+       class="flex items-center gap-4 p-4 rounded-2xl border border-amber-300/50 bg-amber-50/40 dark:bg-amber-900/10 dark:border-amber-500/20 hover:border-amber-400/70 transition-colors block">
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold text-foreground text-sm line-clamp-1">{{ room.title }}</p>
+        <p class="text-xs text-muted-foreground mt-0.5">Vote for the side that argued best</p>
+      </div>
+      <span class="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 uppercase tracking-wide">Vote</span>
+    </a>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <!-- Open rooms (looking for opponents) -->
+  <section class="space-y-3">
+    <h2 class="text-sm font-bold text-foreground">🔓 Open Rooms</h2>
+    {% if open_rooms %}
+    {% for room in open_rooms %}
+    <a href="{% url 'live_debate_room_detail' room.id %}"
+       class="flex items-center gap-4 p-4 rounded-2xl border border-border bg-card hover:border-primary/40 transition-colors block">
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold text-foreground text-sm line-clamp-1">{{ room.title }}</p>
+        <div class="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+          <span>By @{{ room.creator.username }}</span>
+          <span>{{ room.duration_minutes }} min</span>
+          {% if room.yes_debater and not room.no_debater %}
+          <span class="text-primary font-medium">Needs No side →</span>
+          {% elif room.no_debater and not room.yes_debater %}
+          <span class="text-primary font-medium">Needs Yes side →</span>
+          {% endif %}
+        </div>
+      </div>
+      <span class="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold bg-primary/10 text-primary uppercase tracking-wide">Join</span>
+    </a>
+    {% endfor %}
+    {% else %}
+    <div class="text-center py-12 text-muted-foreground text-sm">
+      No open rooms right now.
+      {% if user.is_authenticated %}<button onclick="document.getElementById('create-room-modal').classList.remove('hidden')" class="text-primary underline hover:no-underline ml-1">Create one!</button>{% endif %}
+    </div>
+    {% endif %}
+  </section>
+</div>
+
+<!-- Create room modal -->
+{% if user.is_authenticated %}
+<div id="create-room-modal" class="hidden fixed inset-0 z-[8000] flex items-center justify-center bg-black/50 px-4">
+  <div class="w-full max-w-sm bg-card border border-border rounded-2xl p-6 space-y-4 shadow-xl">
+    <div class="flex items-center justify-between">
+      <h3 class="text-base font-bold">Create Debate Room</h3>
+      <button onclick="document.getElementById('create-room-modal').classList.add('hidden')" class="text-muted-foreground hover:text-foreground text-xl leading-none">&times;</button>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-xs font-semibold text-muted-foreground mb-1">Topic / Question</label>
+        <input id="room-title" type="text" maxlength="200" placeholder="e.g. Should AI replace human jobs?"
+          class="w-full px-3 py-2 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30">
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-muted-foreground mb-1">Description (optional)</label>
+        <textarea id="room-description" maxlength="500" rows="2" placeholder="Context, rules, background..."
+          class="w-full px-3 py-2 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"></textarea>
+      </div>
+      <div class="flex gap-3">
+        <div class="flex-1">
+          <label class="block text-xs font-semibold text-muted-foreground mb-1">Your side</label>
+          <select id="room-side" class="w-full px-3 py-2 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30">
+            <option value="yes">Yes / For</option>
+            <option value="no">No / Against</option>
+          </select>
+        </div>
+        <div class="flex-1">
+          <label class="block text-xs font-semibold text-muted-foreground mb-1">Duration</label>
+          <select id="room-duration" class="w-full px-3 py-2 text-sm bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30">
+            <option value="5">5 min</option>
+            <option value="10" selected>10 min</option>
+            <option value="15">15 min</option>
+            <option value="20">20 min</option>
+            <option value="30">30 min</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <button onclick="createRoom()" class="w-full py-2.5 text-sm font-semibold rounded-xl bg-primary text-white hover:bg-primary/80 transition-colors">
+      Create Room
+    </button>
+    <p id="create-room-msg" class="text-xs text-center text-muted-foreground hidden"></p>
+  </div>
+</div>
+
+<script>
+function createRoom() {
+  var title = document.getElementById('room-title').value.trim();
+  var desc  = document.getElementById('room-description').value.trim();
+  var side  = document.getElementById('room-side').value;
+  var dur   = document.getElementById('room-duration').value;
+  var msg   = document.getElementById('create-room-msg');
+  if (!title) { msg.textContent = 'Topic is required.'; msg.classList.remove('hidden'); return; }
+  var fd = new FormData();
+  fd.append('title', title);
+  fd.append('description', desc);
+  fd.append('creator_side', side);
+  fd.append('duration', dur);
+  fetch('{% url "create_live_debate_room" %}', {
+    method: 'POST', headers: {'X-CSRFToken': getCookie('csrftoken')}, body: fd,
+  }).then(r => r.json()).then(d => {
+    if (d.success) { window.location = '/live-debates/' + d.room_id + '/'; }
+    else { msg.textContent = d.error || 'Error'; msg.classList.remove('hidden'); }
+  }).catch(() => { msg.textContent = 'Network error'; msg.classList.remove('hidden'); });
+}
+</script>
+{% endif %}
+{% endblock %}

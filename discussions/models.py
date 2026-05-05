@@ -1159,3 +1159,80 @@ class PostReport(models.Model):
 
     def __str__(self):
         return f"PostReport #{self.id} on {self.post_id} by {self.reporter_id} ({self.status})"
+
+
+# ─── Live Debate Rooms ────────────────────────────────────────────────────────
+
+class LiveDebateRoom(models.Model):
+    STATUS_OPEN    = 'open'
+    STATUS_LIVE    = 'live'
+    STATUS_VOTING  = 'voting'
+    STATUS_CLOSED  = 'closed'
+    STATUS_CHOICES = [
+        (STATUS_OPEN,   'Open — waiting for debaters'),
+        (STATUS_LIVE,   'Live — debate in progress'),
+        (STATUS_VOTING, 'Voting — community voting on winner'),
+        (STATUS_CLOSED, 'Closed'),
+    ]
+    SIDE_CHOICES = [('yes', 'Yes'), ('no', 'No')]
+
+    id           = models.CharField(max_length=36, primary_key=True)
+    title        = models.CharField(max_length=200, help_text='Debate topic / question')
+    description  = models.TextField(blank=True, default='')
+    creator      = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_debate_rooms')
+    yes_debater  = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='debate_rooms_yes')
+    no_debater   = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='debate_rooms_no')
+    status       = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_OPEN, db_index=True)
+    winner_side  = models.CharField(max_length=3, choices=SIDE_CHOICES, blank=True, default='')
+    duration_minutes = models.PositiveSmallIntegerField(default=10)
+    started_at   = models.DateTimeField(null=True, blank=True)
+    ends_at      = models.DateTimeField(null=True, blank=True)
+    ended_at     = models.DateTimeField(null=True, blank=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"LiveRoom: {self.title[:60]} [{self.status}]"
+
+    @property
+    def is_full(self):
+        return bool(self.yes_debater_id and self.no_debater_id)
+
+    @property
+    def yes_votes(self):
+        return self.live_votes.filter(winner_side='yes').count()
+
+    @property
+    def no_votes(self):
+        return self.live_votes.filter(winner_side='no').count()
+
+
+class LiveDebateMessage(models.Model):
+    room       = models.ForeignKey(LiveDebateRoom, on_delete=models.CASCADE, related_name='messages')
+    sender     = models.ForeignKey(User, on_delete=models.CASCADE, related_name='live_debate_messages')
+    content    = models.TextField(max_length=1000)
+    is_system  = models.BooleanField(default=False, help_text='System/event messages')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.sender.username}: {self.content[:40]}"
+
+
+class LiveDebateVote(models.Model):
+    SIDE_CHOICES = [('yes', 'Yes'), ('no', 'No')]
+    room        = models.ForeignKey(LiveDebateRoom, on_delete=models.CASCADE, related_name='live_votes')
+    voter       = models.ForeignKey(User, on_delete=models.CASCADE, related_name='live_debate_votes')
+    winner_side = models.CharField(max_length=3, choices=SIDE_CHOICES)
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [models.UniqueConstraint(fields=['room', 'voter'], name='unique_live_debate_vote')]
+
+    def __str__(self):
+        return f"{self.voter.username} voted {self.winner_side} wins room {self.room_id}"

@@ -21,7 +21,7 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest, PostReport
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest, PostReport, LiveDebateRoom, LiveDebateMessage, LiveDebateVote
 from discussions.signals import notify_post_author
 from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription, UserBan
 from users.security import is_login_rate_limited, record_login_attempt
@@ -5239,7 +5239,9 @@ def leaderboard(request):
 
     period = request.GET.get('period', 'alltime')
     category = request.GET.get('category', '').strip()
+    tab = request.GET.get('tab', 'posts')   # 'posts' or 'debates'
 
+    # ── Posts leaderboard ────────────────────────────────────────────────────
     post_filter = Q(posts__is_draft=False, posts__is_deleted_by_moderation=False)
     if period == 'week':
         post_filter &= Q(posts__created_at__gte=timezone.now() - timedelta(days=7))
@@ -5264,11 +5266,95 @@ def leaderboard(request):
             'trust_level': p.trust_level if p else 'new',
         })
 
+    # ── Debate leaderboard ────────────────────────────────────────────────────
+    debate_cutoff = timezone.now() - timedelta(days=7) if period == 'week' else None
+
+    # Count debates played (as initiator or target, completed only)
+    debate_qs = Debate.objects.filter(status='completed')
+    if debate_cutoff:
+        debate_qs = debate_qs.filter(updated_at__gte=debate_cutoff)
+
+    # Build per-user debate stats from ObserverVote majorities
+    from collections import defaultdict
+    debate_stats_map = defaultdict(lambda: {'played': 0, 'wins': 0, 'spectators': 0})
+
+    completed_debates = list(debate_qs.select_related('initiator', 'target').prefetch_related('observer_votes'))
+    for debate in completed_debates:
+        yes_votes = sum(1 for v in debate.observer_votes.all() if v.winner_side == 'yes')
+        no_votes = sum(1 for v in debate.observer_votes.all() if v.winner_side == 'no')
+        total_obs = yes_votes + no_votes
+
+        try:
+            init_side = debate.participants.get(user=debate.initiator).side
+            target_side = 'no' if init_side == 'yes' else 'yes'
+        except Exception:
+            init_side, target_side = 'yes', 'no'
+
+        winner_side = None
+        if yes_votes > no_votes:
+            winner_side = 'yes'
+        elif no_votes > yes_votes:
+            winner_side = 'no'
+
+        for participant_user, side in [(debate.initiator, init_side), (debate.target, target_side)]:
+            uid = participant_user.id
+            debate_stats_map[uid]['played'] += 1
+            debate_stats_map[uid]['spectators'] += total_obs
+            if winner_side and side == winner_side:
+                debate_stats_map[uid]['wins'] += 1
+            debate_stats_map[uid]['_user'] = participant_user
+
+    # Also count live room wins
+    try:
+    
+        live_qs = LiveDebateRoom.objects.filter(status='closed', winner_side__in=['yes', 'no'])
+        if debate_cutoff:
+            live_qs = live_qs.filter(ended_at__gte=debate_cutoff)
+        for room in live_qs.select_related('yes_debater', 'no_debater'):
+            winner_user = room.yes_debater if room.winner_side == 'yes' else room.no_debater
+            loser_user = room.no_debater if room.winner_side == 'yes' else room.yes_debater
+            if winner_user:
+                uid = winner_user.id
+                debate_stats_map[uid]['played'] += 1
+                debate_stats_map[uid]['wins'] += 1
+                debate_stats_map[uid].setdefault('_user', winner_user)
+            if loser_user:
+                uid = loser_user.id
+                debate_stats_map[uid]['played'] += 1
+                debate_stats_map[uid].setdefault('_user', loser_user)
+    except Exception:
+        pass
+
+    debate_board_raw = [
+        (uid, stats) for uid, stats in debate_stats_map.items()
+        if stats.get('played', 0) > 0 and '_user' in stats
+    ]
+    debate_board_raw.sort(key=lambda x: (-x[1]['wins'], -x[1]['played']))
+
+    debate_board = []
+    for rank, (uid, stats) in enumerate(debate_board_raw[:50], start=1):
+        u = stats['_user']
+        p = getattr(u, 'profile', None)
+        played = stats['played']
+        wins = stats['wins']
+        debate_board.append({
+            'rank': rank,
+            'username': u.username,
+            'avatar_url': p.get_picture_url if p else '',
+            'wins': wins,
+            'played': played,
+            'win_rate': round(wins / played * 100) if played else 0,
+            'spectators': stats['spectators'],
+            'reputation': getattr(p, 'reputation_score', 0) if p else 0,
+        })
+
     return render(request, 'frontend/leaderboard.html', {
         'board': board,
+        'debate_board': debate_board,
         'period': period,
         'active_category': category,
         'categories': CATEGORY_CHOICES,
+        'tab': tab,
     })
 
 
@@ -7621,3 +7707,230 @@ def post_similarity_check(request):
     )
     data = [{'id': str(p['id']), 'title': p['title'], 'username': p['user__username']} for p in similar]
     return JsonResponse({'similar': data})
+
+
+# ─── Live Debate Rooms ────────────────────────────────────────────────────────
+
+def live_debate_rooms(request):
+
+    open_rooms   = LiveDebateRoom.objects.filter(status='open').select_related('creator', 'yes_debater', 'no_debater').order_by('-created_at')[:20]
+    live_rooms   = LiveDebateRoom.objects.filter(status='live').select_related('creator', 'yes_debater', 'no_debater').order_by('-started_at')[:20]
+    voting_rooms = LiveDebateRoom.objects.filter(status='voting').select_related('creator', 'yes_debater', 'no_debater').order_by('-ended_at')[:10]
+    return render(request, 'frontend/live_debate_rooms.html', {
+        'open_rooms': open_rooms,
+        'live_rooms': live_rooms,
+        'voting_rooms': voting_rooms,
+    })
+
+
+@login_required
+@require_POST
+def create_live_debate_room(request):
+
+    title = request.POST.get('title', '').strip()
+    description = request.POST.get('description', '').strip()
+    creator_side = request.POST.get('creator_side', 'yes')
+    duration = int(request.POST.get('duration', 10))
+
+    if not title:
+        return JsonResponse({'error': 'Title is required'}, status=400)
+    if len(title) > 200:
+        return JsonResponse({'error': 'Title too long (max 200 chars)'}, status=400)
+    if duration not in (5, 10, 15, 20, 30):
+        duration = 10
+
+    room = LiveDebateRoom(
+        id=str(uuid.uuid4()),
+        title=title,
+        description=description[:500],
+        creator=request.user,
+        duration_minutes=duration,
+    )
+    if creator_side == 'yes':
+        room.yes_debater = request.user
+    else:
+        room.no_debater = request.user
+    room.save()
+
+    _msg = LiveDebateRoom.objects.get(id=room.id)  # confirm saved
+    return JsonResponse({'success': True, 'room_id': room.id})
+
+
+@login_required
+@require_POST
+def join_live_debate_room(request, room_id):
+
+    room = get_object_or_404(LiveDebateRoom, id=room_id)
+
+    if room.status != 'open':
+        return JsonResponse({'error': 'Room is no longer open'}, status=400)
+    if room.yes_debater == request.user or room.no_debater == request.user:
+        return JsonResponse({'error': 'You are already in this room'}, status=400)
+
+    if not room.yes_debater_id:
+        room.yes_debater = request.user
+    elif not room.no_debater_id:
+        room.no_debater = request.user
+    else:
+        return JsonResponse({'error': 'Room is full'}, status=400)
+
+    if room.is_full:
+        room.status = LiveDebateRoom.STATUS_LIVE
+        room.started_at = timezone.now()
+        room.ends_at = timezone.now() + timedelta(minutes=room.duration_minutes)
+        room.save()
+        LiveDebateMessage.objects.create(
+            room=room,
+            sender=request.user,
+            content=f"Debate started! {room.yes_debater.username} (Yes) vs {room.no_debater.username} (No). You have {room.duration_minutes} minutes.",
+            is_system=True,
+        )
+    else:
+        room.save()
+
+    return JsonResponse({'success': True, 'status': room.status})
+
+
+def live_debate_room_detail(request, room_id):
+
+    room = get_object_or_404(LiveDebateRoom, id=room_id)
+    messages = room.messages.select_related('sender', 'sender__profile').order_by('created_at')[:200]
+
+    user_vote = None
+    user_is_debater = False
+    if request.user.is_authenticated:
+        user_is_debater = request.user in (room.yes_debater, room.no_debater)
+        try:
+            user_vote = LiveDebateVote.objects.get(room=room, voter=request.user).winner_side
+        except LiveDebateVote.DoesNotExist:
+            pass
+
+    # Auto-close expired live rooms
+    if room.status == LiveDebateRoom.STATUS_LIVE and room.ends_at and timezone.now() >= room.ends_at:
+        room.status = LiveDebateRoom.STATUS_VOTING
+        room.ended_at = timezone.now()
+        room.save(update_fields=['status', 'ended_at'])
+        LiveDebateMessage.objects.create(
+            room=room, sender=room.yes_debater or room.creator,
+            content="Time's up! Community voting is now open. Vote for the side that argued best.",
+            is_system=True,
+        )
+
+    return render(request, 'frontend/live_debate_room.html', {
+        'room': room,
+        'messages': messages,
+        'user_vote': user_vote,
+        'user_is_debater': user_is_debater,
+        'can_join': (
+            room.status == LiveDebateRoom.STATUS_OPEN and
+            request.user.is_authenticated and
+            request.user != room.yes_debater and
+            request.user != room.no_debater and
+            not room.is_full
+        ),
+    })
+
+
+@login_required
+@require_POST
+def live_debate_send_message(request, room_id):
+
+    room = get_object_or_404(LiveDebateRoom, id=room_id)
+
+    if room.status not in (LiveDebateRoom.STATUS_LIVE,):
+        return JsonResponse({'error': 'Chat is only active during live debates'}, status=400)
+
+    is_debater = request.user in (room.yes_debater, room.no_debater)
+    if not is_debater:
+        return JsonResponse({'error': 'Only debaters can send messages'}, status=403)
+
+    content = (request.POST.get('content') or '').strip()
+    if not content:
+        return JsonResponse({'error': 'Empty message'}, status=400)
+    if len(content) > 1000:
+        return JsonResponse({'error': 'Message too long'}, status=400)
+
+    msg = LiveDebateMessage.objects.create(room=room, sender=request.user, content=content)
+    return JsonResponse({
+        'success': True,
+        'id': msg.id,
+        'username': request.user.username,
+        'content': content,
+        'created_at': msg.created_at.isoformat(),
+        'side': 'yes' if request.user == room.yes_debater else 'no',
+    })
+
+
+def live_debate_poll_messages(request, room_id):
+
+    room = get_object_or_404(LiveDebateRoom, id=room_id)
+    since_id = int(request.GET.get('since', 0))
+
+    msgs = room.messages.filter(id__gt=since_id).select_related('sender').order_by('created_at')[:50]
+    data = []
+    for m in msgs:
+        side = ''
+        if room.yes_debater_id and m.sender_id == room.yes_debater_id:
+            side = 'yes'
+        elif room.no_debater_id and m.sender_id == room.no_debater_id:
+            side = 'no'
+        data.append({
+            'id': m.id,
+            'username': m.sender.username,
+            'content': m.content,
+            'is_system': m.is_system,
+            'side': side,
+            'created_at': m.created_at.isoformat(),
+        })
+
+    # Room state for client to update UI
+    time_left = None
+    if room.status == LiveDebateRoom.STATUS_LIVE and room.ends_at:
+        secs = int((room.ends_at - timezone.now()).total_seconds())
+        time_left = max(0, secs)
+
+    return JsonResponse({
+        'messages': data,
+        'status': room.status,
+        'time_left': time_left,
+        'yes_votes': room.yes_votes,
+        'no_votes': room.no_votes,
+    })
+
+
+@login_required
+@require_POST
+def live_debate_vote(request, room_id):
+
+    room = get_object_or_404(LiveDebateRoom, id=room_id)
+
+    if room.status != LiveDebateRoom.STATUS_VOTING:
+        return JsonResponse({'error': 'Voting is not open for this room'}, status=400)
+    if request.user in (room.yes_debater, room.no_debater):
+        return JsonResponse({'error': 'Debaters cannot vote on their own match'}, status=400)
+
+    side = request.POST.get('side', '')
+    if side not in ('yes', 'no'):
+        return JsonResponse({'error': 'Invalid side'}, status=400)
+
+    _, created = LiveDebateVote.objects.get_or_create(
+        room=room, voter=request.user, defaults={'winner_side': side}
+    )
+    if not created:
+        return JsonResponse({'error': 'You already voted'}, status=400)
+
+    # Tally and close if both sides have at least 1 vote and we have a majority
+    yes_v = room.yes_votes
+    no_v  = room.no_votes
+    total = yes_v + no_v
+    # Auto-close after 10+ total votes with clear majority, or after 5 minutes
+    ended_at = room.ended_at
+    minutes_since = (timezone.now() - ended_at).total_seconds() / 60 if ended_at else 999
+    if total >= 10 or minutes_since >= 5:
+        if yes_v != no_v:
+            room.winner_side = 'yes' if yes_v > no_v else 'no'
+        room.status = LiveDebateRoom.STATUS_CLOSED
+        room.save(update_fields=['status', 'winner_side'])
+
+    return JsonResponse({'success': True, 'yes_votes': yes_v + (1 if side == 'yes' else 0),
+                         'no_votes': no_v + (1 if side == 'no' else 0)})
