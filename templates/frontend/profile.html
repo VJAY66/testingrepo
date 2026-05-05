@@ -234,6 +234,9 @@
                       {% endif %}
                       {% if current_streak > 1 %}
                       <span class="inline-flex items-center gap-1 rounded-full bg-orange-100 dark:bg-orange-900/30 px-2.5 py-1 text-[11px] font-bold text-orange-600 dark:text-orange-400" title="{{ current_streak }}-day activity streak">🔥 {{ current_streak }}-day streak</span>
+                      {% if streak_grace_used_at %}
+                      <span class="inline-flex items-center gap-1 rounded-full bg-blue-100 dark:bg-blue-900/30 px-2.5 py-1 text-[11px] font-bold text-blue-600 dark:text-blue-400" title="Grace day used — your streak was protected from a missed day">🛡 Grace active</span>
+                      {% endif %}
                       {% endif %}
                     </div>
                     {% endif %}

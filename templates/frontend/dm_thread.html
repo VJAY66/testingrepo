@@ -13,24 +13,121 @@
       <span class="font-semibold text-foreground">{{ partner.username }}</span>
     </a>
   </div>
+
   <div class="flex-1 space-y-3 overflow-y-auto mb-4" id="dm-messages">
     {% for msg in messages %}
-    <div class="flex {% if msg.sender == request.user %}justify-end{% else %}justify-start{% endif %}">
-      <div class="max-w-xs sm:max-w-md px-4 py-2.5 rounded-2xl text-sm {% if msg.sender == request.user %}bg-primary text-primary-foreground{% else %}bg-card border border-border text-foreground{% endif %}">
-        {{ msg.content }}
-        <p class="text-[10px] opacity-60 mt-1 text-right">{{ msg.created_at|date:"g:i A" }}</p>
+    <div class="flex {% if msg.sender == request.user %}justify-end{% else %}justify-start{% endif %}"
+         data-msg-id="{{ msg.id }}"
+         data-is-own="{% if msg.sender == request.user %}1{% else %}0{% endif %}"
+         data-is-read="{% if msg.is_read %}1{% else %}0{% endif %}">
+      <div class="max-w-xs sm:max-w-md">
+        <div class="px-4 py-2.5 rounded-2xl text-sm {% if msg.sender == request.user %}bg-primary text-primary-foreground{% else %}bg-card border border-border text-foreground{% endif %}">
+          {{ msg.content }}
+          <p class="text-[10px] opacity-60 mt-1 text-right">{{ msg.created_at|date:"g:i A" }}</p>
+        </div>
+        {% if msg.sender == request.user %}
+        <p class="text-[10px] text-right mt-0.5 pr-1 seen-label {% if msg.is_read %}text-primary{% else %}text-muted-foreground/50{% endif %}">
+          {% if msg.is_read %}✓✓ Seen{% else %}✓ Sent{% endif %}
+        </p>
+        {% endif %}
       </div>
     </div>
     {% empty %}
     <p class="text-center text-sm text-muted-foreground py-8">Start the conversation!</p>
     {% endfor %}
   </div>
-  <form method="post" class="flex gap-2 sticky bottom-2">
+
+  <form method="post" class="flex gap-2 sticky bottom-2" id="dm-form">
     {% csrf_token %}
-    <input type="text" name="content" placeholder="Type a message…" maxlength="2000" autofocus required
+    <input type="text" name="content" id="dm-input" placeholder="Type a message…" maxlength="2000" autofocus required
            class="flex-1 rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
     <button type="submit" class="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition">Send</button>
   </form>
 </div>
-<script>var m=document.getElementById('dm-messages');if(m)m.scrollTop=m.scrollHeight;</script>
+
+<script>
+var dmMessages = document.getElementById('dm-messages');
+if (dmMessages) dmMessages.scrollTop = dmMessages.scrollHeight;
+
+// Poll for new messages + updated read receipts every 4 seconds
+var partnerUsername = '{{ partner.username|escapejs }}';
+var lastMsgId = {% with last=messages|last %}{% if last %}{{ last.id }}{% else %}0{% endif %}{% endwith %};
+
+function pollDmThread() {
+  fetch('/dm/' + partnerUsername + '/poll/?after=' + lastMsgId, {
+    headers: {'X-Requested-With': 'XMLHttpRequest'}
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    // Update read receipts on already-rendered own messages
+    if (d.read_up_to) {
+      document.querySelectorAll('[data-is-own="1"]').forEach(function(row) {
+        var mid = parseInt(row.dataset.msgId);
+        if (mid <= d.read_up_to && row.dataset.isRead !== '1') {
+          row.dataset.isRead = '1';
+          var lbl = row.querySelector('.seen-label');
+          if (lbl) { lbl.textContent = '✓✓ Seen'; lbl.className = 'text-[10px] text-right mt-0.5 pr-1 seen-label text-primary'; }
+        }
+      });
+    }
+    // Append new incoming messages
+    if (d.messages && d.messages.length) {
+      d.messages.forEach(function(msg) {
+        lastMsgId = Math.max(lastMsgId, msg.id);
+        var wrapper = document.createElement('div');
+        wrapper.className = 'flex ' + (msg.is_own ? 'justify-end' : 'justify-start');
+        wrapper.dataset.msgId = msg.id;
+        wrapper.dataset.isOwn = msg.is_own ? '1' : '0';
+        wrapper.dataset.isRead = '0';
+        var bubble = '<div class="max-w-xs sm:max-w-md">'
+          + '<div class="px-4 py-2.5 rounded-2xl text-sm '
+          + (msg.is_own ? 'bg-primary text-primary-foreground' : 'bg-card border border-border text-foreground') + '">'
+          + escHtml(msg.content)
+          + '<p class="text-[10px] opacity-60 mt-1 text-right">' + msg.time + '</p></div>'
+          + (msg.is_own ? '<p class="text-[10px] text-right mt-0.5 pr-1 seen-label text-muted-foreground/50">✓ Sent</p>' : '')
+          + '</div>';
+        wrapper.innerHTML = bubble;
+        dmMessages.appendChild(wrapper);
+      });
+      dmMessages.scrollTop = dmMessages.scrollHeight;
+    }
+  }).catch(function() {});
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+setInterval(pollDmThread, 4000);
+
+// Submit via AJAX so we don't do a full page reload
+document.getElementById('dm-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var input = document.getElementById('dm-input');
+  var content = input.value.trim();
+  if (!content) return;
+  var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+  fetch(window.location.pathname, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest'},
+    body: 'content=' + encodeURIComponent(content) + '&csrfmiddlewaretoken=' + csrf,
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.id) {
+      lastMsgId = Math.max(lastMsgId, d.id);
+      var wrapper = document.createElement('div');
+      wrapper.className = 'flex justify-end';
+      wrapper.dataset.msgId = d.id;
+      wrapper.dataset.isOwn = '1';
+      wrapper.dataset.isRead = '0';
+      wrapper.innerHTML = '<div class="max-w-xs sm:max-w-md">'
+        + '<div class="px-4 py-2.5 rounded-2xl text-sm bg-primary text-primary-foreground">'
+        + escHtml(content)
+        + '<p class="text-[10px] opacity-60 mt-1 text-right">' + d.time + '</p></div>'
+        + '<p class="text-[10px] text-right mt-0.5 pr-1 seen-label text-muted-foreground/50">✓ Sent</p>'
+        + '</div>';
+      dmMessages.appendChild(wrapper);
+      dmMessages.scrollTop = dmMessages.scrollHeight;
+      input.value = '';
+    }
+  }).catch(function() { this.submit(); }.bind(this));
+});
+</script>
 {% endblock %}

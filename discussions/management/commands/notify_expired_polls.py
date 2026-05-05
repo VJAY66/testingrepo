@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from discussions.models import Poll, PollFollow, Notification
+from django.db.models import Count
+from discussions.models import Poll, PollFollow, Notification, PollPrediction
 
 
 class Command(BaseCommand):
@@ -40,8 +41,30 @@ class Command(BaseCommand):
                         )
                     except Exception:
                         pass
+            # Resolve predictions for this poll
+            self._resolve_predictions(poll)
+
             poll.expiry_notified = True
             poll.save(update_fields=['expiry_notified', 'updated_at'])
             notified += 1
 
         self.stdout.write(self.style.SUCCESS(f'Notified followers of {notified} expired poll(s).'))
+
+    def _resolve_predictions(self, poll):
+        options = list(poll.options.annotate(vote_count=Count('votes')).order_by('-vote_count'))
+        if not options:
+            return
+        winning_option = options[0]
+        if len(options) > 1 and options[0].vote_count == options[1].vote_count:
+            winning_option = None  # draw
+        for pred in PollPrediction.objects.filter(poll=poll, was_correct__isnull=True).select_related('user__profile'):
+            correct = winning_option is not None and pred.predicted_option_id == winning_option.id
+            pred.was_correct = correct
+            pred.save(update_fields=['was_correct'])
+            if correct:
+                try:
+                    prof = pred.user.profile
+                    prof.reputation_score = max(0, prof.reputation_score + 5)
+                    prof.save(update_fields=['reputation_score'])
+                except Exception:
+                    pass

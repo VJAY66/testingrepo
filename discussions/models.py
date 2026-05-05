@@ -734,6 +734,22 @@ class PollFollow(models.Model):
         constraints = [models.UniqueConstraint(fields=['user', 'poll'], name='unique_poll_follow')]
 
 
+class PollPrediction(models.Model):
+    """A user's prediction of which option will win a poll before it closes."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='poll_predictions')
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name='predictions')
+    predicted_option = models.ForeignKey(PollOption, on_delete=models.CASCADE, related_name='predictions')
+    was_correct = models.BooleanField(null=True, blank=True, help_text='Set when the poll closes; null = unresolved')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} predicted '{self.predicted_option.text}' on {self.poll.title}"
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [models.UniqueConstraint(fields=['user', 'poll'], name='unique_poll_prediction')]
+
+
 class QuestionAction(models.Model):
     ACTION_CHOICES = [('like', 'Like'), ('save', 'Save'), ('repost', 'Repost')]
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='question_actions')

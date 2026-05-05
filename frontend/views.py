@@ -21,7 +21,7 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest, PostReport, LiveDebateRoom, LiveDebateMessage, LiveDebateVote
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest, PostReport, LiveDebateRoom, LiveDebateMessage, LiveDebateVote, PollPrediction
 from discussions.signals import notify_post_author
 from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription, UserBan
 from users.security import is_login_rate_limited, record_login_attempt
@@ -33,6 +33,57 @@ from django.utils.safestring import mark_safe
 
 _EMOJI_TOKEN_RE = re.compile(r'__EMJ__([0-9A-F]{5,6})__')
 _OPEN_ENDED_START_RE = re.compile(r'^(what|why|how|when|where|which|who|whom|whose)\b', re.IGNORECASE)
+
+
+import datetime as _dt
+
+def _update_streak(profile):
+    """Advance or protect a user's activity streak. Called whenever they post or comment.
+
+    Rules:
+    - Same day as last_activity_date → no change.
+    - Consecutive day → increment streak.
+    - Missed exactly 1 day AND grace not used this week → activate grace, keep streak.
+    - Anything else → reset streak to 1.
+    """
+    today = _dt.date.today()
+    last = profile.last_activity_date
+
+    if last is None or last == today:
+        # First activity ever, or already counted today
+        profile.last_activity_date = today
+        if profile.streak_days == 0:
+            profile.streak_days = 1
+        profile.save(update_fields=['last_activity_date', 'streak_days'])
+        return
+
+    delta = (today - last).days
+
+    if delta == 1:
+        # Consecutive day
+        profile.streak_days += 1
+        profile.last_activity_date = today
+        profile.save(update_fields=['streak_days', 'last_activity_date'])
+    elif delta == 2:
+        # Missed exactly one day — check grace
+        grace_used = profile.streak_grace_used_at
+        week_ago = today - _dt.timedelta(days=7)
+        grace_available = grace_used is None or grace_used < week_ago
+        if grace_available:
+            # Grace absorbs the missed day; streak continues
+            profile.streak_grace_used_at = today - _dt.timedelta(days=1)
+            profile.streak_days += 1
+            profile.last_activity_date = today
+            profile.save(update_fields=['streak_days', 'last_activity_date', 'streak_grace_used_at'])
+        else:
+            profile.streak_days = 1
+            profile.last_activity_date = today
+            profile.save(update_fields=['streak_days', 'last_activity_date'])
+    else:
+        # Gap too large — reset
+        profile.streak_days = 1
+        profile.last_activity_date = today
+        profile.save(update_fields=['streak_days', 'last_activity_date'])
 
 
 def _notif_pref(user, notif_type, channel):
@@ -1604,6 +1655,7 @@ def profile(request):
         'coauthor_invites': coauthor_invites,
         'allow_mentions_from': profile_obj.allow_mentions_from if profile_obj else 'everyone',
         'mention_allow_choices': Profile.MENTION_ALLOW_CHOICES,
+        'streak_grace_used_at': profile_obj.streak_grace_used_at if profile_obj else None,
     }
     return render(request, 'frontend/profile.html', context)
 
@@ -2682,6 +2734,10 @@ def create_post(request):
                 _maybe_award_achievements(request.user)
                 return redirect('profile')
 
+            try:
+                _update_streak(request.user.profile)
+            except Exception:
+                pass
             _maybe_award_achievements(request.user)
             return redirect(f'/discussion/{post.id}/?created=1')
         except Exception as e:
@@ -2918,6 +2974,10 @@ def create_comment(request, post_id):
                 content=content if content else '',
                 reply_to=reply_to_comment,
             )
+            try:
+                _update_streak(request.user.profile)
+            except Exception:
+                pass
             if content:
                 _notify_mentions(request.user, content, post)
             if reply_to_comment and reply_to_comment.user != request.user:
@@ -4729,6 +4789,26 @@ def poll_detail(request, poll_id):
             _RCV.objects.filter(user=request.user, poll=poll).values_list('option_id', flat=True)
         )
 
+    # Poll predictions
+    user_prediction = None
+    prediction_stats = {}
+    if request.user.is_authenticated:
+        user_prediction = PollPrediction.objects.filter(poll=poll, user=request.user).first()
+    if poll.is_expired or not poll.is_active:
+        total_preds = PollPrediction.objects.filter(poll=poll).count()
+        for opt in options:
+            cnt = PollPrediction.objects.filter(poll=poll, predicted_option=opt).count()
+            prediction_stats[opt.id] = {
+                'count': cnt,
+                'pct': round(cnt / total_preds * 100, 1) if total_preds > 0 else 0,
+            }
+    can_predict = (
+        request.user.is_authenticated
+        and not (poll.is_expired or not poll.is_active)
+        and user_prediction is None
+        and not user_vote
+    )
+
     return render(request, 'frontend/poll.html', {
         'poll': poll,
         'options': options,
@@ -4738,6 +4818,9 @@ def poll_detail(request, poll_id):
         'voted_option_id': str(user_vote.option_id) if user_vote else None,
         'show_voters': not poll.is_anonymous,
         'user_has_ranked': bool(user_ranked_options),
+        'user_prediction': user_prediction,
+        'prediction_stats': prediction_stats,
+        'can_predict': can_predict,
     })
 
 
@@ -4805,6 +4888,55 @@ def poll_ranked_vote(request, poll_id):
         for r in rankings
     ])
     return JsonResponse({'success': True, 'ranked': len(rankings)})
+
+
+@login_required
+@require_POST
+def predict_poll(request, poll_id):
+    """Submit or update a prediction for which option will win the poll."""
+    poll = get_object_or_404(Poll, id=poll_id, is_deleted_by_moderation=False)
+    if poll.is_expired or not poll.is_active:
+        return JsonResponse({'success': False, 'error': 'This poll has already closed.'}, status=400)
+    if PollVote.objects.filter(poll=poll, user=request.user).exists():
+        return JsonResponse({'success': False, 'error': 'You have already voted — predictions are for before voting.'}, status=400)
+
+    try:
+        option_id = int(request.POST.get('option_id', 0))
+    except (ValueError, TypeError):
+        return JsonResponse({'success': False, 'error': 'Invalid option.'}, status=400)
+
+    option = get_object_or_404(PollOption, id=option_id, poll=poll)
+    prediction, created = PollPrediction.objects.update_or_create(
+        poll=poll, user=request.user,
+        defaults={'predicted_option': option},
+    )
+    return JsonResponse({'success': True, 'option_id': option.id, 'option_text': option.text, 'created': created})
+
+
+def _resolve_poll_predictions(poll):
+    """Called when a poll closes: mark each prediction correct/incorrect and award rep."""
+    options = list(poll.options.annotate(vote_count=Count('votes')).order_by('-vote_count'))
+    if not options:
+        return
+    winning_option = options[0]
+    # Only award if there's a clear winner (not tied)
+    if len(options) > 1 and options[0].vote_count == options[1].vote_count:
+        winning_option = None
+
+    predictions = PollPrediction.objects.filter(poll=poll, was_correct__isnull=True).select_related('user__profile')
+    for pred in predictions:
+        if winning_option is None:
+            pred.was_correct = False  # draw — no reward
+        else:
+            pred.was_correct = (pred.predicted_option_id == winning_option.id)
+        pred.save(update_fields=['was_correct'])
+        if pred.was_correct:
+            try:
+                prof = pred.user.profile
+                prof.reputation_score = max(0, prof.reputation_score + 5)
+                prof.save(update_fields=['reputation_score'])
+            except Exception:
+                pass
 
 
 @require_POST
@@ -7322,11 +7454,19 @@ def dm_thread(request, username):
     partner = get_object_or_404(User, username=username)
     if partner == request.user:
         return redirect('dm_list')
+
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
     if request.method == 'POST':
         content = request.POST.get('content', '').strip()[:2000]
         if content:
-            DirectMessage.objects.create(sender=request.user, recipient=partner, content=content)
+            msg = DirectMessage.objects.create(sender=request.user, recipient=partner, content=content)
+            if is_ajax:
+                return JsonResponse({'id': msg.id, 'time': timezone.localtime(msg.created_at).strftime('%-I:%M %p')})
+        if is_ajax:
+            return JsonResponse({'id': None})
         return redirect('dm_thread', username=username)
+
     messages_qs = DirectMessage.objects.filter(
         Q(sender=request.user, recipient=partner) | Q(sender=partner, recipient=request.user)
     ).order_by('created_at')
@@ -7335,6 +7475,41 @@ def dm_thread(request, username):
     return render(request, 'frontend/dm_thread.html', {
         'partner': partner,
         'messages': messages_qs,
+    })
+
+
+@login_required
+def dm_thread_poll(request, username):
+    """Long-poll endpoint: returns new messages and read-receipt watermark."""
+    partner = get_object_or_404(User, username=username)
+    after_id = int(request.GET.get('after', 0) or 0)
+
+    # Mark partner's messages as read
+    DirectMessage.objects.filter(sender=partner, recipient=request.user, is_read=False).update(is_read=True)
+
+    # New messages since last seen id
+    new_msgs = DirectMessage.objects.filter(
+        Q(sender=request.user, recipient=partner) | Q(sender=partner, recipient=request.user),
+        id__gt=after_id,
+    ).order_by('created_at')
+
+    # Highest id of current user's messages that the partner has read
+    read_up_to = (
+        DirectMessage.objects.filter(sender=request.user, recipient=partner, is_read=True)
+        .order_by('-id').values_list('id', flat=True).first() or 0
+    )
+
+    return JsonResponse({
+        'read_up_to': read_up_to,
+        'messages': [
+            {
+                'id': m.id,
+                'content': m.content,
+                'is_own': m.sender_id == request.user.id,
+                'time': timezone.localtime(m.created_at).strftime('%-I:%M %p'),
+            }
+            for m in new_msgs
+        ],
     })
 
 

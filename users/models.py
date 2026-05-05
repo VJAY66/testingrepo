@@ -45,6 +45,7 @@ class Profile(models.Model):
     totp_enabled = models.BooleanField(default=False, db_index=True, help_text='True when 2FA is fully set up and active')
     quiet_hours_start = models.TimeField(null=True, blank=True, help_text='No notification emails sent after this time')
     quiet_hours_end = models.TimeField(null=True, blank=True, help_text='Notification emails resume at this time')
+    streak_grace_used_at = models.DateField(null=True, blank=True, help_text='Date the weekly streak grace day was last used')
     MENTION_ALLOW_EVERYONE = 'everyone'
     MENTION_ALLOW_FOLLOWERS = 'followers'
     MENTION_ALLOW_NOBODY = 'nobody'

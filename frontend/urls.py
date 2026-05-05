@@ -69,6 +69,7 @@ urlpatterns = [
     path('polls/comment/react/', views.like_poll_comment, name='like_poll_comment'),
     path('polls/<str:poll_id>/', views.poll_detail, name='poll_detail'),
     path('polls/<str:poll_id>/vote/', views.poll_vote, name='poll_vote'),
+    path('polls/<str:poll_id>/predict/', views.predict_poll, name='predict_poll'),
     path('polls/<str:poll_id>/ranked-vote/', views.poll_ranked_vote, name='poll_ranked_vote'),
     path('polls/<str:poll_id>/comment/', views.create_poll_comment, name='create_poll_comment'),
     # Questions
@@ -197,6 +198,7 @@ urlpatterns = [
     path('dm/request/<str:username>/', views.dm_request_send, name='dm_request_send'),
     path('dm/request/<int:request_id>/respond/', views.dm_request_respond, name='dm_request_respond'),
     path('dm/<str:username>/', views.dm_thread, name='dm_thread'),
+    path('dm/<str:username>/poll/', views.dm_thread_poll, name='dm_thread_poll'),
     # Push notifications
     path('push/subscribe/', views.push_subscribe, name='push_subscribe'),
     path('push/unsubscribe/', views.push_unsubscribe, name='push_unsubscribe'),
