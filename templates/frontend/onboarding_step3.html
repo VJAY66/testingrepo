@@ -1,0 +1,74 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Complete Your Profile — PickASide{% endblock %}
+
+{% block content %}
+<style>
+.ob-wrap { min-height:calc(100vh - 80px); display:flex; align-items:center; justify-content:center; padding:2rem 1rem 3rem; }
+.ob-card { width:100%; max-width:520px; background:hsl(var(--card)); border:1px solid hsl(var(--border)/0.6); border-radius:1.75rem; box-shadow:0 24px 60px -16px rgba(0,0,0,0.12),0 0 0 1px hsl(var(--border)/0.15); overflow:hidden; }
+.ob-header { padding:2.25rem 2.25rem 1.5rem; background:linear-gradient(135deg,hsl(var(--primary)/0.07) 0%,hsl(var(--background)) 60%); border-bottom:1px solid hsl(var(--border)/0.4); }
+.ob-body { padding:1.75rem 2.25rem 2.25rem; }
+@media(max-width:480px){ .ob-header,.ob-body{ padding-left:1.25rem; padding-right:1.25rem; } }
+.ob-progress-bar { height:3px; border-radius:999px; background:hsl(var(--border)/0.4); overflow:hidden; margin-bottom:1.5rem; }
+.ob-progress-fill { height:100%; border-radius:999px; background:linear-gradient(to right,hsl(var(--primary)),hsl(var(--accent))); width:66%; }
+.ob-field label { display:block; font-size:.78rem; font-weight:700; color:hsl(var(--muted-foreground)); margin-bottom:.4rem; letter-spacing:.02em; }
+.ob-field textarea, .ob-field input[type="url"] { width:100%; background:hsl(var(--background)); border:1.5px solid hsl(var(--border)/0.7); border-radius:.875rem; padding:.65rem .9rem; font-size:.88rem; color:hsl(var(--foreground)); resize:none; transition:border-color .18s; }
+.ob-field textarea:focus, .ob-field input[type="url"]:focus { outline:none; border-color:hsl(var(--primary)/0.6); box-shadow:0 0 0 3px hsl(var(--primary)/0.1); }
+.char-counter { font-size:.72rem; color:hsl(var(--muted-foreground)); text-align:right; margin-top:.25rem; }
+.ob-submit-btn { width:100%; padding:.85rem 1.5rem; border-radius:999px; font-size:.95rem; font-weight:700; background:linear-gradient(135deg,hsl(var(--primary)),hsl(var(--accent))); color:hsl(var(--primary-foreground)); border:none; cursor:pointer; transition:opacity .2s,transform .2s,box-shadow .2s; box-shadow:0 8px 22px -8px hsl(var(--primary)/0.55); margin-top:1.5rem; }
+.ob-submit-btn:hover { opacity:.92; transform:translateY(-1px); }
+.ob-skip-link { display:block; text-align:center; margin-top:.9rem; font-size:.8rem; color:hsl(var(--muted-foreground)); text-decoration:none; transition:color .15s; }
+.ob-skip-link:hover { color:hsl(var(--foreground)); }
+</style>
+
+<div class="ob-wrap">
+  <div class="ob-card">
+    <div class="ob-header">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent shadow-md">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Step 3 of 3</p>
+          <h1 class="text-xl sm:text-2xl font-extrabold text-foreground leading-tight">Complete your profile</h1>
+        </div>
+      </div>
+      <p class="text-sm text-muted-foreground leading-relaxed">
+        Add a bio and website so others know who you are. You can always update these later.
+      </p>
+    </div>
+
+    <div class="ob-body">
+      <div class="ob-progress-bar"><div class="ob-progress-fill"></div></div>
+
+      <form method="post" id="ob3-form">
+        {% csrf_token %}
+
+        <div class="ob-field mb-4">
+          <label for="ob-bio">Bio <span class="font-normal opacity-60">(optional)</span></label>
+          <textarea id="ob-bio" name="bio" rows="3" maxlength="280" placeholder="Tell us a little about yourself…">{% if profile %}{{ profile.bio }}{% endif %}</textarea>
+          <p class="char-counter"><span id="bio-count">{% if profile %}{{ profile.bio|length }}{% else %}0{% endif %}</span> / 280</p>
+        </div>
+
+        <div class="ob-field">
+          <label for="ob-website">Website <span class="font-normal opacity-60">(optional)</span></label>
+          <input type="url" id="ob-website" name="website" placeholder="https://yoursite.com" value="{% if profile %}{{ profile.website }}{% endif %}">
+        </div>
+
+        <button type="submit" class="ob-submit-btn">
+          🎉 Go to My Feed
+        </button>
+      </form>
+
+      <a href="{% url 'suggested' %}" class="ob-skip-link">Skip — take me to my feed</a>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('ob-bio').addEventListener('input', function() {
+  document.getElementById('bio-count').textContent = this.value.length;
+});
+</script>
+{% endblock %}

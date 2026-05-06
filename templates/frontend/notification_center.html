@@ -1,0 +1,146 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Notifications — PickASide{% endblock %}
+
+{% block content %}
+<style>
+.nc-wrap { max-width:700px; margin:0 auto; padding:2rem 1rem 4rem; }
+.nc-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:.75rem; }
+.nc-title { font-size:1.4rem; font-weight:900; color:hsl(var(--foreground)); letter-spacing:-.01em; }
+.nc-badge { display:inline-flex; align-items:center; gap:.3rem; padding:.15rem .55rem; border-radius:999px; font-size:.68rem; font-weight:700; background:hsl(var(--destructive)/0.15); color:hsl(var(--destructive)); }
+.type-chips { display:flex; gap:.5rem; overflow-x:auto; pb-2; scrollbar-width:none; margin-bottom:1.25rem; }
+.type-chip { display:inline-flex; align-items:center; gap:4px; padding:5px 12px; border-radius:999px; border:1px solid hsl(var(--border)); font-size:.75rem; font-weight:600; white-space:nowrap; cursor:pointer; transition:all .18s; color:hsl(var(--muted-foreground)); background:hsl(var(--card)/0.7); text-decoration:none; }
+.type-chip:hover, .type-chip.active { background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); border-color:transparent; }
+.nc-list { display:flex; flex-direction:column; gap:.5rem; }
+.nc-item { display:flex; align-items:flex-start; gap:.75rem; padding:.9rem 1rem; border-radius:1rem; border:1px solid hsl(var(--border)/0.6); background:hsl(var(--card)); transition:box-shadow .18s; position:relative; }
+.nc-item.unread { border-left:3px solid hsl(var(--primary)); background:hsl(var(--primary)/0.03); }
+.nc-item:hover { box-shadow:0 4px 18px -8px hsl(var(--primary)/0.18); }
+.nc-icon { width:36px; height:36px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:1rem; background:hsl(var(--muted)); }
+.nc-content { flex:1; min-width:0; }
+.nc-msg { font-size:.85rem; color:hsl(var(--foreground)); line-height:1.45; }
+.nc-meta { font-size:.72rem; color:hsl(var(--muted-foreground)); margin-top:.2rem; }
+.nc-read-btn { background:none; border:none; cursor:pointer; font-size:.7rem; color:hsl(var(--primary)); font-weight:600; padding:0; transition:opacity .15s; flex-shrink:0; }
+.nc-read-btn:hover { opacity:.7; }
+.nc-post-link { font-size:.78rem; font-weight:600; color:hsl(var(--primary)); text-decoration:none; display:inline-block; margin-top:.3rem; }
+.nc-post-link:hover { text-decoration:underline; }
+.nc-empty { text-align:center; padding:4rem 1rem; color:hsl(var(--muted-foreground)); }
+.mark-all-btn { font-size:.78rem; font-weight:700; color:hsl(var(--primary)); background:none; border:none; cursor:pointer; padding:0; transition:opacity .15s; }
+.mark-all-btn:hover { opacity:.7; }
+</style>
+
+<div class="nc-wrap">
+  <div class="nc-header">
+    <div class="flex items-center gap-2">
+      <span class="text-2xl">🔔</span>
+      <h1 class="nc-title">Notifications</h1>
+      {% if unread_count > 0 %}
+      <span class="nc-badge">{{ unread_count }} unread</span>
+      {% endif %}
+    </div>
+    <div class="flex items-center gap-3">
+      <button class="mark-all-btn" id="mark-all-btn">Mark all read</button>
+      <a href="{% url 'notifications' %}" class="text-xs text-muted-foreground hover:text-foreground">Debate inbox →</a>
+    </div>
+  </div>
+
+  <!-- Type filter chips -->
+  <div class="type-chips">
+    <a href="{% url 'notification_center' %}" class="type-chip {% if not notif_type %}active{% endif %}">All</a>
+    {% for val, label in notification_types %}
+    <a href="{% url 'notification_center' %}?type={{ val }}" class="type-chip {% if notif_type == val %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+
+  {% if notifications %}
+  <div class="nc-list" id="nc-list">
+    {% for notif in notifications %}
+    <div class="nc-item {% if not notif.is_read %}unread{% endif %}" id="notif-{{ notif.id }}">
+      <div class="nc-icon">
+        {% if notif.notification_type == 'post_comment' or notif.notification_type == 'author_comment' %}💬
+        {% elif notif.notification_type == 'author_debate' %}⚔️
+        {% elif notif.notification_type == 'author_repost' %}🔁
+        {% elif notif.notification_type == 'author_save' %}🔖
+        {% elif notif.notification_type == 'author_like_milestone' %}⭐
+        {% elif notif.notification_type == 'mention' %}@
+        {% elif notif.notification_type == 'profile_view' %}👀
+        {% elif notif.notification_type == 'post_reminder' %}⏰
+        {% elif notif.notification_type == 'moderation_alert' or notif.notification_type == 'moderation_warning' %}🛡️
+        {% else %}🔔
+        {% endif %}
+      </div>
+      <div class="nc-content">
+        <p class="nc-msg">{{ notif.message }}</p>
+        {% if notif.post %}
+        <a href="{% url 'discussion' notif.post.id %}" class="nc-post-link">{{ notif.post.title|truncatechars:70 }}</a>
+        {% endif %}
+        <p class="nc-meta">
+          {{ notif.created_at|timesince }} ago
+          {% if notif.count > 1 %}&middot; {{ notif.count }} times{% endif %}
+        </p>
+      </div>
+      {% if not notif.is_read %}
+      <button class="nc-read-btn" onclick="markRead({{ notif.id }})">Mark read</button>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div class="flex justify-center gap-2 mt-8">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}{% if notif_type %}&type={{ notif_type }}{% endif %}"
+       class="px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-primary hover:text-primary-foreground transition-colors">← Prev</a>
+    {% endif %}
+    <span class="px-4 py-2 text-sm text-muted-foreground">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}{% if notif_type %}&type={{ notif_type }}{% endif %}"
+       class="px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-primary hover:text-primary-foreground transition-colors">Next →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="nc-empty">
+    <div class="text-5xl mb-3">🔔</div>
+    <p class="font-semibold text-foreground mb-1">No notifications</p>
+    <p class="text-sm">{% if notif_type %}No notifications of this type.{% else %}You're all caught up!{% endif %}</p>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function getCookie(name) {
+  var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+  return v ? v[2] : null;
+}
+
+function markRead(id) {
+  fetch('/notifications/inbox/' + id + '/read/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.success) {
+      var el = document.getElementById('notif-' + id);
+      if (el) {
+        el.classList.remove('unread');
+        var btn = el.querySelector('.nc-read-btn');
+        if (btn) btn.remove();
+      }
+    }
+  });
+}
+
+document.getElementById('mark-all-btn').addEventListener('click', function() {
+  fetch('{% url "mark_all_notifications_read" %}', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  }).then(function(r) { return r.json(); }).then(function() {
+    document.querySelectorAll('.nc-item.unread').forEach(function(el) {
+      el.classList.remove('unread');
+      var btn = el.querySelector('.nc-read-btn');
+      if (btn) btn.remove();
+    });
+  });
+});
+</script>
+{% endblock %}

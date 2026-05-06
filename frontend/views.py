@@ -2702,7 +2702,7 @@ def interests_onboarding(request):
         if profile:
             profile.interested_categories = valid
             profile.save(update_fields=['interested_categories'])
-        return redirect('suggested')
+        return redirect('onboarding_step2')
 
     # If user visits again after already setting interests, redirect away
     if already_set and request.GET.get('force') != '1':
@@ -2712,6 +2712,105 @@ def interests_onboarding(request):
         'all_categories': all_categories,
         'selected_categories': profile.interested_categories if profile else [],
     })
+
+
+@login_required
+def onboarding_step2(request):
+    """Step 2 of onboarding: follow suggested people."""
+    if request.method == 'POST':
+        usernames = request.POST.getlist('follow')
+        for uname in usernames:
+            try:
+                target = User.objects.get(username=uname)
+                if target != request.user:
+                    Follow.objects.get_or_create(follower=request.user, following=target)
+            except User.DoesNotExist:
+                pass
+        return redirect('onboarding_step3')
+
+    already_following_ids = Follow.objects.filter(follower=request.user).values_list('following_id', flat=True)
+    suggestions = list(
+        UserSuggestion.objects.filter(user=request.user)
+        .select_related('suggested_user')[:8]
+    )
+    suggested_users = [s.suggested_user for s in suggestions]
+
+    if len(suggested_users) < 4:
+        popular = list(
+            User.objects.exclude(id=request.user.id)
+            .exclude(id__in=already_following_ids)
+            .annotate(_fc=Count('followers'))
+            .order_by('-_fc')[:8]
+        )
+        seen_ids = {u.id for u in suggested_users}
+        for u in popular:
+            if u.id not in seen_ids:
+                suggested_users.append(u)
+                seen_ids.add(u.id)
+            if len(suggested_users) >= 8:
+                break
+
+    profiles = {
+        p.user_id: p
+        for p in Profile.objects.filter(user__in=[u for u in suggested_users])
+    }
+    for u in suggested_users:
+        u._profile = profiles.get(u.id)
+
+    return render(request, 'frontend/onboarding_step2.html', {
+        'suggested_users': suggested_users[:8],
+    })
+
+
+@login_required
+def onboarding_step3(request):
+    """Step 3 of onboarding: complete profile bio and website."""
+    profile = Profile.objects.filter(user=request.user).first()
+
+    if request.method == 'POST':
+        bio = request.POST.get('bio', '').strip()[:280]
+        website = request.POST.get('website', '').strip()
+        if profile:
+            if bio:
+                profile.bio = bio
+            if website:
+                profile.website = website
+            profile.save(update_fields=['bio', 'website'])
+        return redirect('suggested')
+
+    return render(request, 'frontend/onboarding_step3.html', {'profile': profile})
+
+
+@login_required
+def notification_center(request):
+    """Dedicated notification inbox with type filtering and pagination."""
+    notif_type = request.GET.get('type', '').strip()
+    qs = Notification.objects.filter(user=request.user).select_related('post')
+    if notif_type:
+        qs = qs.filter(notification_type=notif_type)
+
+    paginator = Paginator(qs, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
+
+    return render(request, 'frontend/notification_center.html', {
+        'notifications': page_obj.object_list,
+        'page_obj': page_obj,
+        'notif_type': notif_type,
+        'notification_types': Notification.NOTIFICATION_TYPES,
+        'unread_count': unread_count,
+    })
+
+
+@login_required
+@require_POST
+def mark_notification_read(request, notif_id):
+    """Mark a single Notification as read."""
+    notif = get_object_or_404(Notification, id=notif_id, user=request.user)
+    notif.is_read = True
+    notif.save(update_fields=['is_read'])
+    return JsonResponse({'success': True})
 
 
 @login_required

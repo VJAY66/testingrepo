@@ -1,0 +1,103 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Follow People — PickASide{% endblock %}
+
+{% block content %}
+<style>
+.ob-wrap { min-height: calc(100vh - 80px); display:flex; align-items:center; justify-content:center; padding:2rem 1rem 3rem; }
+.ob-card { width:100%; max-width:660px; background:hsl(var(--card)); border:1px solid hsl(var(--border)/0.6); border-radius:1.75rem; box-shadow:0 24px 60px -16px rgba(0,0,0,0.12),0 0 0 1px hsl(var(--border)/0.15); overflow:hidden; }
+.ob-header { padding:2.25rem 2.25rem 1.5rem; background:linear-gradient(135deg,hsl(var(--primary)/0.07) 0%,hsl(var(--background)) 60%); border-bottom:1px solid hsl(var(--border)/0.4); }
+.ob-body { padding:1.75rem 2.25rem 2.25rem; }
+@media(max-width:480px){ .ob-header,.ob-body{ padding-left:1.25rem; padding-right:1.25rem; } }
+.ob-progress-bar { height:3px; border-radius:999px; background:hsl(var(--border)/0.4); overflow:hidden; margin-bottom:1.5rem; }
+.ob-progress-fill { height:100%; border-radius:999px; background:linear-gradient(to right,hsl(var(--primary)),hsl(var(--accent))); width:33%; }
+.user-card { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:1rem; border:1.5px solid hsl(var(--border)/0.5); background:hsl(var(--background)); transition:all .18s; cursor:pointer; }
+.user-card.selected { border-color:hsl(var(--primary)); background:hsl(var(--primary)/0.06); }
+.user-card input[type="checkbox"] { display:none; }
+.user-avatar { width:40px; height:40px; border-radius:50%; border:1px solid hsl(var(--border)); overflow:hidden; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:hsl(var(--muted)); }
+.user-avatar img { width:100%; height:100%; object-fit:cover; }
+.follow-check { width:20px; height:20px; border-radius:50%; border:2px solid hsl(var(--border)); flex-shrink:0; margin-left:auto; display:flex; align-items:center; justify-content:center; transition:all .18s; }
+.user-card.selected .follow-check { background:hsl(var(--primary)); border-color:hsl(var(--primary)); }
+.ob-submit-btn { width:100%; padding:.85rem 1.5rem; border-radius:999px; font-size:.95rem; font-weight:700; background:linear-gradient(135deg,hsl(var(--primary)),hsl(var(--accent))); color:hsl(var(--primary-foreground)); border:none; cursor:pointer; transition:opacity .2s,transform .2s,box-shadow .2s; box-shadow:0 8px 22px -8px hsl(var(--primary)/0.55); }
+.ob-submit-btn:hover { opacity:.92; transform:translateY(-1px); }
+.ob-skip-link { display:block; text-align:center; margin-top:.9rem; font-size:.8rem; color:hsl(var(--muted-foreground)); text-decoration:none; transition:color .15s; }
+.ob-skip-link:hover { color:hsl(var(--foreground)); }
+</style>
+
+<div class="ob-wrap">
+  <div class="ob-card">
+    <div class="ob-header">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent shadow-md">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Step 2 of 3</p>
+          <h1 class="text-xl sm:text-2xl font-extrabold text-foreground leading-tight">Follow some people</h1>
+        </div>
+      </div>
+      <p class="text-sm text-muted-foreground leading-relaxed">
+        Follow at least one person to start building your network. Your feed will be more interesting right away.
+      </p>
+    </div>
+
+    <div class="ob-body">
+      <div class="ob-progress-bar"><div class="ob-progress-fill"></div></div>
+
+      <form method="post" id="ob2-form">
+        {% csrf_token %}
+        {% if suggested_users %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-5">
+          {% for user in suggested_users %}
+          <label class="user-card" id="card-{{ user.username }}">
+            <input type="checkbox" name="follow" value="{{ user.username }}">
+            <div class="user-avatar">
+              {% if user._profile and user._profile.profile_picture %}
+              <img src="{{ user._profile.profile_picture.url }}" alt="">
+              {% else %}
+              <span class="text-sm font-bold text-muted-foreground">{{ user.username|slice:":1"|upper }}</span>
+              {% endif %}
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold text-foreground truncate">@{{ user.username }}</p>
+              {% if user._profile and user._profile.bio %}
+              <p class="text-xs text-muted-foreground truncate">{{ user._profile.bio|truncatechars:50 }}</p>
+              {% endif %}
+            </div>
+            <div class="follow-check" id="check-{{ user.username }}">
+              <svg class="hidden w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 12 10">
+                <path d="M1 5l3 3 7-7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-muted-foreground text-sm mb-5">
+          No suggestions yet — you can find people to follow from the feed.
+        </div>
+        {% endif %}
+
+        <button type="submit" class="ob-submit-btn">
+          Next: Complete Profile →
+        </button>
+      </form>
+
+      <a href="{% url 'onboarding_step3' %}" class="ob-skip-link">Skip for now</a>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.user-card').forEach(function(card) {
+  var checkbox = card.querySelector('input[type="checkbox"]');
+  var checkIcon = card.querySelector('.follow-check svg');
+  card.addEventListener('click', function() {
+    checkbox.checked = !checkbox.checked;
+    card.classList.toggle('selected', checkbox.checked);
+    if (checkIcon) checkIcon.classList.toggle('hidden', !checkbox.checked);
+  });
+});
+</script>
+{% endblock %}

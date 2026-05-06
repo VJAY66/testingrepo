@@ -5,7 +5,7 @@ from django.conf.urls.static import static
 from django.contrib.sitemaps.views import sitemap
 from django.views.generic import TemplateView
 from frontend.sitemaps import PostSitemap, StaticSitemap, CategorySitemap
-from frontend.feeds import LatestPostsFeed, CategoryFeed
+from frontend.feeds import LatestPostsFeed, CategoryFeed, UserPostFeed, UserPostAtomFeed
 
 sitemaps = {
     'posts': PostSitemap,
@@ -23,6 +23,8 @@ urlpatterns = [
     # RSS feeds
     path('feed/', LatestPostsFeed(), name='feed_latest'),
     path('feed/<str:category_name>/', CategoryFeed(), name='feed_category'),
+    path('feed/user/<str:username>/', UserPostFeed(), name='feed_user'),
+    path('feed/user/<str:username>/atom/', UserPostAtomFeed(), name='feed_user_atom'),
 ]
 
 if settings.DEBUG:
