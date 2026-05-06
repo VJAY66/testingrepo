@@ -149,6 +149,37 @@
       <div class="mod-empty">No pending profile reports.</div>
     {% endif %}
   </div>
+
+  <!-- Post Reports -->
+  <div class="mod-section">
+    <p class="mod-section-label">📝 Post Reports ({{ post_reports|length }})</p>
+    {% if post_reports %}
+      {% for report in post_reports %}
+      <div class="mod-card" id="postr-{{ report.id }}">
+        <div class="mod-card-meta">
+          <strong>@{{ report.reporter.username }}</strong> reported a post by
+          <a href="{% url 'user_profile' report.post.user.username %}" target="_blank" class="text-primary hover:underline">@{{ report.post.user.username }}</a>
+          &middot; Reason: <strong>{{ report.get_reason_display }}</strong>
+          &middot; {{ report.created_at|timesince }} ago
+        </div>
+        <div class="mod-card-content">
+          <a href="{% url 'discussion' report.post.id %}" target="_blank" class="font-semibold text-primary hover:underline">{{ report.post.title|truncatechars:120 }}</a>
+          {% if report.post.content %}<p class="mt-1 text-xs text-muted-foreground">{{ report.post.content|truncatechars:200 }}</p>{% endif %}
+        </div>
+        {% if report.details %}
+        <div style="font-size:0.78rem;color:hsl(var(--muted-foreground));padding:0 0.25rem;">"{{ report.details|truncatechars:200 }}"</div>
+        {% endif %}
+        <div class="mod-actions">
+          <button class="mod-btn mod-btn-dismiss" onclick="resolveReport('post', {{ report.id }}, 'dismiss')">Dismiss</button>
+          <button class="mod-btn mod-btn-warn" onclick="resolveReport('post', {{ report.id }}, 'warn_author')">Warn Author</button>
+          <button class="mod-btn mod-btn-action" onclick="resolveReport('post', {{ report.id }}, 'delete_post')">Delete Post</button>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="mod-empty">No pending post reports.</div>
+    {% endif %}
+  </div>
 </div>
 
 <script>
@@ -161,9 +192,10 @@ var actionUrls = {
   comment: function(id) { return '/moderation/comment-reports/' + id + '/review/'; },
   message: function(id) { return '/moderation/debate-message-reports/' + id + '/review/'; },
   profile: function(id) { return '/moderation/profile-reports/' + id + '/review/'; },
+  post:    function(id) { return '/moderation/post-reports/' + id + '/review/'; },
 };
 
-var cardPrefix = { comment: 'cr-', message: 'mr-', profile: 'pr-' };
+var cardPrefix = { comment: 'cr-', message: 'mr-', profile: 'pr-', post: 'postr-' };
 
 function resolveReport(type, id, action) {
   var url = actionUrls[type](id);

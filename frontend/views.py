@@ -4396,6 +4396,62 @@ def moderate_profile_report(request, report_id):
 
 @login_required
 @require_POST
+def moderate_post_report(request, report_id):
+    """Moderator review action for reported posts."""
+    if not _is_configured_moderator(request.user):
+        return JsonResponse({'success': False, 'error': 'Only configured moderators can review post reports.'}, status=403)
+
+    report = get_object_or_404(
+        PostReport.objects.select_related('post', 'post__user', 'reporter'),
+        id=report_id,
+    )
+
+    if report.status != 'pending':
+        return JsonResponse({'success': True, 'message': 'This post report was already reviewed.'})
+
+    action = (request.POST.get('action') or '').strip().lower()
+    if action not in {'dismiss', 'warn_author', 'delete_post'}:
+        return JsonResponse({'success': False, 'error': 'Invalid moderation action.'}, status=400)
+
+    post = report.post
+    author = post.user
+
+    if action == 'dismiss':
+        report.status = 'dismissed'
+        report.save(update_fields=['status', 'updated_at'])
+        return JsonResponse({'success': True, 'message': 'Post report dismissed.'})
+
+    if action == 'delete_post':
+        post.is_deleted_by_moderation = True
+        post.moderation_reason = f'Deleted following report #{report_id}: {report.get_reason_display()}'
+        post.save(update_fields=['is_deleted_by_moderation', 'moderation_reason', 'updated_at'])
+        Notification.objects.create(
+            user=author,
+            post=post,
+            notification_type='moderation_warning',
+            message='Your post was removed after a moderation review. Please follow community guidelines.',
+        )
+        report.status = 'actioned'
+        report.save(update_fields=['status', 'updated_at'])
+        return JsonResponse({'success': True, 'message': 'Post removed and author notified.'})
+
+    # warn_author
+    Notification.objects.create(
+        user=author,
+        post=post,
+        notification_type='moderation_warning',
+        message=(
+            f'Your post "{post.title[:80]}" was reported and reviewed by moderators. '
+            'Please follow community guidelines.'
+        ),
+    )
+    report.status = 'reviewed'
+    report.save(update_fields=['status', 'updated_at'])
+    return JsonResponse({'success': True, 'message': 'Author warned and post report marked reviewed.'})
+
+
+@login_required
+@require_POST
 def increase_debate_limits(request, debate_id):
     debate = get_object_or_404(Debate, id=debate_id)
 
@@ -6293,23 +6349,30 @@ def moderation_dashboard(request):
         from django.http import Http404
         raise Http404
 
-    comment_reports = CommentReport.objects.filter(
+    comment_reports = list(CommentReport.objects.filter(
         status='pending'
-    ).select_related('comment', 'comment__post', 'comment__user', 'reporter').order_by('-created_at')[:50]
+    ).select_related('comment', 'comment__post', 'comment__user', 'reporter').order_by('-created_at')[:50])
 
-    message_reports = DebateMessageReport.objects.filter(
+    message_reports = list(DebateMessageReport.objects.filter(
         status='pending'
-    ).select_related('message', 'message__debate', 'reporter', 'reported_user').order_by('-created_at')[:50]
+    ).select_related('message', 'message__debate', 'reporter', 'reported_user').order_by('-created_at')[:50])
 
-    profile_reports = ProfileReport.objects.filter(
+    profile_reports = list(ProfileReport.objects.filter(
         status='pending'
-    ).select_related('reporter', 'reported_user').order_by('-created_at')[:50]
+    ).select_related('reporter', 'reported_user').order_by('-created_at')[:50])
+
+    post_reports = list(PostReport.objects.filter(
+        status='pending'
+    ).select_related('post', 'post__user', 'reporter').order_by('-created_at')[:50])
+
+    total_pending = len(comment_reports) + len(message_reports) + len(profile_reports) + len(post_reports)
 
     return render(request, 'frontend/moderation_dashboard.html', {
         'comment_reports': comment_reports,
         'message_reports': message_reports,
         'profile_reports': profile_reports,
-        'total_pending': comment_reports.count() + message_reports.count() + profile_reports.count(),
+        'post_reports': post_reports,
+        'total_pending': total_pending,
     })
 
 
@@ -7080,6 +7143,27 @@ def explore(request):
     )
     _enrich_posts_for_feed(rising_posts, request.user)
 
+    # Trending hashtags (last 7 days, top 15)
+    _tag_counts: dict = {}
+    _tag_cutoff = timezone.now() - timedelta(days=7)
+    for _model in [Post, Poll, Question, Review]:
+        for _raw in _model.objects.filter(created_at__gte=_tag_cutoff).exclude(hashtags='').values_list('hashtags', flat=True):
+            for _t in Post.parse_hashtags(_raw, max_tags=20):
+                _tag_counts[_t] = _tag_counts.get(_t, 0) + 1
+    _max_count = max(_tag_counts.values(), default=1)
+    trending_tags = sorted(
+        [{'tag': t, 'count': c, 'weight': round(c / _max_count * 100)} for t, c in _tag_counts.items()],
+        key=lambda x: x['count'], reverse=True,
+    )[:15]
+
+    # Hot posts today (is_hot=True, last 24 h, max 5)
+    _hot_cutoff = timezone.now() - timedelta(hours=24)
+    hot_today = list(
+        _annotated_feed_posts_queryset()
+        .filter(is_hot=True, created_at__gte=_hot_cutoff, is_draft=False, is_deleted_by_moderation=False)
+        .order_by('-like_count')[:5]
+    )
+
     context = {
         'posts': posts,
         'page_obj': page_obj,
@@ -7087,6 +7171,8 @@ def explore(request):
         'categories': get_frontend_categories(),
         'active_category': category_filter,
         'search_query': search_q,
+        'trending_tags': trending_tags,
+        'hot_today': hot_today,
     }
     return render(request, 'frontend/explore.html', context)
 
