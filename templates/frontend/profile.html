@@ -837,7 +837,17 @@
                 <div class="flex items-center gap-2 mt-2 flex-wrap">
                     <button type="button" onclick="publishDraft('{{ post.id }}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition">Publish</button>
                     <span class="text-xs text-muted-foreground">Saved {{ post.created_at|date:"M j, Y" }}</span>
-                    {% if post.scheduled_for %}<span class="text-xs text-blue-600 dark:text-blue-400">Scheduled: {{ post.scheduled_for|date:"M j, g:i A" }}</span>{% endif %}
+                    <button type="button" onclick="toggleReschedule('{{ post.id }}')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-medium text-muted-foreground hover:text-primary hover:border-primary transition">
+                        📅 {% if post.scheduled_for %}{{ post.scheduled_for|date:"M j, g:i A" }}{% else %}Schedule{% endif %}
+                    </button>
+                </div>
+                <div id="reschedule-form-{{ post.id }}" class="hidden mt-2 flex items-center gap-2 flex-wrap">
+                    <input type="datetime-local" id="reschedule-input-{{ post.id }}"
+                        class="rounded-lg border border-border bg-background text-foreground text-xs px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        {% if post.scheduled_for %}value="{{ post.scheduled_for|date:'Y-m-d' }}T{{ post.scheduled_for|date:'H:i' }}"{% endif %}>
+                    <button type="button" onclick="saveReschedule('{{ post.id }}')" class="px-3 py-1.5 rounded-full bg-sky-500 text-white text-xs font-bold hover:bg-sky-600 transition">Save</button>
+                    <button type="button" onclick="clearSchedule('{{ post.id }}')" class="px-3 py-1.5 rounded-full border border-border text-xs text-muted-foreground hover:text-destructive transition">Clear</button>
+                    <span id="reschedule-msg-{{ post.id }}" class="text-xs text-muted-foreground"></span>
                 </div>
             </article>
             {% endfor %}
@@ -1379,6 +1389,46 @@ function publishDraft(postId) {
     }).then(r => r.json()).then(d => {
         if (d.success) { window.location.href = d.url; }
         else { alert(d.error || 'Failed to publish.'); }
+    });
+}
+
+function toggleReschedule(postId) {
+    var form = document.getElementById('reschedule-form-' + postId);
+    if (form) form.classList.toggle('hidden');
+}
+
+function saveReschedule(postId) {
+    var input = document.getElementById('reschedule-input-' + postId);
+    var msg = document.getElementById('reschedule-msg-' + postId);
+    if (!input || !input.value) { if (msg) msg.textContent = 'Pick a date/time first.'; return; }
+    var body = new URLSearchParams({ scheduled_for: input.value });
+    fetch('/posts/' + postId + '/reschedule/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken') || '', 'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body.toString()
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            if (msg) msg.textContent = 'Saved!';
+            setTimeout(function() { location.reload(); }, 800);
+        } else {
+            if (msg) msg.textContent = d.error || 'Failed to save.';
+        }
+    });
+}
+
+function clearSchedule(postId) {
+    var msg = document.getElementById('reschedule-msg-' + postId);
+    fetch('/posts/' + postId + '/reschedule/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken') || '', 'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'scheduled_for='
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            if (msg) msg.textContent = 'Schedule cleared.';
+            setTimeout(function() { location.reload(); }, 600);
+        } else {
+            if (msg) msg.textContent = d.error || 'Failed.';
+        }
     });
 }
 

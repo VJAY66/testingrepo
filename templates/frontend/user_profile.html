@@ -410,6 +410,54 @@
     </section>
 </div>
 
+<!-- Activity Heatmap -->
+{% if activity_heatmap_json %}
+<div class="mt-4 rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+    <h3 class="text-sm font-bold text-foreground mb-3">Activity <span class="text-muted-foreground font-normal text-xs">— last 52 weeks</span></h3>
+    <div id="up-activity-heatmap" class="overflow-x-auto"></div>
+</div>
+<script>
+(function() {
+    var data = {{ activity_heatmap_json|safe }};
+    var container = document.getElementById('up-activity-heatmap');
+    if (!container) return;
+    var today = new Date(); today.setHours(0,0,0,0);
+    var start = new Date(today); start.setDate(start.getDate() - 363);
+    start.setDate(start.getDate() - start.getDay()); // align to Sunday
+    var maxVal = Math.max(1, Math.max.apply(null, Object.values(data).concat([0])));
+    function pad(n) { return n < 10 ? '0'+n : ''+n; }
+    function dateKey(d) { return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+    function colorLevel(v) {
+        if (v === 0) return 'hsl(var(--muted))';
+        var pct = v / maxVal;
+        if (pct <= 0.25) return 'hsl(142 71% 45% / 0.35)';
+        if (pct <= 0.5)  return 'hsl(142 71% 45% / 0.6)';
+        if (pct <= 0.75) return 'hsl(142 71% 45% / 0.8)';
+        return 'hsl(142 71% 45%)';
+    }
+    var table = document.createElement('table');
+    table.style.cssText = 'border-collapse:separate;border-spacing:3px;width:max-content';
+    var tbody = document.createElement('tbody');
+    var rows = [];
+    for (var r = 0; r < 7; r++) rows.push(document.createElement('tr'));
+    var cur = new Date(start);
+    while (cur <= today) {
+        var key = dateKey(cur);
+        var val = data[key] || 0;
+        var td = document.createElement('td');
+        td.style.cssText = 'width:11px;height:11px;border-radius:2px;';
+        td.style.background = colorLevel(val);
+        td.title = key + (val ? ': ' + val + ' action' + (val > 1 ? 's' : '') : ': no activity');
+        rows[cur.getDay()].appendChild(td);
+        cur.setDate(cur.getDate() + 1);
+    }
+    rows.forEach(function(r) { tbody.appendChild(r); });
+    table.appendChild(tbody);
+    container.appendChild(table);
+})();
+</script>
+{% endif %}
+
 <div id="rp-modal-backdrop" class="rp-modal-backdrop" aria-hidden="true">
     <div class="rp-modal" role="dialog" aria-modal="true" aria-labelledby="rp-modal-title">
         <div class="rp-modal-head">

@@ -1799,6 +1799,32 @@ def user_profile(request, username):
             ProfileHighlight.objects.filter(user=request.user).values_list('post_id', flat=True)
         )
 
+    # Activity heatmap for public profile (post + comment counts per day, last 364 days)
+    import json as _upjson, datetime as _updt
+    from django.db.models.functions import TruncDate as _UpTruncDate
+    _up_heatmap_start = timezone.now().date() - timedelta(days=363)
+    _up_post_counts = {
+        str(r['day']): r['n']
+        for r in Post.objects.filter(
+            user=profile_user, is_draft=False,
+            created_at__date__gte=_up_heatmap_start,
+        ).annotate(day=_UpTruncDate('created_at')).values('day').annotate(n=Count('id'))
+    }
+    _up_comment_counts = {
+        str(r['day']): r['n']
+        for r in Comment.objects.filter(
+            user=profile_user,
+            created_at__date__gte=_up_heatmap_start,
+        ).annotate(day=_UpTruncDate('created_at')).values('day').annotate(n=Count('id'))
+    }
+    _up_all_days = {}
+    _up_d = _up_heatmap_start
+    while _up_d <= timezone.now().date():
+        _up_key = str(_up_d)
+        _up_all_days[_up_key] = _up_post_counts.get(_up_key, 0) + _up_comment_counts.get(_up_key, 0)
+        _up_d += _updt.timedelta(days=1)
+    up_activity_heatmap_json = _upjson.dumps(_up_all_days)
+
     context = {
         'profile_user': profile_user,
         'user_posts': user_posts,
@@ -1826,6 +1852,7 @@ def user_profile(request, username):
         'user_endorsements': user_endorsements,
         'highlights': highlights,
         'user_highlight_post_ids': user_highlight_post_ids,
+        'activity_heatmap_json': up_activity_heatmap_json,
         'hide_profile_views': profile_obj.hide_profile_views if profile_obj else False,
         'profile_views_count': (
             ProfileView.objects.filter(viewed=profile_user).count()
@@ -2800,6 +2827,31 @@ def publish_draft(request, post_id):
     post.scheduled_for = None
     post.save(update_fields=['is_draft', 'scheduled_for', 'updated_at'])
     return JsonResponse({'success': True, 'url': f'/discussion/{post.id}/?created=1'})
+
+
+@login_required
+@require_POST
+def reschedule_draft(request, post_id):
+    """Update or clear the scheduled_for time on a draft post."""
+    post = get_object_or_404(Post, id=post_id, user=request.user, is_draft=True)
+    scheduled_for_raw = request.POST.get('scheduled_for', '').strip()
+    if not scheduled_for_raw:
+        post.scheduled_for = None
+        post.save(update_fields=['scheduled_for', 'updated_at'])
+        return JsonResponse({'success': True, 'scheduled_for': None})
+    from django.utils.dateparse import parse_datetime
+    try:
+        naive_dt = parse_datetime(scheduled_for_raw)
+        if naive_dt is None:
+            return JsonResponse({'success': False, 'error': 'Invalid datetime format.'}, status=400)
+        scheduled_dt = timezone.make_aware(naive_dt) if timezone.is_naive(naive_dt) else naive_dt
+        if scheduled_dt <= timezone.now():
+            return JsonResponse({'success': False, 'error': 'Scheduled time must be in the future.'}, status=400)
+        post.scheduled_for = scheduled_dt
+        post.save(update_fields=['scheduled_for', 'updated_at'])
+        return JsonResponse({'success': True, 'scheduled_for': scheduled_dt.isoformat()})
+    except Exception:
+        return JsonResponse({'success': False, 'error': 'Could not parse datetime.'}, status=400)
 
 
 @login_required

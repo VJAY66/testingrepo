@@ -4,7 +4,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.utils import timezone
 from django.db.models import Count, Q
 
-from discussions.models import Post, PostAction, Challenge
+from discussions.models import Post, PostAction, Challenge, ReadLater
 from users.models import Achievement, DEFAULT_NOTIFICATION_PREFS
 
 import datetime
@@ -77,6 +77,12 @@ class Command(BaseCommand):
                 Achievement.objects.filter(user=user, awarded_at__gte=week_ago)
             )
 
+            unread_read_later = list(
+                ReadLater.objects.filter(user=user, is_read=False)
+                .select_related('post')
+                .order_by('added_at')[:10]
+            )
+
             try:
                 profile = user.profile
                 streak = profile.streak_days
@@ -87,7 +93,8 @@ class Command(BaseCommand):
 
             subject = "Your PickASide Weekly Digest \U0001f525"
             text_body, html_body = self._build_digest(
-                user, top_posts, active_challenges, new_achievements, streak, reputation
+                user, top_posts, active_challenges, new_achievements, streak, reputation,
+                unread_read_later,
             )
 
             if dry_run:
@@ -126,10 +133,14 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
 
     def _build_digest(
-        self, user, top_posts, active_challenges, new_achievements, streak, reputation
+        self, user, top_posts, active_challenges, new_achievements, streak, reputation,
+        unread_read_later=None,
     ):
         """Return (plain_text, html) tuple for the digest email."""
+        from django.conf import settings as _settings
+        site_url = getattr(_settings, 'SITE_URL', '')
         first_name = user.first_name or user.username
+        unread_read_later = unread_read_later or []
 
         # ---- plain text ----
         lines = [
@@ -168,6 +179,16 @@ class Command(BaseCommand):
                 lines.append(f"  - {ach.code}")
         else:
             lines.append("  No new achievements this week — keep going!")
+
+        if unread_read_later:
+            lines += [
+                "",
+                "=== YOUR UNREAD SAVED POSTS ===",
+                f"You have {len(unread_read_later)} post(s) waiting in your Read Later list:",
+            ]
+            for rl in unread_read_later:
+                url = f"{site_url}/discussion/{rl.post_id}/" if site_url else f"/discussion/{rl.post_id}/"
+                lines.append(f"  - {rl.post.title}  {url}")
 
         lines += [
             "",
@@ -209,6 +230,7 @@ class Command(BaseCommand):
             "    .stat .label { font-size: 12px; color: #6b7280; }",
             "    .footer { background: #f9fafb; padding: 16px 32px; font-size: 12px; color: #9ca3af; text-align: center; border-top: 1px solid #e5e7eb; }",
             "    .empty { color: #9ca3af; font-style: italic; }",
+            "    .read-later-item { margin-bottom: 8px; padding: 10px 12px; background: #f5f3ff; border-left: 4px solid #8b5cf6; border-radius: 4px; }",
             "  </style>",
             "</head>",
             "<body>",
@@ -258,6 +280,18 @@ class Command(BaseCommand):
             html_lines.append("      </div>")
         else:
             html_lines.append('      <p class="empty">No new achievements this week — keep going!</p>')
+
+        if unread_read_later:
+            html_lines.append('      <div class="section-title">Your Read Later List</div>')
+            html_lines.append(f'      <p style="font-size:13px;color:#6b7280;margin-bottom:8px;">You have {len(unread_read_later)} unread post(s) saved for later:</p>')
+            for rl in unread_read_later:
+                url = f"{site_url}/discussion/{rl.post_id}/" if site_url else f"/discussion/{rl.post_id}/"
+                html_lines.append(
+                    f'      <div class="post-item" style="border-left-color:#8b5cf6;">'
+                    f'<div class="title"><a href="{self._escape(url)}" style="color:#4f46e5;text-decoration:none;">{self._escape(rl.post.title)}</a></div>'
+                    f'<div class="meta">Added {rl.added_at.strftime("%b %d")}</div>'
+                    f'</div>'
+                )
 
         html_lines += [
             '      <div class="section-title">Your Stats</div>',

@@ -122,6 +122,7 @@ urlpatterns = [
     path('moderation/', views.moderation_dashboard, name='moderation_dashboard'),
     # Draft posts & pinned posts
     path('posts/<str:post_id>/publish/', views.publish_draft, name='publish_draft'),
+    path('posts/<str:post_id>/reschedule/', views.reschedule_draft, name='reschedule_draft'),
     path('posts/<str:post_id>/pin/', views.pin_post, name='pin_post'),
     # Save collections
     path('collections/create/', views.create_collection, name='create_collection'),
