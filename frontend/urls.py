@@ -275,4 +275,7 @@ urlpatterns = [
     path('live-debates/<str:room_id>/messages/', views.live_debate_poll_messages, name='live_debate_poll_messages'),
     path('live-debates/<str:room_id>/send/', views.live_debate_send_message, name='live_debate_send_message'),
     path('live-debates/<str:room_id>/vote/', views.live_debate_vote, name='live_debate_vote'),
+    # Bookmarks
+    path('bookmarks/', views.bookmarks, name='bookmarks'),
+    path('posts/<str:post_id>/bookmark/', views.toggle_bookmark, name='toggle_bookmark'),
 ]

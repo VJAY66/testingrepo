@@ -135,7 +135,19 @@
               <span>💬 {{ post.comment_count|default:0 }}</span>
               <span>🗂️ {{ post.conversation_count|default:0 }}</span>
             </div>
-            <a href="{% url 'discussion' post.id %}" class="text-xs font-semibold text-primary hover:text-primary/80">Read →</a>
+            <div class="flex items-center gap-2">
+              {% if user.is_authenticated %}
+              <button type="button"
+                onclick="exploreToggleBookmark(this, '{{ post.id }}')"
+                title="{% if post.is_saved %}Remove bookmark{% else %}Bookmark{% endif %}"
+                class="explore-bk-btn p-1 rounded-lg transition-colors {% if post.is_saved %}text-primary{% else %}text-muted-foreground hover:text-primary{% endif %}">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="{% if post.is_saved %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/>
+                </svg>
+              </button>
+              {% endif %}
+              <a href="{% url 'discussion' post.id %}" class="text-xs font-semibold text-primary hover:text-primary/80">Read →</a>
+            </div>
           </div>
         </div>
         {% endfor %}
@@ -206,4 +218,32 @@
   </div><!-- end two-column -->
 
 </div>
+
+<script>
+function exploreToggleBookmark(btn, postId) {
+  const csrfToken = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+  fetch('/posts/' + postId + '/bookmark/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrfToken },
+    credentials: 'same-origin',
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.success) return;
+    const svg = btn.querySelector('svg');
+    if (d.saved) {
+      btn.classList.remove('text-muted-foreground', 'hover:text-primary');
+      btn.classList.add('text-primary');
+      svg.setAttribute('fill', 'currentColor');
+      btn.title = 'Remove bookmark';
+    } else {
+      btn.classList.remove('text-primary');
+      btn.classList.add('text-muted-foreground', 'hover:text-primary');
+      svg.setAttribute('fill', 'none');
+      btn.title = 'Bookmark';
+    }
+  })
+  .catch(() => {});
+}
+</script>
 {% endblock %}

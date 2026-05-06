@@ -2733,6 +2733,7 @@ function acceptCookies() {
                                 </div>
                                 <div class="user-menu-divider"></div>
                                 <a href="{% url 'profile' %}" class="user-menu-item">My Profile</a>
+                                <a href="{% url 'bookmarks' %}" class="user-menu-item">Bookmarks</a>
                                 <a href="{% url 'logout' %}" class="user-menu-item text-red-600">Logout</a>
                             </div>
                         </div>
@@ -2790,6 +2791,7 @@ function acceptCookies() {
                                 </div>
                                 <div class="user-menu-divider"></div>
                                 <a href="{% url 'profile' %}" class="user-menu-item">My Profile</a>
+                                <a href="{% url 'bookmarks' %}" class="user-menu-item">Bookmarks</a>
                                 <a href="{% url 'logout' %}" class="user-menu-item text-red-600">Logout</a>
                             </div>
                         </div>
@@ -2844,6 +2846,7 @@ function acceptCookies() {
             <span id="mobile-menu-chat-badge" class="nav-mobile-chat-badge"></span>
         </a>
         <a href="{% url 'notifications' %}" class="mobile-menu-link">Notifications</a>
+        <a href="{% url 'bookmarks' %}" class="mobile-menu-link">Bookmarks</a>
         <a href="{% url 'profile' %}" class="mobile-menu-link">Profile</a>
         <a href="{% url 'interests_onboarding' %}?force=1" class="mobile-menu-link">Interested Categories</a>
         <a href="{% url 'logout' %}" class="mobile-menu-link">Logout</a>
@@ -3499,7 +3502,9 @@ function acceptCookies() {
                         if (typeof d.notifications === 'number') {
                             updateNotificationBadge(d.notifications);
                             if (_lastNotifCount >= 0 && d.notifications > _lastNotifCount) {
-                                _showToast('You have ' + d.notifications + ' new notification' + (d.notifications !== 1 ? 's' : ''), 'notif');
+                                // Use rich message if available, otherwise fall back to generic
+                                var msg = d.latest_message ? d.latest_message : ('You have ' + d.notifications + ' new notification' + (d.notifications !== 1 ? 's' : ''));
+                                _showToast(msg, 'notif');
                             }
                             _lastNotifCount = d.notifications;
                         }

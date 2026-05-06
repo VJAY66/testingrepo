@@ -8258,17 +8258,31 @@ def notification_stream_v2(request):
     import time as _time
 
     def _event_gen(user):
+        import json as _json
         last_notifs = -1
         last_dms = -1
+        last_notif_id = None
         for _ in range(60):
             try:
                 notifs = Notification.objects.filter(user=user, is_read=False).count()
                 dms = DMRequest.objects.filter(recipient=user, status=DMRequest.STATUS_PENDING).count()
+                payload = {}
                 if notifs != last_notifs or dms != last_dms:
+                    payload['notifications'] = notifs
+                    payload['dms'] = dms
+                # Detect a new notification and emit its message for rich toasts
+                latest = Notification.objects.filter(user=user, is_read=False).order_by('-created_at').first()
+                if latest and latest.id != last_notif_id and last_notif_id is not None:
+                    payload['latest_message'] = latest.message[:120]
+                    payload['latest_type'] = latest.notification_type
+                if latest:
+                    last_notif_id = latest.id
+                elif last_notif_id is None:
+                    last_notif_id = -1
+                if payload:
                     last_notifs = notifs
                     last_dms = dms
-                    import json as _json
-                    yield f'data: {_json.dumps({"notifications": notifs, "dms": dms})}\n\n'
+                    yield f'data: {_json.dumps(payload)}\n\n'
                 _time.sleep(5)
             except Exception:
                 break
@@ -8279,6 +8293,61 @@ def notification_stream_v2(request):
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
     return response
+
+# ─── Bookmarks ────────────────────────────────────────────────────────────────
+
+@login_required
+def bookmarks(request):
+    q = request.GET.get('q', '').strip()
+    category = request.GET.get('category', '').strip()
+
+    qs = PostAction.objects.filter(
+        user=request.user, action='save'
+    ).select_related('post', 'post__user', 'post__user__profile').order_by('-created_at')
+
+    if q:
+        qs = qs.filter(Q(post__title__icontains=q) | Q(post__content__icontains=q))
+    if category:
+        qs = qs.filter(post__category=category)
+
+    paginator = Paginator(qs, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    saved_categories = list(
+        PostAction.objects.filter(user=request.user, action='save')
+        .values_list('post__category', flat=True)
+        .distinct()
+        .order_by('post__category')
+    )
+
+    return render(request, 'frontend/bookmarks.html', {
+        'page_obj': page_obj,
+        'bookmarks': page_obj.object_list,
+        'q': q,
+        'category': category,
+        'saved_categories': saved_categories,
+        'total': qs.count(),
+    })
+
+
+@login_required
+@require_POST
+def toggle_bookmark(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    existing = PostAction.objects.filter(user=request.user, post=post, action='save').first()
+    if existing:
+        existing.delete()
+        saved = False
+    else:
+        try:
+            PostAction.objects.create(user=request.user, post=post, action='save')
+            notify_post_author(post, 'author_save', request.user)
+        except IntegrityError:
+            pass
+        saved = True
+    save_count = PostAction.objects.filter(post=post, action='save').count()
+    return JsonResponse({'success': True, 'saved': saved, 'save_count': save_count})
+
 
 # ─── Blocked Users Management ─────────────────────────────────────────────────
 
