@@ -1387,6 +1387,13 @@ def discussion(request, post_id):
             'next_item': all_items[current_idx + 1] if current_idx is not None and current_idx < len(all_items) - 1 else None,
         }
 
+    # Post reminder state for authenticated user
+    from discussions.models import PostReminder as _PR
+    post.has_reminder = (
+        request.user.is_authenticated
+        and _PR.objects.filter(user=request.user, post=post, is_sent=False).exists()
+    )
+
     context = {
         'post': post,
         'post_display_content': _render_markdown(_normalize_post_content(post.content)),
@@ -1621,6 +1628,54 @@ def profile(request):
     except Exception:
         coauthor_invites = []
 
+    # Cross-post analytics summary for the Analytics tab
+    from discussions.models import PostInsight as _PI
+    _pub_post_ids = list(
+        Post.objects.filter(user=request.user, is_draft=False)
+        .values_list('id', flat=True)
+    )
+    _total_views = PostView.objects.filter(post_id__in=_pub_post_ids).count()
+    _total_likes = PostAction.objects.filter(post_id__in=_pub_post_ids, action='like').count()
+    _total_saves = PostAction.objects.filter(post_id__in=_pub_post_ids, action='save').count()
+    _total_comments = Comment.objects.filter(post_id__in=_pub_post_ids).count()
+    _total_engagements = _total_likes + _total_saves + _total_comments
+    _engagement_rate = round(_total_engagements / _total_views * 100, 1) if _total_views > 0 else 0.0
+
+    # Top 5 posts by view count
+    _top_posts = list(
+        Post.objects.filter(user=request.user, is_draft=False)
+        .annotate(
+            view_count=Count('views', distinct=True),
+            like_count=Count('actions', filter=Q(actions__action='like'), distinct=True),
+        )
+        .order_by('-view_count')[:5]
+    )
+
+    # 30-day daily view trend across all posts
+    _thirty_ago = timezone.now().date() - timedelta(days=29)
+    _daily_views_qs = (
+        _PI.objects.filter(post_id__in=_pub_post_ids, date__gte=_thirty_ago)
+        .values('date')
+        .annotate(total=Count('unique_viewers'))
+        .order_by('date')
+    )
+    _daily_map = {str(r['date']): r['total'] for r in _daily_views_qs}
+    import datetime as _adt2
+    _analytics_daily = []
+    for _i in range(29, -1, -1):
+        _d = (timezone.now() - timedelta(days=_i)).date()
+        _analytics_daily.append({'date': _d.strftime('%b %d'), 'views': _daily_map.get(str(_d), 0)})
+
+    _analytics_summary = {
+        'total_views': _total_views,
+        'total_likes': _total_likes,
+        'total_saves': _total_saves,
+        'total_comments': _total_comments,
+        'engagement_rate': _engagement_rate,
+        'top_posts': _top_posts,
+        'daily_json': json.dumps(_analytics_daily),
+    }
+
     context = {
         'user_posts': user_posts,
         'user_reposts': user_reposts,
@@ -1672,6 +1727,7 @@ def profile(request):
         'allow_mentions_from': profile_obj.allow_mentions_from if profile_obj else 'everyone',
         'mention_allow_choices': Profile.MENTION_ALLOW_CHOICES,
         'streak_grace_used_at': profile_obj.streak_grace_used_at if profile_obj else None,
+        'analytics_summary': _analytics_summary,
     }
     return render(request, 'frontend/profile.html', context)
 
@@ -8358,3 +8414,46 @@ def who_viewed_profile(request):
         'views': views,
         'hidden': False,
     })
+
+
+@login_required
+@require_POST
+def set_post_reminder(request, post_id):
+    """Create or update a reminder for a post. Clears it when preset is 'clear'."""
+    from discussions.models import PostReminder
+    post = get_object_or_404(Post, id=post_id, is_draft=False)
+    preset = request.POST.get('preset', '').strip()
+
+    if preset == 'clear':
+        PostReminder.objects.filter(user=request.user, post=post).delete()
+        return JsonResponse({'success': True, 'cleared': True})
+
+    now = timezone.now()
+    if preset == '1h':
+        remind_at = now + timedelta(hours=1)
+    elif preset == 'tomorrow':
+        remind_at = (now + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+    elif preset == 'next_week':
+        remind_at = (now + timedelta(weeks=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+    else:
+        custom_raw = request.POST.get('remind_at', '').strip()
+        if not custom_raw:
+            return JsonResponse({'success': False, 'error': 'No time provided.'}, status=400)
+        from django.utils.dateparse import parse_datetime
+        try:
+            naive = parse_datetime(custom_raw)
+            if naive is None:
+                raise ValueError
+            remind_at = timezone.make_aware(naive) if timezone.is_naive(naive) else naive
+        except (ValueError, Exception):
+            return JsonResponse({'success': False, 'error': 'Invalid datetime.'}, status=400)
+        preset = 'custom'
+
+    if remind_at <= now:
+        return JsonResponse({'success': False, 'error': 'Reminder time must be in the future.'}, status=400)
+
+    PostReminder.objects.update_or_create(
+        user=request.user, post=post,
+        defaults={'remind_at': remind_at, 'preset': preset, 'is_sent': False},
+    )
+    return JsonResponse({'success': True, 'remind_at': remind_at.isoformat()})

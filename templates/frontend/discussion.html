@@ -354,6 +354,22 @@
               🕐 <span class="hidden sm:inline">Later</span>
             </button>
             {% endif %}
+            {% if user.is_authenticated %}
+            <div class="relative inline-block" id="reminder-wrap-{{ post.id }}">
+              <button type="button" onclick="toggleReminderMenu('{{ post.id|escapejs }}')"
+                title="Set reminder"
+                class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced {% if post.has_reminder %}text-amber-500 bg-amber-50/60{% else %}text-muted-foreground hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/20{% endif %} hover:shadow-md overflow-hidden">
+                <span class="sm:w-5 sm:h-5 w-4 h-4 relative z-10 text-base leading-none">⏰</span>
+                <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Remind</span>
+              </button>
+              <div id="reminder-menu-{{ post.id }}" class="hidden absolute left-0 top-full mt-1 z-50 w-48 rounded-xl border border-border bg-card shadow-lg p-1">
+                <button onclick="setReminder('{{ post.id|escapejs }}','1h')" class="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-muted transition">⏱ In 1 hour</button>
+                <button onclick="setReminder('{{ post.id|escapejs }}','tomorrow')" class="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-muted transition">🌅 Tomorrow morning</button>
+                <button onclick="setReminder('{{ post.id|escapejs }}','next_week')" class="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-muted transition">📅 Next week</button>
+                {% if post.has_reminder %}<button onclick="setReminder('{{ post.id|escapejs }}','clear')" class="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-destructive/10 text-destructive transition">✕ Clear reminder</button>{% endif %}
+              </div>
+            </div>
+            {% endif %}
             <button type="button" data-action="hot" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_hot %}active text-orange-500 bg-orange-50/60 border-orange-300/60{% else %}text-muted-foreground hover:text-orange-500 hover:bg-orange-50/60{% endif %}">🔥 <span class="action-count text-xs" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','hot')">{{ post.hot_count|default:0 }}</span></button>
             <button type="button" data-action="debatable" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_debatable %}active text-purple-500 bg-purple-50/60 border-purple-300/60{% else %}text-muted-foreground hover:text-purple-500 hover:bg-purple-50/60{% endif %}">🤔 <span class="action-count text-xs" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','debatable')">{{ post.debatable_count|default:0 }}</span></button>
             <button type="button" data-action="agree" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_agree %}active text-green-600 bg-green-50/60 border-green-300/60{% else %}text-muted-foreground hover:text-green-600 hover:bg-green-50/60{% endif %}">👏 <span class="action-count text-xs" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','agree')">{{ post.agree_count|default:0 }}</span></button>
@@ -2014,6 +2030,40 @@ function toggleReadLaterDiscussion(postId, btn) {
       btn.classList.toggle('bg-teal-50', d.saved);
       btn.classList.toggle('border-teal-300', d.saved);
       btn.title = d.saved ? 'Remove from Read Later' : 'Read Later';
+    }
+  });
+}
+
+function toggleReminderMenu(postId) {
+  var menu = document.getElementById('reminder-menu-' + postId);
+  if (!menu) return;
+  menu.classList.toggle('hidden');
+  if (!menu.classList.contains('hidden')) {
+    var close = function(e) {
+      if (!menu.contains(e.target)) { menu.classList.add('hidden'); document.removeEventListener('click', close); }
+    };
+    setTimeout(function() { document.addEventListener('click', close); }, 0);
+  }
+}
+
+function setReminder(postId, preset) {
+  var menu = document.getElementById('reminder-menu-' + postId);
+  if (menu) menu.classList.add('hidden');
+  var body = new URLSearchParams({ preset: preset });
+  fetch('/posts/' + postId + '/reminder/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') || '', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString()
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.success) {
+      var btn = document.querySelector('#reminder-wrap-' + postId + ' button');
+      if (d.cleared) {
+        if (btn) { btn.classList.remove('text-amber-500', 'bg-amber-50/60'); btn.classList.add('text-muted-foreground'); }
+      } else {
+        if (btn) { btn.classList.add('text-amber-500', 'bg-amber-50/60'); btn.classList.remove('text-muted-foreground'); }
+      }
+    } else {
+      alert(d.error || 'Could not set reminder.');
     }
   });
 }

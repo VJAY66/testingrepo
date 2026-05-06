@@ -329,6 +329,7 @@ class Notification(models.Model):
         ('author_like_milestone', 'Your Post Hit a Like Milestone'),
         ('mention', 'You Were Mentioned'),
         ('profile_view', 'Someone Viewed Your Profile'),
+        ('post_reminder', 'Post Reminder'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
@@ -1257,3 +1258,29 @@ class LiveDebateVote(models.Model):
 
     def __str__(self):
         return f"{self.voter.username} voted {self.winner_side} wins room {self.room_id}"
+
+
+class PostReminder(models.Model):
+    """A user-set reminder to revisit a specific post at a chosen time."""
+    PRESET_CHOICES = [
+        ('1h',        'In 1 hour'),
+        ('tomorrow',  'Tomorrow'),
+        ('next_week', 'Next week'),
+        ('custom',    'Custom time'),
+    ]
+    user       = models.ForeignKey(User, on_delete=models.CASCADE, related_name='post_reminders')
+    post       = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='reminders')
+    remind_at  = models.DateTimeField(db_index=True)
+    preset     = models.CharField(max_length=10, choices=PRESET_CHOICES, default='custom')
+    is_sent    = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['remind_at']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'post'], name='unique_post_reminder'),
+        ]
+        indexes = [models.Index(fields=['is_sent', 'remind_at'])]
+
+    def __str__(self):
+        return f"{self.user.username} reminder for post {self.post_id} at {self.remind_at}"

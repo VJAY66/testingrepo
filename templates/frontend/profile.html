@@ -402,6 +402,10 @@
             <span class="hidden sm:inline">Blocked</span>
             {% if blocked_users %}<span class="rounded-full bg-destructive/15 text-destructive px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ blocked_users|length }}</span>{% endif %}
         </button>
+        <button type="button" id="tab-btn-analytics" onclick="switchProfileTab('analytics')"
+            class="profile-tab-btn flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-2 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200">
+            📊 <span class="hidden sm:inline">Analytics</span>
+        </button>
     </div>
 
     <!-- Tab: Posts -->
@@ -1034,6 +1038,99 @@
         {% endif %}
     </section>
 
+    <!-- Tab: Analytics -->
+    <section id="tab-analytics" class="hidden space-y-4">
+        <!-- Headline stats -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="rounded-2xl border border-border/70 bg-card p-4 shadow-sm text-center">
+                <p class="text-2xl font-black text-foreground">{{ analytics_summary.total_views }}</p>
+                <p class="text-xs text-muted-foreground mt-1 font-semibold uppercase tracking-wide">Total Views</p>
+            </div>
+            <div class="rounded-2xl border border-border/70 bg-card p-4 shadow-sm text-center">
+                <p class="text-2xl font-black text-foreground">{{ analytics_summary.total_likes }}</p>
+                <p class="text-xs text-muted-foreground mt-1 font-semibold uppercase tracking-wide">Likes</p>
+            </div>
+            <div class="rounded-2xl border border-border/70 bg-card p-4 shadow-sm text-center">
+                <p class="text-2xl font-black text-foreground">{{ analytics_summary.total_comments }}</p>
+                <p class="text-xs text-muted-foreground mt-1 font-semibold uppercase tracking-wide">Comments</p>
+            </div>
+            <div class="rounded-2xl border border-border/70 bg-card p-4 shadow-sm text-center">
+                <p class="text-2xl font-black {% if analytics_summary.engagement_rate >= 5 %}text-green-500{% else %}text-foreground{% endif %}">{{ analytics_summary.engagement_rate }}%</p>
+                <p class="text-xs text-muted-foreground mt-1 font-semibold uppercase tracking-wide">Engagement</p>
+            </div>
+        </div>
+
+        <!-- 30-day views sparkline -->
+        <div class="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+            <p class="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-3">Views — last 30 days</p>
+            <div class="overflow-x-auto">
+                <canvas id="analytics-views-chart" height="80" style="min-width:480px;"></canvas>
+            </div>
+        </div>
+
+        <!-- Top posts -->
+        {% if analytics_summary.top_posts %}
+        <div class="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+            <p class="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-3">Top Posts by Views</p>
+            <div class="space-y-2">
+                {% for post in analytics_summary.top_posts %}
+                <div class="flex items-center gap-3 py-2 border-b border-border/40 last:border-0">
+                    <span class="text-xs font-bold text-muted-foreground w-4 shrink-0">{{ forloop.counter }}</span>
+                    <div class="flex-1 min-w-0">
+                        <a href="{% url 'discussion' post.id %}" class="text-sm font-semibold text-foreground hover:text-primary truncate block">{{ post.title }}</a>
+                        <div class="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                            <span>👁 {{ post.view_count }} views</span>
+                            <span>⭐ {{ post.like_count }} likes</span>
+                        </div>
+                    </div>
+                    <a href="{% url 'creator_analytics' post.id %}" class="shrink-0 text-xs text-primary hover:underline">Details →</a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </section>
+    <script>
+    (function() {
+        var analyticsData = {{ analytics_summary.daily_json|safe }};
+        var canvas = document.getElementById('analytics-views-chart');
+        if (!canvas || !analyticsData.length) return;
+        var labels = analyticsData.map(function(d) { return d.date; });
+        var values = analyticsData.map(function(d) { return d.views; });
+        var maxV = Math.max(1, Math.max.apply(null, values));
+        var ctx = canvas.getContext('2d');
+        var W = canvas.parentElement.scrollWidth || 480;
+        canvas.width = Math.max(480, W);
+        canvas.height = 80;
+        var pad = 8, w = canvas.width - pad * 2, h = canvas.height - pad * 2;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        var step = w / Math.max(labels.length - 1, 1);
+        var pts = values.map(function(v, i) {
+            return { x: pad + i * step, y: pad + h - (v / maxV) * h };
+        });
+        ctx.beginPath();
+        pts.forEach(function(p, i) { i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y); });
+        ctx.strokeStyle = 'hsl(221 83% 53%)';
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+        ctx.lineTo(pts[pts.length-1].x, pad + h);
+        ctx.lineTo(pts[0].x, pad + h);
+        ctx.closePath();
+        ctx.fillStyle = 'hsl(221 83% 53% / 0.12)';
+        ctx.fill();
+        // x-axis labels (every 5th)
+        ctx.fillStyle = 'hsl(var(--muted-foreground))';
+        ctx.font = '9px sans-serif';
+        ctx.textAlign = 'center';
+        labels.forEach(function(l, i) {
+            if (i % 5 === 0 || i === labels.length - 1) {
+                ctx.fillText(l, pad + i * step, canvas.height - 1);
+            }
+        });
+    })();
+    </script>
+
     <!-- Activity Heatmap -->
     <div class="mt-4 rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
         <h3 class="text-sm font-bold text-foreground mb-3">Activity <span class="text-muted-foreground font-normal text-xs">— last 52 weeks</span></h3>
@@ -1444,7 +1541,7 @@ function togglePin(postId, btn) {
 }
 
 function switchProfileTab(name) {
-    ['posts', 'reposts', 'debates', 'saved', 'followed', 'followers', 'following', 'reviews', 'questions', 'polls', 'answers', 'drafts', 'series', 'reactions', 'calendar'].forEach(function(t) {
+    ['posts', 'reposts', 'debates', 'saved', 'followed', 'followers', 'following', 'reviews', 'questions', 'polls', 'answers', 'drafts', 'series', 'reactions', 'calendar', 'blocked', 'analytics'].forEach(function(t) {
         var sec = document.getElementById('tab-' + t);
         var btn = document.getElementById('tab-btn-' + t);
         if (sec) {
