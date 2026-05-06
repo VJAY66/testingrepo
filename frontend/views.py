@@ -1891,6 +1891,23 @@ def user_profile(request, username):
         _up_d += _updt.timedelta(days=1)
     up_activity_heatmap_json = _upjson.dumps(_up_all_days)
 
+    # Mutual followers — people the viewer follows who also follow profile_user
+    mutual_followers = []
+    mutual_followers_count = 0
+    if request.user.is_authenticated and request.user != profile_user:
+        viewer_following_ids = set(
+            Follow.objects.filter(follower=request.user).values_list('following_id', flat=True)
+        )
+        profile_follower_ids = set(
+            Follow.objects.filter(following=profile_user).values_list('follower_id', flat=True)
+        )
+        mutual_ids = viewer_following_ids & profile_follower_ids
+        mutual_followers_count = len(mutual_ids)
+        if mutual_ids:
+            mutual_followers = list(
+                User.objects.filter(id__in=list(mutual_ids)[:3]).values_list('username', flat=True)
+            )
+
     context = {
         'profile_user': profile_user,
         'user_posts': user_posts if can_see_content else [],
@@ -1928,6 +1945,9 @@ def user_profile(request, username):
             if profile_obj and not profile_obj.hide_profile_views and request.user == profile_user
             else None
         ),
+        'streak_days': profile_obj.streak_days if profile_obj else 0,
+        'mutual_followers': mutual_followers,
+        'mutual_followers_count': mutual_followers_count,
     }
     return render(request, 'frontend/user_profile.html', context)
 
@@ -8739,6 +8759,13 @@ def approve_follow_request(request, req_id):
     Follow.objects.get_or_create(follower=freq.from_user, following=request.user)
     freq.status = FollowRequest.STATUS_APPROVED
     freq.save(update_fields=['status', 'updated_at'])
+    _send_notification_email(
+        freq.from_user,
+        f'@{request.user.username} approved your follow request',
+        f'Good news! @{request.user.username} approved your follow request.\n\n'
+        f'Visit their profile: {getattr(settings, "SITE_URL", "")}/user/{request.user.username}/',
+        notif_type='follow',
+    )
     return JsonResponse({'success': True})
 
 

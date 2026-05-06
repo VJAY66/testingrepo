@@ -4,11 +4,38 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
+from django.core.mail import send_mail
+from django.conf import settings
 from django.utils import timezone
 from users.models import Profile, Follow, FollowRequest
 from users.security import is_login_rate_limited, record_login_attempt
 from users.throttles import LoginRateThrottle
 from users.serializers import UserSerializer, UserRegistrationSerializer, ProfileSerializer
+
+
+def _send_follow_email(target_user, follower_user):
+    """Email target_user that follower_user started following them."""
+    if not getattr(target_user, 'email', None):
+        return
+    try:
+        prefs = target_user.profile.notification_prefs or {}
+    except Exception:
+        prefs = {}
+    from users.models import DEFAULT_NOTIFICATION_PREFS
+    type_prefs = prefs.get('follow') or DEFAULT_NOTIFICATION_PREFS.get('follow', {})
+    if not type_prefs.get('email', True):
+        return
+    try:
+        send_mail(
+            f'@{follower_user.username} started following you',
+            f'@{follower_user.username} is now following you on PickASide.\n\n'
+            f'View their profile: {getattr(settings, "SITE_URL", "")}/user/{follower_user.username}/',
+            settings.DEFAULT_FROM_EMAIL,
+            [target_user.email],
+            fail_silently=True,
+        )
+    except Exception:
+        pass
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -103,7 +130,9 @@ class UserViewSet(viewsets.ModelViewSet):
                     'my_following_count': request.user.following_links.count(),
                 })
             else:
-                Follow.objects.get_or_create(follower=request.user, following=target_user)
+                _, created_follow = Follow.objects.get_or_create(follower=request.user, following=target_user)
+                if created_follow:
+                    _send_follow_email(target_user, request.user)
                 message = f'Now following {username}'
                 is_following = True
         elif action == 'unfollow':

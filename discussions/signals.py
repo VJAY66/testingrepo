@@ -1,7 +1,35 @@
-﻿from django.db.models.signals import post_save
+from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
+from django.core.mail import send_mail
+from django.conf import settings
 from .models import Comment, Notification, PostFollow
+
+
+def _email_post_author(post, actor_user):
+    """Send a one-time email to the post author when they get their first comment."""
+    author = post.user
+    if not getattr(author, 'email', None) or author.id == actor_user.id:
+        return
+    try:
+        prefs = author.profile.notification_prefs or {}
+    except Exception:
+        prefs = {}
+    from users.models import DEFAULT_NOTIFICATION_PREFS
+    type_prefs = prefs.get('author_comment') or DEFAULT_NOTIFICATION_PREFS.get('follow', {})
+    if not type_prefs.get('email', True):
+        return
+    try:
+        send_mail(
+            f'@{actor_user.username} commented on your post',
+            f'@{actor_user.username} commented on your post "{post.title}".\n\n'
+            f'View it: {getattr(settings, "SITE_URL", "")}/discussion/{post.id}/',
+            settings.DEFAULT_FROM_EMAIL,
+            [author.email],
+            fail_silently=True,
+        )
+    except Exception:
+        pass
 
 # ---------------------------------------------------------------------------
 # Author notification helpers
@@ -61,6 +89,8 @@ def notify_post_author(post, notification_type, actor_user):
             message=_AUTHOR_FIRST_MESSAGES[notification_type](actor_user),
             count=1,
         )
+        if notification_type == 'author_comment':
+            _email_post_author(post, actor_user)
         return
 
     batch_window = _batch_window_seconds(first_notif.created_at)
