@@ -8642,3 +8642,65 @@ def set_post_reminder(request, post_id):
         defaults={'remind_at': remind_at, 'preset': preset, 'is_sent': False},
     )
     return JsonResponse({'success': True, 'remind_at': remind_at.isoformat()})
+
+
+def debate_hall_of_fame(request):
+    """Public archive of top-rated completed debates."""
+    period = request.GET.get('period', 'all_time')
+    category = request.GET.get('category', '').strip()
+
+    qs = (
+        Debate.objects.filter(status='completed')
+        .select_related('initiator', 'target', 'post', 'poll')
+        .annotate(
+            vote_count=Count('observer_votes', distinct=True),
+            msg_count=Count('messages', distinct=True),
+            yes_votes=Count(
+                'observer_votes',
+                filter=Q(observer_votes__winner_side='yes'),
+                distinct=True,
+            ),
+            no_votes=Count(
+                'observer_votes',
+                filter=Q(observer_votes__winner_side='no'),
+                distinct=True,
+            ),
+        )
+    )
+
+    now = timezone.now()
+    if period == 'this_week':
+        qs = qs.filter(updated_at__gte=now - timedelta(days=7))
+    elif period == 'this_month':
+        qs = qs.filter(updated_at__gte=now - timedelta(days=30))
+
+    if category:
+        qs = qs.filter(post__category=category)
+
+    qs = qs.order_by('-vote_count', '-msg_count', '-updated_at')
+
+    paginator = Paginator(qs, 15)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    debates = list(page_obj.object_list)
+    for d in debates:
+        if d.yes_votes > d.no_votes:
+            d.winner_label = 'Yes'
+            d.winner_user = d.initiator if getattr(d, 'end_controller_side', '') == 'yes' else None
+        elif d.no_votes > d.yes_votes:
+            d.winner_label = 'No'
+            d.winner_user = None
+        else:
+            d.winner_label = 'Draw' if d.outcome == 'draw' else 'Tied'
+            d.winner_user = None
+
+    categories = [c[0] for c in CATEGORY_CHOICES]
+
+    return render(request, 'frontend/debate_hall_of_fame.html', {
+        'debates': debates,
+        'page_obj': page_obj,
+        'period': period,
+        'category': category,
+        'categories': categories,
+        'total': page_obj.paginator.count,
+    })

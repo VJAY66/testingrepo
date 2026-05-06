@@ -260,6 +260,8 @@ urlpatterns = [
     path('account/2fa/login/', views.totp_login_verify, name='totp_login_verify'),
     # Post similarity check
     path('posts/similarity-check/', views.post_similarity_check, name='post_similarity_check'),
+    # Debate Hall of Fame
+    path('debates/hall-of-fame/', views.debate_hall_of_fame, name='debate_hall_of_fame'),
     # Live Debate Rooms
     path('live-debates/', views.live_debate_rooms, name='live_debate_rooms'),
     path('live-debates/create/', views.create_live_debate_room, name='create_live_debate_room'),

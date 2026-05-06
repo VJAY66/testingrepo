@@ -1,0 +1,283 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Debate Hall of Fame — PickASide{% endblock %}
+
+{% block content %}
+<style>
+.hof-hero {
+  background: linear-gradient(135deg, hsl(38 92% 50%/0.12), hsl(var(--primary)/0.08));
+  border-bottom: 1px solid hsl(var(--border)/0.5);
+}
+.hof-wrap { max-width: 900px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+
+/* Period + category filter bar */
+.filter-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 14px; border-radius: 999px;
+  border: 1px solid hsl(var(--border)); font-size: .75rem; font-weight: 600;
+  white-space: nowrap; cursor: pointer; transition: all .18s;
+  color: hsl(var(--muted-foreground)); background: hsl(var(--card)/0.7);
+  text-decoration: none;
+}
+.filter-chip:hover, .filter-chip.active {
+  background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: transparent;
+}
+
+/* Podium top-3 */
+.podium { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 2rem; }
+@media(max-width:640px){ .podium { grid-template-columns: 1fr; } }
+
+.podium-card {
+  border-radius: 1.25rem; padding: 1.1rem 1.15rem;
+  border: 1.5px solid hsl(var(--border)/0.7); background: hsl(var(--card));
+  display: flex; flex-direction: column; gap: .6rem;
+  transition: box-shadow .2s;
+  position: relative; overflow: hidden;
+}
+.podium-card:hover { box-shadow: 0 8px 28px -10px hsl(var(--primary)/0.25); }
+.podium-card.rank-1 { border-color: hsl(38 92% 50%/0.7); background: linear-gradient(160deg, hsl(38 92% 50%/0.06), hsl(var(--card))); }
+.podium-card.rank-2 { border-color: hsl(220 14% 70%/0.7); }
+.podium-card.rank-3 { border-color: hsl(25 70% 55%/0.6); }
+
+.rank-badge {
+  position: absolute; top: 10px; right: 12px;
+  font-size: 1.3rem; line-height: 1;
+}
+
+.podium-participants {
+  display: flex; align-items: center; gap: 6px;
+}
+.p-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1.5px solid hsl(var(--border)); background: hsl(var(--muted));
+  display: flex; align-items: center; justify-content: center;
+  font-size: .68rem; font-weight: 700; color: hsl(var(--muted-foreground));
+  overflow: hidden; flex-shrink: 0;
+}
+.p-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.vs-dot { font-size: .7rem; font-weight: 800; color: hsl(var(--muted-foreground)); padding: 0 1px; }
+
+.podium-topic {
+  font-size: .8rem; font-weight: 700; color: hsl(var(--foreground));
+  line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.vote-bar-wrap { width: 100%; height: 5px; border-radius: 999px; background: hsl(var(--border)/0.4); overflow: hidden; }
+.vote-bar-yes { height: 100%; background: hsl(142 71% 45%); border-radius: 999px; transition: width .4s; }
+
+.podium-meta {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: .7rem; color: hsl(var(--muted-foreground));
+}
+.winner-pill {
+  display: inline-flex; align-items: center; gap: 3px; padding: 1px 8px;
+  border-radius: 999px; font-size: .65rem; font-weight: 800;
+  background: hsl(142 71% 45%/0.15); color: hsl(142 71% 38%);
+}
+.winner-pill.draw { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
+
+/* Main list */
+.hof-list { display: flex; flex-direction: column; gap: .6rem; }
+.hof-row {
+  display: flex; align-items: flex-start; gap: .85rem;
+  padding: .9rem 1rem; border-radius: 1rem;
+  border: 1px solid hsl(var(--border)/0.6); background: hsl(var(--card));
+  transition: box-shadow .18s;
+}
+.hof-row:hover { box-shadow: 0 4px 18px -8px hsl(var(--primary)/0.18); }
+.hof-rank-num {
+  width: 28px; text-align: center; flex-shrink: 0;
+  font-size: .75rem; font-weight: 900; color: hsl(var(--muted-foreground));
+  padding-top: 2px;
+}
+.hof-body { flex: 1; min-width: 0; }
+.hof-participants { display: flex; align-items: center; gap: 5px; margin-bottom: .3rem; font-size: .78rem; }
+.hof-topic { font-size: .85rem; font-weight: 700; color: hsl(var(--foreground)); line-height: 1.4; margin-bottom: .35rem;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.hof-stats { display: flex; align-items: center; gap: .85rem; font-size: .72rem; color: hsl(var(--muted-foreground)); flex-wrap: wrap; }
+.hof-cta { flex-shrink: 0; }
+.hof-btn {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 5px 12px; border-radius: 999px; font-size: .72rem; font-weight: 700;
+  background: hsl(var(--primary)/0.1); color: hsl(var(--primary));
+  text-decoration: none; transition: background .18s;
+}
+.hof-btn:hover { background: hsl(var(--primary)/0.18); }
+
+.empty-state { text-align: center; padding: 5rem 1rem; color: hsl(var(--muted-foreground)); }
+
+/* Category select */
+.cat-select {
+  background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground)); border-radius: 999px;
+  padding: 5px 32px 5px 14px; font-size: .75rem; font-weight: 600;
+  appearance: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+</style>
+
+<!-- Hero -->
+<div class="hof-hero py-8 px-4">
+  <div class="max-w-4xl mx-auto">
+    <div class="flex items-center gap-3 mb-1">
+      <span style="font-size:2rem">🏆</span>
+      <div>
+        <h1 class="text-2xl font-extrabold text-foreground leading-tight">Debate Hall of Fame</h1>
+        <p class="text-sm text-muted-foreground">The best-rated completed debates, ranked by community votes</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="hof-wrap">
+
+  <!-- Filters -->
+  <form method="get" class="flex flex-wrap items-center gap-2 mb-6">
+    <a href="?period=all_time{% if category %}&category={{ category }}{% endif %}"
+       class="filter-chip {% if period == 'all_time' %}active{% endif %}">🌍 All Time</a>
+    <a href="?period=this_month{% if category %}&category={{ category }}{% endif %}"
+       class="filter-chip {% if period == 'this_month' %}active{% endif %}">📅 This Month</a>
+    <a href="?period=this_week{% if category %}&category={{ category }}{% endif %}"
+       class="filter-chip {% if period == 'this_week' %}active{% endif %}">🔥 This Week</a>
+
+    <div class="relative ml-auto">
+      <select name="category" class="cat-select" onchange="this.form.submit()">
+        <option value="">All Categories</option>
+        {% for cat in categories %}
+        <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+      </select>
+      <input type="hidden" name="period" value="{{ period }}">
+    </div>
+  </form>
+
+  {% if debates %}
+  <p class="text-xs text-muted-foreground mb-4">{{ total }} debate{{ total|pluralize }} found</p>
+
+  <!-- Podium: top 3 -->
+  {% if page_obj.number == 1 and debates|length >= 1 %}
+  <div class="podium">
+    {% for debate in debates|slice:":3" %}
+    {% with rank=forloop.counter %}
+    <div class="podium-card rank-{{ rank }}">
+      <span class="rank-badge">{% if rank == 1 %}🥇{% elif rank == 2 %}🥈{% else %}🥉{% endif %}</span>
+
+      <div class="podium-participants">
+        <div class="p-avatar">
+          {% with p=debate.initiator %}{{ p.username|slice:":1"|upper }}{% endwith %}
+        </div>
+        <span class="text-xs font-semibold text-foreground truncate" style="max-width:64px">@{{ debate.initiator.username }}</span>
+        <span class="vs-dot">vs</span>
+        <div class="p-avatar">
+          {% with p=debate.target %}{{ p.username|slice:":1"|upper }}{% endwith %}
+        </div>
+        <span class="text-xs font-semibold text-foreground truncate" style="max-width:64px">@{{ debate.target.username }}</span>
+      </div>
+
+      <p class="podium-topic">
+        {% if debate.post %}{{ debate.post.title }}
+        {% elif debate.poll %}{{ debate.poll.title }}
+        {% else %}Direct Debate{% endif %}
+      </p>
+
+      {% if debate.vote_count > 0 %}
+      <div>
+        <div class="vote-bar-wrap">
+          <div class="vote-bar-yes" style="width:{% widthratio debate.yes_votes debate.vote_count 100 %}%"></div>
+        </div>
+        <div class="flex justify-between mt-1" style="font-size:.65rem;color:hsl(var(--muted-foreground))">
+          <span>Yes {{ debate.yes_votes }}</span>
+          <span>No {{ debate.no_votes }}</span>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="podium-meta">
+        <span class="winner-pill {% if debate.winner_label == 'Draw' or debate.winner_label == 'Tied' %}draw{% endif %}">
+          {% if debate.winner_label == 'Draw' or debate.winner_label == 'Tied' %}🤝 {{ debate.winner_label }}
+          {% else %}🏆 {{ debate.winner_label }} wins{% endif %}
+        </span>
+        <a href="{% url 'debate_transcript' debate.id %}" class="hof-btn">View →</a>
+      </div>
+
+      <div class="text-xs text-muted-foreground">
+        ⭐ {{ debate.vote_count }} vote{{ debate.vote_count|pluralize }}
+        &middot; 💬 {{ debate.msg_count }} message{{ debate.msg_count|pluralize }}
+      </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Remaining list (rank 4+, or all on page > 1) -->
+  {% with start_rank=page_obj.start_index %}
+  <div class="hof-list">
+    {% for debate in debates %}
+    {% if page_obj.number > 1 or forloop.counter > 3 %}
+    <div class="hof-row">
+      <div class="hof-rank-num">#{{ forloop.counter0|add:start_rank }}</div>
+      <div class="hof-body">
+        <div class="hof-participants">
+          <span class="font-semibold text-foreground">@{{ debate.initiator.username }}</span>
+          <span class="text-muted-foreground">vs</span>
+          <span class="font-semibold text-foreground">@{{ debate.target.username }}</span>
+          <span class="winner-pill {% if debate.winner_label == 'Draw' or debate.winner_label == 'Tied' %}draw{% endif %} ml-1">
+            {% if debate.winner_label == 'Draw' or debate.winner_label == 'Tied' %}🤝 {{ debate.winner_label }}
+            {% else %}🏆 {{ debate.winner_label }}{% endif %}
+          </span>
+        </div>
+        <p class="hof-topic">
+          {% if debate.post %}{{ debate.post.title }}
+          {% elif debate.poll %}{{ debate.poll.title }}
+          {% else %}Direct Debate{% endif %}
+        </p>
+        <div class="hof-stats">
+          <span>⭐ {{ debate.vote_count }} vote{{ debate.vote_count|pluralize }}</span>
+          <span>💬 {{ debate.msg_count }} message{{ debate.msg_count|pluralize }}</span>
+          {% if debate.post %}<span>🗂️ {{ debate.post.category }}</span>{% endif %}
+          <span>{{ debate.updated_at|date:"M j, Y" }}</span>
+        </div>
+      </div>
+      <div class="hof-cta">
+        <a href="{% url 'debate_transcript' debate.id %}" class="hof-btn">View →</a>
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endwith %}
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div class="flex justify-center gap-2 mt-8">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&period={{ period }}{% if category %}&category={{ category }}{% endif %}"
+       class="px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-primary hover:text-primary-foreground transition-colors">← Prev</a>
+    {% endif %}
+    <span class="px-4 py-2 text-sm text-muted-foreground">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&period={{ period }}{% if category %}&category={{ category }}{% endif %}"
+       class="px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-primary hover:text-primary-foreground transition-colors">Next →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="empty-state">
+    <div class="text-5xl mb-4">🏆</div>
+    <p class="font-semibold text-foreground mb-1">No debates yet</p>
+    <p class="text-sm">
+      {% if period == 'this_week' %}No completed debates this week.
+      {% elif period == 'this_month' %}No completed debates this month.
+      {% elif category %}No completed {{ category }} debates found.
+      {% else %}Be the first to complete a debate!{% endif %}
+    </p>
+    {% if period != 'all_time' %}
+    <a href="?period=all_time{% if category %}&category={{ category }}{% endif %}" class="inline-block mt-3 text-sm text-primary hover:underline">View all time →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
