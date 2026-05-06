@@ -47,6 +47,7 @@ class Profile(models.Model):
     quiet_hours_end = models.TimeField(null=True, blank=True, help_text='Notification emails resume at this time')
     streak_grace_used_at = models.DateField(null=True, blank=True, help_text='Date the weekly streak grace day was last used')
     hide_profile_views = models.BooleanField(default=False, help_text='When True, this user\'s profile visits are not recorded and they cannot see who viewed them')
+    is_private = models.BooleanField(default=False, help_text='When True, posts are hidden from non-followers and new followers must be approved')
     MENTION_ALLOW_EVERYONE = 'everyone'
     MENTION_ALLOW_FOLLOWERS = 'followers'
     MENTION_ALLOW_NOBODY = 'nobody'
@@ -120,6 +121,33 @@ class Follow(models.Model):
         ordering = ['-created_at']
         constraints = [
             models.UniqueConstraint(fields=['follower', 'following'], name='unique_follow_pair'),
+        ]
+
+
+class FollowRequest(models.Model):
+    """Pending follow request sent to a private-profile user."""
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_DENIED = 'denied'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_DENIED, 'Denied'),
+    ]
+
+    from_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_follow_requests')
+    to_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_follow_requests')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.from_user.username} → {self.to_user.username} ({self.status})"
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['from_user', 'to_user'], name='unique_follow_request'),
         ]
 
 

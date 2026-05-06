@@ -1,0 +1,106 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Follow Requests — PickASide{% endblock %}
+
+{% block content %}
+<style>
+.fr-wrap { max-width: 600px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+.fr-title { font-size: 1.4rem; font-weight: 900; color: hsl(var(--foreground)); letter-spacing: -.01em; }
+.fr-badge { display:inline-flex; align-items:center; gap:.3rem; padding:.15rem .55rem; border-radius:999px; font-size:.68rem; font-weight:700; background:hsl(var(--primary)/0.15); color:hsl(var(--primary)); }
+.fr-card { display:flex; align-items:center; gap:.85rem; padding:.9rem 1rem; border-radius:1rem; border:1px solid hsl(var(--border)/0.6); background:hsl(var(--card)); transition:box-shadow .18s; margin-bottom:.5rem; }
+.fr-card:hover { box-shadow:0 4px 18px -8px hsl(var(--primary)/0.18); }
+.fr-avatar { width:44px; height:44px; border-radius:50%; border:1.5px solid hsl(var(--border)); background:hsl(var(--muted)); display:flex; align-items:center; justify-content:center; font-size:.9rem; font-weight:700; color:hsl(var(--muted-foreground)); overflow:hidden; flex-shrink:0; }
+.fr-avatar img { width:100%; height:100%; object-fit:cover; }
+.fr-info { flex:1; min-width:0; }
+.fr-username { font-size:.9rem; font-weight:700; color:hsl(var(--foreground)); text-decoration:none; }
+.fr-username:hover { color:hsl(var(--primary)); }
+.fr-time { font-size:.72rem; color:hsl(var(--muted-foreground)); margin-top:.1rem; }
+.fr-actions { display:flex; gap:.5rem; flex-shrink:0; }
+.fr-btn { padding:6px 14px; border-radius:999px; font-size:.75rem; font-weight:700; border:none; cursor:pointer; transition:all .15s; }
+.fr-btn-approve { background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); }
+.fr-btn-approve:hover { opacity:.88; }
+.fr-btn-deny { background:hsl(var(--secondary)); color:hsl(var(--foreground)); border:1px solid hsl(var(--border)); }
+.fr-btn-deny:hover { background:hsl(var(--muted)); }
+.fr-done { opacity:.35; pointer-events:none; transition:opacity .3s; }
+.fr-empty { text-align:center; padding:5rem 1rem; color:hsl(var(--muted-foreground)); }
+</style>
+
+<div class="fr-wrap">
+  <div class="flex items-center gap-2 mb-6">
+    <h1 class="fr-title">Follow Requests</h1>
+    {% if count > 0 %}<span class="fr-badge">{{ count }}</span>{% endif %}
+  </div>
+
+  {% if requests %}
+  <div id="fr-list">
+    {% for req in requests %}
+    <div class="fr-card" id="fr-{{ req.id }}">
+      <div class="fr-avatar">
+        {% with p=req.from_user.profile %}
+          {% if p.profile_picture %}
+          <img src="{{ p.profile_picture.url }}" alt="">
+          {% else %}
+          {{ req.from_user.username|slice:":1"|upper }}
+          {% endif %}
+        {% empty %}
+          {{ req.from_user.username|slice:":1"|upper }}
+        {% endwith %}
+      </div>
+      <div class="fr-info">
+        <a href="{% url 'user_profile' req.from_user.username %}" class="fr-username">@{{ req.from_user.username }}</a>
+        {% with p=req.from_user.profile %}
+          {% if p.bio %}<p class="text-xs text-muted-foreground truncate mt-0.5">{{ p.bio|truncatechars:60 }}</p>{% endif %}
+        {% empty %}{% endwith %}
+        <p class="fr-time">{{ req.created_at|timesince }} ago</p>
+      </div>
+      <div class="fr-actions">
+        <button class="fr-btn fr-btn-approve" onclick="handleRequest({{ req.id }}, 'approve')">Approve</button>
+        <button class="fr-btn fr-btn-deny" onclick="handleRequest({{ req.id }}, 'deny')">Deny</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <p id="fr-all-done" class="hidden text-center text-sm text-muted-foreground mt-6">All caught up! No more pending requests.</p>
+
+  {% else %}
+  <div class="fr-empty">
+    <div class="text-5xl mb-3">🔒</div>
+    <p class="font-semibold text-foreground mb-1">No pending requests</p>
+    <p class="text-sm">When someone requests to follow your private account, they'll appear here.</p>
+    <a href="{% url 'profile' %}" class="inline-block mt-4 text-sm text-primary hover:underline">← Back to profile</a>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function getCookie(name) {
+  var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+  return v ? v[2] : null;
+}
+
+var pending = {{ count }};
+
+function handleRequest(id, action) {
+  var url = '/follow-requests/' + id + '/' + action + '/';
+  var card = document.getElementById('fr-' + id);
+  fetch(url, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.success) {
+      card.classList.add('fr-done');
+      setTimeout(function() {
+        card.remove();
+        pending--;
+        if (pending <= 0) {
+          document.getElementById('fr-all-done').classList.remove('hidden');
+        }
+      }, 400);
+      if (typeof window.showToast === 'function') {
+        window.showToast(action === 'approve' ? 'Follow request approved.' : 'Request denied.', 'success');
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

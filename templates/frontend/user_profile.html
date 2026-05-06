@@ -151,6 +151,12 @@
                 <div class="text-center sm:text-left">
                     <div class="inline-flex items-center gap-2 flex-wrap">
                         <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-foreground">{{ profile_user.username }}</h1>
+                        {% if is_private %}
+                        <span title="Private account" class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-gray-500/15 text-gray-600 dark:text-gray-300">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM10 11V7a2 2 0 114 0v4"/></svg>
+                            Private
+                        </span>
+                        {% endif %}
                         <span title="{{ presence_label }}" class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold {% if is_online %}bg-emerald-500/15 text-emerald-700 dark:text-emerald-300{% else %}bg-gray-500/15 text-gray-600 dark:text-gray-300{% endif %}">
                             <span class="h-1.5 w-1.5 rounded-full {% if is_online %}bg-emerald-500{% else %}bg-gray-400{% endif %}"></span>
                             {% if is_online %}Online{% else %}Offline{% endif %}
@@ -218,11 +224,29 @@
                         {% if follows_you_back and not is_own_profile %}
                         <span class="text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-full">Follows you</span>
                         {% endif %}
+                        {% if is_following %}
                         <button id="follow-btn" type="button" onclick="toggleFollow('{{ profile_user.username }}')"
-                                class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition
-                                {% if is_following %}bg-gray-500 text-white hover:bg-gray-600{% else %}bg-primary text-primary-foreground hover:bg-primary/90{% endif %}">
-                            {% if is_following %}Unfollow{% else %}Follow{% endif %}
+                                class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition bg-gray-500 text-white hover:bg-gray-600">
+                            Unfollow
                         </button>
+                        {% elif request_pending %}
+                        <button id="follow-btn" type="button" onclick="cancelFollowRequest('{{ profile_user.username }}')"
+                                class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition bg-muted text-muted-foreground hover:bg-red-50 hover:text-red-600 border border-border">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Requested
+                        </button>
+                        {% elif is_private %}
+                        <button id="follow-btn" type="button" onclick="toggleFollow('{{ profile_user.username }}')"
+                                class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition bg-primary text-primary-foreground hover:bg-primary/90">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM10 11V7a2 2 0 114 0v4"/></svg>
+                            Request to Follow
+                        </button>
+                        {% else %}
+                        <button id="follow-btn" type="button" onclick="toggleFollow('{{ profile_user.username }}')"
+                                class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition bg-primary text-primary-foreground hover:bg-primary/90">
+                            Follow
+                        </button>
+                        {% endif %}
                         <button id="block-btn" type="button" onclick="toggleBlock('{{ profile_user.username|escapejs }}')"
                                 class="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold transition
                                 {% if is_blocked %}border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300{% else %}border-border text-muted-foreground hover:border-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20{% endif %}">
@@ -238,6 +262,22 @@
                                 class="inline-flex items-center rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 dark:bg-red-900/20 dark:border-red-700 dark:text-red-400">
                             Report Profile
                         </button>
+                    </div>
+                    {% endif %}
+
+                    {% if is_own_profile %}
+                    <div class="mt-3 flex items-center gap-2">
+                      <button id="privacy-toggle-btn" type="button" onclick="togglePrivacy()"
+                              class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition
+                              {% if is_private %}border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300{% else %}border-border text-muted-foreground hover:border-primary/40 hover:text-primary{% endif %}">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM10 11V7a2 2 0 114 0v4"/>
+                        </svg>
+                        {% if is_private %}Private account{% else %}Public account{% endif %}
+                      </button>
+                      <a href="{% url 'follow_requests_list' %}" class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition">
+                        Follow requests
+                      </a>
                     </div>
                     {% endif %}
                 </div>
@@ -262,6 +302,33 @@
       </div>
     </div>
     {% endif %}
+
+    <!-- Private profile gate -->
+    {% if is_private and not can_see_content %}
+    <div class="text-center py-16 px-4">
+      <div class="inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
+        <svg class="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM10 11V7a2 2 0 114 0v4"/>
+        </svg>
+      </div>
+      <h2 class="text-lg font-bold text-foreground mb-1">This account is private</h2>
+      <p class="text-sm text-muted-foreground mb-4">Follow this account to see their posts, polls, and more.</p>
+      {% if request_pending %}
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-muted px-4 py-2 text-sm font-semibold text-muted-foreground">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Follow request sent
+      </span>
+      {% elif user.is_authenticated %}
+      <button onclick="toggleFollow('{{ profile_user.username }}')"
+              class="inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM10 11V7a2 2 0 114 0v4"/></svg>
+        Request to Follow
+      </button>
+      {% else %}
+      <a href="{% url 'login' %}" class="inline-flex items-center rounded-lg px-5 py-2.5 text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition">Log in to follow</a>
+      {% endif %}
+    </div>
+    {% else %}
 
     <!-- Tab bar -->
     <div class="flex gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 shadow-sm overflow-x-auto mb-6">
@@ -410,8 +477,10 @@
     </section>
 </div>
 
+{% endif %}{# end private gate else #}
+
 <!-- Activity Heatmap -->
-{% if activity_heatmap_json %}
+{% if activity_heatmap_json and can_see_content %}
 <div class="mt-4 rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
     <h3 class="text-sm font-bold text-foreground mb-3">Activity <span class="text-muted-foreground font-normal text-xs">— last 52 weeks</span></h3>
     <div id="up-activity-heatmap" class="overflow-x-auto"></div>
@@ -510,12 +579,20 @@ function toggleFollow(username) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            const nowFollowing = !!data.is_following;
-            btn.textContent = nowFollowing ? 'Unfollow' : 'Follow';
-            btn.className = nowFollowing ?
-                'inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition bg-gray-500 text-white hover:bg-gray-600' :
-                'inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition bg-primary text-primary-foreground hover:bg-primary/90';
-
+            if (data.request_pending) {
+                btn.innerHTML = '<svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Requested';
+                btn.className = 'inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition bg-muted text-muted-foreground hover:bg-red-50 hover:text-red-600 border border-border';
+                btn.setAttribute('onclick', "cancelFollowRequest('" + username + "')");
+            } else {
+                const nowFollowing = !!data.is_following;
+                btn.textContent = nowFollowing ? 'Unfollow' : 'Follow';
+                btn.className = nowFollowing ?
+                    'inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition bg-gray-500 text-white hover:bg-gray-600' :
+                    'inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition bg-primary text-primary-foreground hover:bg-primary/90';
+                if (nowFollowing) {
+                    btn.setAttribute('onclick', "toggleFollow('" + username + "')");
+                }
+            }
             if (followersCountEl && typeof data.followers_count !== 'undefined') {
                 followersCountEl.textContent = data.followers_count;
             }
@@ -529,6 +606,40 @@ function toggleFollow(username) {
     .catch(error => {
         console.error('Error:', error);
         alert('An error occurred. Please try again.');
+    });
+}
+
+function togglePrivacy() {
+    fetch('{% url "toggle_profile_privacy" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') || '' },
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            const btn = document.getElementById('privacy-toggle-btn');
+            if (data.is_private) {
+                btn.textContent = '';
+                btn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM10 11V7a2 2 0 114 0v4"/></svg> Private account';
+                btn.className = btn.className.replace('border-border text-muted-foreground hover:border-primary/40 hover:text-primary', 'border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300');
+            } else {
+                btn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM10 11V7a2 2 0 114 0v4"/></svg> Public account';
+                btn.className = btn.className.replace('border-amber-400 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300', 'border-border text-muted-foreground hover:border-primary/40 hover:text-primary');
+            }
+        }
+    });
+}
+
+function cancelFollowRequest(username) {
+    const btn = document.getElementById('follow-btn');
+    fetch('/api/users/follow/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') || '' },
+        body: JSON.stringify({ username: username, action: 'unfollow' })
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            btn.innerHTML = '<svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM10 11V7a2 2 0 114 0v4"/></svg>Request to Follow';
+            btn.className = 'inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition bg-primary text-primary-foreground hover:bg-primary/90';
+            btn.setAttribute('onclick', "toggleFollow('" + username + "')");
+        }
     });
 }
 

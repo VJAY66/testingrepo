@@ -23,7 +23,7 @@ import uuid
 
 from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest, PostReport, LiveDebateRoom, LiveDebateMessage, LiveDebateVote, PollPrediction
 from discussions.signals import notify_post_author
-from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription, UserBan, ProfileView
+from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription, UserBan, ProfileView, FollowRequest
 from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
 from utils.moderation import check_content_moderation
@@ -1792,9 +1792,19 @@ def user_profile(request, username):
     # Check if current user is following this user
     is_following = False
     is_blocked = False
+    request_pending = False
+    is_private = bool(profile_obj and profile_obj.is_private)
     if request.user.is_authenticated:
         is_following = Follow.objects.filter(follower=request.user, following=profile_user).exists()
         is_blocked = UserBlock.objects.filter(blocker=request.user, blocked=profile_user).exists()
+        if is_private and not is_following and request.user != profile_user:
+            request_pending = FollowRequest.objects.filter(
+                from_user=request.user, to_user=profile_user, status='pending'
+            ).exists()
+
+    # Gate content for private profiles
+    is_own_profile = request.user == profile_user
+    can_see_content = is_own_profile or is_following or not is_private
 
     follows_you_back = False
     user_endorsements = []
@@ -1883,17 +1893,20 @@ def user_profile(request, username):
 
     context = {
         'profile_user': profile_user,
-        'user_posts': user_posts,
-        'user_reviews': user_reviews,
-        'user_questions': user_questions,
-        'user_polls': user_polls,
+        'user_posts': user_posts if can_see_content else [],
+        'user_reviews': user_reviews if can_see_content else [],
+        'user_questions': user_questions if can_see_content else [],
+        'user_polls': user_polls if can_see_content else [],
         'avatar_url': avatar_url,
         'is_online': is_online,
         'presence_label': presence_label,
         'followers_count': profile_user.follower_links.count(),
         'following_count': profile_user.following_links.count(),
         'is_following': is_following,
-        'is_own_profile': request.user == profile_user,
+        'is_own_profile': is_own_profile,
+        'is_private': is_private,
+        'can_see_content': can_see_content,
+        'request_pending': request_pending,
         'is_blocked': is_blocked,
         'profile_bio': profile_obj.bio if profile_obj else '',
         'profile_website': profile_obj.website if profile_obj else '',
@@ -8704,3 +8717,52 @@ def debate_hall_of_fame(request):
         'categories': categories,
         'total': page_obj.paginator.count,
     })
+
+
+@login_required
+def follow_requests_list(request):
+    """Page listing incoming pending follow requests."""
+    pending = FollowRequest.objects.filter(
+        to_user=request.user, status='pending'
+    ).select_related('from_user', 'from_user__profile').order_by('-created_at')
+    return render(request, 'frontend/follow_requests.html', {
+        'requests': pending,
+        'count': pending.count(),
+    })
+
+
+@login_required
+@require_POST
+def approve_follow_request(request, req_id):
+    """Approve a follow request — creates a Follow and marks request approved."""
+    freq = get_object_or_404(FollowRequest, id=req_id, to_user=request.user, status='pending')
+    Follow.objects.get_or_create(follower=freq.from_user, following=request.user)
+    freq.status = FollowRequest.STATUS_APPROVED
+    freq.save(update_fields=['status', 'updated_at'])
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_POST
+def deny_follow_request(request, req_id):
+    """Deny a follow request."""
+    freq = get_object_or_404(FollowRequest, id=req_id, to_user=request.user, status='pending')
+    freq.status = FollowRequest.STATUS_DENIED
+    freq.save(update_fields=['status', 'updated_at'])
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_POST
+def toggle_profile_privacy(request):
+    """Toggle the is_private flag on the user's profile."""
+    profile, _ = Profile.objects.get_or_create(user=request.user, defaults={'username': request.user.username})
+    profile.is_private = not profile.is_private
+    profile.save(update_fields=['is_private'])
+    if not profile.is_private:
+        # Profile went public — auto-approve all pending requests
+        pending = FollowRequest.objects.filter(to_user=request.user, status='pending')
+        for freq in pending:
+            Follow.objects.get_or_create(follower=freq.from_user, following=request.user)
+        pending.update(status=FollowRequest.STATUS_APPROVED)
+    return JsonResponse({'success': True, 'is_private': profile.is_private})

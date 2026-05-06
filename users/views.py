@@ -5,7 +5,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from django.utils import timezone
-from users.models import Profile, Follow
+from users.models import Profile, Follow, FollowRequest
 from users.security import is_login_rate_limited, record_login_attempt
 from users.throttles import LoginRateThrottle
 from users.serializers import UserSerializer, UserRegistrationSerializer, ProfileSerializer
@@ -69,12 +69,46 @@ class UserViewSet(viewsets.ModelViewSet):
         if target_user == request.user:
             return Response({'success': False, 'message': 'Cannot follow yourself'}, status=status.HTTP_400_BAD_REQUEST)
 
+        target_profile = Profile.objects.filter(user=target_user).first()
+        is_private = bool(target_profile and target_profile.is_private)
+
         if action == 'follow':
-            Follow.objects.get_or_create(follower=request.user, following=target_user)
-            message = f'Now following {username}'
-            is_following = True
+            if is_private:
+                # Already following (approved)?
+                already_follows = Follow.objects.filter(follower=request.user, following=target_user).exists()
+                if already_follows:
+                    return Response({
+                        'success': True,
+                        'message': f'Already following {username}',
+                        'is_following': True,
+                        'request_pending': False,
+                        'followers_count': target_user.follower_links.count(),
+                        'following_count': target_user.following_links.count(),
+                        'my_following_count': request.user.following_links.count(),
+                    })
+                req, created = FollowRequest.objects.get_or_create(
+                    from_user=request.user, to_user=target_user,
+                    defaults={'status': FollowRequest.STATUS_PENDING},
+                )
+                if not created and req.status == FollowRequest.STATUS_DENIED:
+                    req.status = FollowRequest.STATUS_PENDING
+                    req.save(update_fields=['status', 'updated_at'])
+                return Response({
+                    'success': True,
+                    'message': f'Follow request sent to {username}',
+                    'is_following': False,
+                    'request_pending': True,
+                    'followers_count': target_user.follower_links.count(),
+                    'following_count': target_user.following_links.count(),
+                    'my_following_count': request.user.following_links.count(),
+                })
+            else:
+                Follow.objects.get_or_create(follower=request.user, following=target_user)
+                message = f'Now following {username}'
+                is_following = True
         elif action == 'unfollow':
             Follow.objects.filter(follower=request.user, following=target_user).delete()
+            FollowRequest.objects.filter(from_user=request.user, to_user=target_user).delete()
             message = f'Unfollowed {username}'
             is_following = False
         else:
@@ -84,6 +118,7 @@ class UserViewSet(viewsets.ModelViewSet):
             'success': True,
             'message': message,
             'is_following': is_following,
+            'request_pending': False,
             'followers_count': target_user.follower_links.count(),
             'following_count': target_user.following_links.count(),
             'my_following_count': request.user.following_links.count(),
