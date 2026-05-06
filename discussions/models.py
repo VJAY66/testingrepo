@@ -51,6 +51,7 @@ class Post(models.Model):
     is_flagged = models.BooleanField(default=False, help_text='Flagged by moderation system')
     moderation_reason = models.TextField(blank=True, default='', help_text='Reason for moderation action')
     is_draft = models.BooleanField(default=False, help_text='Saved draft, not yet published')
+    is_anonymous = models.BooleanField(default=False, help_text='Hide author identity from other users (moderators can still see)')
     is_pinned = models.BooleanField(default=False, help_text='Pinned to top of author profile')
     scheduled_for = models.DateTimeField(null=True, blank=True, help_text='Publish this draft automatically at this time')
     closes_at = models.DateTimeField(null=True, blank=True, help_text='Lock comments after this time')

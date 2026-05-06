@@ -139,6 +139,19 @@
                                     <p id="hashtags-error" class="hidden text-xs text-red-500 mt-1"></p>
             </div>
 
+            <!-- Anonymous toggle -->
+            <label class="flex items-center gap-3 rounded-2xl border border-border bg-background/60 px-4 py-3 cursor-pointer hover:border-primary/40 transition-colors">
+                <div class="relative flex-shrink-0">
+                    <input type="checkbox" id="anon-toggle" name="is_anonymous" value="1" class="sr-only peer">
+                    <div class="w-10 h-6 bg-muted rounded-full peer-checked:bg-primary transition-colors"></div>
+                    <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-foreground">Post Anonymously</p>
+                    <p class="text-xs text-muted-foreground">Your identity will be hidden from other users. Moderators can still see who you are.</p>
+                </div>
+            </label>
+
             <input type="hidden" name="save_draft" id="save-draft-flag" value="0">
             <div id="schedule-input-wrapper" class="hidden mt-2">
                 <label for="scheduled-for-input" class="block text-xs font-medium text-muted-foreground mb-1">Schedule publish time (optional)</label>

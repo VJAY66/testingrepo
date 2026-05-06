@@ -7,9 +7,15 @@
 <meta property="og:description" content="{% if post.content %}{{ post.content|truncatechars:160 }}{% else %}Join the debate on PickASide.{% endif %}">
 <meta property="og:type" content="article">
 <meta property="og:url" content="{{ request.build_absolute_uri }}">
-<meta property="article:author" content="{{ post.user.username }}">
+{% if not post.is_anonymous %}<meta property="article:author" content="{{ post.user.username }}">{% endif %}
 <meta property="article:section" content="{{ post.category }}">
+{% if post.author_avatar %}
+<meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ post.author_avatar }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{{ post.author_avatar }}">
+{% else %}
 <meta name="twitter:card" content="summary">
+{% endif %}
 <meta name="twitter:title" content="{{ post.title|truncatechars:70 }}">
 <meta name="twitter:description" content="{% if post.content %}{{ post.content|truncatechars:160 }}{% else %}Join the debate on PickASide.{% endif %}">
 <meta name="description" content="{% if post.content %}{{ post.content|truncatechars:160 }}{% else %}{{ post.title }} — debate on PickASide{% endif %}">
@@ -24,7 +30,7 @@
   "description": "{{ post.content|truncatechars:160|escapejs }}",
   "author": {
     "@type": "Person",
-    "name": "{{ post.user.username|escapejs }}"
+    "name": "{% if post.is_anonymous %}Anonymous{% else %}{{ post.user.username|escapejs }}{% endif %}"
   },
   "datePublished": "{{ post.created_at|date:'c' }}",
   "dateModified": "{{ post.updated_at|date:'c' }}",
@@ -51,6 +57,18 @@
     <div class="bg-card border border-border rounded-2xl px-6 pt-6 pb-3" data-post-id="{{ post.id }}" data-share-url="{% url 'discussion' post.id %}">
         <div class="flex items-start justify-between mb-4">
             <div class="flex items-center space-x-2">
+                {% if post.is_anonymous and not reveal_identity %}
+                <div class="w-8 h-8 bg-muted rounded-full flex items-center justify-center border border-border flex-shrink-0">
+                    <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                </div>
+                <div>
+                    <p class="font-medium text-foreground flex items-center gap-1.5">
+                        Anonymous
+                        <span class="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full font-semibold">anon</span>
+                    </p>
+                    <p class="text-sm text-muted-foreground">{{ post.created_at|date:"M j, Y g:i A" }}</p>
+                </div>
+                {% else %}
                 <a href="{% url 'user_profile' post.user.username %}" class="flex-shrink-0">
                 {% if post.author_avatar %}
                 <img src="{{ post.author_avatar }}" alt="{{ post.user.username }}" class="w-8 h-8 rounded-full object-cover border border-border" loading="lazy">
@@ -61,9 +79,13 @@
                 {% endif %}
                 </a>
                 <div>
-                    <p class="font-medium text-foreground">{{ post.user.username }}</p>
+                    <p class="font-medium text-foreground flex items-center gap-1.5">
+                        {{ post.user.username }}
+                        {% if post.is_anonymous %}<span class="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full font-semibold">posted anonymously</span>{% endif %}
+                    </p>
                     <p class="text-sm text-muted-foreground">{{ post.created_at|date:"M j, Y g:i A" }}</p>
                 </div>
+                {% endif %}
             </div>
             <div class="flex items-center gap-2 flex-wrap">
                 <span class="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-sm">

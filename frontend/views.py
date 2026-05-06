@@ -1408,6 +1408,8 @@ def discussion(request, post_id):
         'user_vote_type': user_vote_type,
         'user_has_commented': user_has_commented,
         'is_post_creator': is_post_creator,
+        'is_moderator': _is_configured_moderator(request.user) if request.user.is_authenticated else False,
+        'reveal_identity': is_post_creator or (_is_configured_moderator(request.user) if request.user.is_authenticated else False),
         'show_post_submitted': show_post_submitted,
         'can_edit_post': can_manage_post_today and not post_has_comments,
         'can_delete_post': can_manage_post_today,
@@ -2964,6 +2966,8 @@ def create_post(request):
             except Post.DoesNotExist:
                 pass
 
+        is_anonymous = request.POST.get('is_anonymous') == '1'
+
         try:
             post = Post.objects.create(
                 id=str(uuid.uuid4()),
@@ -2977,6 +2981,7 @@ def create_post(request):
                 quoted_post=quoted_post_obj,
                 mood=mood,
                 reply_restriction=reply_restriction,
+                is_anonymous=is_anonymous,
             )
 
             if not post or not post.id:

@@ -1,6 +1,24 @@
 {% extends 'frontend/base.html' %}
 
-{% block title %}{{ profile_user.username }} - Discussion Hub{% endblock %}
+{% block title %}@{{ profile_user.username }} — PickASide{% endblock %}
+
+{% block og_meta %}
+<meta property="og:title" content="@{{ profile_user.username }} on PickASide">
+<meta property="og:description" content="{% if profile_bio %}{{ profile_bio|truncatechars:160 }}{% else %}{{ profile_user.username }}'s discussions, debates and polls on PickASide.{% endif %}">
+<meta property="og:type" content="profile">
+<meta property="og:url" content="{{ request.build_absolute_uri }}">
+<meta property="profile:username" content="{{ profile_user.username }}">
+{% if avatar_url %}
+<meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ avatar_url }}">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{{ avatar_url }}">
+{% else %}
+<meta name="twitter:card" content="summary">
+{% endif %}
+<meta name="twitter:title" content="@{{ profile_user.username }} on PickASide">
+<meta name="twitter:description" content="{% if profile_bio %}{{ profile_bio|truncatechars:160 }}{% else %}{{ profile_user.username }}'s debates on PickASide.{% endif %}">
+<meta name="description" content="{% if profile_bio %}{{ profile_bio|truncatechars:160 }}{% else %}@{{ profile_user.username }}'s profile on PickASide.{% endif %}">
+{% endblock %}
 
 {% block content %}
 <style>
