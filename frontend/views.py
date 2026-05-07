@@ -2998,6 +2998,7 @@ def create_post(request):
                 _update_streak(request.user.profile)
             except Exception:
                 pass
+            _notify_mentions(request.user, f"{title} {content}", post)
             _maybe_award_achievements(request.user)
             return redirect(f'/discussion/{post.id}/?created=1')
         except Exception as e:
@@ -5984,9 +5985,37 @@ def leaderboard(request):
             'reputation': getattr(p, 'reputation_score', 0) if p else 0,
         })
 
+    # ── Streak leaderboard ───────────────────────────────────────────────────
+    from users.models import Profile as _Profile
+    streak_qs = _Profile.objects.filter(streak_days__gt=0).select_related('user').order_by('-streak_days')[:50]
+    streak_board = []
+    for rank, p in enumerate(streak_qs, start=1):
+        streak_board.append({
+            'rank': rank,
+            'username': p.user.username,
+            'avatar_url': p.get_picture_url,
+            'streak_days': p.streak_days,
+            'reputation': p.reputation_score,
+        })
+
+    # ── Reputation leaderboard ───────────────────────────────────────────────
+    rep_qs = _Profile.objects.filter(reputation_score__gt=0).select_related('user').order_by('-reputation_score')[:50]
+    reputation_board = []
+    for rank, p in enumerate(rep_qs, start=1):
+        reputation_board.append({
+            'rank': rank,
+            'username': p.user.username,
+            'avatar_url': p.get_picture_url,
+            'reputation': p.reputation_score,
+            'streak_days': p.streak_days,
+            'trust_level': p.trust_level,
+        })
+
     return render(request, 'frontend/leaderboard.html', {
         'board': board,
         'debate_board': debate_board,
+        'streak_board': streak_board,
+        'reputation_board': reputation_board,
         'period': period,
         'active_category': category,
         'categories': CATEGORY_CHOICES,
@@ -7234,6 +7263,39 @@ def for_you_feed(request):
         'follow_suggestions': _follow_suggestions(request.user),
         'trending_sidebar': _get_trending_hashtags(),
         'active_stories': active_stories,
+    }
+    return render(request, 'frontend/index.html', context)
+
+
+# ─── Following Feed ────────────────────────────────────────────────────────────
+
+@login_required
+def following_feed(request):
+    """Chronological feed of posts from people the current user follows."""
+    following_ids = list(Follow.objects.filter(follower=request.user).values_list('following_id', flat=True))
+
+    base_qs = _annotated_feed_posts_queryset().filter(
+        user_id__in=following_ids,
+        is_draft=False,
+        is_deleted_by_moderation=False,
+    ).order_by('-created_at')
+
+    paginator = Paginator(base_qs, 10)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    posts = list(page_obj.object_list)
+    _enrich_posts_for_feed(posts, request.user)
+    posts = _filter_muted_posts(posts, request.user)
+
+    context = {
+        'posts': posts,
+        'page_obj': page_obj,
+        'active_tab': 'following',
+        'is_suggested_page': False,
+        'categories': get_frontend_categories(),
+        'active_category': '',
+        'follow_suggestions': _follow_suggestions(request.user),
+        'trending_sidebar': _get_trending_hashtags(),
+        'following_count': len(following_ids),
     }
     return render(request, 'frontend/index.html', context)
 

@@ -34,19 +34,25 @@
     </div>
   </div>
 
-  <!-- Tab switcher: Posts vs Debates -->
-  <div class="flex items-center gap-2">
+  <!-- Tab switcher -->
+  <div class="flex items-center gap-2 flex-wrap">
     <a href="?tab=posts&period={{ period }}{% if active_category %}&category={{ active_category }}{% endif %}"
-       class="tab-btn {% if tab != 'debates' %}active{% endif %}">🗳️ Top Posters</a>
+       class="tab-btn {% if tab == 'posts' or tab == '' %}active{% endif %}">🗳️ Top Posters</a>
     <a href="?tab=debates&period={{ period }}"
        class="tab-btn {% if tab == 'debates' %}active{% endif %}">⚔️ Top Debaters</a>
+    <a href="?tab=streaks"
+       class="tab-btn {% if tab == 'streaks' %}active{% endif %}">🔥 Streaks</a>
+    <a href="?tab=reputation"
+       class="tab-btn {% if tab == 'reputation' %}active{% endif %}">🌟 Reputation</a>
   </div>
 
-  <!-- Period tabs -->
+  <!-- Period tabs (only for posts / debates) -->
+  {% if tab != 'streaks' and tab != 'reputation' %}
   <div class="flex items-center gap-2 flex-wrap">
     <a href="?tab={{ tab }}&period=alltime{% if active_category %}&category={{ active_category }}{% endif %}" class="tab-btn {% if period == 'alltime' %}active{% endif %}">All Time</a>
     <a href="?tab={{ tab }}&period=week{% if active_category %}&category={{ active_category }}{% endif %}" class="tab-btn {% if period == 'week' %}active{% endif %}">This Week</a>
   </div>
+  {% endif %}
 
   {% if tab == 'debates' %}
   <!-- ── Debate leaderboard ── -->
@@ -138,7 +144,80 @@
     <p class="text-sm text-muted-foreground">Be the first to post{% if active_category %} in {{ active_category }}{% endif %}!</p>
   </div>
   {% endif %}
-  {% endif %}{# end tab == 'debates' / else #}
+  {% elif tab == 'streaks' %}
+  <!-- ── Streak leaderboard ── -->
+  {% if streak_board %}
+  <div class="space-y-3">
+    {% for entry in streak_board %}
+    <a href="{% url 'user_profile' entry.username %}" class="lb-card flex items-center gap-3 sm:gap-4 p-3 sm:p-4 no-underline block group">
+      <div class="rank-badge {% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
+        {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else %}{{ entry.rank }}{% endif %}
+      </div>
+      {% if entry.avatar_url %}
+      <img src="{{ entry.avatar_url }}" alt="{{ entry.username }}" class="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0">
+      {% else %}
+      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-red-500 text-white flex items-center justify-center font-black text-base flex-shrink-0">{{ entry.username|first|upper }}</div>
+      {% endif %}
+      <div class="flex-1 min-w-0">
+        <p class="font-bold text-foreground group-hover:text-primary transition-colors truncate">{{ entry.username }}</p>
+        <div class="mt-1 flex flex-wrap gap-1.5">
+          <span class="stat-pill">🔥 {{ entry.streak_days }} day streak</span>
+          {% if entry.reputation %}<span class="stat-pill">🌟 {{ entry.reputation }} rep</span>{% endif %}
+        </div>
+      </div>
+      <div class="text-right flex-shrink-0">
+        <p class="total-score">{{ entry.streak_days }}</p>
+        <p class="text-[10px] text-muted-foreground uppercase tracking-wide">days</p>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="flex flex-col items-center justify-center py-20 text-center space-y-4">
+    <span class="text-5xl">🔥</span>
+    <h2 class="text-lg font-bold text-foreground">No streaks yet</h2>
+    <p class="text-sm text-muted-foreground">Post every day to build your streak!</p>
+  </div>
+  {% endif %}
+
+  {% elif tab == 'reputation' %}
+  <!-- ── Reputation leaderboard ── -->
+  {% if reputation_board %}
+  <div class="space-y-3">
+    {% for entry in reputation_board %}
+    <a href="{% url 'user_profile' entry.username %}" class="lb-card flex items-center gap-3 sm:gap-4 p-3 sm:p-4 no-underline block group">
+      <div class="rank-badge {% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
+        {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else %}{{ entry.rank }}{% endif %}
+      </div>
+      {% if entry.avatar_url %}
+      <img src="{{ entry.avatar_url }}" alt="{{ entry.username }}" class="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0">
+      {% else %}
+      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-base flex-shrink-0">{{ entry.username|first|upper }}</div>
+      {% endif %}
+      <div class="flex-1 min-w-0">
+        <p class="font-bold text-foreground group-hover:text-primary transition-colors truncate">{{ entry.username }}</p>
+        <div class="mt-1 flex flex-wrap gap-1.5">
+          <span class="stat-pill">🌟 {{ entry.reputation }} reputation</span>
+          {% if entry.streak_days %}<span class="stat-pill">🔥 {{ entry.streak_days }}d streak</span>{% endif %}
+          <span class="stat-pill">{{ entry.trust_level }} member</span>
+        </div>
+      </div>
+      <div class="text-right flex-shrink-0">
+        <p class="total-score">{{ entry.reputation }}</p>
+        <p class="text-[10px] text-muted-foreground uppercase tracking-wide">rep</p>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="flex flex-col items-center justify-center py-20 text-center space-y-4">
+    <span class="text-5xl">🌟</span>
+    <h2 class="text-lg font-bold text-foreground">No reputation scores yet</h2>
+    <p class="text-sm text-muted-foreground">Earn reputation by posting, debating, and getting likes!</p>
+  </div>
+  {% endif %}
+
+  {% endif %}{# end tab == 'debates' / streaks / reputation / else #}
 
 </div>
 {% endblock %}

@@ -90,8 +90,9 @@
         <div class="hfb-inner">
             {% if user.is_authenticated %}
             <a href="{% url 'for_you_feed' %}" class="hfb-pill {% if active_tab == 'for_you' %}hfb-active{% endif %}"><span>🎯</span> For You</a>
+            <a href="{% url 'following_feed' %}" class="hfb-pill {% if active_tab == 'following' %}hfb-active{% endif %}"><span>👥</span> Following</a>
             {% endif %}
-            <a href="{% url 'index' %}" class="hfb-pill {% if not active_category and active_tab != 'for_you' %}hfb-active{% endif %}"><span>✨</span> All</a>
+            <a href="{% url 'index' %}" class="hfb-pill {% if not active_category and active_tab != 'for_you' and active_tab != 'following' %}hfb-active{% endif %}"><span>✨</span> All</a>
             {% for cat in categories %}
             <a href="?category={{ cat.name|urlencode }}" class="hfb-pill {% if active_category == cat.name %}hfb-active{% endif %}"><span>{{ cat.icon }}</span> {{ cat.name }}</a>
             {% endfor %}
@@ -321,7 +322,16 @@
                 {% endif %}
                 {% empty %}
                 <div class="text-center py-12">
-                    {% if active_tab == 'suggested' %}
+                    {% if active_tab == 'following' %}
+                    {% if following_count == 0 %}
+                    <div class="text-4xl mb-3">👥</div>
+                    <p class="font-semibold text-foreground mb-1">You're not following anyone yet</p>
+                    <p class="text-sm text-muted-foreground mb-4">Follow users to see their posts here.</p>
+                    <a href="{% url 'explore' %}" class="inline-block rounded-full bg-primary text-primary-foreground px-5 py-2 text-sm font-semibold hover:bg-primary/90 transition">Explore Posts</a>
+                    {% else %}
+                    <p class="text-muted-foreground">The people you follow haven't posted yet.</p>
+                    {% endif %}
+                    {% elif active_tab == 'suggested' %}
                     <p class="text-muted-foreground">No suggested posts available yet.</p>
                     {% else %}
                     <p class="text-muted-foreground">No trending discussions yet.</p>

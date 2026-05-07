@@ -169,6 +169,7 @@ urlpatterns = [
     path('challenges/<int:challenge_id>/enter/', views.enter_challenge, name='enter_challenge'),
     # For You feed (personalised algorithm)
     path('for-you/', views.for_you_feed, name='for_you_feed'),
+    path('following/', views.following_feed, name='following_feed'),
     # Explore / Discover
     path('explore/', views.explore, name='explore'),
     # Stories
