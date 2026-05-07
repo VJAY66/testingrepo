@@ -7472,6 +7472,106 @@ def delete_story(request, story_id):
 # ─── Creator Analytics ────────────────────────────────────────────────────────
 
 @login_required
+def analytics_dashboard(request):
+    """Aggregate creator analytics dashboard for the logged-in user."""
+    now = timezone.now()
+    user = request.user
+
+    user_posts = Post.objects.filter(user=user, is_draft=False, is_deleted_by_moderation=False)
+
+    # All-time totals
+    total_posts = user_posts.count()
+    total_likes = PostAction.objects.filter(post__user=user, action='like').count()
+    total_saves = PostAction.objects.filter(post__user=user, action='save').count()
+    total_comments = Comment.objects.filter(post__user=user).count()
+    total_views = PostView.objects.filter(post__user=user).count()
+    total_debates = Debate.objects.filter(post__user=user).count()
+    total_followers = user.follower_links.count()
+
+    # Follower growth: followers gained in last 30 days
+    thirty_ago = now - timedelta(days=30)
+    new_followers_30d = user.follower_links.filter(created_at__gte=thirty_ago).count()
+
+    # Top 5 posts by likes
+    top_by_likes = list(
+        user_posts.annotate(
+            like_count=Count('actions', filter=Q(actions__action='like'), distinct=True),
+            comment_count=Count('comments', distinct=True),
+        ).order_by('-like_count')[:5]
+    )
+
+    # Top 5 posts by comments
+    top_by_comments = list(
+        user_posts.annotate(
+            like_count=Count('actions', filter=Q(actions__action='like'), distinct=True),
+            comment_count=Count('comments', distinct=True),
+        ).order_by('-comment_count')[:5]
+    )
+
+    # Posts per day for last 30 days
+    from django.db.models.functions import TruncDate as _TruncDate
+    post_by_day = {
+        str(r['day']): r['n']
+        for r in user_posts.filter(created_at__gte=thirty_ago)
+        .annotate(day=_TruncDate('created_at'))
+        .values('day')
+        .annotate(n=Count('id'))
+    }
+
+    # Follower growth per day for last 30 days
+    follower_by_day = {
+        str(r['day']): r['n']
+        for r in user.follower_links.filter(created_at__gte=thirty_ago)
+        .annotate(day=_TruncDate('created_at'))
+        .values('day')
+        .annotate(n=Count('id'))
+    }
+
+    daily_chart = []
+    for i in range(29, -1, -1):
+        day = (now - timedelta(days=i)).date()
+        key = str(day)
+        daily_chart.append({
+            'date': day.strftime('%b %d'),
+            'posts': post_by_day.get(key, 0),
+            'followers': follower_by_day.get(key, 0),
+        })
+
+    # Likes gained in last 30 days
+    likes_30d = PostAction.objects.filter(
+        post__user=user, action='like', created_at__gte=thirty_ago
+    ).count()
+
+    # Engagement rate: (likes + comments + saves) / views * 100
+    engagement_rate = round((total_likes + total_comments + total_saves) / total_views * 100, 1) if total_views > 0 else 0
+
+    # Category breakdown of user's posts
+    from django.db.models import FloatField
+    cat_breakdown = list(
+        user_posts.values('category').annotate(n=Count('id')).order_by('-n')[:6]
+    )
+
+    context = {
+        'total_posts': total_posts,
+        'total_likes': total_likes,
+        'total_saves': total_saves,
+        'total_comments': total_comments,
+        'total_views': total_views,
+        'total_debates': total_debates,
+        'total_followers': total_followers,
+        'new_followers_30d': new_followers_30d,
+        'likes_30d': likes_30d,
+        'engagement_rate': engagement_rate,
+        'top_by_likes': top_by_likes,
+        'top_by_comments': top_by_comments,
+        'daily_chart': daily_chart,
+        'daily_chart_json': json.dumps(daily_chart),
+        'cat_breakdown': cat_breakdown,
+    }
+    return render(request, 'frontend/analytics_dashboard.html', context)
+
+
+@login_required
 def creator_analytics(request, post_id):
     post = get_object_or_404(Post, id=post_id, user=request.user)
     now = timezone.now()
@@ -8236,17 +8336,21 @@ def search_advanced(request):
     sort = request.GET.get('sort', 'newest')
     date_range = request.GET.get('date_range', '')
     min_likes = request.GET.get('min_likes', '')
+    min_comments = request.GET.get('min_comments', '')
+    author = request.GET.get('author', '').strip()
     has_debate = bool(request.GET.get('has_debate'))
 
     results = []
     total = 0
 
-    if query or category:
-        qs = Post.objects.filter(is_draft=False)
+    if query or category or author or date_range or min_likes or min_comments or has_debate:
+        qs = Post.objects.filter(is_draft=False, is_deleted_by_moderation=False)
         if query:
-            qs = qs.filter(Q(title__icontains=query) | Q(content__icontains=query))
+            qs = qs.filter(Q(title__icontains=query) | Q(content__icontains=query) | Q(hashtags__icontains=query))
         if category:
             qs = qs.filter(category=category)
+        if author:
+            qs = qs.filter(user__username__icontains=author)
         if date_range:
             now = timezone.now()
             if date_range == 'today':
@@ -8267,6 +8371,11 @@ def search_advanced(request):
                 qs = qs.filter(like_count__gte=int(min_likes))
             except ValueError:
                 pass
+        if min_comments:
+            try:
+                qs = qs.filter(comment_count__gte=int(min_comments))
+            except ValueError:
+                pass
         if has_debate:
             qs = qs.filter(debate_count__gt=0)
         sort_map = {
@@ -8278,7 +8387,12 @@ def search_advanced(request):
         qs = qs.order_by(sort_map.get(sort, '-created_at'))
         qs = qs.select_related('user', 'user__profile')
         total = qs.count()
-        results = qs[:50]
+
+        paginator = Paginator(qs, 20)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        results = page_obj.object_list
+    else:
+        page_obj = None
 
     return render(request, 'frontend/search_advanced.html', {
         'query': query,
@@ -8286,9 +8400,12 @@ def search_advanced(request):
         'sort': sort,
         'date_range': date_range,
         'min_likes': min_likes,
+        'min_comments': min_comments,
+        'author': author,
         'has_debate': has_debate,
         'results': results,
         'total': total,
+        'page_obj': page_obj,
         'categories': CATEGORY_CHOICES,
     })
 

@@ -1,0 +1,237 @@
+{% extends 'frontend/base.html' %}
+{% block title %}My Analytics — PickASide{% endblock %}
+
+{% block content %}
+<style>
+.stat-card { border-radius:1.1rem; border:1px solid hsl(var(--border)/0.7); background:hsl(var(--card)); padding:1.1rem 1.25rem; }
+.stat-card .value { font-size:1.75rem; font-weight:800; color:hsl(var(--foreground)); line-height:1; }
+.stat-card .label { font-size:.7rem; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:hsl(var(--muted-foreground)); margin-top:.35rem; }
+.stat-card .sub { font-size:.7rem; color:hsl(var(--muted-foreground)); margin-top:.2rem; }
+.section-title { font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:hsl(var(--muted-foreground)); margin-bottom:.75rem; }
+.rank-num { font-size:.7rem; font-weight:700; color:hsl(var(--muted-foreground)); width:1.5rem; flex-shrink:0; }
+.post-row { display:flex; align-items:flex-start; gap:.6rem; padding:.6rem .8rem; border-radius:.75rem; transition:background .15s; }
+.post-row:hover { background:hsl(var(--muted)/0.5); }
+.bar { height:6px; border-radius:999px; background:hsl(var(--primary)/0.25); overflow:hidden; }
+.bar-fill { height:100%; border-radius:999px; background:hsl(var(--primary)); }
+</style>
+
+<div class="max-w-5xl mx-auto px-4 py-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-foreground">My Analytics</h1>
+      <p class="text-sm text-muted-foreground mt-0.5">Overview of your content performance</p>
+    </div>
+    <a href="{% url 'profile' %}" class="text-xs text-primary hover:underline">← Back to profile</a>
+  </div>
+
+  <!-- Top stat cards -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    <div class="stat-card">
+      <div class="value">{{ total_posts }}</div>
+      <div class="label">Posts</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">{{ total_views }}</div>
+      <div class="label">Total Views</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">{{ total_likes }}</div>
+      <div class="label">Total Likes</div>
+      <div class="sub">{{ likes_30d }} in last 30 days</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">{{ total_followers }}</div>
+      <div class="label">Followers</div>
+      <div class="sub">+{{ new_followers_30d }} this month</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">{{ total_comments }}</div>
+      <div class="label">Comments received</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">{{ total_saves }}</div>
+      <div class="label">Times saved</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">{{ total_debates }}</div>
+      <div class="label">Debates started</div>
+    </div>
+    <div class="stat-card">
+      <div class="value">{{ engagement_rate }}%</div>
+      <div class="label">Engagement rate</div>
+      <div class="sub">(likes+comments+saves)/views</div>
+    </div>
+  </div>
+
+  <!-- Activity chart + category breakdown -->
+  <div class="flex gap-4 mb-6 flex-col lg:flex-row">
+
+    <!-- 30-day activity chart -->
+    <div class="flex-1 rounded-2xl border border-border/70 bg-card p-4">
+      <p class="section-title">Last 30 Days — Posts & Follower Gains</p>
+      <canvas id="activityChart" height="140"></canvas>
+    </div>
+
+    <!-- Category breakdown -->
+    {% if cat_breakdown %}
+    <div class="w-full lg:w-56 rounded-2xl border border-border/70 bg-card p-4">
+      <p class="section-title">Posts by Category</p>
+      <div class="space-y-2">
+        {% for cat in cat_breakdown %}
+        <div>
+          <div class="flex items-center justify-between text-xs mb-0.5">
+            <span class="text-foreground font-medium truncate">{{ cat.category }}</span>
+            <span class="text-muted-foreground ml-2 flex-shrink-0">{{ cat.n }}</span>
+          </div>
+          <div class="bar">
+            <div class="bar-fill" style="width:{% widthratio cat.n total_posts 100 %}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Top posts tables -->
+  <div class="grid gap-4 sm:grid-cols-2 mb-6">
+
+    <!-- Top by likes -->
+    <div class="rounded-2xl border border-border/70 bg-card p-4">
+      <p class="section-title">🏆 Top Posts by Likes</p>
+      {% if top_by_likes %}
+      <div>
+        {% for post in top_by_likes %}
+        <div class="post-row">
+          <span class="rank-num">#{{ forloop.counter }}</span>
+          <div class="flex-1 min-w-0">
+            <a href="{% url 'discussion' post.id %}" class="text-xs font-semibold text-foreground hover:text-primary transition-colors line-clamp-2 block">{{ post.title }}</a>
+            <div class="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
+              <span>⭐ {{ post.like_count }}</span>
+              <span>💬 {{ post.comment_count }}</span>
+              <span>{{ post.created_at|date:"M j, Y" }}</span>
+            </div>
+          </div>
+          <a href="{% url 'creator_analytics' post.id %}" title="View analytics" class="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-xs text-muted-foreground text-center py-6">No posts yet</p>
+      {% endif %}
+    </div>
+
+    <!-- Top by comments -->
+    <div class="rounded-2xl border border-border/70 bg-card p-4">
+      <p class="section-title">💬 Top Posts by Comments</p>
+      {% if top_by_comments %}
+      <div>
+        {% for post in top_by_comments %}
+        <div class="post-row">
+          <span class="rank-num">#{{ forloop.counter }}</span>
+          <div class="flex-1 min-w-0">
+            <a href="{% url 'discussion' post.id %}" class="text-xs font-semibold text-foreground hover:text-primary transition-colors line-clamp-2 block">{{ post.title }}</a>
+            <div class="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
+              <span>💬 {{ post.comment_count }}</span>
+              <span>⭐ {{ post.like_count }}</span>
+              <span>{{ post.created_at|date:"M j, Y" }}</span>
+            </div>
+          </div>
+          <a href="{% url 'creator_analytics' post.id %}" title="View analytics" class="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-xs text-muted-foreground text-center py-6">No posts yet</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Link to per-post analytics -->
+  {% if total_posts %}
+  <div class="rounded-2xl border border-border/70 bg-card/60 p-4 text-center">
+    <p class="text-sm text-muted-foreground">Want deeper metrics for a specific post?</p>
+    <p class="text-xs text-muted-foreground mt-0.5">Go to any of your posts and click the <strong>Analytics</strong> button.</p>
+  </div>
+  {% endif %}
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  var raw = {{ daily_chart_json|safe }};
+  var labels = raw.map(function(d) { return d.date; });
+  var posts  = raw.map(function(d) { return d.posts; });
+  var follows = raw.map(function(d) { return d.followers; });
+
+  var isDark = document.documentElement.classList.contains('dark');
+  var gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  var tickColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
+
+  var ctx = document.getElementById('activityChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Posts',
+          data: posts,
+          backgroundColor: 'hsl(239 84% 67% / 0.75)',
+          borderRadius: 4,
+          order: 1,
+        },
+        {
+          label: 'New Followers',
+          data: follows,
+          type: 'line',
+          borderColor: 'hsl(160 60% 45%)',
+          backgroundColor: 'hsl(160 60% 45% / 0.12)',
+          pointRadius: 0,
+          borderWidth: 2,
+          fill: true,
+          tension: 0.4,
+          order: 0,
+          yAxisID: 'y2',
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: tickColor, font: { size: 11 } } },
+        tooltip: { callbacks: {} }
+      },
+      scales: {
+        x: {
+          ticks: { color: tickColor, font: { size: 9 }, maxTicksLimit: 10 },
+          grid: { color: gridColor }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { color: tickColor, font: { size: 10 }, precision: 0 },
+          grid: { color: gridColor },
+          title: { display: true, text: 'Posts', color: tickColor, font: { size: 10 } }
+        },
+        y2: {
+          position: 'right',
+          beginAtZero: true,
+          ticks: { color: tickColor, font: { size: 10 }, precision: 0 },
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: 'Followers', color: tickColor, font: { size: 10 } }
+        }
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}

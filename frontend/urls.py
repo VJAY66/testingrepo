@@ -178,6 +178,7 @@ urlpatterns = [
     path('stories/<int:story_id>/', views.view_story, name='view_story'),
     path('stories/<int:story_id>/delete/', views.delete_story, name='delete_story'),
     # Creator Analytics
+    path('analytics/', views.analytics_dashboard, name='analytics_dashboard'),
     path('posts/<str:post_id>/analytics/', views.creator_analytics, name='creator_analytics'),
     path('posts/<str:post_id>/analytics/refresh/', views.refresh_post_insight, name='refresh_post_insight'),
     # Close Friends
