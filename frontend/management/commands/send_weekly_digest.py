@@ -87,14 +87,36 @@ class Command(BaseCommand):
                 profile = user.profile
                 streak = profile.streak_days
                 reputation = profile.reputation_score
+                interested_cats = profile.interested_categories or []
             except Exception:
                 streak = 0
                 reputation = 0
+                interested_cats = []
+
+            # Personalized posts: top 3 from each interested category this week
+            personalized_posts = []
+            if interested_cats:
+                personalized_posts = list(
+                    Post.objects.filter(
+                        created_at__gte=week_ago,
+                        category__in=interested_cats,
+                        is_draft=False,
+                        is_deleted_by_moderation=False,
+                    )
+                    .annotate(like_count=Count("actions", filter=Q(actions__action="like")))
+                    .order_by("-like_count")[:5]
+                )
+
+            # New followers this week
+            from users.models import Follow as _Follow
+            new_followers_count = _Follow.objects.filter(
+                following=user, created_at__gte=week_ago
+            ).count()
 
             subject = "Your PickASide Weekly Digest \U0001f525"
             text_body, html_body = self._build_digest(
                 user, top_posts, active_challenges, new_achievements, streak, reputation,
-                unread_read_later,
+                unread_read_later, personalized_posts, interested_cats, new_followers_count,
             )
 
             if dry_run:
@@ -134,13 +156,15 @@ class Command(BaseCommand):
 
     def _build_digest(
         self, user, top_posts, active_challenges, new_achievements, streak, reputation,
-        unread_read_later=None,
+        unread_read_later=None, personalized_posts=None, interested_cats=None, new_followers_count=0,
     ):
         """Return (plain_text, html) tuple for the digest email."""
         from django.conf import settings as _settings
         site_url = getattr(_settings, 'SITE_URL', '')
         first_name = user.first_name or user.username
         unread_read_later = unread_read_later or []
+        personalized_posts = personalized_posts or []
+        interested_cats = interested_cats or []
 
         # ---- plain text ----
         lines = [
@@ -189,6 +213,24 @@ class Command(BaseCommand):
             for rl in unread_read_later:
                 url = f"{site_url}/discussion/{rl.post_id}/" if site_url else f"/discussion/{rl.post_id}/"
                 lines.append(f"  - {rl.post.title}  {url}")
+
+        if personalized_posts:
+            cats_label = ', '.join(interested_cats[:3])
+            lines += [
+                "",
+                f"=== PICKED FOR YOU ({cats_label}) ===",
+            ]
+            for i, post in enumerate(personalized_posts, 1):
+                likes = getattr(post, "like_count", 0)
+                url = f"{site_url}/discussion/{post.id}/" if site_url else f"/discussion/{post.id}/"
+                lines.append(f"  {i}. [{post.category}] {post.title}  ({likes} likes)  {url}")
+
+        if new_followers_count:
+            lines += [
+                "",
+                f"=== NEW FOLLOWERS THIS WEEK ===",
+                f"  You gained {new_followers_count} new follower{'s' if new_followers_count != 1 else ''} this week!",
+            ]
 
         lines += [
             "",
@@ -292,6 +334,25 @@ class Command(BaseCommand):
                     f'<div class="meta">Added {rl.added_at.strftime("%b %d")}</div>'
                     f'</div>'
                 )
+
+        if personalized_posts:
+            cats_label = ', '.join(self._escape(c) for c in interested_cats[:3])
+            html_lines.append(f'      <div class="section-title">Picked For You &mdash; {cats_label}</div>')
+            for i, post in enumerate(personalized_posts, 1):
+                likes = getattr(post, "like_count", 0)
+                url = f"{site_url}/discussion/{post.id}/" if site_url else f"/discussion/{post.id}/"
+                html_lines.append(
+                    f'      <div class="post-item" style="border-left-color:#10b981;">'
+                    f'<div class="title"><a href="{self._escape(url)}" style="color:#4f46e5;text-decoration:none;">{i}. {self._escape(post.title)}</a></div>'
+                    f'<div class="meta">{self._escape(post.category)} &bull; {likes} like{"s" if likes != 1 else ""}</div>'
+                    f'</div>'
+                )
+
+        if new_followers_count:
+            html_lines.append('      <div class="section-title">New Followers This Week</div>')
+            html_lines.append(
+                f'      <p style="font-size:14px;color:#333;">🎉 You gained <strong>{new_followers_count}</strong> new follower{"s" if new_followers_count != 1 else ""} this week!</p>'
+            )
 
         html_lines += [
             '      <div class="section-title">Your Stats</div>',

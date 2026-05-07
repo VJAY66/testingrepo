@@ -1916,6 +1916,7 @@ def user_profile(request, username):
         'user_reviews': user_reviews if can_see_content else [],
         'user_questions': user_questions if can_see_content else [],
         'user_polls': user_polls if can_see_content else [],
+        'pinned_post': Post.objects.filter(user=profile_user, is_pinned=True, is_draft=False).first() if can_see_content else None,
         'avatar_url': avatar_url,
         'is_online': is_online,
         'presence_label': presence_label,
@@ -8320,6 +8321,12 @@ def bookmarks(request):
         .order_by('post__category')
     )
 
+    user_collections = list(
+        SaveCollection.objects.filter(user=request.user).annotate(
+            item_count=Count('items')
+        ).order_by('name')
+    )
+
     return render(request, 'frontend/bookmarks.html', {
         'page_obj': page_obj,
         'bookmarks': page_obj.object_list,
@@ -8327,6 +8334,7 @@ def bookmarks(request):
         'category': category,
         'saved_categories': saved_categories,
         'total': qs.count(),
+        'user_collections': user_collections,
     })
 
 
