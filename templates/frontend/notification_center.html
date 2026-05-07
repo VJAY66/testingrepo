@@ -68,13 +68,32 @@
         {% endif %}
       </div>
       <div class="nc-content">
+        {% if notif.actors and notif.count > 1 %}
+          {% with actors=notif.actors %}
+          <p class="nc-msg">
+            {% if actors|length == 1 %}
+              <strong>@{{ actors.0 }}</strong>
+            {% elif actors|length == 2 %}
+              <strong>@{{ actors.0 }}</strong> and <strong>@{{ actors.1 }}</strong>
+            {% else %}
+              <strong>@{{ actors.0 }}</strong>, <strong>@{{ actors.1 }}</strong>{% if notif.count > 2 %} and {{ notif.count|add:"-2" }} others{% endif %}
+            {% endif %}
+            {% if notif.notification_type == 'author_comment' %}commented on your post
+            {% elif notif.notification_type == 'author_debate' %}started a debate on your post
+            {% elif notif.notification_type == 'author_repost' %}reposted your post
+            {% elif notif.notification_type == 'author_save' %}saved your post
+            {% else %}{{ notif.message }}{% endif %}
+          </p>
+          {% endwith %}
+        {% else %}
         <p class="nc-msg">{{ notif.message }}</p>
+        {% endif %}
         {% if notif.post %}
         <a href="{% url 'discussion' notif.post.id %}" class="nc-post-link">{{ notif.post.title|truncatechars:70 }}</a>
         {% endif %}
         <p class="nc-meta">
           {{ notif.created_at|timesince }} ago
-          {% if notif.count > 1 %}&middot; {{ notif.count }} times{% endif %}
+          {% if notif.count > 1 %}&middot; {{ notif.count }} people{% endif %}
         </p>
       </div>
       {% if not notif.is_read %}

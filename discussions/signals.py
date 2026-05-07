@@ -88,6 +88,7 @@ def notify_post_author(post, notification_type, actor_user):
             notification_type=notification_type,
             message=_AUTHOR_FIRST_MESSAGES[notification_type](actor_user),
             count=1,
+            actors=[actor_user.username],
         )
         if notification_type == 'author_comment':
             _email_post_author(post, actor_user)
@@ -105,15 +106,20 @@ def notify_post_author(post, notification_type, actor_user):
             notification_type=notification_type,
             message=_AUTHOR_FIRST_MESSAGES[notification_type](actor_user),
             count=1,
+            actors=[actor_user.username],
         )
     else:
         # Still within the window — increment the existing batch counter
+        actors_list = list(last_notif.actors or [])
+        if actor_user.username not in actors_list:
+            actors_list.append(actor_user.username)
         new_count = last_notif.count + 1
         label = _AUTHOR_BATCH_LABELS[notification_type]
         last_notif.count = new_count
+        last_notif.actors = actors_list
         last_notif.message = f'{new_count} {label}.'
         last_notif.is_read = False  # Surface it again
-        last_notif.save(update_fields=['count', 'message', 'is_read'])
+        last_notif.save(update_fields=['count', 'message', 'actors', 'is_read'])
 
 
 # ---------------------------------------------------------------------------
