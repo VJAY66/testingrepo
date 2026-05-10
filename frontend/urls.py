@@ -128,6 +128,7 @@ urlpatterns = [
     # Hashtag following
     path('hashtags/follow/', views.follow_hashtag, name='follow_hashtag'),
     path('hashtags/feed/', views.hashtag_followed_feed, name='hashtag_followed_feed'),
+    path('scheduled/', views.scheduled_posts, name='scheduled_posts'),
     # Moderation dashboard
     path('moderation/', views.moderation_dashboard, name='moderation_dashboard'),
     # Draft posts & pinned posts

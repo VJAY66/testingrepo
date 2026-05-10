@@ -6063,9 +6063,34 @@ def trending_hashtags(request):
         for tag, count in trending
     ]
 
+    followed_tags_set = set()
+    if request.user.is_authenticated:
+        followed_tags_set = set(
+            HashtagFollow.objects.filter(user=request.user).values_list('tag', flat=True)
+        )
+
     return render(request, 'frontend/trending_hashtags.html', {
         'tag_list': tag_list,
         'period_days': 7,
+        'followed_tags_set': followed_tags_set,
+    })
+
+
+@login_required
+def scheduled_posts(request):
+    """List the current user's draft posts that have a scheduled_for time set."""
+    posts = (
+        Post.objects.filter(user=request.user, is_draft=True, scheduled_for__isnull=False)
+        .order_by('scheduled_for')
+    )
+    drafts_unscheduled = (
+        Post.objects.filter(user=request.user, is_draft=True, scheduled_for__isnull=True)
+        .order_by('-created_at')[:20]
+    )
+    return render(request, 'frontend/scheduled_posts.html', {
+        'scheduled': posts,
+        'drafts': drafts_unscheduled,
+        'now': timezone.now(),
     })
 
 

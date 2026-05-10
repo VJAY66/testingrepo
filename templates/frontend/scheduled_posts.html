@@ -1,0 +1,166 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Scheduled Posts — PickASide{% endblock %}
+
+{% block content %}
+<style>
+.sp-wrap { max-width: 700px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+.sp-card { border: 1px solid hsl(var(--border)/0.7); border-radius: 1rem; background: hsl(var(--card)); padding: 1rem 1.1rem; margin-bottom: 0.65rem; display: flex; align-items: flex-start; gap: 1rem; }
+.sp-card:hover { box-shadow: 0 4px 18px -8px hsl(var(--primary)/0.15); }
+.sp-badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.68rem; font-weight: 700; }
+.sp-badge.scheduled { background: hsl(var(--primary)/0.1); color: hsl(var(--primary)); }
+.sp-badge.draft { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
+.sp-badge.overdue { background: hsl(var(--destructive)/0.12); color: hsl(var(--destructive)); }
+.sp-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
+.sp-btn { padding: 0.25rem 0.75rem; border-radius: 999px; border: 1px solid hsl(var(--border)); font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all .16s; background: none; color: hsl(var(--foreground)); }
+.sp-btn:hover { border-color: hsl(var(--primary)); color: hsl(var(--primary)); background: hsl(var(--primary)/0.06); }
+.sp-btn.danger:hover { border-color: hsl(var(--destructive)); color: hsl(var(--destructive)); background: hsl(var(--destructive)/0.06); }
+.sp-btn.primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: transparent; }
+.sp-btn.primary:hover { opacity: 0.88; }
+.section-label { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin: 1.5rem 0 0.6rem; }
+</style>
+
+<div class="sp-wrap">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-foreground">Scheduled Posts</h1>
+      <p class="text-sm text-muted-foreground mt-0.5">Drafts queued for automatic publishing</p>
+    </div>
+    <a href="{% url 'ask_question' %}" class="sp-btn primary">+ New Post</a>
+  </div>
+
+  <!-- Scheduled section -->
+  {% if scheduled %}
+  <p class="section-label">⏰ Scheduled ({{ scheduled|length }})</p>
+  {% for post in scheduled %}
+  <div class="sp-card" id="sp-{{ post.id }}">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 mb-1 flex-wrap">
+        {% if post.scheduled_for < now %}
+        <span class="sp-badge overdue">⚠ Overdue — pending publish</span>
+        {% else %}
+        <span class="sp-badge scheduled">🕐 Publishes {{ post.scheduled_for|date:"M j, Y · g:i A" }}</span>
+        {% endif %}
+        <span class="text-xs text-muted-foreground">{{ post.category }}</span>
+      </div>
+      <p class="text-sm font-semibold text-foreground leading-snug">{{ post.title }}</p>
+      <div class="sp-actions">
+        <button class="sp-btn primary" onclick="publishNow('{{ post.id }}')">Publish Now</button>
+        <button class="sp-btn" onclick="openReschedule('{{ post.id }}', this)">Reschedule</button>
+        <button class="sp-btn danger" onclick="clearSchedule('{{ post.id }}')">Remove Schedule</button>
+      </div>
+      <div id="reschedule-form-{{ post.id }}" class="hidden mt-2 flex gap-2 items-center">
+        <input type="datetime-local" id="dt-{{ post.id }}"
+          class="rounded-xl border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:border-primary"
+          value="{{ post.scheduled_for|date:'Y-m-d' }}T{{ post.scheduled_for|date:'H:i' }}">
+        <button class="sp-btn primary" onclick="saveReschedule('{{ post.id }}')">Save</button>
+        <button class="sp-btn" onclick="document.getElementById('reschedule-form-{{ post.id }}').classList.add('hidden')">Cancel</button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="text-center py-12 text-muted-foreground">
+    <div class="text-4xl mb-3">🕐</div>
+    <p class="font-semibold text-foreground">No scheduled posts</p>
+    <p class="text-sm mt-1">When you save a draft with a future publish time it will appear here.</p>
+  </div>
+  {% endif %}
+
+  <!-- Unscheduled drafts -->
+  {% if drafts %}
+  <p class="section-label">📝 Unscheduled Drafts ({{ drafts|length }})</p>
+  {% for post in drafts %}
+  <div class="sp-card" id="sp-{{ post.id }}">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 mb-1">
+        <span class="sp-badge draft">Draft</span>
+        <span class="text-xs text-muted-foreground">{{ post.category }} · saved {{ post.created_at|date:"M j" }}</span>
+      </div>
+      <p class="text-sm font-semibold text-foreground leading-snug">{{ post.title }}</p>
+      <div class="sp-actions">
+        <button class="sp-btn primary" onclick="publishNow('{{ post.id }}')">Publish Now</button>
+        <button class="sp-btn" onclick="openReschedule('{{ post.id }}', this)">Schedule</button>
+      </div>
+      <div id="reschedule-form-{{ post.id }}" class="hidden mt-2 flex gap-2 items-center">
+        <input type="datetime-local" id="dt-{{ post.id }}"
+          class="rounded-xl border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:border-primary">
+        <button class="sp-btn primary" onclick="saveReschedule('{{ post.id }}')">Save Schedule</button>
+        <button class="sp-btn" onclick="document.getElementById('reschedule-form-{{ post.id }}').classList.add('hidden')">Cancel</button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if not scheduled and not drafts %}
+  <div class="mt-6 rounded-2xl border border-border/60 bg-card/60 p-5 text-center text-sm text-muted-foreground">
+    You have no drafts. <a href="{% url 'ask_question' %}" class="text-primary hover:underline">Create a post →</a>
+  </div>
+  {% endif %}
+
+  <div class="mt-8 rounded-2xl border border-border/60 bg-muted/30 p-4 text-xs text-muted-foreground">
+    <strong class="text-foreground">How scheduling works:</strong> Set a future publish time when saving a draft.
+    The server runs <code>manage.py auto_publish_scheduled_posts</code> every minute via cron and publishes posts whose time has arrived.
+    Overdue posts publish on the next cron run.
+  </div>
+</div>
+
+<script>
+function getCsrf() {
+  var v = document.cookie.match('(^|;) ?csrftoken=([^;]*)(;|$)');
+  return v ? v[2] : '';
+}
+
+function publishNow(postId) {
+  if (!confirm('Publish this post now?')) return;
+  fetch('/posts/' + postId + '/publish/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCsrf() },
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.success) {
+      window.location.href = d.url;
+    } else {
+      alert(d.error || 'Could not publish.');
+    }
+  });
+}
+
+function openReschedule(postId, btn) {
+  var form = document.getElementById('reschedule-form-' + postId);
+  form.classList.toggle('hidden');
+}
+
+function saveReschedule(postId) {
+  var dt = document.getElementById('dt-' + postId).value;
+  if (!dt) { alert('Please pick a date and time.'); return; }
+  fetch('/posts/' + postId + '/reschedule/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCsrf(), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'scheduled_for=' + encodeURIComponent(dt),
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.success) {
+      window.location.reload();
+    } else {
+      alert(d.error || 'Could not reschedule.');
+    }
+  });
+}
+
+function clearSchedule(postId) {
+  if (!confirm('Remove the schedule? The post will remain a draft.')) return;
+  fetch('/posts/' + postId + '/reschedule/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCsrf(), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'scheduled_for=',
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.success) window.location.reload();
+  });
+}
+</script>
+{% endblock %}

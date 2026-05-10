@@ -60,10 +60,22 @@
     <p class="th-sub">Top tags used across all content in the last {{ period_days }} days</p>
   </div>
 
+  {% if user.is_authenticated %}
+  <div class="flex items-center gap-3 mb-4">
+    <a href="{% url 'hashtag_followed_feed' %}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/20 transition-colors">
+      # My Hashtag Feed →
+    </a>
+    {% if followed_tags_set %}
+    <span class="text-xs text-muted-foreground">Following {{ followed_tags_set|length }} tag{{ followed_tags_set|length|pluralize }}</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {% if tag_list %}
-    <p class="th-section-label">{{ tag_list|length }} trending tags</p>
+    <p class="th-section-label">{{ tag_list|length }} trending tags — click # to explore, ♡ to follow</p>
     <div class="th-grid" id="th-tag-cloud">
       {% for item in tag_list %}
+      <div class="th-tag-wrap" style="display:inline-flex;align-items:center;gap:0.3rem;">
         {% if item.weight >= 70 %}
           <a href="/search/?q=%23{{ item.tag }}" class="th-tag" data-weight="big" title="{{ item.count }} use{{ item.count|pluralize }}">
         {% elif item.weight >= 35 %}
@@ -71,10 +83,22 @@
         {% else %}
           <a href="/search/?q=%23{{ item.tag }}" class="th-tag" data-weight="sm" title="{{ item.count }} use{{ item.count|pluralize }}">
         {% endif %}
-          <span class="th-hash">#</span>
-          <span class="th-name">{{ item.tag }}</span>
-          <span class="th-count">{{ item.count }}</span>
-        </a>
+            <span class="th-hash">#</span>
+            <span class="th-name">{{ item.tag }}</span>
+            <span class="th-count">{{ item.count }}</span>
+          </a>
+          {% if user.is_authenticated %}
+          <button type="button"
+            onclick="toggleHashtagFollow(this, '{{ item.tag }}')"
+            data-tag="{{ item.tag }}"
+            data-following="{% if item.tag in followed_tags_set %}1{% else %}0{% endif %}"
+            title="{% if item.tag in followed_tags_set %}Unfollow #{{ item.tag }}{% else %}Follow #{{ item.tag }}{% endif %}"
+            class="th-follow-btn {% if item.tag in followed_tags_set %}following{% endif %}"
+            style="background:none;border:1px solid hsl(var(--border));border-radius:999px;cursor:pointer;padding:2px 8px;font-size:0.72rem;font-weight:700;transition:all .16s;{% if item.tag in followed_tags_set %}color:hsl(var(--primary));border-color:hsl(var(--primary)/0.5);background:hsl(var(--primary)/0.08);{% else %}color:hsl(var(--muted-foreground));{% endif %}">
+            {% if item.tag in followed_tags_set %}✓{% else %}♡{% endif %}
+          </button>
+          {% endif %}
+      </div>
       {% endfor %}
     </div>
   {% else %}
@@ -85,4 +109,37 @@
     </div>
   {% endif %}
 </div>
+
+<script>
+function getCsrf() {
+  var v = document.cookie.match('(^|;) ?csrftoken=([^;]*)(;|$)');
+  return v ? v[2] : '';
+}
+function toggleHashtagFollow(btn, tag) {
+  fetch('/hashtags/follow/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCsrf(), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'tag=' + encodeURIComponent(tag),
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (!d.success) return;
+    if (d.following) {
+      btn.textContent = '✓';
+      btn.title = 'Unfollow #' + tag;
+      btn.style.color = 'hsl(var(--primary))';
+      btn.style.borderColor = 'hsl(var(--primary)/0.5)';
+      btn.style.background = 'hsl(var(--primary)/0.08)';
+      if (typeof window.showToast === 'function') window.showToast('Following #' + tag, 'success');
+    } else {
+      btn.textContent = '♡';
+      btn.title = 'Follow #' + tag;
+      btn.style.color = 'hsl(var(--muted-foreground))';
+      btn.style.borderColor = 'hsl(var(--border))';
+      btn.style.background = 'none';
+      if (typeof window.showToast === 'function') window.showToast('Unfollowed #' + tag, 'success');
+    }
+  });
+}
+</script>
 {% endblock %}
