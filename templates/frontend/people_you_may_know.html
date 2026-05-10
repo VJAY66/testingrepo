@@ -49,12 +49,16 @@
         </span>
         {% endif %}
       </div>
-      <button class="follow-btn {% if s.suggested_user.id in followed_ids %}unfollow{% else %}follow{% endif %}"
-        data-uid="{{ s.suggested_user.id }}"
-        data-username="{{ s.suggested_user.username }}"
-        onclick="toggleFollow(this)">
-        {% if s.suggested_user.id in followed_ids %}Following{% else %}Follow{% endif %}
-      </button>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <button class="follow-btn {% if s.suggested_user.id in followed_ids %}unfollow{% else %}follow{% endif %}"
+          data-uid="{{ s.suggested_user.id }}"
+          data-username="{{ s.suggested_user.username }}"
+          onclick="toggleFollow(this)">
+          {% if s.suggested_user.id in followed_ids %}Following{% else %}Follow{% endif %}
+        </button>
+        <button onclick="dismissSuggestion('{{ s.suggested_user.id }}')" title="Dismiss"
+          style="background:none;border:none;cursor:pointer;color:hsl(var(--muted-foreground));font-size:1.1rem;line-height:1;padding:2px 4px;">×</button>
+      </div>
     </div>
     {% endfor %}
   </div>
@@ -85,25 +89,47 @@
 </div>
 
 <script>
-function toggleFollow(btn) {
-  const uid = btn.dataset.uid;
-  const username = btn.dataset.username;
-  const isFollowing = btn.classList.contains('unfollow');
+function getCookie(name) {
+  var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+  return v ? v[2] : '';
+}
 
-  fetch('/api/follow/', {
+function toggleFollow(btn) {
+  var username = btn.dataset.username;
+  var isFollowing = btn.classList.contains('unfollow');
+  btn.disabled = true;
+  btn.style.opacity = '0.6';
+
+  fetch('/api/users/follow/', {
     method: 'POST',
     headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: isFollowing ? 'unfollow' : 'follow', username })
-  }).then(r => r.json()).then(d => {
-    if (isFollowing) {
-      btn.textContent = 'Follow'; btn.className = 'follow-btn follow';
+    body: JSON.stringify({ action: isFollowing ? 'unfollow' : 'follow', username: username })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    btn.disabled = false;
+    btn.style.opacity = '';
+    if (!d.success) return;
+    if (d.request_pending) {
+      btn.textContent = 'Requested';
+      btn.className = 'follow-btn unfollow';
+    } else if (d.is_following) {
+      btn.textContent = 'Following';
+      btn.className = 'follow-btn unfollow';
     } else {
-      btn.textContent = 'Following'; btn.className = 'follow-btn unfollow';
+      btn.textContent = 'Follow';
+      btn.className = 'follow-btn follow';
     }
-  }).catch(() => {
-    // Fallback: redirect to profile
-    window.location.href = '/user/' + username + '/';
-  });
+  })
+  .catch(function() { btn.disabled = false; btn.style.opacity = ''; });
+}
+
+function dismissSuggestion(userId) {
+  var card = document.getElementById('pymk-' + userId);
+  if (!card) return;
+  card.style.transition = 'opacity .2s';
+  card.style.opacity = '0';
+  setTimeout(function() { card.remove(); }, 220);
 }
 </script>
 {% endblock %}

@@ -989,9 +989,24 @@ def _filter_muted_posts(posts, user):
 
 
 def _follow_suggestions(user, limit=5):
-    """Return users the viewer might want to follow based on shared interest categories."""
+    """Return Profile objects the viewer might want to follow.
+
+    Uses pre-computed UserSuggestion rows when available; falls back to a
+    lightweight category-overlap scan so the sidebar is never empty.
+    """
     if not user.is_authenticated:
         return []
+
+    # Try pre-computed suggestions first
+    precomputed = list(
+        UserSuggestion.objects.filter(user=user)
+        .select_related('suggested_user', 'suggested_user__profile')
+        .order_by('-score')[:limit]
+    )
+    if precomputed:
+        return [s.suggested_user.profile for s in precomputed]
+
+    # Fallback: category overlap
     profile = getattr(user, 'profile', None)
     cats = list(profile.interested_categories or []) if profile else []
     already_following = set(
@@ -1000,12 +1015,11 @@ def _follow_suggestions(user, limit=5):
     already_following.add(user.id)
     qs = Profile.objects.select_related('user').exclude(user_id__in=already_following)
     if cats:
-        # Prefer users who share interest categories
         qs = qs.filter(
             interested_categories__isnull=False
         ).exclude(interested_categories=[])
     suggestions = []
-    for p in qs.order_by('-user__follower_links')[:50]:
+    for p in qs.order_by('-reputation_score')[:50]:
         shared = len(set(p.interested_categories or []) & set(cats)) if cats else 0
         suggestions.append((shared, p))
     suggestions.sort(key=lambda x: -x[0])
