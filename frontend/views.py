@@ -1076,15 +1076,27 @@ def index(request):
     exclude_ids = blocked_ids | muted_ids
     if exclude_ids:
         annotated_posts = annotated_posts.exclude(user_id__in=exclude_ids)
-    trending_posts = annotated_posts.order_by(
-        '-like_count',
-        '-comment_count',
-        '-conversation_count',
-        '-author_posts_count',
-        '-created_at',
-    )
 
-    paginator = Paginator(trending_posts, 10)
+    # Boost posts whose hashtags match the user's followed topics
+    user_followed_tags = set()
+    if request.user.is_authenticated:
+        user_followed_tags = set(
+            HashtagFollow.objects.filter(user=request.user).values_list('tag', flat=True)
+        )
+    if user_followed_tags:
+        from django.db.models import BooleanField, Case, When, Value as _V
+        _tag_q = Q()
+        for _t in list(user_followed_tags)[:20]:
+            _tag_q |= Q(hashtags__icontains=_t)
+        annotated_posts = annotated_posts.annotate(
+            has_followed_tag=Case(When(_tag_q, then=_V(True)), default=_V(False), output_field=BooleanField())
+        ).order_by('-has_followed_tag', '-like_count', '-comment_count', '-conversation_count', '-author_posts_count', '-created_at')
+    else:
+        annotated_posts = annotated_posts.order_by(
+            '-like_count', '-comment_count', '-conversation_count', '-author_posts_count', '-created_at',
+        )
+
+    paginator = Paginator(annotated_posts, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
     posts = list(page_obj.object_list)
     _enrich_posts_for_feed(posts, request.user)
@@ -1100,6 +1112,7 @@ def index(request):
         'follow_suggestions': _follow_suggestions(request.user),
         'trending_sidebar': _get_trending_hashtags(),
         'rising_creators': _get_rising_creators(limit=5),
+        'user_followed_tags': user_followed_tags,
     }
     return render(request, 'frontend/index.html', context)
 
@@ -1977,6 +1990,23 @@ def user_profile(request, username):
                 User.objects.filter(id__in=list(mutual_ids)[:3]).values_list('username', flat=True)
             )
 
+    # Debate win/loss/draw record (derived from observer votes)
+    _dp_qs = DebateParticipant.objects.filter(user=profile_user, debate__status='completed')
+    _debate_played = _dp_qs.values('debate_id').distinct().count()
+    _yes_wins = ObserverVote.objects.filter(
+        debate__participants__user=profile_user,
+        debate__participants__side='yes',
+        winner_side='yes',
+    ).values('debate').distinct().count()
+    _no_wins = ObserverVote.objects.filter(
+        debate__participants__user=profile_user,
+        debate__participants__side='no',
+        winner_side='no',
+    ).values('debate').distinct().count()
+    _debate_wins = _yes_wins + _no_wins
+    _debate_draws = _dp_qs.filter(debate__outcome='draw').values('debate_id').distinct().count()
+    _debate_losses = max(0, _debate_played - _debate_wins - _debate_draws)
+
     context = {
         'profile_user': profile_user,
         'user_posts': user_posts if can_see_content else [],
@@ -1999,6 +2029,11 @@ def user_profile(request, username):
         'profile_bio': profile_obj.bio if profile_obj else '',
         'profile_website': profile_obj.website if profile_obj else '',
         'debate_participations_count': DebateParticipant.objects.filter(user=profile_user).count(),
+        'debate_played': _debate_played,
+        'debate_wins': _debate_wins,
+        'debate_losses': _debate_losses,
+        'debate_draws': _debate_draws,
+        'debate_win_rate': round(_debate_wins / _debate_played * 100) if _debate_played else 0,
         'trust_badge': profile_obj.trust_badge if profile_obj else ('', '', ''),
         'trust_level': profile_obj.trust_level if profile_obj else 'new',
         'is_verified': profile_obj.is_verified if profile_obj else False,
@@ -7700,6 +7735,10 @@ def _compute_spam_score(post):
 @login_required
 def for_you_feed(request):
     """Instagram-style personalised feed using pre-computed FeedScore."""
+    user_followed_tags = set(
+        HashtagFollow.objects.filter(user=request.user).values_list('tag', flat=True)
+    )
+
     scored_post_ids = (
         FeedScore.objects
         .filter(user=request.user)
@@ -7708,18 +7747,44 @@ def for_you_feed(request):
     )
 
     if scored_post_ids:
-        # Preserve feed score ordering
         id_list = list(scored_post_ids)
         annotated = _annotated_feed_posts_queryset().filter(id__in=id_list)
         id_to_post = {p.id: p for p in annotated}
         posts_qs = [id_to_post[pid] for pid in id_list if pid in id_to_post]
     else:
-        # Fallback: interest-based ordering for users without pre-computed scores
         interests = list(request.user.profile.interested_categories or [])
         base_qs = _annotated_feed_posts_queryset().filter(is_draft=False, is_deleted_by_moderation=False)
         if interests:
             base_qs = base_qs.filter(category__in=interests)
         posts_qs = list(base_qs.order_by('-created_at')[:50])
+
+    # Inject recent followed-hashtag posts not already in the scored list
+    if user_followed_tags:
+        scored_ids_set = {p.id for p in posts_qs}
+        _tag_q = Q()
+        for _t in list(user_followed_tags)[:20]:
+            _tag_q |= Q(hashtags__icontains=_t)
+        topic_posts = list(
+            _annotated_feed_posts_queryset()
+            .filter(_tag_q, is_draft=False, is_deleted_by_moderation=False)
+            .exclude(id__in=scored_ids_set)
+            .order_by('-created_at')[:20]
+        )
+        # Interleave: insert a topic post every 4 scored posts
+        merged, ti = [], 0
+        for i, p in enumerate(posts_qs):
+            merged.append(p)
+            if (i + 1) % 4 == 0 and ti < len(topic_posts):
+                merged.append(topic_posts[ti])
+                ti += 1
+        merged.extend(topic_posts[ti:])
+        posts_qs = merged
+
+    muted_ids = _muted_user_ids(request.user)
+    blocked_ids = _blocked_user_ids(request.user)
+    excluded = muted_ids | blocked_ids
+    if excluded:
+        posts_qs = [p for p in posts_qs if p.user_id not in excluded]
 
     paginator = Paginator(posts_qs, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
@@ -7727,7 +7792,6 @@ def for_you_feed(request):
     _enrich_posts_for_feed(posts, request.user)
     posts = _filter_muted_posts(posts, request.user)
 
-    # Active stories from followed users
     active_stories = _get_active_stories_for_user(request.user)
 
     context = {
@@ -7740,6 +7804,7 @@ def for_you_feed(request):
         'follow_suggestions': _follow_suggestions(request.user),
         'trending_sidebar': _get_trending_hashtags(),
         'active_stories': active_stories,
+        'user_followed_tags': user_followed_tags,
     }
     return render(request, 'frontend/index.html', context)
 

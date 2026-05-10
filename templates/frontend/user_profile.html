@@ -235,6 +235,17 @@
                             <p class="text-xl font-black leading-none text-amber-600 dark:text-amber-400">{{ debate_participations_count }}</p>
                             <p class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Debates</p>
                         </div>
+                        {% if debate_played > 0 %}
+                        <a href="{% url 'leaderboard' %}?tab=debates" class="inline-flex items-center gap-2 rounded-2xl border border-border/70 bg-background/80 px-4 py-2.5 hover:border-primary/40 transition-colors" title="Debate record — {{ debate_win_rate }}% win rate">
+                            <div class="flex items-center gap-1.5 text-sm font-black leading-none">
+                                <span class="text-green-600 dark:text-green-400">{{ debate_wins }}W</span>
+                                <span class="text-muted-foreground/50 font-normal">·</span>
+                                <span class="text-destructive">{{ debate_losses }}L</span>
+                                {% if debate_draws %}<span class="text-muted-foreground/50 font-normal">·</span><span class="text-muted-foreground">{{ debate_draws }}D</span>{% endif %}
+                            </div>
+                            <p class="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Record</p>
+                        </a>
+                        {% endif %}
                         {% if streak_days >= 2 %}
                         <div class="inline-flex items-center gap-1.5 rounded-2xl border border-orange-300/70 bg-orange-50 dark:bg-orange-900/20 px-4 py-2.5" title="Activity streak">
                             <span class="text-lg leading-none">🔥</span>
