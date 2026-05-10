@@ -7915,6 +7915,9 @@ def debate_timer_status(request, debate_id):
 
 @login_required
 def read_later_list(request):
+    if request.method == 'POST' and request.POST.get('clear_done'):
+        ReadLater.objects.filter(user=request.user, is_read=True).delete()
+        return redirect('read_later')
     items = ReadLater.objects.filter(user=request.user).select_related(
         'post', 'post__user', 'post__user__profile'
     )

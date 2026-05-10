@@ -146,6 +146,13 @@
                 </svg>
               </button>
               {% endif %}
+              {% if user.is_authenticated %}
+              <button type="button" onclick="toggleReadLater('{{ post.id|escapejs }}', this)"
+                title="{% if post.is_read_later %}Remove from Read Later{% else %}Read Later{% endif %}"
+                class="p-1 rounded-lg transition-colors text-sm {% if post.is_read_later %}text-teal-600{% else %}text-muted-foreground hover:text-teal-600{% endif %}">
+                🕐
+              </button>
+              {% endif %}
               <button type="button"
                 onclick="exploreShare(this, '{{ post.id }}', {{ post.title|escapejs|tojson }})"
                 title="Share"
@@ -349,6 +356,30 @@ function exploreToggleBookmark(btn, postId) {
     }
   })
   .catch(() => {});
+}
+
+function toggleReadLater(postId, btn) {
+  var csrf = document.cookie.match('(^|;) ?csrftoken=([^;]*)(;|$)');
+  csrf = csrf ? csrf[2] : '';
+  fetch('/read-later/toggle/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'post_id=' + encodeURIComponent(postId)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (!d.success) return;
+    if (d.saved) {
+      btn.classList.add('text-teal-600');
+      btn.classList.remove('text-muted-foreground', 'hover:text-teal-600');
+      btn.title = 'Remove from Read Later';
+    } else {
+      btn.classList.remove('text-teal-600');
+      btn.classList.add('text-muted-foreground', 'hover:text-teal-600');
+      btn.title = 'Read Later';
+    }
+  })
+  .catch(function() {});
 }
 </script>
 {% endblock %}

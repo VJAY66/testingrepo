@@ -486,6 +486,12 @@
                                     </svg>
                                     <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.save_count|default:0 }}</span>
                                 </button>
+                                <button type="button" onclick="toggleReadLater('{{ post.id|escapejs }}', this)"
+                                    title="{% if post.is_read_later %}Remove from Read Later{% else %}Read Later{% endif %}"
+                                    class="group relative flex items-center justify-center gap-1 w-auto h-8 sm:px-2.5 px-2 rounded-full transition-all pointer-events-auto text-xs font-medium
+                                      {% if post.is_read_later %}text-teal-600 bg-teal-50 dark:bg-teal-900/20 border border-teal-300{% else %}text-muted-foreground border border-transparent hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20{% endif %}">
+                                    🕐
+                                </button>
                                 <button type="button" data-action="hot" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_hot %}text-orange-500 bg-orange-50/60 border-orange-300/60{% else %}text-muted-foreground hover:text-orange-500 hover:bg-orange-50/60{% endif %}">🔥 <span class="action-count text-xs">{{ post.hot_count|default:0 }}</span></button>
                                 <button type="button" data-action="debatable" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_debatable %}text-purple-500 bg-purple-50/60 border-purple-300/60{% else %}text-muted-foreground hover:text-purple-500 hover:bg-purple-50/60{% endif %}">🤔 <span class="action-count text-xs">{{ post.debatable_count|default:0 }}</span></button>
                                 <button type="button" data-action="agree" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_agree %}text-green-600 bg-green-50/60 border-green-300/60{% else %}text-muted-foreground hover:text-green-600 hover:bg-green-50/60{% endif %}">👏 <span class="action-count text-xs">{{ post.agree_count|default:0 }}</span></button>
@@ -930,5 +936,29 @@ document.addEventListener('keydown', function(event) {
         closeSharePanel();
     }
 });
+
+function toggleReadLater(postId, btn) {
+  var csrf = document.cookie.match('(^|;) ?csrftoken=([^;]*)(;|$)');
+  csrf = csrf ? csrf[2] : '';
+  fetch('/read-later/toggle/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'post_id=' + encodeURIComponent(postId)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (!d.success) return;
+    if (d.saved) {
+      btn.classList.add('text-teal-600', 'bg-teal-50', 'border-teal-300');
+      btn.classList.remove('text-muted-foreground', 'border-transparent');
+      btn.title = 'Remove from Read Later';
+    } else {
+      btn.classList.remove('text-teal-600', 'bg-teal-50', 'border-teal-300');
+      btn.classList.add('text-muted-foreground', 'border-transparent');
+      btn.title = 'Read Later';
+    }
+  })
+  .catch(function() {});
+}
 </script>
 {% endblock %}
