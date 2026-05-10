@@ -7684,6 +7684,37 @@ def creator_analytics(request, post_id):
     total_engagements = total_likes + total_comments + total_saves
     engagement_rate = round((total_engagements / total_views * 100), 1) if total_views > 0 else 0
 
+    # Recent viewers (last 30, with profile data)
+    recent_viewers = list(
+        PostView.objects.filter(post=post)
+        .select_related('user', 'user__profile')
+        .order_by('-viewed_at')[:30]
+    )
+
+    # Unique viewer count by day bucket for the sparkline (already in daily_data)
+    # Top engagers: users who liked, commented, or reacted — sorted by total actions
+    from collections import defaultdict
+    engager_scores = defaultdict(lambda: {'user': None, 'likes': 0, 'comments': 0, 'reactions': 0})
+
+    for pa in PostAction.objects.filter(post=post).select_related('user', 'user__profile'):
+        e = engager_scores[pa.user_id]
+        e['user'] = pa.user
+        if pa.action == 'like':
+            e['likes'] += 1
+        else:
+            e['reactions'] += 1
+
+    for cm in Comment.objects.filter(post=post).select_related('user', 'user__profile'):
+        e = engager_scores[cm.user_id]
+        e['user'] = cm.user
+        e['comments'] += 1
+
+    top_engagers = sorted(
+        [v for v in engager_scores.values() if v['user']],
+        key=lambda x: x['likes'] * 3 + x['comments'] * 2 + x['reactions'],
+        reverse=True,
+    )[:10]
+
     context = {
         'post': post,
         'total_views': total_views,
@@ -7700,6 +7731,9 @@ def creator_analytics(request, post_id):
         'views_wow': views_wow,
         'likes_wow': likes_wow,
         'best_hour': best_hour,
+        'recent_viewers': recent_viewers,
+        'top_engagers': top_engagers,
+        'unique_viewer_count': len(set(v.user_id for v in recent_viewers)),
     }
     return render(request, 'frontend/creator_analytics.html', context)
 
