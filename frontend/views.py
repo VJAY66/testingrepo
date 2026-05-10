@@ -2829,6 +2829,95 @@ def like_comment(request):
     except Comment.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Comment not found'})
 
+def _handle_start_review_debate(request, review_comment_id):
+    """Start or join a debate on a review comment."""
+    try:
+        review_comment = ReviewComment.objects.select_related('review', 'user').get(id=review_comment_id)
+    except ReviewComment.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Comment not found.'}, status=404)
+
+    target_user = review_comment.user
+    review = review_comment.review
+
+    if request.user == target_user:
+        return JsonResponse({'success': False, 'error': 'Cannot debate with yourself.'})
+
+    if _is_blocked_by_comment_owner(target_user, request.user):
+        return JsonResponse({'success': False, 'error': 'You are not allowed to send debate requests to this commenter.'})
+
+    if DebateParticipant.objects.filter(user=request.user, is_banned=True, debate__review_comment=review_comment).exists():
+        return JsonResponse({'success': False, 'error': 'You were removed from this debate and cannot start it again.'})
+
+    # Must have voted on the review
+    try:
+        user_reaction = ReviewReaction.objects.get(review=review, user=request.user)
+    except ReviewReaction.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Please vote Agree or Disagree on the review before starting a debate.'}, status=400)
+
+    # Must be on opposite side
+    if user_reaction.reaction == review_comment.side:
+        return JsonResponse({'success': False, 'error': 'You can only debate someone from the opposite side.'}, status=400)
+
+    # Map agree→yes, disagree→no for DebateParticipant.side
+    side_map = {'agree': 'yes', 'disagree': 'no'}
+    desired_side = side_map[user_reaction.reaction]
+
+    accepted_debate = Debate.objects.filter(
+        review_comment=review_comment, target=target_user, status='accepted'
+    ).order_by('-updated_at').first()
+
+    if accepted_debate:
+        _ensure_debate_core_participants(accepted_debate)
+        active_counts = {
+            item['side']: item['total']
+            for item in DebateParticipant.objects.filter(debate=accepted_debate, is_active=True).values('side').annotate(total=Count('id'))
+        }
+        chosen_side = _pick_debate_side_for_user(accepted_debate, desired_side, active_counts=active_counts, fallback_side=desired_side)
+        participant = DebateParticipant.objects.filter(debate=accepted_debate, user=request.user).first()
+
+        if participant and participant.is_banned:
+            return JsonResponse({'success': False, 'error': 'You were removed from this conversation.'})
+        if participant and participant.is_active:
+            return JsonResponse({'success': True, 'message': 'You are already in this conversation.', 'redirect_url': f'/debates/{accepted_debate.id}/chat/'})
+
+        yes_active = active_counts.get('yes', 0)
+        no_active = active_counts.get('no', 0)
+        conversation_full = (
+            accepted_debate.yes_supporters > 0 and accepted_debate.no_supporters > 0
+            and yes_active >= accepted_debate.yes_supporters
+            and no_active >= accepted_debate.no_supporters
+        )
+        if conversation_full:
+            if not participant:
+                DebateParticipant.objects.create(debate=accepted_debate, user=request.user, side=chosen_side, is_active=False)
+            return JsonResponse({'success': True, 'queued': True, 'message': 'Debate is full. You can view it.', 'redirect_url': f'/debates/{accepted_debate.id}/chat/'})
+
+        if participant:
+            participant.is_active = True
+            participant.left_at = None
+            participant.save(update_fields=['is_active', 'left_at'])
+        else:
+            DebateParticipant.objects.create(debate=accepted_debate, user=request.user, side=chosen_side, is_active=True)
+
+        if not accepted_debate.end_controller_id:
+            _set_end_controller_with_fallback(accepted_debate, preferred_side=chosen_side)
+
+        return JsonResponse({'success': True, 'message': 'Joined debate!', 'redirect_url': f'/debates/{accepted_debate.id}/chat/'})
+
+    existing = Debate.objects.filter(review_comment=review_comment, initiator=request.user, target=target_user, status='pending').exists()
+    if existing:
+        return JsonResponse({'success': False, 'error': 'Debate request already sent.'})
+
+    debate = Debate.objects.create(
+        id=str(uuid.uuid4()),
+        review_comment=review_comment,
+        initiator=request.user,
+        target=target_user,
+        status='pending',
+    )
+    return JsonResponse({'success': True, 'message': 'Debate request sent!', 'debate_id': debate.id})
+
+
 def _handle_start_poll_debate(request, poll_comment_id):
     """Start or join a debate on a poll comment."""
     try:
@@ -2937,7 +3026,7 @@ def _handle_start_poll_debate(request, poll_comment_id):
             content=f"{request.user.username} requested to restart the poll debate.",
             is_system=True,
         )
-        return JsonResponse({'success': True, 'message': 'Debate restart request sent!'})
+        return JsonResponse({'success': True, 'message': 'Debate restart request sent!', 'debate_id': reusable_completed.id})
 
     existing = Debate.objects.filter(
         poll_comment=poll_comment, initiator=request.user, target=target_user, status='pending'
@@ -2945,7 +3034,7 @@ def _handle_start_poll_debate(request, poll_comment_id):
     if existing:
         return JsonResponse({'success': False, 'error': 'Debate request already sent.'})
 
-    Debate.objects.create(
+    debate = Debate.objects.create(
         id=str(uuid.uuid4()),
         poll_comment=poll_comment,
         poll=poll,
@@ -2954,7 +3043,7 @@ def _handle_start_poll_debate(request, poll_comment_id):
         status='pending',
     )
 
-    return JsonResponse({'success': True, 'message': 'Debate request sent!'})
+    return JsonResponse({'success': True, 'message': 'Debate request sent!', 'debate_id': debate.id})
 
 
 @login_required
@@ -3055,7 +3144,7 @@ def start_debate(request):
                 is_system=True,
             )
 
-            return JsonResponse({'success': True, 'message': 'Debate restart request sent!'})
+            return JsonResponse({'success': True, 'message': 'Debate restart request sent!', 'debate_id': reusable_completed.id})
 
         if accepted_debate:
             _ensure_debate_core_participants(accepted_debate)
@@ -3191,7 +3280,7 @@ def start_debate(request):
                 'error': 'You are in queue. This user already has 10 pending requests, commentor still not responding to existing requests.'
             })
 
-        Debate.objects.create(
+        debate = Debate.objects.create(
             id=str(uuid.uuid4()),
             comment=comment,
             post=comment.post,
@@ -3200,7 +3289,7 @@ def start_debate(request):
             status='pending'
         )
 
-        return JsonResponse({'success': True, 'message': 'Debate request sent!'})
+        return JsonResponse({'success': True, 'message': 'Debate request sent!', 'debate_id': debate.id})
     except Comment.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Comment not found'})
 
@@ -4020,6 +4109,19 @@ def increase_debate_limits(request, debate_id):
 
 
 @login_required
+@login_required
+def debate_status(request, debate_id):
+    """Lightweight endpoint polled by the initiator while waiting for acceptance."""
+    try:
+        debate = Debate.objects.only('id', 'status', 'initiator_id').get(id=debate_id, initiator=request.user)
+    except Debate.DoesNotExist:
+        return JsonResponse({'error': 'Not found'}, status=404)
+    data = {'status': debate.status}
+    if debate.status == 'accepted':
+        data['redirect_url'] = f'/debates/{debate.id}/chat/'
+    return JsonResponse(data)
+
+
 def debate_info(request, debate_id):
     """Return debate metadata as JSON for the floating chat manager"""
     debate = get_object_or_404(
@@ -5921,19 +6023,35 @@ def _get_trending_hashtags(limit=10):
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
+
     from datetime import timedelta as _timedelta
-    from collections import Counter
-    cutoff = timezone.now() - _timedelta(hours=24)
-    all_tags = []
-    for model, field in [(Post, 'hashtags'), (Poll, 'hashtags')]:
-        for obj in model.objects.filter(created_at__gte=cutoff).values_list(field, flat=True):
-            if obj:
-                all_tags.extend(
-                    t.strip().lstrip('#') for t in str(obj).replace(',', ' ').split() if t.strip()
-                )
-    top = [{'tag': tag, 'count': count} for tag, count in Counter(all_tags).most_common(limit) if tag]
-    cache.set(cache_key, top, 900)  # 15 min cache
-    return top
+    from collections import defaultdict
+
+    now = timezone.now()
+    # Three time windows with decaying weights: most recent activity scores highest
+    windows = [
+        (now - _timedelta(hours=2),  now,                              4.0),
+        (now - _timedelta(hours=6),  now - _timedelta(hours=2),        2.0),
+        (now - _timedelta(hours=24), now - _timedelta(hours=6),        1.0),
+    ]
+
+    scores = defaultdict(float)
+    for start, end, weight in windows:
+        for model, field in [(Post, 'hashtags'), (Poll, 'hashtags')]:
+            for raw in model.objects.filter(
+                created_at__gte=start, created_at__lt=end
+            ).values_list(field, flat=True):
+                if not raw:
+                    continue
+                for token in str(raw).replace(',', ' ').split():
+                    tag = token.strip().lstrip('#').lower()
+                    if tag:
+                        scores[tag] += weight
+
+    top = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:limit]
+    result = [{'tag': tag, 'count': round(score)} for tag, score in top if tag]
+    cache.set(cache_key, result, 900)  # 15 min cache
+    return result
 
 
 # ─── Endorsements ─────────────────────────────────────────────────────────────

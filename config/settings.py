@@ -113,6 +113,53 @@ DATABASES = {
     )
 }
 
+_cache_backend = os.getenv('CACHE_BACKEND', 'django.core.cache.backends.locmem.LocMemCache')
+CACHES = {
+    'default': {
+        'BACKEND': _cache_backend,
+        'LOCATION': os.getenv('CACHE_LOCATION', 'pickside-default'),
+        'TIMEOUT': int(os.getenv('CACHE_TIMEOUT', '300')),
+        **({'OPTIONS': {'CLIENT_CLASS': 'django_redis.client.DefaultClient'}} if 'redis' in _cache_backend else {}),
+    }
+}
+
+# Celery
+CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TIMEZONE = os.getenv('TIME_ZONE', 'UTC')
+CELERY_TASK_ALWAYS_EAGER = _env_bool('CELERY_TASK_ALWAYS_EAGER', default=True)  # runs synchronously unless Redis available
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    # Publish scheduled posts every minute
+    'publish-scheduled-posts': {
+        'task': 'frontend.tasks.publish_scheduled_posts',
+        'schedule': 60.0,  # every 60 seconds
+    },
+    # Weekly digest every Monday at 9 AM UTC
+    'send-weekly-digest': {
+        'task': 'frontend.tasks.send_weekly_digest',
+        'schedule': crontab(hour=9, minute=0, day_of_week=1),
+    },
+    # Hard-delete accounts requested for deletion 30+ days ago — daily at 3 AM
+    'cleanup-deleted-accounts': {
+        'task': 'frontend.tasks.cleanup_deleted_accounts',
+        'schedule': crontab(hour=3, minute=0),
+    },
+}
+
+# Elasticsearch
+ELASTICSEARCH_URL = os.getenv('ELASTICSEARCH_URL', '')  # empty = disabled, fall back to DB search
+ELASTICSEARCH_INDEX_PREFIX = os.getenv('ELASTICSEARCH_INDEX_PREFIX', 'pickside')
+
+# Push Notifications (VAPID)
+VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY', '')
+VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY', '')
+VAPID_ADMIN_EMAIL = os.getenv('VAPID_ADMIN_EMAIL', os.getenv('DEFAULT_FROM_EMAIL', 'PickASide <noreply@pickside.app>'))
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
