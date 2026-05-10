@@ -1012,12 +1012,24 @@ def _follow_suggestions(user, limit=5):
     return [p for _, p in suggestions[:limit]]
 
 
+def _blocked_user_ids(user):
+    """Return set of user IDs to exclude: users the current user blocked and users who blocked them."""
+    if not user.is_authenticated:
+        return set()
+    blocked = set(UserBlock.objects.filter(blocker=user).values_list('blocked_id', flat=True))
+    blocking_me = set(UserBlock.objects.filter(blocked=user).values_list('blocker_id', flat=True))
+    return blocked | blocking_me
+
+
 def index(request):
     """Home page with trending posts and categories"""
     active_category = request.GET.get('category', '').strip()
     annotated_posts = _annotated_feed_posts_queryset()
     if active_category:
         annotated_posts = annotated_posts.filter(category=active_category)
+    blocked_ids = _blocked_user_ids(request.user)
+    if blocked_ids:
+        annotated_posts = annotated_posts.exclude(user_id__in=blocked_ids)
     trending_posts = annotated_posts.order_by(
         '-like_count',
         '-comment_count',
@@ -1058,6 +1070,10 @@ def suggested(request):
             | Q(user__username__icontains=search_query)
             | Q(hashtags__icontains=search_query)
         ).distinct()
+
+    blocked_ids = _blocked_user_ids(request.user)
+    if blocked_ids:
+        annotated_posts = annotated_posts.exclude(user_id__in=blocked_ids)
 
     ordered_posts = _build_suggested_posts_for_user(request.user, annotated_posts)
 
@@ -7273,9 +7289,11 @@ def for_you_feed(request):
 def following_feed(request):
     """Chronological feed of posts from people the current user follows."""
     following_ids = list(Follow.objects.filter(follower=request.user).values_list('following_id', flat=True))
+    blocked_ids = _blocked_user_ids(request.user)
+    safe_following = [uid for uid in following_ids if uid not in blocked_ids]
 
     base_qs = _annotated_feed_posts_queryset().filter(
-        user_id__in=following_ids,
+        user_id__in=safe_following,
         is_draft=False,
         is_deleted_by_moderation=False,
     ).order_by('-created_at')
@@ -7316,6 +7334,9 @@ def explore(request):
         # Exclude posts from people you already follow
         following_ids = list(Follow.objects.filter(follower=request.user).values_list('following_id', flat=True))
         base_qs = base_qs.exclude(user_id__in=following_ids).exclude(user=request.user)
+        blocked_ids = _blocked_user_ids(request.user)
+        if blocked_ids:
+            base_qs = base_qs.exclude(user_id__in=blocked_ids)
 
     if category_filter:
         base_qs = base_qs.filter(category=category_filter)

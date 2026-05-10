@@ -159,7 +159,8 @@
                        class="w-full rounded-2xl border border-border bg-background px-4 py-2 text-foreground text-sm shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
                        placeholder="Schedule for...">
             </div>
-            <div class="flex gap-3 mt-3">
+            <div class="flex gap-3 mt-3 items-center">
+                <span id="draft-status" class="text-xs text-muted-foreground opacity-0 transition-opacity duration-500 flex-shrink-0"></span>
                 <button type="submit" id="submit-btn"
                         class="flex-1 rounded-full bg-primary text-primary-foreground px-6 py-3 text-sm font-semibold hover:bg-primary/90 transition">
                     Post Question
@@ -426,6 +427,83 @@
             hashtagsInput.focus();
         }
     });
+
+    // ── Draft auto-save (localStorage) ────────────────────────────────────────
+    var DRAFT_KEY = 'pickside_draft_v1';
+
+    function readDraftFields() {
+        return {
+            title: titleInput.value,
+            category: document.getElementById('category').value,
+            hashtags: hashtagsInput.value,
+            is_anonymous: document.getElementById('anon-toggle').checked,
+            savedAt: new Date().toISOString(),
+        };
+    }
+
+    function saveDraftToStorage() {
+        if (!titleInput.value.trim()) return;
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(readDraftFields()));
+        showDraftStatus('Draft saved');
+    }
+
+    function showDraftStatus(msg) {
+        var el = document.getElementById('draft-status');
+        if (!el) return;
+        el.textContent = msg;
+        el.classList.remove('opacity-0');
+        clearTimeout(el._t);
+        el._t = setTimeout(function() { el.classList.add('opacity-0'); }, 2000);
+    }
+
+    function restoreDraft(draft) {
+        titleInput.value = draft.title || '';
+        charCount.textContent = titleInput.value.length;
+        updateTitleFormatState();
+        var catEl = document.getElementById('category');
+        if (draft.category) catEl.value = draft.category;
+        if (draft.hashtags) {
+            hashtagsInput.value = draft.hashtags;
+            updateCurrentHashtagCounter();
+        }
+        document.getElementById('anon-toggle').checked = !!draft.is_anonymous;
+        document.getElementById('draft-banner').remove();
+    }
+
+    (function initDraftBanner() {
+        var raw = localStorage.getItem(DRAFT_KEY);
+        if (!raw) return;
+        try {
+            var draft = JSON.parse(raw);
+            if (!draft.title) return;
+            var when = draft.savedAt ? new Date(draft.savedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+            var banner = document.createElement('div');
+            banner.id = 'draft-banner';
+            banner.className = 'mb-4 flex items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm';
+            banner.innerHTML = '<span class="text-foreground font-medium">📝 You have an unsaved draft' + (when ? ' from ' + when : '') + '</span>' +
+                '<span class="flex gap-2 flex-shrink-0">' +
+                '<button type="button" id="draft-restore-btn" class="rounded-full bg-primary text-primary-foreground px-3 py-1 text-xs font-semibold hover:bg-primary/90">Restore</button>' +
+                '<button type="button" id="draft-discard-btn" class="rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground">Discard</button>' +
+                '</span>';
+            var form = document.getElementById('ask-form-shell');
+            form.parentNode.insertBefore(banner, form);
+            document.getElementById('draft-restore-btn').addEventListener('click', function() { restoreDraft(draft); });
+            document.getElementById('draft-discard-btn').addEventListener('click', function() {
+                localStorage.removeItem(DRAFT_KEY);
+                banner.remove();
+            });
+        } catch(e) {}
+    })();
+
+    // Auto-save every 30s
+    setInterval(saveDraftToStorage, 30000);
+    // Also save on meaningful input pause
+    var draftDebounce = null;
+    titleInput.addEventListener('input', function() { clearTimeout(draftDebounce); draftDebounce = setTimeout(saveDraftToStorage, 3000); });
+
+    // Clear draft on successful submit
+    askForm.addEventListener('submit', function() { localStorage.removeItem(DRAFT_KEY); });
+    // ──────────────────────────────────────────────────────────────────────────
 
     // Save Draft button — show scheduling input, then submit on second click
     const draftBtn = document.getElementById('draft-btn');
