@@ -3378,6 +3378,95 @@ def like_comment(request):
     except Comment.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Comment not found'})
 
+def _handle_start_review_debate(request, review_comment_id):
+    """Start or join a debate on a review comment."""
+    try:
+        review_comment = ReviewComment.objects.select_related('review', 'user').get(id=review_comment_id)
+    except ReviewComment.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Comment not found.'}, status=404)
+
+    target_user = review_comment.user
+    review = review_comment.review
+
+    if request.user == target_user:
+        return JsonResponse({'success': False, 'error': 'Cannot debate with yourself.'})
+
+    if _is_blocked_by_comment_owner(target_user, request.user):
+        return JsonResponse({'success': False, 'error': 'You are not allowed to send debate requests to this commenter.'})
+
+    if DebateParticipant.objects.filter(user=request.user, is_banned=True, debate__review_comment=review_comment).exists():
+        return JsonResponse({'success': False, 'error': 'You were removed from this debate and cannot start it again.'})
+
+    # Must have voted on the review
+    try:
+        user_reaction = ReviewReaction.objects.get(review=review, user=request.user)
+    except ReviewReaction.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Please vote Agree or Disagree on the review before starting a debate.'}, status=400)
+
+    # Must be on opposite side
+    if user_reaction.reaction == review_comment.side:
+        return JsonResponse({'success': False, 'error': 'You can only debate someone from the opposite side.'}, status=400)
+
+    # Map agree→yes, disagree→no for DebateParticipant.side
+    side_map = {'agree': 'yes', 'disagree': 'no'}
+    desired_side = side_map[user_reaction.reaction]
+
+    accepted_debate = Debate.objects.filter(
+        review_comment=review_comment, target=target_user, status='accepted'
+    ).order_by('-updated_at').first()
+
+    if accepted_debate:
+        _ensure_debate_core_participants(accepted_debate)
+        active_counts = {
+            item['side']: item['total']
+            for item in DebateParticipant.objects.filter(debate=accepted_debate, is_active=True).values('side').annotate(total=Count('id'))
+        }
+        chosen_side = _pick_debate_side_for_user(accepted_debate, desired_side, active_counts=active_counts, fallback_side=desired_side)
+        participant = DebateParticipant.objects.filter(debate=accepted_debate, user=request.user).first()
+
+        if participant and participant.is_banned:
+            return JsonResponse({'success': False, 'error': 'You were removed from this conversation.'})
+        if participant and participant.is_active:
+            return JsonResponse({'success': True, 'message': 'You are already in this conversation.', 'redirect_url': f'/debates/{accepted_debate.id}/chat/'})
+
+        yes_active = active_counts.get('yes', 0)
+        no_active = active_counts.get('no', 0)
+        conversation_full = (
+            accepted_debate.yes_supporters > 0 and accepted_debate.no_supporters > 0
+            and yes_active >= accepted_debate.yes_supporters
+            and no_active >= accepted_debate.no_supporters
+        )
+        if conversation_full:
+            if not participant:
+                DebateParticipant.objects.create(debate=accepted_debate, user=request.user, side=chosen_side, is_active=False)
+            return JsonResponse({'success': True, 'queued': True, 'message': 'Debate is full. You can view it.', 'redirect_url': f'/debates/{accepted_debate.id}/chat/'})
+
+        if participant:
+            participant.is_active = True
+            participant.left_at = None
+            participant.save(update_fields=['is_active', 'left_at'])
+        else:
+            DebateParticipant.objects.create(debate=accepted_debate, user=request.user, side=chosen_side, is_active=True)
+
+        if not accepted_debate.end_controller_id:
+            _set_end_controller_with_fallback(accepted_debate, preferred_side=chosen_side)
+
+        return JsonResponse({'success': True, 'message': 'Joined debate!', 'redirect_url': f'/debates/{accepted_debate.id}/chat/'})
+
+    existing = Debate.objects.filter(review_comment=review_comment, initiator=request.user, target=target_user, status='pending').exists()
+    if existing:
+        return JsonResponse({'success': False, 'error': 'Debate request already sent.'})
+
+    Debate.objects.create(
+        id=str(uuid.uuid4()),
+        review_comment=review_comment,
+        initiator=request.user,
+        target=target_user,
+        status='pending',
+    )
+    return JsonResponse({'success': True, 'message': 'Debate request sent!'})
+
+
 def _handle_start_poll_debate(request, poll_comment_id):
     """Start or join a debate on a poll comment."""
     try:
@@ -3513,6 +3602,10 @@ def start_debate(request):
     poll_comment_id = request.POST.get('poll_comment_id')
     if poll_comment_id:
         return _handle_start_poll_debate(request, poll_comment_id)
+
+    review_comment_id = request.POST.get('review_comment_id')
+    if review_comment_id:
+        return _handle_start_review_debate(request, review_comment_id)
 
     comment_id = request.POST.get('comment_id')
 
@@ -5774,10 +5867,9 @@ def create_review(request):
 
 def review_detail(request, review_id):
     review = get_object_or_404(Review, id=review_id, is_deleted_by_moderation=False)
-    comments = review.comments.filter(is_deleted_by_moderation=False).select_related('user')
+    comments = review.comments.filter(is_deleted_by_moderation=False).select_related('user', 'user__profile')
 
     user_reaction = None
-    comments_with_reaction = []
     if request.user.is_authenticated:
         try:
             r = ReviewReaction.objects.get(review=review, user=request.user)
@@ -5785,20 +5877,38 @@ def review_detail(request, review_id):
         except ReviewReaction.DoesNotExist:
             pass
 
-    for c in comments:
-        ur = None
-        if request.user.is_authenticated:
-            try:
-                rcr = ReviewCommentReaction.objects.get(comment=c, user=request.user)
-                ur = rcr.reaction
-            except ReviewCommentReaction.DoesNotExist:
-                pass
-        comments_with_reaction.append({'comment': c, 'user_reaction': ur})
+    # Build per-comment reaction map
+    user_comment_reactions = {}
+    if request.user.is_authenticated:
+        for rcr in ReviewCommentReaction.objects.filter(comment__review=review, user=request.user):
+            user_comment_reactions[rcr.comment_id] = rcr.reaction
+
+    # Active debate for current user on this review
+    user_debate = None
+    if request.user.is_authenticated:
+        user_debate = Debate.objects.filter(
+            review_comment__review=review,
+            status='accepted',
+            participants__user=request.user,
+            participants__is_active=True,
+        ).first()
+
+    def enrich(c):
+        return {
+            'comment': c,
+            'user_reaction': user_comment_reactions.get(c.id),
+            'active_debate': c.debates.filter(status='accepted').first(),
+        }
+
+    agree_comments = [enrich(c) for c in comments if c.side == 'agree']
+    disagree_comments = [enrich(c) for c in comments if c.side == 'disagree']
 
     return render(request, 'frontend/review_detail.html', {
         'review': review,
         'user_reaction': user_reaction,
-        'comments_with_reaction': comments_with_reaction,
+        'agree_comments': agree_comments,
+        'disagree_comments': disagree_comments,
+        'user_debate': user_debate,
     })
 
 
@@ -5852,11 +5962,23 @@ def create_review_comment(request, review_id):
     try:
         data = json.loads(request.body)
         content = (data.get('content') or '').strip()
+        side = (data.get('side') or '').strip()
     except (json.JSONDecodeError, TypeError):
         return JsonResponse({'error': 'Invalid request'}, status=400)
 
     if not content:
         return JsonResponse({'error': 'Comment cannot be empty.'}, status=400)
+
+    if side not in ('agree', 'disagree'):
+        return JsonResponse({'error': 'You must pick a side (agree or disagree) before commenting.'}, status=400)
+
+    # Validate side matches the user's actual vote
+    try:
+        user_reaction = ReviewReaction.objects.get(review=review, user=request.user)
+        if user_reaction.reaction != side:
+            return JsonResponse({'error': f'You voted {user_reaction.reaction} — you can only comment on that side.'}, status=400)
+    except ReviewReaction.DoesNotExist:
+        return JsonResponse({'error': 'Please vote Agree or Disagree on the review before commenting.'}, status=400)
 
     if check_content_moderation(content):
         return JsonResponse({'error': 'Your comment contains inappropriate content.'}, status=400)
@@ -5866,6 +5988,7 @@ def create_review_comment(request, review_id):
         review=review,
         user=request.user,
         content=content,
+        side=side,
     )
 
     return JsonResponse({
@@ -5874,6 +5997,8 @@ def create_review_comment(request, review_id):
             'id': comment.id,
             'content': comment.content,
             'username': request.user.username,
+            'picture_url': request.user.profile.get_picture_url() if hasattr(request.user, 'profile') else '',
+            'side': side,
             'likes': 0,
             'dislikes': 0,
             'created_at': comment.created_at.strftime('%b %d, %Y'),
@@ -5912,6 +6037,25 @@ def like_review_comment(request):
     comment.save(update_fields=['likes', 'dislikes', 'updated_at'])
 
     return JsonResponse({'success': True, 'likes': likes, 'dislikes': dislikes})
+
+
+@login_required
+@require_POST
+def pin_review_comment(request, review_id):
+    review = get_object_or_404(Review, id=review_id, is_deleted_by_moderation=False)
+    if review.user != request.user:
+        return JsonResponse({'error': 'Only the review author can pin comments.'}, status=403)
+    comment_id = (request.POST.get('comment_id') or '').strip()
+    comment = get_object_or_404(ReviewComment, id=comment_id, review=review)
+    # Toggle: unpin if already pinned, otherwise unpin all on that side and pin this one
+    if comment.is_pinned:
+        comment.is_pinned = False
+        comment.save(update_fields=['is_pinned'])
+        return JsonResponse({'success': True, 'pinned': False})
+    ReviewComment.objects.filter(review=review, side=comment.side, is_pinned=True).update(is_pinned=False)
+    comment.is_pinned = True
+    comment.save(update_fields=['is_pinned'])
+    return JsonResponse({'success': True, 'pinned': True})
 
 
 # ─── Leaderboard ─────────────────────────────────────────────────────────────

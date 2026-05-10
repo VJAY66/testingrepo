@@ -96,6 +96,7 @@ urlpatterns = [
     path('reviews/<str:review_id>/', views.review_detail, name='review_detail'),
     path('reviews/<str:review_id>/react/', views.react_to_review, name='react_to_review'),
     path('reviews/<str:review_id>/comment/', views.create_review_comment, name='create_review_comment'),
+    path('reviews/<str:review_id>/pin-comment/', views.pin_review_comment, name='pin_review_comment'),
     # Trending hashtags
     path('trending/', views.trending_hashtags, name='trending_hashtags'),
     # Activity feed

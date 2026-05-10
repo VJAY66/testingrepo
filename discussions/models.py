@@ -187,6 +187,7 @@ class Debate(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='debates', null=True, blank=True)
     poll_comment = models.ForeignKey('PollComment', on_delete=models.CASCADE, related_name='debates', null=True, blank=True)
     poll = models.ForeignKey('Poll', on_delete=models.CASCADE, related_name='debates', null=True, blank=True)
+    review_comment = models.ForeignKey('ReviewComment', on_delete=models.CASCADE, related_name='debates', null=True, blank=True)
     initiator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='initiated_debates')
     target = models.ForeignKey(User, on_delete=models.CASCADE, related_name='target_debates')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -206,6 +207,8 @@ class Debate(models.Model):
 
     @property
     def context_title(self):
+        if self.review_comment_id:
+            return self.review_comment.review.subject
         if self.post_id:
             return self.post.title
         if self.poll_id:
@@ -684,10 +687,14 @@ class ReviewReaction(models.Model):
 
 
 class ReviewComment(models.Model):
+    SIDE_CHOICES = [('agree', 'Agree'), ('disagree', 'Disagree')]
+
     id = models.CharField(max_length=36, primary_key=True)
     review = models.ForeignKey(Review, on_delete=models.CASCADE, related_name='comments')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='review_comments')
     content = models.TextField()
+    side = models.CharField(max_length=10, choices=SIDE_CHOICES, default='agree')
+    is_pinned = models.BooleanField(default=False)
     likes = models.IntegerField(default=0)
     dislikes = models.IntegerField(default=0)
     is_deleted_by_moderation = models.BooleanField(default=False)
@@ -698,7 +705,7 @@ class ReviewComment(models.Model):
         return f"ReviewComment on {self.review.subject} by {self.user.username}"
 
     class Meta:
-        ordering = ['created_at']
+        ordering = ['-is_pinned', 'created_at']
 
 
 class ReviewCommentReaction(models.Model):

@@ -1,324 +1,455 @@
 {% extends 'frontend/base.html' %}
-{% block title %}{{ review.subject }} — Review — Discussion Hub{% endblock %}
+{% block title %}{{ review.subject }} — Review — PickASide{% endblock %}
 
 {% block content %}
 <style>
+/* ── Base card ── */
 .rv-card {
-    background: linear-gradient(152deg, hsl(var(--card) / 0.92), hsl(var(--card) / 0.72));
-    backdrop-filter: blur(18px);
-    box-shadow: 0 28px 72px -40px rgba(15,23,42,0.6), inset 0 1px 0 rgba(255,255,255,0.18);
-    border-radius: 1.5rem;
-    border: 1px solid hsl(var(--border) / 0.4);
+  background: linear-gradient(152deg, hsl(var(--card)/0.92), hsl(var(--card)/0.72));
+  backdrop-filter: blur(18px);
+  box-shadow: 0 28px 72px -40px rgba(15,23,42,.6), inset 0 1px 0 rgba(255,255,255,.18);
+  border-radius: 1.5rem;
+  border: 1px solid hsl(var(--border)/0.4);
 }
 .star-filled { color: hsl(38 92% 50%); }
-.star-empty  { color: hsl(var(--muted-foreground) / 0.3); }
-.react-btn {
-    display: inline-flex; align-items: center; gap: 0.45rem;
-    padding: 0.55rem 1.25rem; border-radius: 999px;
-    border: 1.5px solid hsl(var(--border));
-    font-size: 0.82rem; font-weight: 700;
-    cursor: pointer; background: hsl(var(--background) / 0.6);
-    transition: border-color 150ms, background 150ms, color 150ms;
+.star-empty  { color: hsl(var(--muted-foreground)/0.3); }
+
+/* ── Side picker cards ── */
+.side-card {
+  flex: 1;
+  border-radius: 1.1rem;
+  border: 2px solid transparent;
+  padding: 18px 16px;
+  cursor: pointer;
+  transition: border-color .2s, box-shadow .2s, transform .15s;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  text-align: center;
 }
-.react-btn.agree-active { border-color: hsl(142 71% 45%); background: hsl(142 71% 45% / 0.12); color: hsl(142 71% 35%); }
-.react-btn.disagree-active { border-color: hsl(346 77% 50%); background: hsl(346 77% 50% / 0.1); color: hsl(346 77% 44%); }
-.react-btn:not(.agree-active):not(.disagree-active) { color: hsl(var(--muted-foreground)); }
-.react-btn:not(.agree-active):hover { border-color: hsl(142 71% 45% / 0.5); color: hsl(142 71% 38%); }
-.react-btn.disagree-btn:not(.disagree-active):hover { border-color: hsl(346 77% 50% / 0.5); color: hsl(346 77% 44%); }
-.comment-input {
-    width: 100%;
-    padding: 0.75rem 1rem;
-    border-radius: 0.9rem;
-    border: 1.5px solid hsl(var(--border));
-    background: hsl(var(--background) / 0.72);
-    color: hsl(var(--foreground));
-    font-size: 0.9rem;
-    font-family: inherit;
-    resize: none;
-    outline: none;
-    transition: border-color 180ms ease, box-shadow 180ms ease;
+.side-card:hover { transform: translateY(-2px); }
+.side-card.agree-card {
+  background: linear-gradient(135deg, hsl(142 71% 97%), hsl(142 71% 94%));
+  border-color: hsl(142 71% 75%);
+  box-shadow: 0 4px 16px -4px hsl(142 71% 45%/.2);
 }
-.comment-input:focus { border-color: hsl(var(--primary)); box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15); }
-.comment-card {
-    padding: 0.75rem 1rem;
-    border-radius: 1rem;
-    border: 1px solid hsl(var(--border));
-    background: hsl(var(--card));
-    overflow: hidden;
-    box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+.side-card.agree-card.selected {
+  border-color: hsl(142 71% 45%);
+  box-shadow: 0 4px 24px -4px hsl(142 71% 45%/.4);
 }
+.side-card.disagree-card {
+  background: linear-gradient(135deg, hsl(346 77% 97%), hsl(346 77% 94%));
+  border-color: hsl(346 77% 75%);
+  box-shadow: 0 4px 16px -4px hsl(346 77% 50%/.2);
+}
+.side-card.disagree-card.selected {
+  border-color: hsl(346 77% 50%);
+  box-shadow: 0 4px 24px -4px hsl(346 77% 50%/.4);
+}
+.dark .side-card.agree-card    { background: linear-gradient(135deg, hsl(142 30% 12%), hsl(142 30% 10%)); }
+.dark .side-card.disagree-card { background: linear-gradient(135deg, hsl(346 30% 12%), hsl(346 30% 10%)); }
+.side-icon {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.agree-icon    { background: hsl(142 71% 45%/.15); }
+.disagree-icon { background: hsl(346 77% 50%/.15); }
+
+/* ── Comment columns ── */
+.debate-col {
+  display: flex; flex-direction: column; gap: 10px;
+}
+.debate-col-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-radius: .9rem;
+  font-weight: 700; font-size: 13px; margin-bottom: 2px;
+}
+.agree-col-hdr    { background: hsl(142 71% 45%/.1); color: hsl(142 71% 35%); }
+.disagree-col-hdr { background: hsl(346 77% 50%/.1); color: hsl(346 77% 44%); }
+.dark .agree-col-hdr    { color: hsl(142 60% 55%); }
+.dark .disagree-col-hdr { color: hsl(346 60% 65%); }
+
+.rc-card {
+  border-radius: 1rem;
+  border: 1px solid hsl(var(--border)/0.7);
+  background: hsl(var(--card));
+  padding: 12px 14px;
+  position: relative;
+  transition: box-shadow .15s;
+}
+.rc-card:hover { box-shadow: 0 4px 16px -8px hsl(var(--primary)/.15); }
+.rc-card.agree-card-border    { border-left: 3px solid hsl(142 71% 45%/.5); }
+.rc-card.disagree-card-border { border-left: 3px solid hsl(346 77% 50%/.5); }
+.rc-card.pinned { border-color: hsl(38 92% 50%/.5); background: hsl(38 92% 50%/.04); }
+.pin-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 700; color: hsl(38 72% 45%);
+  background: hsl(38 92% 50%/.15); padding: 2px 7px; border-radius: 999px;
+}
+
+/* ── Comment input ── */
+.rc-input {
+  width: 100%; padding: .65rem .9rem; border-radius: .8rem;
+  border: 1.5px solid hsl(var(--border));
+  background: hsl(var(--background)/.8); color: hsl(var(--foreground));
+  font-size: .87rem; font-family: inherit; resize: none; outline: none;
+  transition: border-color .18s, box-shadow .18s;
+}
+.rc-input:focus { border-color: hsl(var(--primary)); box-shadow: 0 0 0 3px hsl(var(--primary)/.12); }
+
+/* ── Debate button ── */
+.debate-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid hsl(var(--border)); cursor: pointer;
+  background: transparent; color: hsl(var(--muted-foreground));
+  transition: border-color .15s, color .15s, background .15s;
+}
+.debate-btn:hover { border-color: hsl(var(--primary)/.5); color: hsl(var(--primary)); background: hsl(var(--primary)/.06); }
+.debate-btn.active { border-color: hsl(var(--primary)); color: hsl(var(--primary)); background: hsl(var(--primary)/.1); }
 </style>
 
-<div class="max-w-3xl mx-auto px-4 py-6 sm:py-10 space-y-6">
+<div class="max-w-5xl mx-auto px-4 py-6 sm:py-10 space-y-6">
 
-    <a href="{% url 'reviews_list' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-        Back to reviews
-    </a>
+  <a href="{% url 'reviews_list' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    Back to reviews
+  </a>
 
-    <!-- Review card -->
-    <div class="rv-card p-6 sm:p-8" id="review-card" data-review-id="{{ review.id }}">
-
-        <!-- Header: author + badges -->
-        <div class="flex items-start justify-between gap-3 mb-5">
-            <div class="flex items-center gap-2.5">
-                <a href="{% url 'user_profile' review.user.username %}">
-                    <div class="w-9 h-9 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm flex-shrink-0">
-                        {{ review.user.username|first|upper }}
-                    </div>
-                </a>
-                <div>
-                    <a href="{% url 'user_profile' review.user.username %}" class="font-semibold text-foreground hover:text-primary transition-colors">{{ review.user.username }}</a>
-                    <p class="text-xs text-muted-foreground">{{ review.created_at|date:"M j, Y" }}</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-                <span class="px-2.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full text-xs font-bold">{{ review.subject_type }}</span>
-                <span class="px-2.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full text-xs font-bold uppercase tracking-wide">{{ review.category }}</span>
-            </div>
+  <!-- ── Review card ── -->
+  <div class="rv-card p-6 sm:p-8" id="review-card" data-review-id="{{ review.id }}">
+    <div class="flex items-start justify-between gap-3 mb-5">
+      <div class="flex items-center gap-2.5">
+        <a href="{% url 'user_profile' review.user.username %}">
+          <div class="w-9 h-9 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm flex-shrink-0">
+            {{ review.user.username|first|upper }}
+          </div>
+        </a>
+        <div>
+          <a href="{% url 'user_profile' review.user.username %}" class="font-semibold text-foreground hover:text-primary transition-colors">{{ review.user.username }}</a>
+          <p class="text-xs text-muted-foreground">{{ review.created_at|date:"M j, Y" }}</p>
         </div>
-
-        <!-- Subject + rating -->
-        <div class="flex items-start justify-between gap-4 mb-4">
-            <h1 class="text-xl sm:text-2xl font-bold text-foreground leading-snug">{{ review.subject }}</h1>
-            <div class="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
-                {% for i in "12345" %}
-                <svg class="w-6 h-6 {% if forloop.counter <= review.rating %}star-filled{% else %}star-empty{% endif %}" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                </svg>
-                {% endfor %}
-                <span class="ml-2 text-sm font-bold text-muted-foreground">{{ review.rating }}/5</span>
-            </div>
-        </div>
-
-        <!-- Content -->
-        <p class="text-base text-foreground leading-relaxed whitespace-pre-wrap mb-5">{{ review.content }}</p>
-
-        <!-- Hashtags -->
-        {% if review.hashtags %}
-        <div class="mb-5 flex flex-wrap gap-1.5">
-            {% for tag in review.get_hashtags_list %}
-            <a href="{% url 'hashtag_search' %}?tag={{ tag }}" class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-gradient-to-r from-cyan-500/20 via-teal-500/20 to-amber-500/20 border border-cyan-500/30 hover:border-cyan-500/60 text-cyan-600 dark:text-cyan-400 text-xs font-medium transition">#{{ tag }}</a>
-            {% endfor %}
-        </div>
-        {% endif %}
-
-        <!-- Agree / Disagree -->
-        <div class="flex items-center gap-3 pt-5 border-t border-border/40">
-            {% if user.is_authenticated and review.user != user %}
-            <button type="button"
-                    id="agree-btn"
-                    onclick="reactReview('agree')"
-                    class="react-btn {% if user_reaction == 'agree' %}agree-active{% endif %}">
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                Agree · <span id="agree-count">{{ review.agree_count }}</span>
-            </button>
-            <button type="button"
-                    id="disagree-btn"
-                    onclick="reactReview('disagree')"
-                    class="react-btn disagree-btn {% if user_reaction == 'disagree' %}disagree-active{% endif %}">
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
-                Disagree · <span id="disagree-count">{{ review.disagree_count }}</span>
-            </button>
-            {% else %}
-            <span class="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                <span id="agree-count">{{ review.agree_count }}</span> agree
-            </span>
-            <span class="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                <svg class="w-4 h-4 text-rose-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
-                <span id="disagree-count">{{ review.disagree_count }}</span> disagree
-            </span>
-            {% if not user.is_authenticated %}
-            <span class="ml-auto text-xs text-muted-foreground"><a href="{% url 'login' %}?next={{ request.path }}" class="text-primary font-semibold hover:underline">Log in</a> to react</span>
-            {% endif %}
-            {% endif %}
-        </div>
-    </div><!-- /rv-card -->
-
-    <!-- Comments section -->
-    <div class="rv-card p-6 sm:p-8 space-y-5" id="comments-section">
-        <h2 class="text-base font-bold text-foreground flex items-center gap-2">
-            <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-            Comments
-        </h2>
-
-        <!-- Comment form -->
-        {% if user.is_authenticated %}
-        <div id="comment-form-section">
-            <textarea id="comment-textarea" class="comment-input mb-2" rows="3"
-                      placeholder="Share your thoughts on this review…" maxlength="500"></textarea>
-            <div class="flex items-center justify-between">
-                <span id="comment-error" class="text-xs text-destructive hidden"></span>
-                <button type="button" onclick="submitComment()"
-                        class="ml-auto inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition">
-                    Post Comment
-                </button>
-            </div>
-        </div>
-        {% else %}
-        <p class="text-sm text-muted-foreground"><a href="{% url 'login' %}?next={{ request.path }}" class="text-primary font-semibold hover:underline">Log in</a> to leave a comment.</p>
-        {% endif %}
-
-        <!-- Existing comments -->
-        <div class="space-y-3" id="comments-list">
-            {% for cw in comments_with_reaction %}
-            <div class="comment-card" id="comment-{{ cw.comment.id }}">
-                <div class="flex items-center gap-2 mb-1.5">
-                    <div class="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">
-                        {{ cw.comment.user.username|first|upper }}
-                    </div>
-                    <span class="text-xs font-semibold text-foreground">{{ cw.comment.user.username }}</span>
-                    <span class="ml-auto text-[10px] text-muted-foreground">{{ cw.comment.created_at|date:"M j" }}</span>
-                </div>
-                <p class="text-sm text-foreground leading-relaxed mb-2">{{ cw.comment.content }}</p>
-                <div class="flex items-center gap-3">
-                    {% if user.is_authenticated and cw.comment.user != user %}
-                    <button type="button"
-                            onclick="reactComment('{{ cw.comment.id }}', 'like')"
-                            class="inline-flex items-center gap-1 text-xs font-semibold transition {% if cw.user_reaction == 'like' %}text-primary{% else %}text-muted-foreground hover:text-primary{% endif %}"
-                            id="like-btn-{{ cw.comment.id }}">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
-                        <span id="like-count-{{ cw.comment.id }}">{{ cw.comment.likes }}</span>
-                    </button>
-                    <button type="button"
-                            onclick="reactComment('{{ cw.comment.id }}', 'dislike')"
-                            class="inline-flex items-center gap-1 text-xs font-semibold transition {% if cw.user_reaction == 'dislike' %}text-destructive{% else %}text-muted-foreground hover:text-destructive{% endif %}"
-                            id="dislike-btn-{{ cw.comment.id }}">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"/></svg>
-                        <span id="dislike-count-{{ cw.comment.id }}">{{ cw.comment.dislikes }}</span>
-                    </button>
-                    {% else %}
-                    <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
-                        {{ cw.comment.likes }}
-                    </span>
-                    <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"/></svg>
-                        {{ cw.comment.dislikes }}
-                    </span>
-                    {% endif %}
-                </div>
-            </div>
-            {% empty %}
-            <p class="text-sm text-muted-foreground text-center py-6" id="no-comments-msg">No comments yet. Be the first!</p>
-            {% endfor %}
-        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+        <span class="px-2.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full text-xs font-bold">{{ review.subject_type }}</span>
+        <span class="px-2.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full text-xs font-bold uppercase tracking-wide">{{ review.category }}</span>
+      </div>
     </div>
+
+    <div class="flex items-start justify-between gap-4 mb-4">
+      <h1 class="text-xl sm:text-2xl font-bold text-foreground leading-snug">{{ review.subject }}</h1>
+      <div class="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
+        {% for i in "12345" %}
+        <svg class="w-6 h-6 {% if forloop.counter <= review.rating %}star-filled{% else %}star-empty{% endif %}" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+        </svg>
+        {% endfor %}
+        <span class="ml-2 text-sm font-bold text-muted-foreground">{{ review.rating }}/5</span>
+      </div>
+    </div>
+
+    <p class="text-base text-foreground leading-relaxed whitespace-pre-wrap mb-5">{{ review.content }}</p>
+
+    {% if review.hashtags %}
+    <div class="mb-5 flex flex-wrap gap-1.5">
+      {% for tag in review.get_hashtags_list %}
+      <a href="{% url 'hashtag_search' %}?tag={{ tag }}" class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-gradient-to-r from-cyan-500/20 via-teal-500/20 to-amber-500/20 border border-cyan-500/30 hover:border-cyan-500/60 text-cyan-600 dark:text-cyan-400 text-xs font-medium transition">#{{ tag }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ── Vote bar ── -->
+    {% if review.agree_count or review.disagree_count %}
+    {% with total=review.agree_count|add:review.disagree_count %}
+    <div class="mb-4 h-2 rounded-full bg-rose-200/60 dark:bg-rose-900/30 overflow-hidden">
+      <div class="h-full bg-emerald-500 rounded-full transition-all" style="width:{% if total > 0 %}{% widthratio review.agree_count total 100 %}{% else %}50{% endif %}%"></div>
+    </div>
+    {% endwith %}
+    {% endif %}
+  </div>
+
+  <!-- ── Pick a Side ── -->
+  <div id="pick-a-side">
+    {% if user.is_authenticated and review.user != user %}
+    <div class="flex gap-3 sm:gap-4">
+      <!-- Agree -->
+      <div class="side-card agree-card {% if user_reaction == 'agree' %}selected{% endif %}" id="agree-side-card" onclick="pickSide('agree')">
+        <div class="side-icon agree-icon">
+          <svg class="w-6 h-6 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+        </div>
+        <div>
+          <p class="font-bold text-emerald-700 dark:text-emerald-400 text-sm">Agree</p>
+          <p class="text-xs text-muted-foreground mt-0.5"><span id="agree-count">{{ review.agree_count }}</span> agree</p>
+        </div>
+        {% if user_reaction == 'agree' %}
+        <span class="text-xs font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-full">Your side ✓</span>
+        {% endif %}
+      </div>
+
+      <!-- Disagree -->
+      <div class="side-card disagree-card {% if user_reaction == 'disagree' %}selected{% endif %}" id="disagree-side-card" onclick="pickSide('disagree')">
+        <div class="side-icon disagree-icon">
+          <svg class="w-6 h-6 text-rose-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+        </div>
+        <div>
+          <p class="font-bold text-rose-700 dark:text-rose-400 text-sm">Disagree</p>
+          <p class="text-xs text-muted-foreground mt-0.5"><span id="disagree-count">{{ review.disagree_count }}</span> disagree</p>
+        </div>
+        {% if user_reaction == 'disagree' %}
+        <span class="text-xs font-bold text-rose-600 bg-rose-100 dark:bg-rose-900/40 px-2 py-0.5 rounded-full">Your side ✓</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Comment input (appears after voting) -->
+    {% if user_reaction %}
+    <div class="mt-4 p-4 rounded-xl border {% if user_reaction == 'agree' %}border-emerald-200 bg-emerald-50/60 dark:bg-emerald-900/10{% else %}border-rose-200 bg-rose-50/60 dark:bg-rose-900/10{% endif %}" id="comment-form-box">
+      <p class="text-xs font-semibold mb-2 {% if user_reaction == 'agree' %}text-emerald-700 dark:text-emerald-400{% else %}text-rose-700 dark:text-rose-400{% endif %}">
+        Add your {{ user_reaction }} comment
+      </p>
+      <textarea id="comment-textarea" class="rc-input mb-2" rows="3"
+        placeholder="Share your perspective…" maxlength="500"></textarea>
+      <div class="flex items-center justify-between">
+        <span id="comment-error" class="text-xs text-destructive hidden"></span>
+        <button type="button" onclick="submitComment('{{ user_reaction }}')"
+          class="ml-auto inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition
+            {% if user_reaction == 'agree' %}bg-emerald-600 text-white hover:bg-emerald-700{% else %}bg-rose-600 text-white hover:bg-rose-700{% endif %}">
+          Post as {{ user_reaction|capfirst }}
+        </button>
+      </div>
+    </div>
+    {% else %}
+    <p class="mt-3 text-xs text-center text-muted-foreground">Pick a side above to leave a comment.</p>
+    {% endif %}
+
+    {% else %}
+    <!-- Not auth / own review: just show counts -->
+    <div class="flex gap-3">
+      <div class="side-card agree-card flex-row justify-center gap-3" style="cursor:default">
+        <svg class="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+        <span class="font-bold text-emerald-700 dark:text-emerald-400 text-sm"><span id="agree-count">{{ review.agree_count }}</span> Agree</span>
+      </div>
+      <div class="side-card disagree-card flex-row justify-center gap-3" style="cursor:default">
+        <svg class="w-5 h-5 text-rose-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+        <span class="font-bold text-rose-700 dark:text-rose-400 text-sm"><span id="disagree-count">{{ review.disagree_count }}</span> Disagree</span>
+      </div>
+    </div>
+    {% if not user.is_authenticated %}
+    <p class="mt-2 text-xs text-center text-muted-foreground"><a href="{% url 'login' %}?next={{ request.path }}" class="text-primary font-semibold hover:underline">Log in</a> to pick a side and comment.</p>
+    {% endif %}
+    {% endif %}
+  </div>
+
+  <!-- ── Split Comment Columns ── -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+    <!-- Agree column -->
+    <div class="debate-col">
+      <div class="debate-col-header agree-col-hdr">
+        <span>✓ Agree · {{ agree_comments|length }}</span>
+      </div>
+
+      {% if user_reaction == 'agree' %}
+      <div id="agree-new-comments"></div>
+      {% endif %}
+
+      {% for cw in agree_comments %}
+      {% include "frontend/_review_comment_card.html" with cw=cw side="agree" review=review %}
+      {% empty %}
+      <p class="text-xs text-muted-foreground text-center py-6" id="agree-empty">No agree comments yet.</p>
+      {% endfor %}
+    </div>
+
+    <!-- Disagree column -->
+    <div class="debate-col">
+      <div class="debate-col-header disagree-col-hdr">
+        <span>✗ Disagree · {{ disagree_comments|length }}</span>
+      </div>
+
+      {% if user_reaction == 'disagree' %}
+      <div id="disagree-new-comments"></div>
+      {% endif %}
+
+      {% for cw in disagree_comments %}
+      {% include "frontend/_review_comment_card.html" with cw=cw side="disagree" review=review %}
+      {% empty %}
+      <p class="text-xs text-muted-foreground text-center py-6" id="disagree-empty">No disagree comments yet.</p>
+      {% endfor %}
+    </div>
+  </div>
 
 </div>
 
+<!-- ── Debate modal ── -->
+<div id="review-debate-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+  <div class="bg-card rounded-2xl border border-border shadow-xl w-full max-w-sm p-6">
+    <h3 class="font-bold text-foreground mb-1" id="rdm-title">Start Debate</h3>
+    <p class="text-xs text-muted-foreground mb-4" id="rdm-body">Challenge this commenter to a formal debate.</p>
+    <div class="flex gap-3">
+      <button onclick="closeReviewDebateModal()" class="flex-1 py-2 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition">Cancel</button>
+      <button onclick="confirmReviewDebate()" id="rdm-confirm-btn" class="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition">Challenge</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const REVIEW_ID = '{{ review.id }}';
-const CSRF_TOKEN = '{{ csrf_token }}';
+const REVIEW_ID   = '{{ review.id }}';
+const CSRF_TOKEN  = '{{ csrf_token }}';
+const IS_AUTHOR   = {% if user == review.user %}true{% else %}false{% endif %};
+const USER_SIDE   = '{{ user_reaction|default:"" }}';
 
-function reactReview(type) {
-    fetch(`/reviews/${REVIEW_ID}/react/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-        body: JSON.stringify({ reaction: type }),
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            document.getElementById('agree-count').textContent = data.agree_count;
-            document.getElementById('disagree-count').textContent = data.disagree_count;
-            const agreeBtn = document.getElementById('agree-btn');
-            const disagreeBtn = document.getElementById('disagree-btn');
-            if (agreeBtn && disagreeBtn) {
-                agreeBtn.classList.remove('agree-active');
-                disagreeBtn.classList.remove('disagree-active');
-                if (data.action !== 'removed') {
-                    if (type === 'agree') agreeBtn.classList.add('agree-active');
-                    else disagreeBtn.classList.add('disagree-active');
-                }
-            }
-        } else {
-            alert(data.error || 'Failed to react.');
-        }
-    })
-    .catch(() => alert('Network error. Please try again.'));
-}
-
-function submitComment() {
-    const ta = document.getElementById('comment-textarea');
-    const err = document.getElementById('comment-error');
-    const content = ta ? ta.value.trim() : '';
-    if (!content) {
-        err && (err.textContent = 'Please write something first.') && err.classList.remove('hidden');
-        return;
+/* ── Side picker ── */
+function pickSide(side) {
+  fetch(`/reviews/${REVIEW_ID}/react/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+    body: JSON.stringify({ reaction: side }),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      document.getElementById('agree-count').textContent = d.agree_count;
+      document.getElementById('disagree-count').textContent = d.disagree_count;
+      // Reload to re-render columns with new state
+      location.reload();
+    } else {
+      alert(d.error || 'Could not record vote.');
     }
-    err && err.classList.add('hidden');
-
-    fetch(`/reviews/${REVIEW_ID}/comment/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-        body: JSON.stringify({ content }),
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            const c = data.comment;
-            const list = document.getElementById('comments-list');
-            const noMsg = document.getElementById('no-comments-msg');
-            if (noMsg) noMsg.remove();
-            const el = document.createElement('div');
-            el.className = 'comment-card';
-            el.id = `comment-${c.id}`;
-            el.innerHTML = `
-                <div class="flex items-center gap-2 mb-1.5">
-                    <div class="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">${c.username[0].toUpperCase()}</div>
-                    <span class="text-xs font-semibold text-foreground">${escapeHtml(c.username)}</span>
-                    <span class="ml-auto text-[10px] text-muted-foreground">${c.created_at}</span>
-                </div>
-                <p class="text-sm text-foreground leading-relaxed mb-2">${escapeHtml(c.content)}</p>
-                <div class="flex items-center gap-3">
-                    <span class="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
-                        0
-                    </span>
-                </div>`;
-            list.appendChild(el);
-            ta.value = '';
-        } else {
-            err && (err.textContent = data.error || 'Failed to post comment.') && err.classList.remove('hidden');
-        }
-    })
-    .catch(() => {
-        err && (err.textContent = 'Network error.') && err.classList.remove('hidden');
-    });
+  });
 }
 
+/* ── Comment submission ── */
+function submitComment(side) {
+  const ta = document.getElementById('comment-textarea');
+  const err = document.getElementById('comment-error');
+  const content = ta ? ta.value.trim() : '';
+  if (!content) {
+    if (err) { err.textContent = 'Please write something first.'; err.classList.remove('hidden'); }
+    return;
+  }
+  if (err) err.classList.add('hidden');
+
+  fetch(`/reviews/${REVIEW_ID}/comment/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+    body: JSON.stringify({ content, side }),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      const c = d.comment;
+      const container = document.getElementById(`${side}-new-comments`);
+      const emptyMsg  = document.getElementById(`${side}-empty`);
+      if (emptyMsg) emptyMsg.remove();
+      if (container) {
+        const isAgree = side === 'agree';
+        const el = document.createElement('div');
+        el.className = `rc-card ${isAgree ? 'agree-card-border' : 'disagree-card-border'}`;
+        el.id = `rc-${c.id}`;
+        el.innerHTML = `
+          <div class="flex items-center gap-2 mb-1.5">
+            <div class="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">${escH(c.username[0].toUpperCase())}</div>
+            <span class="text-xs font-semibold text-foreground">${escH(c.username)}</span>
+            <span class="ml-auto text-[10px] text-muted-foreground">${escH(c.created_at)}</span>
+          </div>
+          <p class="text-sm text-foreground leading-relaxed mb-2">${escH(c.content)}</p>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-muted-foreground">👍 0</span>
+            <span class="text-xs text-muted-foreground">👎 0</span>
+          </div>`;
+        container.prepend(el);
+      }
+      ta.value = '';
+    } else {
+      if (err) { err.textContent = d.error || 'Failed to post.'; err.classList.remove('hidden'); }
+    }
+  })
+  .catch(() => {
+    if (err) { err.textContent = 'Network error.'; err.classList.remove('hidden'); }
+  });
+}
+
+/* ── Like / dislike comment ── */
 function reactComment(commentId, reaction) {
-    fetch('/reviews/comment/react/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-        body: JSON.stringify({ comment_id: commentId, reaction }),
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            const lc = document.getElementById(`like-count-${commentId}`);
-            const dc = document.getElementById(`dislike-count-${commentId}`);
-            if (lc) lc.textContent = data.likes;
-            if (dc) dc.textContent = data.dislikes;
-            const lb = document.getElementById(`like-btn-${commentId}`);
-            const db = document.getElementById(`dislike-btn-${commentId}`);
-            if (lb && db) {
-                if (reaction === 'like') {
-                    lb.classList.add('text-primary'); lb.classList.remove('text-muted-foreground', 'hover:text-primary');
-                    db.classList.remove('text-destructive'); db.classList.add('text-muted-foreground', 'hover:text-destructive');
-                } else {
-                    db.classList.add('text-destructive'); db.classList.remove('text-muted-foreground', 'hover:text-destructive');
-                    lb.classList.remove('text-primary'); lb.classList.add('text-muted-foreground', 'hover:text-primary');
-                }
-            }
-        }
-    });
+  fetch('/reviews/comment/react/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+    body: JSON.stringify({ comment_id: commentId, reaction }),
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.success) return;
+    const lc = document.getElementById(`lc-${commentId}`);
+    const dc = document.getElementById(`dc-${commentId}`);
+    if (lc) lc.textContent = d.likes;
+    if (dc) dc.textContent = d.dislikes;
+    const lb = document.getElementById(`lb-${commentId}`);
+    const db = document.getElementById(`db-${commentId}`);
+    if (lb && db) {
+      if (reaction === 'like') {
+        lb.classList.add('text-primary'); lb.classList.remove('text-muted-foreground');
+        db.classList.remove('text-destructive'); db.classList.add('text-muted-foreground');
+      } else {
+        db.classList.add('text-destructive'); db.classList.remove('text-muted-foreground');
+        lb.classList.remove('text-primary'); lb.classList.add('text-muted-foreground');
+      }
+    }
+  });
 }
 
-function escapeHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+/* ── Pin comment ── */
+function pinComment(commentId) {
+  const fd = new FormData();
+  fd.append('comment_id', commentId);
+  fd.append('csrfmiddlewaretoken', CSRF_TOKEN);
+  fetch(`/reviews/${REVIEW_ID}/pin-comment/`, { method: 'POST', body: fd })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) location.reload();
+  });
+}
+
+/* ── Debate modal ── */
+let _debateCommentId = null;
+let _debateUsername  = null;
+
+function openReviewDebateModal(commentId, username, hasActiveDebate, debateUrl) {
+  if (hasActiveDebate && debateUrl) {
+    window.location.href = debateUrl;
+    return;
+  }
+  _debateCommentId = commentId;
+  _debateUsername  = username;
+  document.getElementById('rdm-title').textContent = hasActiveDebate ? 'Join Debate' : 'Challenge to Debate';
+  document.getElementById('rdm-body').textContent = `${hasActiveDebate ? 'Join the ongoing debate with' : 'Challenge'} @${username} to a formal debate on this review.`;
+  document.getElementById('rdm-confirm-btn').textContent = hasActiveDebate ? 'Join' : 'Challenge';
+  document.getElementById('review-debate-modal').classList.remove('hidden');
+}
+
+function closeReviewDebateModal() {
+  document.getElementById('review-debate-modal').classList.add('hidden');
+}
+
+function confirmReviewDebate() {
+  const btn = document.getElementById('rdm-confirm-btn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  const fd = new FormData();
+  fd.append('review_comment_id', _debateCommentId);
+  fd.append('csrfmiddlewaretoken', CSRF_TOKEN);
+  fetch('/start-debate/', { method: 'POST', body: fd })
+  .then(r => r.json())
+  .then(d => {
+    closeReviewDebateModal();
+    if (d.redirect_url) { window.location.href = d.redirect_url; return; }
+    if (d.success) {
+      alert(d.message || 'Debate request sent!');
+    } else {
+      alert(d.error || 'Could not send debate request.');
+    }
+  })
+  .catch(() => { btn.disabled = false; btn.textContent = 'Challenge'; alert('Network error.'); });
+}
+
+function escH(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
 {% endblock %}
