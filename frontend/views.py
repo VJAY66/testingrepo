@@ -1076,6 +1076,7 @@ def index(request):
         'is_suggested_page': False,
         'follow_suggestions': _follow_suggestions(request.user),
         'trending_sidebar': _get_trending_hashtags(),
+        'rising_creators': _get_rising_creators(limit=5),
     }
     return render(request, 'frontend/index.html', context)
 
@@ -7036,6 +7037,79 @@ def _get_trending_hashtags(limit=10):
     top = [{'tag': tag, 'count': count} for tag, count in Counter(all_tags).most_common(limit) if tag]
     cache.set(cache_key, top, 900)  # 15 min cache
     return top
+
+
+def _get_rising_creators(limit=20):
+    """Return users ranked by follower gains + post engagement over the last 7 days."""
+    cache_key = f'rising_creators_{limit}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    from discussions.models import PostAction as _PostAction
+    week_ago = timezone.now() - timedelta(days=7)
+
+    # New followers gained this week per user
+    new_follows = (
+        Follow.objects
+        .filter(created_at__gte=week_ago)
+        .values('following_id')
+        .annotate(new_followers=Count('id'))
+    )
+    follower_gain = {row['following_id']: row['new_followers'] for row in new_follows}
+
+    # Post engagement (all actions) on posts published this week
+    engagement = (
+        _PostAction.objects
+        .filter(created_at__gte=week_ago, post__is_draft=False, post__is_deleted_by_moderation=False)
+        .values('post__user_id')
+        .annotate(actions=Count('id'))
+    )
+    eng_map = {row['post__user_id']: row['actions'] for row in engagement}
+
+    # Combine: 3× follower gain + 1× engagement actions
+    all_ids = set(follower_gain) | set(eng_map)
+    scored = sorted(
+        all_ids,
+        key=lambda uid: follower_gain.get(uid, 0) * 3 + eng_map.get(uid, 0),
+        reverse=True,
+    )[:limit]
+
+    if not scored:
+        cache.set(cache_key, [], 900)
+        return []
+
+    users = User.objects.filter(id__in=scored).select_related('profile')
+    user_map = {u.id: u for u in users}
+
+    result = []
+    for uid in scored:
+        u = user_map.get(uid)
+        if not u:
+            continue
+        result.append({
+            'user': u,
+            'new_followers': follower_gain.get(uid, 0),
+            'engagement': eng_map.get(uid, 0),
+        })
+
+    cache.set(cache_key, result, 900)  # 15 min cache
+    return result
+
+
+@login_required
+def trending_users(request):
+    creators = _get_rising_creators(limit=30)
+    # Annotate is_following for the current user
+    if creators:
+        following_ids = set(
+            Follow.objects.filter(follower=request.user)
+            .values_list('following_id', flat=True)
+        )
+        for item in creators:
+            item['is_following'] = item['user'].id in following_ids
+            item['is_self'] = item['user'] == request.user
+    return render(request, 'frontend/trending_users.html', {'creators': creators})
 
 
 # ─── Endorsements ─────────────────────────────────────────────────────────────

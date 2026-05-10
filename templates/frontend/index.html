@@ -426,6 +426,32 @@ function toggleFollowAuthor(username, btn) {
 </div>
 {% endif %}
 
+{% if rising_creators and not is_suggested_page %}
+<div class="mt-4 rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+    <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-bold text-foreground">🚀 Rising This Week</h3>
+        <a href="{% url 'trending_users' %}" class="text-xs text-primary hover:underline">See all</a>
+    </div>
+    <div class="space-y-3">
+        {% for item in rising_creators %}
+        <div class="flex items-center gap-2">
+            <a href="{% url 'user_profile' item.user.username %}" class="flex-shrink-0">
+                {% if item.user.profile.get_picture_url %}
+                <img src="{{ item.user.profile.get_picture_url }}" class="w-8 h-8 rounded-full object-cover border border-border">
+                {% else %}
+                <div class="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-primary text-xs font-bold">{{ item.user.username|first|upper }}</div>
+                {% endif %}
+            </a>
+            <div class="flex-1 min-w-0">
+                <a href="{% url 'user_profile' item.user.username %}" class="text-sm font-semibold text-foreground hover:text-primary truncate block">@{{ item.user.username }}</a>
+                {% if item.new_followers %}<span class="text-xs text-emerald-600 font-semibold">+{{ item.new_followers }} followers</span>{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 {% if user.is_authenticated and not is_suggested_page %}
 <div id="create-post-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-card p-6 rounded-lg w-full max-w-md mx-4">

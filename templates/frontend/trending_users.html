@@ -1,0 +1,111 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Rising Creators — PickASide{% endblock %}
+
+{% block content %}
+<style>
+.tu-page { max-width: 600px; margin: 0 auto; padding: 24px 16px; }
+.tu-card { border-radius: 1.1rem; border: 1px solid hsl(var(--border)/0.7); background: hsl(var(--card)); padding: 14px 16px; display: flex; align-items: center; gap: 12px; margin-bottom: 10px; transition: box-shadow .18s; }
+.tu-card:hover { box-shadow: 0 4px 20px -8px hsl(var(--primary)/0.15); }
+.tu-avatar { width: 48px; height: 48px; border-radius: 50%; border: 1.5px solid hsl(var(--border)); overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: hsl(var(--muted)); }
+.tu-rank { font-size: 13px; font-weight: 800; color: hsl(var(--muted-foreground)); width: 24px; flex-shrink: 0; text-align: center; }
+.tu-rank.top3 { color: hsl(var(--primary)); }
+.stat-pill { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: hsl(var(--muted)/0.6); color: hsl(var(--muted-foreground)); }
+.follow-btn { min-width: 76px; padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 700; border: none; cursor: pointer; transition: all .18s; }
+.follow-btn.follow { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.follow-btn.following { background: hsl(var(--border)); color: hsl(var(--foreground)); }
+</style>
+
+<div class="tu-page">
+  <div class="flex items-center gap-3 mb-2">
+    <h1 class="text-xl font-bold text-foreground">🚀 Rising Creators</h1>
+  </div>
+  <p class="text-sm text-muted-foreground mb-6">Users gaining the most followers and engagement this week</p>
+
+  {% if creators %}
+  <div>
+    {% for item in creators %}
+    <div class="tu-card">
+      <span class="tu-rank {% if forloop.counter <= 3 %}top3{% endif %}">
+        {% if forloop.counter == 1 %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}{{ forloop.counter }}{% endif %}
+      </span>
+      <a href="{% url 'user_profile' item.user.username %}">
+        <div class="tu-avatar">
+          {% if item.user.profile.get_picture_url %}
+          <img src="{{ item.user.profile.get_picture_url }}" class="w-full h-full object-cover" loading="lazy" alt="">
+          {% else %}
+          <span class="text-base font-bold text-muted-foreground">{{ item.user.username|slice:":1"|upper }}</span>
+          {% endif %}
+        </div>
+      </a>
+      <div class="flex-1 min-w-0">
+        <a href="{% url 'user_profile' item.user.username %}" class="text-sm font-bold text-foreground hover:text-primary block truncate">
+          @{{ item.user.username }}
+          {% if item.user.profile.is_verified %}<span class="text-sky-500 text-xs ml-1">✓</span>{% endif %}
+        </a>
+        {% if item.user.profile.bio %}<p class="text-xs text-muted-foreground truncate mb-1">{{ item.user.profile.bio|truncatechars:55 }}</p>{% endif %}
+        <div class="flex items-center gap-2 mt-1">
+          {% if item.new_followers %}
+          <span class="stat-pill">📈 +{{ item.new_followers }} this week</span>
+          {% endif %}
+          {% if item.engagement %}
+          <span class="stat-pill">⚡ {{ item.engagement }} actions</span>
+          {% endif %}
+        </div>
+      </div>
+      {% if user.is_authenticated and not item.is_self %}
+      <button class="follow-btn {% if item.is_following %}following{% else %}follow{% endif %}"
+        data-username="{{ item.user.username }}"
+        onclick="toggleFollow(this)">
+        {% if item.is_following %}Following{% else %}Follow{% endif %}
+      </button>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="text-center py-20">
+    <div class="text-5xl mb-3">🌱</div>
+    <p class="font-semibold text-foreground mb-1">No trending data yet</p>
+    <p class="text-sm text-muted-foreground">Check back after more activity has been recorded this week.</p>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function getCookie(name) {
+  var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+  return v ? v[2] : '';
+}
+
+function toggleFollow(btn) {
+  var username = btn.dataset.username;
+  var isFollowing = btn.classList.contains('following');
+  btn.disabled = true;
+  btn.style.opacity = '0.6';
+
+  fetch('/api/users/follow/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: isFollowing ? 'unfollow' : 'follow', username: username })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    btn.disabled = false;
+    btn.style.opacity = '';
+    if (!d.success) return;
+    if (d.request_pending) {
+      btn.textContent = 'Requested';
+      btn.className = 'follow-btn following';
+    } else if (d.is_following) {
+      btn.textContent = 'Following';
+      btn.className = 'follow-btn following';
+    } else {
+      btn.textContent = 'Follow';
+      btn.className = 'follow-btn follow';
+    }
+  })
+  .catch(function() { btn.disabled = false; btn.style.opacity = ''; });
+}
+</script>
+{% endblock %}

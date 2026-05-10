@@ -191,6 +191,8 @@ urlpatterns = [
     path('close-friends/toggle/', views.toggle_close_friend, name='toggle_close_friend'),
     # People You May Know
     path('people-you-may-know/', views.people_you_may_know, name='people_you_may_know'),
+    # Trending / Rising Creators
+    path('trending-users/', views.trending_users, name='trending_users'),
     # Post audience
     path('posts/<str:post_id>/audience/', views.update_post_audience, name='update_post_audience'),
     # Profile highlights
