@@ -117,6 +117,9 @@
             </div>
             <input type="hidden" name="content" value="">
 
+            <!-- Live link preview while composing -->
+            <div id="compose-link-preview" class="hidden rounded-xl border border-border/70 bg-muted/30 overflow-hidden"></div>
+
             <div>
                 <label for="category" class="block text-sm font-medium text-foreground mb-2">Category</label>
                 <select id="category" name="category" required
@@ -503,6 +506,55 @@
 
     // Clear draft on successful submit
     askForm.addEventListener('submit', function() { localStorage.removeItem(DRAFT_KEY); });
+
+    // ── Live Link Preview while composing ─────────────────────────────────────
+    var _lpDebounce = null;
+    var _lpLastUrl = '';
+    var _lpContainer = document.getElementById('compose-link-preview');
+
+    function _escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function _extractUrl(text) {
+      var m = (text || '').match(/https?:\/\/[^\s<>"'{}|\\^`\[\]]{8,}/);
+      return m ? m[0] : null;
+    }
+
+    function _renderComposePreview(url, d) {
+      if (!d || !d.title) { _lpContainer.classList.add('hidden'); _lpContainer.innerHTML = ''; return; }
+      var host = '';
+      try { host = new URL(url).hostname.replace(/^www\./,''); } catch(e){}
+      _lpContainer.innerHTML =
+        '<div class="flex gap-3 p-3 items-start">' +
+        (d.image ? '<img src="'+_escHtml(d.image)+'" class="w-16 h-12 object-cover rounded-lg flex-shrink-0 bg-muted" loading="lazy" onerror="this.remove()">' : '') +
+        '<div class="min-w-0 flex-1">' +
+        (d.site_name||host ? '<p class="text-[10px] font-bold text-primary uppercase tracking-wide mb-0.5">'+_escHtml(d.site_name||host)+'</p>' : '') +
+        '<p class="text-sm font-semibold text-foreground line-clamp-1">'+_escHtml(d.title)+'</p>' +
+        (d.description ? '<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2">'+_escHtml(d.description)+'</p>' : '') +
+        '</div>' +
+        '<button type="button" onclick="document.getElementById(\'compose-link-preview\').classList.add(\'hidden\')" ' +
+        'class="flex-shrink-0 text-muted-foreground hover:text-foreground text-lg leading-none ml-1" title="Dismiss">×</button>' +
+        '</div>';
+      _lpContainer.classList.remove('hidden');
+    }
+
+    function _onTitleChange() {
+      var url = _extractUrl(titleInput.value);
+      if (!url || url === _lpLastUrl) return;
+      _lpLastUrl = url;
+      clearTimeout(_lpDebounce);
+      _lpDebounce = setTimeout(function() {
+        fetch('/link-preview/?url=' + encodeURIComponent(url))
+          .then(function(r){ return r.json(); })
+          .then(function(d){ _renderComposePreview(url, d); })
+          .catch(function(){});
+      }, 600);
+    }
+
+    titleInput.addEventListener('input', _onTitleChange);
+    titleInput.addEventListener('paste', function(){ setTimeout(_onTitleChange, 50); });
+    // ──────────────────────────────────────────────────────────────────────────
     // ──────────────────────────────────────────────────────────────────────────
 
     // Save Draft button — show scheduling input, then submit on second click

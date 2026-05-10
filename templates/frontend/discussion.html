@@ -154,20 +154,37 @@
         <div id="link-preview-container" class="mb-4 hidden"></div>
         <script>
         (function(){
-          var urls = Array.from(document.querySelectorAll('#post-content-display a[href]')).map(function(a){return a.href;}).filter(function(u){return u.startsWith('http');});
-          if (!urls.length) return;
-          fetch('/link-preview/?url=' + encodeURIComponent(urls[0])).then(function(r){return r.json();}).then(function(d){
-            if (!d.title) return;
-            var c = document.getElementById('link-preview-container');
-            c.innerHTML = '<a href="' + urls[0] + '" target="_blank" rel="noopener" class="flex gap-3 p-3 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 transition-colors no-underline">' +
-              (d.image ? '<img src="' + d.image + '" class="w-20 h-16 object-cover rounded-lg flex-shrink-0" loading="lazy">' : '') +
-              '<div class="min-w-0"><p class="text-sm font-semibold text-foreground line-clamp-1">' + (d.title||'') + '</p>' +
-              (d.description ? '<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2">' + d.description + '</p>' : '') +
-              (d.site_name ? '<p class="text-xs text-primary mt-1">' + d.site_name + '</p>' : '') +
-              '</div></a>';
-            c.classList.remove('hidden');
-          }).catch(function(){});
+          var text = (document.getElementById('post-content-display') || {}).textContent || '';
+          var titleText = (document.getElementById('post-title-display') || {}).textContent || '';
+          var combined = titleText + ' ' + text;
+          var found = combined.match(/https?:\/\/[^\s<>"'{}|\\^`\[\]]{8,}/g) || [];
+          var url = found.find(function(u){ return u.length < 500; });
+          if (!url) return;
+          fetch('/link-preview/?url=' + encodeURIComponent(url))
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+              if (!d.title) return;
+              var c = document.getElementById('link-preview-container');
+              c.innerHTML = renderLinkCard(url, d);
+              c.classList.remove('hidden');
+            }).catch(function(){});
         })();
+
+        function renderLinkCard(url, d) {
+          var host = '';
+          try { host = new URL(url).hostname.replace(/^www\./, ''); } catch(e) {}
+          return '<a href="' + escHtml(url) + '" target="_blank" rel="noopener noreferrer" ' +
+            'class="flex gap-3 p-3 rounded-xl border border-border/70 bg-muted/30 hover:bg-muted/50 transition-colors" style="text-decoration:none">' +
+            (d.image ? '<img src="' + escHtml(d.image) + '" class="w-20 h-16 object-cover rounded-lg flex-shrink-0 bg-muted" loading="lazy" onerror="this.remove()">' : '') +
+            '<div class="min-w-0 flex flex-col justify-center gap-0.5">' +
+            (d.site_name || host ? '<p class="text-[10px] font-semibold text-primary uppercase tracking-wide">' + escHtml(d.site_name || host) + '</p>' : '') +
+            '<p class="text-sm font-semibold text-foreground line-clamp-2 leading-snug">' + escHtml(d.title || url) + '</p>' +
+            (d.description ? '<p class="text-xs text-muted-foreground line-clamp-2 leading-relaxed">' + escHtml(d.description) + '</p>' : '') +
+            '</div></a>';
+        }
+        function escHtml(s) {
+          return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
         </script>
 
         <!-- Hashtags Section -->
