@@ -287,9 +287,32 @@ def _opposite_side(side):
     return 'no' if side == 'yes' else 'yes'
 
 
+PRE_JOIN_LIMIT = 5  # max participants per side while a debate is still pending
+
+
+def _pending_side_counts(debate):
+    rows = (DebateParticipant.objects
+            .filter(debate=debate, is_active=True)
+            .values('side').annotate(n=Count('id')))
+    counts = {r['side']: r['n'] for r in rows}
+    return counts.get('yes', 0), counts.get('no', 0)
+
+
+def _can_pre_join(yes_count, no_count, side):
+    """True when a new participant may join `side` on a pending debate.
+    Each side can be at most 1 ahead of the other, up to PRE_JOIN_LIMIT."""
+    my_count = yes_count if side == 'yes' else no_count
+    other_count = no_count if side == 'yes' else yes_count
+    return my_count <= other_count and my_count < PRE_JOIN_LIMIT
+
+
 def _debate_primary_sides(debate):
     if debate.poll_comment_id:
         return 'no', 'yes'  # initiator='no', target='yes' by convention for polls
+    if debate.review_comment_id:
+        _side_map = {'agree': 'yes', 'disagree': 'no'}
+        target_side = _side_map.get(debate.review_comment.side, 'yes')
+        return _opposite_side(target_side), target_side
     target_side = debate.comment.vote_type
     initiator_side = _opposite_side(target_side)
     return initiator_side, target_side
@@ -3453,9 +3476,35 @@ def _handle_start_review_debate(request, review_comment_id):
 
         return JsonResponse({'success': True, 'message': 'Joined debate!', 'redirect_url': f'/debates/{accepted_debate.id}/chat/'})
 
-    existing = Debate.objects.filter(review_comment=review_comment, initiator=request.user, target=target_user, status='pending').exists()
-    if existing:
-        return JsonResponse({'success': False, 'error': 'Debate request already sent.'})
+    # Check for an existing pending debate on this review comment
+    pending = Debate.objects.filter(review_comment=review_comment, status='pending').order_by('-created_at').first()
+    if pending:
+        # Initiator is already participant #1 — just return waiting state
+        if pending.initiator == request.user:
+            return JsonResponse({'success': True, 'waiting': True,
+                                 'message': 'Challenge already sent. Waiting for them to accept…',
+                                 'debate_id': pending.id})
+        # Already pre-joined
+        if DebateParticipant.objects.filter(debate=pending, user=request.user).exists():
+            return JsonResponse({'success': True, 'waiting': True,
+                                 'message': 'You already pre-joined. Waiting for the debate to start.',
+                                 'debate_id': pending.id})
+        # Try to pre-join
+        yes_pre, no_pre = _pending_side_counts(pending)
+        if not _can_pre_join(yes_pre, no_pre, desired_side):
+            my_count = yes_pre if desired_side == 'yes' else no_pre
+            if my_count >= PRE_JOIN_LIMIT:
+                return JsonResponse({'success': False,
+                                     'error': f'Your side is already full ({PRE_JOIN_LIMIT}/{PRE_JOIN_LIMIT} pre-joined).'})
+            return JsonResponse({'success': False,
+                                 'error': 'The other side needs to catch up first. Try again shortly.'})
+        DebateParticipant.objects.create(debate=pending, user=request.user, side=desired_side, is_active=True)
+        yes_pre2, no_pre2 = _pending_side_counts(pending)
+        return JsonResponse({'success': True, 'pre_joined': True,
+                             'message': 'Pre-joined! Waiting for the debate to start.',
+                             'debate_id': pending.id,
+                             'pre_join_yes': yes_pre2,
+                             'pre_join_no': no_pre2})
 
     debate = Debate.objects.create(
         id=str(uuid.uuid4()),
@@ -3464,7 +3513,10 @@ def _handle_start_review_debate(request, review_comment_id):
         target=target_user,
         status='pending',
     )
-    return JsonResponse({'success': True, 'message': 'Debate request sent!', 'debate_id': debate.id})
+    # Auto-add initiator as participant #1 on their side
+    DebateParticipant.objects.create(debate=debate, user=request.user, side=desired_side, is_active=True)
+    return JsonResponse({'success': True, 'message': 'Challenge sent! Others can now pre-join while you wait.',
+                         'debate_id': debate.id})
 
 
 def _handle_start_poll_debate(request, poll_comment_id):
@@ -3577,11 +3629,37 @@ def _handle_start_poll_debate(request, poll_comment_id):
         )
         return JsonResponse({'success': True, 'message': 'Debate restart request sent!', 'debate_id': reusable_completed.id})
 
-    existing = Debate.objects.filter(
-        poll_comment=poll_comment, initiator=request.user, target=target_user, status='pending'
-    ).exists()
-    if existing:
-        return JsonResponse({'success': False, 'error': 'Debate request already sent.'})
+    # Determine which side the requesting user is on (for poll debates, initiator='no')
+    initiator_desired_side = 'no'
+
+    # Check for an existing pending debate on this poll comment
+    pending = Debate.objects.filter(poll_comment=poll_comment, status='pending').order_by('-created_at').first()
+    if pending:
+        if pending.initiator == request.user:
+            return JsonResponse({'success': True, 'waiting': True,
+                                 'message': 'Challenge already sent. Waiting for them to accept…',
+                                 'debate_id': pending.id})
+        if DebateParticipant.objects.filter(debate=pending, user=request.user).exists():
+            return JsonResponse({'success': True, 'waiting': True,
+                                 'message': 'You already pre-joined. Waiting for the debate to start.',
+                                 'debate_id': pending.id})
+        # Side for pre-joiner: same as initiator_desired_side (no) unless they voted same as target
+        pre_join_side = 'yes' if user_vote.option_id == poll_comment.option_id else 'no'
+        yes_pre, no_pre = _pending_side_counts(pending)
+        if not _can_pre_join(yes_pre, no_pre, pre_join_side):
+            my_count = yes_pre if pre_join_side == 'yes' else no_pre
+            if my_count >= PRE_JOIN_LIMIT:
+                return JsonResponse({'success': False,
+                                     'error': f'Your side is already full ({PRE_JOIN_LIMIT}/{PRE_JOIN_LIMIT} pre-joined).'})
+            return JsonResponse({'success': False,
+                                 'error': 'The other side needs to catch up first. Try again shortly.'})
+        DebateParticipant.objects.create(debate=pending, user=request.user, side=pre_join_side, is_active=True)
+        yes_pre2, no_pre2 = _pending_side_counts(pending)
+        return JsonResponse({'success': True, 'pre_joined': True,
+                             'message': 'Pre-joined! Waiting for the debate to start.',
+                             'debate_id': pending.id,
+                             'pre_join_yes': yes_pre2,
+                             'pre_join_no': no_pre2})
 
     debate = Debate.objects.create(
         id=str(uuid.uuid4()),
@@ -3591,8 +3669,10 @@ def _handle_start_poll_debate(request, poll_comment_id):
         target=target_user,
         status='pending',
     )
-
-    return JsonResponse({'success': True, 'message': 'Debate request sent!', 'debate_id': debate.id})
+    # Auto-add initiator as participant #1 on their side
+    DebateParticipant.objects.create(debate=debate, user=request.user, side=initiator_desired_side, is_active=True)
+    return JsonResponse({'success': True, 'message': 'Challenge sent! Others can now pre-join while you wait.',
+                         'debate_id': debate.id})
 
 
 @login_required
@@ -3803,34 +3883,48 @@ def start_debate(request):
                 'redirect_url': f'/debates/{accepted_debate.id}/chat/'
             })
 
-        # Check if debate already exists
-        existing_debate = Debate.objects.filter(
-            comment=comment,
-            initiator=request.user,
-            target=target_user,
-            status='pending',
-        ).exists()
+        # Check for an existing pending debate on this comment (any initiator)
+        pending_debate = Debate.objects.filter(comment=comment, status='pending').order_by('-created_at').first()
+        if pending_debate:
+            # Initiator is already participant #1 — return waiting state
+            if pending_debate.initiator == request.user:
+                return JsonResponse({'success': True, 'waiting': True,
+                                     'message': 'Challenge already sent. Waiting for them to accept…',
+                                     'debate_id': pending_debate.id})
+            # Already pre-joined
+            if DebateParticipant.objects.filter(debate=pending_debate, user=request.user).exists():
+                return JsonResponse({'success': True, 'waiting': True,
+                                     'message': 'You already pre-joined. Waiting for the debate to start.',
+                                     'debate_id': pending_debate.id})
+            # Determine side for pre-joiner
+            if desired_side not in ('yes', 'no'):
+                return JsonResponse({'success': False,
+                                     'error': 'Please vote yes or no on the post before pre-joining.'}, status=400)
+            yes_pre, no_pre = _pending_side_counts(pending_debate)
+            if not _can_pre_join(yes_pre, no_pre, desired_side):
+                my_count = yes_pre if desired_side == 'yes' else no_pre
+                if my_count >= PRE_JOIN_LIMIT:
+                    return JsonResponse({'success': False,
+                                         'error': f'Your side is already full ({PRE_JOIN_LIMIT}/{PRE_JOIN_LIMIT} pre-joined).'})
+                return JsonResponse({'success': False,
+                                     'error': 'The other side needs to catch up first. Try again shortly.'})
+            DebateParticipant.objects.create(debate=pending_debate, user=request.user,
+                                             side=desired_side, is_active=True)
+            yes_pre2, no_pre2 = _pending_side_counts(pending_debate)
+            return JsonResponse({'success': True, 'pre_joined': True,
+                                 'message': 'Pre-joined! Waiting for the debate to start.',
+                                 'debate_id': pending_debate.id,
+                                 'pre_join_yes': yes_pre2,
+                                 'pre_join_no': no_pre2})
 
-        if existing_debate:
-            return JsonResponse({'success': False, 'error': 'Debate request already sent'})
-
+        # No existing pending debate — create one
         pending_for_target = Debate.objects.filter(target=target_user, status='pending')
-        category_pending_count = pending_for_target.filter(comment__vote_type=comment.vote_type).count()
         total_pending_count = pending_for_target.count()
-        side_label = 'YES' if comment.vote_type == 'yes' else 'NO'
-
-        if category_pending_count >= 5:
-            return JsonResponse({
-                'success': False,
-                'queued': True,
-                'error': f'You are in queue. {side_label} queue is full (5/5), commentor still not responding to existing requests.'
-            })
-
         if total_pending_count >= 10:
             return JsonResponse({
                 'success': False,
                 'queued': True,
-                'error': 'You are in queue. This user already has 10 pending requests, commentor still not responding to existing requests.'
+                'error': 'This user already has 10 open challenges. Please wait for them to respond.'
             })
 
         debate = Debate.objects.create(
@@ -3841,8 +3935,12 @@ def start_debate(request):
             target=target_user,
             status='pending'
         )
-
-        return JsonResponse({'success': True, 'message': 'Debate request sent!', 'debate_id': debate.id})
+        # Auto-add initiator as participant #1 on their side
+        DebateParticipant.objects.create(debate=debate, user=request.user,
+                                         side=desired_side or _opposite_side(comment.vote_type),
+                                         is_active=True)
+        return JsonResponse({'success': True, 'message': 'Challenge sent! Others can now pre-join while you wait.',
+                             'debate_id': debate.id})
     except Comment.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Comment not found'})
 
@@ -3928,10 +4026,13 @@ def accept_debate(request, debate_id):
             if limits_source:
                 yes_supporters, no_supporters = limits_source
             else:
+                yes_pre_req, no_pre_req = _pending_side_counts(debate)
                 return JsonResponse({
                     'success': False,
                     'requires_counts': True,
-                    'error': 'Please set participant limits for this debate first.'
+                    'error': 'Please set participant limits for this debate first.',
+                    'pre_join_yes': yes_pre_req,
+                    'pre_join_no': no_pre_req,
                 })
         else:
             if yes_supporters_raw == '' or no_supporters_raw == '':
@@ -3944,6 +4045,27 @@ def accept_debate(request, debate_id):
                 no_supporters = max(int(no_supporters_raw), 0)
             except ValueError:
                 return JsonResponse({'success': False, 'error': 'Participant counts must be valid numbers'})
+
+        # Enforce minimums from pre-joiners already in the debate
+        yes_pre, no_pre = _pending_side_counts(debate)
+        if yes_supporters > 0 and yes_supporters < yes_pre:
+            return JsonResponse({
+                'success': False,
+                'error': f'YES side already has {yes_pre} pre-joined participant(s). Limit cannot be below {yes_pre}.',
+                'pre_join_yes': yes_pre,
+                'pre_join_no': no_pre,
+            })
+        if no_supporters > 0 and no_supporters < no_pre:
+            return JsonResponse({
+                'success': False,
+                'error': f'NO side already has {no_pre} pre-joined participant(s). Limit cannot be below {no_pre}.',
+                'pre_join_yes': yes_pre,
+                'pre_join_no': no_pre,
+            })
+        # If acceptor didn't specify limits, auto-floor to at least the current counts
+        if yes_supporters == 0 and no_supporters == 0 and limits_source is None:
+            # Still requires the acceptor to set explicit limits — handled above
+            pass
 
         debate.status = 'accepted'
         debate.yes_supporters = yes_supporters
@@ -4797,14 +4919,21 @@ def increase_debate_limits(request, debate_id):
 @login_required
 @login_required
 def debate_status(request, debate_id):
-    """Lightweight endpoint polled by the initiator while waiting for acceptance."""
+    """Lightweight endpoint polled by pre-joiners while waiting for the debate to be accepted."""
     try:
-        debate = Debate.objects.only('id', 'status', 'initiator_id').get(id=debate_id, initiator=request.user)
+        debate = Debate.objects.only('id', 'status', 'initiator_id').get(id=debate_id)
+        # Any participant (not just initiator) may poll
+        if not DebateParticipant.objects.filter(debate=debate, user=request.user).exists():
+            return JsonResponse({'error': 'Not found'}, status=404)
     except Debate.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
     data = {'status': debate.status}
     if debate.status == 'accepted':
         data['redirect_url'] = f'/debates/{debate.id}/chat/'
+    elif debate.status == 'pending':
+        yes_pre, no_pre = _pending_side_counts(debate)
+        data['pre_join_yes'] = yes_pre
+        data['pre_join_no'] = no_pre
     return JsonResponse(data)
 
 

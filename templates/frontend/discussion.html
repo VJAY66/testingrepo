@@ -1231,10 +1231,11 @@ function startDebate(commentId, triggerEl) {
                 window.location.href = data.redirect_url;
                 return;
             }
-            // Request sent — show waiting indicator and start polling
-            showInlineActionPopup(triggerEl, data.message || 'Challenge sent! Waiting for them to accept…', 'success');
+            showInlineActionPopup(triggerEl, data.message || 'Challenge sent!', 'success');
             if (data.debate_id) {
-                _startDebateStatusPolling(data.debate_id, triggerEl);
+                var initialYes = data.pre_join_yes || null;
+                var initialNo  = data.pre_join_no  || null;
+                _startDebateStatusPolling(data.debate_id, triggerEl, initialYes, initialNo);
             }
         } else {
             showInlineActionPopup(triggerEl, data.error || 'Failed to start debate.', 'error');
@@ -1243,13 +1244,38 @@ function startDebate(commentId, triggerEl) {
     .catch(() => window.showToast('Failed to start debate.', 'error'));
 }
 
-function _startDebateStatusPolling(debateId, triggerEl) {
+function _startDebateStatusPolling(debateId, triggerEl, initYes, initNo) {
     if (_debatePollInterval) clearInterval(_debatePollInterval);
     var dots = 0;
-    var indicator = document.createElement('span');
+
+    // Remove any existing indicator
+    var old = document.getElementById('debate-waiting-indicator');
+    if (old) old.remove();
+
+    var indicator = document.createElement('div');
     indicator.id = 'debate-waiting-indicator';
-    indicator.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;background:hsl(var(--primary));color:hsl(var(--primary-foreground));padding:10px 16px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 4px 20px rgba(0,0,0,.2);';
-    indicator.textContent = '⏳ Waiting for opponent to accept…';
+    indicator.style.cssText = [
+        'position:fixed', 'bottom:20px', 'right:20px', 'z-index:9999',
+        'background:hsl(var(--primary))', 'color:hsl(var(--primary-foreground))',
+        'padding:12px 18px', 'border-radius:12px', 'font-size:13px', 'font-weight:700',
+        'box-shadow:0 4px 20px rgba(0,0,0,.25)', 'display:flex', 'flex-direction:column',
+        'gap:6px', 'min-width:220px'
+    ].join(';');
+
+    var titleEl = document.createElement('span');
+    titleEl.textContent = '⏳ Waiting for opponent to accept…';
+
+    var countsEl = document.createElement('span');
+    countsEl.style.cssText = 'font-size:11px;font-weight:600;opacity:.85;';
+    function _updateCounts(y, n) {
+        if (y !== null && n !== null) {
+            countsEl.textContent = '👥 Pre-joined — YES: ' + y + '/5  ·  NO: ' + n + '/5';
+        }
+    }
+    _updateCounts(initYes, initNo);
+
+    indicator.appendChild(titleEl);
+    indicator.appendChild(countsEl);
     document.body.appendChild(indicator);
 
     _debatePollInterval = setInterval(function() {
@@ -1258,21 +1284,25 @@ function _startDebateStatusPolling(debateId, triggerEl) {
         .then(function(d) {
             if (d.status === 'accepted' && d.redirect_url) {
                 clearInterval(_debatePollInterval);
-                indicator.textContent = '✅ Debate accepted! Entering arena…';
+                titleEl.textContent = '✅ Debate accepted! Entering arena…';
                 indicator.style.background = 'hsl(142 71% 45%)';
                 setTimeout(function() { window.location.href = d.redirect_url; }, 800);
             } else if (d.status === 'rejected') {
                 clearInterval(_debatePollInterval);
-                indicator.textContent = '❌ Challenge declined.';
+                titleEl.textContent = '❌ Challenge declined.';
                 indicator.style.background = 'hsl(346 77% 50%)';
                 setTimeout(function() { indicator.remove(); }, 3000);
             } else {
                 dots = (dots + 1) % 4;
-                indicator.textContent = '⏳ Waiting for opponent' + '.'.repeat(dots + 1);
+                titleEl.textContent = '⏳ Waiting for opponent' + '.'.repeat(dots + 1);
+                _updateCounts(
+                    d.pre_join_yes != null ? d.pre_join_yes : null,
+                    d.pre_join_no  != null ? d.pre_join_no  : null
+                );
             }
         })
         .catch(function() {});
-    }, 4000); // poll every 4 seconds
+    }, 4000);
 }
 
 function reportComment(commentId) {
