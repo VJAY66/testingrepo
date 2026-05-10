@@ -108,6 +108,10 @@ urlpatterns = [
     # User blocking
     path('block-user/', views.block_user, name='block_user'),
     path('unblock-user/', views.unblock_user, name='unblock_user'),
+    # User muting
+    path('mute-user/', views.mute_user, name='mute_user'),
+    path('unmute-user/', views.unmute_user, name='unmute_user'),
+    path('profile/muted/', views.muted_users_list, name='muted_users'),
     # Follow requests (private profiles)
     path('follow-requests/', views.follow_requests_list, name='follow_requests_list'),
     path('follow-requests/<int:req_id>/approve/', views.approve_follow_request, name='approve_follow_request'),

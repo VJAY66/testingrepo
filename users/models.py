@@ -167,6 +167,22 @@ class UserBlock(models.Model):
         ]
 
 
+class UserMute(models.Model):
+    """Soft hide — muted user's posts vanish from feeds but they can still follow/see you."""
+    muter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='muting')
+    muted = models.ForeignKey(User, on_delete=models.CASCADE, related_name='muted_by')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.muter.username} muted {self.muted.username}"
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['muter', 'muted'], name='unique_user_mute'),
+        ]
+
+
 class SaveCollection(models.Model):
     """Named collection of saved posts, owned by a user."""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='save_collections')

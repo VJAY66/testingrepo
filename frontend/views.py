@@ -23,7 +23,7 @@ import uuid
 
 from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest, PostReport, LiveDebateRoom, LiveDebateMessage, LiveDebateVote, PollPrediction
 from discussions.signals import notify_post_author
-from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription, UserBan, ProfileView, FollowRequest
+from users.models import Follow, UserBlock, UserMute, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription, UserBan, ProfileView, FollowRequest
 from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
 from utils.moderation import check_content_moderation
@@ -1035,6 +1035,13 @@ def _blocked_user_ids(user):
     return blocked | blocking_me
 
 
+def _muted_user_ids(user):
+    """Return set of user IDs muted by the current user (posts hidden from feeds, one-way)."""
+    if not user.is_authenticated:
+        return set()
+    return set(UserMute.objects.filter(muter=user).values_list('muted_id', flat=True))
+
+
 def index(request):
     """Home page with trending posts and categories"""
     active_category = request.GET.get('category', '').strip()
@@ -1042,8 +1049,10 @@ def index(request):
     if active_category:
         annotated_posts = annotated_posts.filter(category=active_category)
     blocked_ids = _blocked_user_ids(request.user)
-    if blocked_ids:
-        annotated_posts = annotated_posts.exclude(user_id__in=blocked_ids)
+    muted_ids = _muted_user_ids(request.user)
+    exclude_ids = blocked_ids | muted_ids
+    if exclude_ids:
+        annotated_posts = annotated_posts.exclude(user_id__in=exclude_ids)
     trending_posts = annotated_posts.order_by(
         '-like_count',
         '-comment_count',
@@ -1086,8 +1095,10 @@ def suggested(request):
         ).distinct()
 
     blocked_ids = _blocked_user_ids(request.user)
-    if blocked_ids:
-        annotated_posts = annotated_posts.exclude(user_id__in=blocked_ids)
+    muted_ids = _muted_user_ids(request.user)
+    exclude_ids = blocked_ids | muted_ids
+    if exclude_ids:
+        annotated_posts = annotated_posts.exclude(user_id__in=exclude_ids)
 
     ordered_posts = _build_suggested_posts_for_user(request.user, annotated_posts)
 
@@ -1824,11 +1835,13 @@ def user_profile(request, username):
     # Check if current user is following this user
     is_following = False
     is_blocked = False
+    is_muted = False
     request_pending = False
     is_private = bool(profile_obj and profile_obj.is_private)
     if request.user.is_authenticated:
         is_following = Follow.objects.filter(follower=request.user, following=profile_user).exists()
         is_blocked = UserBlock.objects.filter(blocker=request.user, blocked=profile_user).exists()
+        is_muted = UserMute.objects.filter(muter=request.user, muted=profile_user).exists()
         if is_private and not is_following and request.user != profile_user:
             request_pending = FollowRequest.objects.filter(
                 from_user=request.user, to_user=profile_user, status='pending'
@@ -1958,6 +1971,7 @@ def user_profile(request, username):
         'can_see_content': can_see_content,
         'request_pending': request_pending,
         'is_blocked': is_blocked,
+        'is_muted': is_muted,
         'profile_bio': profile_obj.bio if profile_obj else '',
         'profile_website': profile_obj.website if profile_obj else '',
         'debate_participations_count': DebateParticipant.objects.filter(user=profile_user).count(),
@@ -6372,6 +6386,38 @@ def unblock_user(request):
     return JsonResponse({'success': True, 'blocked': False, 'removed': deleted > 0})
 
 
+# ─── Mute / Unmute User ───────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def mute_user(request):
+    username = request.POST.get('username', '').strip()
+    if not username:
+        return JsonResponse({'success': False, 'error': 'Username required.'}, status=400)
+    if username == request.user.username:
+        return JsonResponse({'success': False, 'error': 'You cannot mute yourself.'}, status=400)
+    target = get_object_or_404(User, username=username)
+    _, created = UserMute.objects.get_or_create(muter=request.user, muted=target)
+    return JsonResponse({'success': True, 'muted': True, 'created': created})
+
+
+@login_required
+@require_POST
+def unmute_user(request):
+    username = request.POST.get('username', '').strip()
+    if not username:
+        return JsonResponse({'success': False, 'error': 'Username required.'}, status=400)
+    target = get_object_or_404(User, username=username)
+    deleted, _ = UserMute.objects.filter(muter=request.user, muted=target).delete()
+    return JsonResponse({'success': True, 'muted': False, 'removed': deleted > 0})
+
+
+@login_required
+def muted_users_list(request):
+    mutes = UserMute.objects.filter(muter=request.user).select_related('muted', 'muted__profile').order_by('-created_at')
+    return render(request, 'frontend/muted_users.html', {'mutes': mutes})
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Profile Bio / Website Update
 # ─────────────────────────────────────────────────────────────────────────────
@@ -7329,7 +7375,9 @@ def following_feed(request):
     """Chronological feed of posts from people the current user follows."""
     following_ids = list(Follow.objects.filter(follower=request.user).values_list('following_id', flat=True))
     blocked_ids = _blocked_user_ids(request.user)
-    safe_following = [uid for uid in following_ids if uid not in blocked_ids]
+    muted_ids = _muted_user_ids(request.user)
+    excluded = blocked_ids | muted_ids
+    safe_following = [uid for uid in following_ids if uid not in excluded]
 
     base_qs = _annotated_feed_posts_queryset().filter(
         user_id__in=safe_following,
@@ -7374,8 +7422,10 @@ def explore(request):
         following_ids = list(Follow.objects.filter(follower=request.user).values_list('following_id', flat=True))
         base_qs = base_qs.exclude(user_id__in=following_ids).exclude(user=request.user)
         blocked_ids = _blocked_user_ids(request.user)
-        if blocked_ids:
-            base_qs = base_qs.exclude(user_id__in=blocked_ids)
+        muted_ids = _muted_user_ids(request.user)
+        exclude_ids = blocked_ids | muted_ids
+        if exclude_ids:
+            base_qs = base_qs.exclude(user_id__in=exclude_ids)
 
     if category_filter:
         base_qs = base_qs.filter(category=category_filter)

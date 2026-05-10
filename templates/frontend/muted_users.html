@@ -1,0 +1,67 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Muted Users — PickASide{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6 space-y-4">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold text-foreground">Muted Users</h1>
+    <a href="{% url 'profile' %}" class="text-sm text-muted-foreground hover:text-primary">← Back to profile</a>
+  </div>
+  <p class="text-sm text-muted-foreground">Muted users' posts are hidden from your feeds. They can still follow you and see your posts — they won't know you muted them.</p>
+
+  {% if mutes %}
+  <div class="space-y-3" id="muted-list">
+    {% for mute in mutes %}
+    <div class="bg-card border border-border rounded-2xl p-4 flex items-center gap-3" id="mute-row-{{ mute.muted.username }}">
+      <a href="{% url 'user_profile' mute.muted.username %}" class="flex-shrink-0">
+        {% if mute.muted.profile.get_picture_url %}
+        <img src="{{ mute.muted.profile.get_picture_url }}" class="w-10 h-10 rounded-full object-cover border border-border">
+        {% else %}
+        <div class="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-primary font-bold text-sm">{{ mute.muted.username|first|upper }}</div>
+        {% endif %}
+      </a>
+      <div class="flex-1 min-w-0">
+        <a href="{% url 'user_profile' mute.muted.username %}" class="font-semibold text-sm text-foreground hover:text-primary">@{{ mute.muted.username }}</a>
+        {% if mute.muted.profile.bio %}<p class="text-xs text-muted-foreground truncate">{{ mute.muted.profile.bio|truncatechars:60 }}</p>{% endif %}
+        <p class="text-xs text-muted-foreground">Muted {{ mute.created_at|date:"M j, Y" }}</p>
+      </div>
+      <button onclick="unmuteUser('{{ mute.muted.username }}', this)"
+              class="px-3 py-1.5 rounded-xl border border-border text-xs font-semibold text-muted-foreground hover:border-slate-400 hover:text-slate-600 transition">
+        Unmute
+      </button>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-16 text-muted-foreground">
+    <span class="text-4xl">🔇</span>
+    <p class="mt-4 font-semibold">No muted users</p>
+    <p class="text-sm mt-1">Mute someone from their profile to hide their posts from your feeds.</p>
+  </div>
+  {% endif %}
+</div>
+<script>
+function getCookie(name) {
+  var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+  return v ? v[2] : '';
+}
+function unmuteUser(username, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Unmuting…';
+  fetch('/unmute-user/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'username=' + encodeURIComponent(username)
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.success) {
+      var row = document.getElementById('mute-row-' + username);
+      if (row) row.remove();
+      var list = document.getElementById('muted-list');
+      if (list && !list.children.length) location.reload();
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'Unmute';
+    }
+  }).catch(function(){ btn.disabled = false; btn.textContent = 'Unmute'; });
+}
+</script>
+{% endblock %}
