@@ -1213,6 +1213,8 @@ function showInlineActionPopup(triggerEl, message, tone = 'success') {
     }, 2200);
 }
 
+var _debatePollInterval = null;
+
 function startDebate(commentId, triggerEl) {
     fetch('{% url "start_debate" %}', {
         method: 'POST',
@@ -1225,16 +1227,52 @@ function startDebate(commentId, triggerEl) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showInlineActionPopup(triggerEl, data.message || 'Debate request sent successfully!', 'success');
             if (data.redirect_url) {
                 window.location.href = data.redirect_url;
                 return;
+            }
+            // Request sent — show waiting indicator and start polling
+            showInlineActionPopup(triggerEl, data.message || 'Challenge sent! Waiting for them to accept…', 'success');
+            if (data.debate_id) {
+                _startDebateStatusPolling(data.debate_id, triggerEl);
             }
         } else {
             showInlineActionPopup(triggerEl, data.error || 'Failed to start debate.', 'error');
         }
     })
     .catch(() => window.showToast('Failed to start debate.', 'error'));
+}
+
+function _startDebateStatusPolling(debateId, triggerEl) {
+    if (_debatePollInterval) clearInterval(_debatePollInterval);
+    var dots = 0;
+    var indicator = document.createElement('span');
+    indicator.id = 'debate-waiting-indicator';
+    indicator.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;background:hsl(var(--primary));color:hsl(var(--primary-foreground));padding:10px 16px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 4px 20px rgba(0,0,0,.2);';
+    indicator.textContent = '⏳ Waiting for opponent to accept…';
+    document.body.appendChild(indicator);
+
+    _debatePollInterval = setInterval(function() {
+        fetch('/debates/' + debateId + '/status/')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.status === 'accepted' && d.redirect_url) {
+                clearInterval(_debatePollInterval);
+                indicator.textContent = '✅ Debate accepted! Entering arena…';
+                indicator.style.background = 'hsl(142 71% 45%)';
+                setTimeout(function() { window.location.href = d.redirect_url; }, 800);
+            } else if (d.status === 'rejected') {
+                clearInterval(_debatePollInterval);
+                indicator.textContent = '❌ Challenge declined.';
+                indicator.style.background = 'hsl(346 77% 50%)';
+                setTimeout(function() { indicator.remove(); }, 3000);
+            } else {
+                dots = (dots + 1) % 4;
+                indicator.textContent = '⏳ Waiting for opponent' + '.'.repeat(dots + 1);
+            }
+        })
+        .catch(function() {});
+    }, 4000); // poll every 4 seconds
 }
 
 function reportComment(commentId) {

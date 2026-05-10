@@ -135,6 +135,25 @@ CELERY_TIMEZONE = os.getenv('TIME_ZONE', 'UTC')
 CELERY_TASK_ALWAYS_EAGER = _env_bool('CELERY_TASK_ALWAYS_EAGER', default=True)  # runs synchronously unless Redis available
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    # Publish scheduled posts every minute
+    'publish-scheduled-posts': {
+        'task': 'frontend.tasks.publish_scheduled_posts',
+        'schedule': 60.0,  # every 60 seconds
+    },
+    # Weekly digest every Monday at 9 AM UTC
+    'send-weekly-digest': {
+        'task': 'frontend.tasks.send_weekly_digest',
+        'schedule': crontab(hour=9, minute=0, day_of_week=1),
+    },
+    # Hard-delete accounts requested for deletion 30+ days ago — daily at 3 AM
+    'cleanup-deleted-accounts': {
+        'task': 'frontend.tasks.cleanup_deleted_accounts',
+        'schedule': crontab(hour=3, minute=0),
+    },
+}
+
 # Elasticsearch
 ELASTICSEARCH_URL = os.getenv('ELASTICSEARCH_URL', '')  # empty = disabled, fall back to DB search
 ELASTICSEARCH_INDEX_PREFIX = os.getenv('ELASTICSEARCH_INDEX_PREFIX', 'pickside')

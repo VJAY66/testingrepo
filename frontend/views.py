@@ -3457,14 +3457,14 @@ def _handle_start_review_debate(request, review_comment_id):
     if existing:
         return JsonResponse({'success': False, 'error': 'Debate request already sent.'})
 
-    Debate.objects.create(
+    debate = Debate.objects.create(
         id=str(uuid.uuid4()),
         review_comment=review_comment,
         initiator=request.user,
         target=target_user,
         status='pending',
     )
-    return JsonResponse({'success': True, 'message': 'Debate request sent!'})
+    return JsonResponse({'success': True, 'message': 'Debate request sent!', 'debate_id': debate.id})
 
 
 def _handle_start_poll_debate(request, poll_comment_id):
@@ -3575,7 +3575,7 @@ def _handle_start_poll_debate(request, poll_comment_id):
             content=f"{request.user.username} requested to restart the poll debate.",
             is_system=True,
         )
-        return JsonResponse({'success': True, 'message': 'Debate restart request sent!'})
+        return JsonResponse({'success': True, 'message': 'Debate restart request sent!', 'debate_id': reusable_completed.id})
 
     existing = Debate.objects.filter(
         poll_comment=poll_comment, initiator=request.user, target=target_user, status='pending'
@@ -3583,7 +3583,7 @@ def _handle_start_poll_debate(request, poll_comment_id):
     if existing:
         return JsonResponse({'success': False, 'error': 'Debate request already sent.'})
 
-    Debate.objects.create(
+    debate = Debate.objects.create(
         id=str(uuid.uuid4()),
         poll_comment=poll_comment,
         poll=poll,
@@ -3592,7 +3592,7 @@ def _handle_start_poll_debate(request, poll_comment_id):
         status='pending',
     )
 
-    return JsonResponse({'success': True, 'message': 'Debate request sent!'})
+    return JsonResponse({'success': True, 'message': 'Debate request sent!', 'debate_id': debate.id})
 
 
 @login_required
@@ -3697,7 +3697,7 @@ def start_debate(request):
                 is_system=True,
             )
 
-            return JsonResponse({'success': True, 'message': 'Debate restart request sent!'})
+            return JsonResponse({'success': True, 'message': 'Debate restart request sent!', 'debate_id': reusable_completed.id})
 
         if accepted_debate:
             _ensure_debate_core_participants(accepted_debate)
@@ -3833,7 +3833,7 @@ def start_debate(request):
                 'error': 'You are in queue. This user already has 10 pending requests, commentor still not responding to existing requests.'
             })
 
-        Debate.objects.create(
+        debate = Debate.objects.create(
             id=str(uuid.uuid4()),
             comment=comment,
             post=comment.post,
@@ -3842,7 +3842,7 @@ def start_debate(request):
             status='pending'
         )
 
-        return JsonResponse({'success': True, 'message': 'Debate request sent!'})
+        return JsonResponse({'success': True, 'message': 'Debate request sent!', 'debate_id': debate.id})
     except Comment.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Comment not found'})
 
@@ -4795,6 +4795,19 @@ def increase_debate_limits(request, debate_id):
 
 
 @login_required
+@login_required
+def debate_status(request, debate_id):
+    """Lightweight endpoint polled by the initiator while waiting for acceptance."""
+    try:
+        debate = Debate.objects.only('id', 'status', 'initiator_id').get(id=debate_id, initiator=request.user)
+    except Debate.DoesNotExist:
+        return JsonResponse({'error': 'Not found'}, status=404)
+    data = {'status': debate.status}
+    if debate.status == 'accepted':
+        data['redirect_url'] = f'/debates/{debate.id}/chat/'
+    return JsonResponse(data)
+
+
 def debate_info(request, debate_id):
     """Return debate metadata as JSON for the floating chat manager"""
     debate = get_object_or_404(
@@ -7168,19 +7181,35 @@ def _get_trending_hashtags(limit=10):
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
+
     from datetime import timedelta as _timedelta
-    from collections import Counter
-    cutoff = timezone.now() - _timedelta(hours=24)
-    all_tags = []
-    for model, field in [(Post, 'hashtags'), (Poll, 'hashtags')]:
-        for obj in model.objects.filter(created_at__gte=cutoff).values_list(field, flat=True):
-            if obj:
-                all_tags.extend(
-                    t.strip().lstrip('#') for t in str(obj).replace(',', ' ').split() if t.strip()
-                )
-    top = [{'tag': tag, 'count': count} for tag, count in Counter(all_tags).most_common(limit) if tag]
-    cache.set(cache_key, top, 900)  # 15 min cache
-    return top
+    from collections import defaultdict
+
+    now = timezone.now()
+    # Three time windows with decaying weights: most recent activity scores highest
+    windows = [
+        (now - _timedelta(hours=2),  now,                              4.0),
+        (now - _timedelta(hours=6),  now - _timedelta(hours=2),        2.0),
+        (now - _timedelta(hours=24), now - _timedelta(hours=6),        1.0),
+    ]
+
+    scores = defaultdict(float)
+    for start, end, weight in windows:
+        for model, field in [(Post, 'hashtags'), (Poll, 'hashtags')]:
+            for raw in model.objects.filter(
+                created_at__gte=start, created_at__lt=end
+            ).values_list(field, flat=True):
+                if not raw:
+                    continue
+                for token in str(raw).replace(',', ' ').split():
+                    tag = token.strip().lstrip('#').lower()
+                    if tag:
+                        scores[tag] += weight
+
+    top = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:limit]
+    result = [{'tag': tag, 'count': round(score)} for tag, score in top if tag]
+    cache.set(cache_key, result, 900)  # 15 min cache
+    return result
 
 
 def _get_rising_creators(limit=20):
