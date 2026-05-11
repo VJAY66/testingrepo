@@ -138,6 +138,37 @@
   </div>
   {% endif %}
 
+  {% if stories_bar %}
+  <!-- Stories bar -->
+  <div class="mb-5">
+    <div class="flex gap-3 overflow-x-auto pb-1" style="scrollbar-width:none;-webkit-overflow-scrolling:touch">
+      {% if user.is_authenticated %}
+      <a href="{% url 'create_story' %}" class="flex flex-col items-center gap-1 flex-shrink-0 group" title="Add your story">
+        <div class="w-14 h-14 rounded-full border-2 border-dashed border-primary/40 bg-primary/5 flex items-center justify-center group-hover:border-primary group-hover:bg-primary/10 transition-colors">
+          <span class="text-xl text-primary">+</span>
+        </div>
+        <span class="text-[10px] text-muted-foreground font-medium truncate max-w-[56px]">Your story</span>
+      </a>
+      {% endif %}
+      {% for story in stories_bar %}
+      <button type="button" onclick="openStory({{ story.id }})" class="flex flex-col items-center gap-1 flex-shrink-0 group" title="{{ story.user.username }}'s story">
+        <div class="w-14 h-14 rounded-full p-0.5 {% if story.viewer_has_seen %}bg-muted{% else %}bg-gradient-to-tr from-primary to-cyan-400{% endif %}">
+          <div class="w-full h-full rounded-full {% if story.image %}overflow-hidden{% else %}flex items-center justify-center{% endif %} bg-card border border-background"
+               style="{% if not story.image %}background:{{ story.bg_color }};{% endif %}">
+            {% if story.image %}
+            <img src="{{ story.image.url }}" alt="{{ story.user.username }}" class="w-full h-full object-cover rounded-full">
+            {% else %}
+            <span class="text-white font-bold text-base">{{ story.user.username|first|upper }}</span>
+            {% endif %}
+          </div>
+        </div>
+        <span class="text-[10px] {% if story.viewer_has_seen %}text-muted-foreground{% else %}text-foreground font-semibold{% endif %} truncate max-w-[56px]">{{ story.user.username }}</span>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
         {% if user.is_authenticated %}
         <div id="what-you-missed-banner" class="hidden rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-2">
           <div class="flex items-center justify-between">
@@ -1527,5 +1558,45 @@ function clearQuote() {
     }).catch(function(){});
 })();
 {% endif %}
+
+// ── Story viewer ─────────────────────────────────────────────────────────────
+function openStory(storyId) {
+  fetch('/stories/' + storyId + '/')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.error) { alert(d.error); return; }
+      var overlay = document.getElementById('story-overlay');
+      if (!overlay) return;
+      var bg = document.getElementById('story-bg');
+      var img = document.getElementById('story-img');
+      var txt = document.getElementById('story-text');
+      var usr = document.getElementById('story-username');
+      if (bg)  bg.style.background = d.image_url ? '#000' : d.bg_color;
+      if (img) { img.src = d.image_url; img.style.display = d.image_url ? 'block' : 'none'; }
+      if (txt) { txt.textContent = d.content; txt.style.display = d.content ? 'block' : 'none'; }
+      if (usr) usr.textContent = '@' + d.user;
+      overlay.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    });
+}
+function closeStory() {
+  var overlay = document.getElementById('story-overlay');
+  if (overlay) overlay.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeStory(); });
 </script>
+
+<!-- Story viewer overlay -->
+<div id="story-overlay" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-black/85">
+  <div id="story-bg" class="relative w-full max-w-sm mx-auto rounded-2xl overflow-hidden" style="aspect-ratio:9/16;max-height:90vh">
+    <img id="story-img" src="" alt="" class="absolute inset-0 w-full h-full object-cover hidden">
+    <div id="story-text" class="absolute inset-0 flex items-center justify-center p-6 text-white text-xl font-bold text-center leading-snug hidden" style="text-shadow:0 2px 8px rgba(0,0,0,0.5)"></div>
+    <div class="absolute top-0 inset-x-0 p-3 flex items-center justify-between bg-gradient-to-b from-black/50 to-transparent">
+      <span id="story-username" class="text-white text-sm font-semibold"></span>
+      <button onclick="closeStory()" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}

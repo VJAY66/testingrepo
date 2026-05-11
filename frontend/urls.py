@@ -298,4 +298,6 @@ urlpatterns = [
     path('lists/<str:list_id>/add-member/', views.add_list_member, name='add_list_member'),
     path('lists/<str:list_id>/remove-member/', views.remove_list_member, name='remove_list_member'),
     path('lists/add-from-profile/', views.add_to_list_from_profile, name='add_to_list_from_profile'),
+    # My Reminders
+    path('reminders/', views.my_reminders, name='my_reminders'),
 ]

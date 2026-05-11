@@ -84,6 +84,14 @@
                         {% if post.is_anonymous %}<span class="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full font-semibold">posted anonymously</span>{% endif %}
                     </p>
                     <p class="text-sm text-muted-foreground">{{ post.created_at|date:"M j, Y g:i A" }}</p>
+                    {% if accepted_coauthors %}
+                    <p class="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 flex-wrap">
+                        <span>with</span>
+                        {% for ca in accepted_coauthors %}
+                        <a href="{% url 'user_profile' ca.user.username %}" class="text-primary font-medium hover:underline">@{{ ca.user.username }}</a>{% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    </p>
+                    {% endif %}
                 </div>
                 {% endif %}
             </div>

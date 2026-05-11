@@ -1110,6 +1110,26 @@ def index(request):
     _enrich_posts_for_feed(posts, request.user)
     posts = _filter_muted_posts(posts, request.user)
 
+    # Stories bar: active (non-expired) stories from followed users + own
+    stories_bar = []
+    if request.user.is_authenticated:
+        following_ids = list(
+            Follow.objects.filter(follower=request.user).values_list('following_id', flat=True)
+        )
+        story_user_ids = following_ids + [request.user.id]
+        now_ts = timezone.now()
+        stories_bar = list(
+            Story.objects.filter(user_id__in=story_user_ids, expires_at__gt=now_ts)
+            .select_related('user')
+            .order_by('-created_at')[:30]
+        )
+        viewed_ids = set(
+            StoryView.objects.filter(viewer=request.user, story__in=stories_bar)
+            .values_list('story_id', flat=True)
+        )
+        for s in stories_bar:
+            s.viewer_has_seen = s.id in viewed_ids
+
     context = {
         'posts': posts,
         'page_obj': page_obj,
@@ -1121,6 +1141,7 @@ def index(request):
         'trending_sidebar': _get_trending_hashtags(),
         'rising_creators': _get_rising_creators(limit=5),
         'user_followed_tags': user_followed_tags,
+        'stories_bar': stories_bar,
     }
     return render(request, 'frontend/index.html', context)
 
@@ -1480,8 +1501,16 @@ def discussion(request, post_id):
         and _PR.objects.filter(user=request.user, post=post, is_sent=False).exists()
     )
 
+    # Accepted co-authors for display
+    from discussions.models import PostCoAuthor as _PCADisc
+    accepted_coauthors = list(
+        _PCADisc.objects.filter(post=post, accepted=True)
+        .select_related('user').order_by('created_at')
+    )
+
     context = {
         'post': post,
+        'accepted_coauthors': accepted_coauthors,
         'post_display_content': _render_markdown(_normalize_post_content(post.content)),
         'yes_comments': yes_comments,
         'no_comments': no_comments,
@@ -2015,12 +2044,22 @@ def user_profile(request, username):
     _debate_draws = _dp_qs.filter(debate__outcome='draw').values('debate_id').distinct().count()
     _debate_losses = max(0, _debate_played - _debate_wins - _debate_draws)
 
+    # Public series for this profile
+    public_user_series = []
+    if can_see_content:
+        public_user_series = list(
+            PostSeries.objects.filter(user=profile_user)
+            .annotate(post_count=Count('items'))
+            .order_by('-created_at')
+        )
+
     context = {
         'profile_user': profile_user,
         'user_posts': user_posts if can_see_content else [],
         'user_reviews': user_reviews if can_see_content else [],
         'user_questions': user_questions if can_see_content else [],
         'user_polls': user_polls if can_see_content else [],
+        'user_series': public_user_series,
         'pinned_posts': list(Post.objects.filter(user=profile_user, is_pinned=True, is_draft=False).order_by('-updated_at')[:3]) if can_see_content else [],
         'avatar_url': avatar_url,
         'is_online': is_online,
@@ -2851,6 +2890,18 @@ def my_interests(request):
         'followed_categories': followed_categories,
         'all_categories': all_categories,
     })
+
+
+@login_required
+def my_reminders(request):
+    """Show all pending (unsent) post reminders for the logged-in user."""
+    from discussions.models import PostReminder as _RemView
+    reminders = list(
+        _RemView.objects.filter(user=request.user, is_sent=False)
+        .select_related('post', 'post__user')
+        .order_by('remind_at')
+    )
+    return render(request, 'frontend/my_reminders.html', {'reminders': reminders})
 
 
 @login_required
