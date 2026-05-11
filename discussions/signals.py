@@ -6,6 +6,15 @@ from django.conf import settings
 from .models import Comment, Notification, PostFollow
 
 
+def _push(user, title, body, url=''):
+    """Fire-and-forget web push; imports lazily to avoid circular imports."""
+    try:
+        from frontend.views import _send_web_push
+        _send_web_push(user, title, body, url)
+    except Exception:
+        pass
+
+
 def _email_post_author(post, actor_user):
     """Send a one-time email to the post author when they get their first comment."""
     author = post.user
@@ -79,17 +88,20 @@ def notify_post_author(post, notification_type, actor_user):
     ).order_by('created_at')
 
     first_notif = existing_qs.first()
+    site_url = getattr(settings, 'SITE_URL', '')
 
     if first_notif is None:
         # Very first event — notify immediately
+        msg = _AUTHOR_FIRST_MESSAGES[notification_type](actor_user)
         Notification.objects.create(
             user=post.user,
             post=post,
             notification_type=notification_type,
-            message=_AUTHOR_FIRST_MESSAGES[notification_type](actor_user),
+            message=msg,
             count=1,
             actors=[actor_user.username],
         )
+        _push(post.user, 'PickASide', msg, f'{site_url}/discussion/{post.id}/')
         if notification_type == 'author_comment':
             _email_post_author(post, actor_user)
         return
@@ -100,14 +112,16 @@ def notify_post_author(post, notification_type, actor_user):
 
     if time_since_last >= batch_window:
         # Batch window expired — start a fresh notification
+        msg = _AUTHOR_FIRST_MESSAGES[notification_type](actor_user)
         Notification.objects.create(
             user=post.user,
             post=post,
             notification_type=notification_type,
-            message=_AUTHOR_FIRST_MESSAGES[notification_type](actor_user),
+            message=msg,
             count=1,
             actors=[actor_user.username],
         )
+        _push(post.user, 'PickASide', msg, f'{site_url}/discussion/{post.id}/')
     else:
         # Still within the window — increment the existing batch counter
         actors_list = list(last_notif.actors or [])
@@ -146,9 +160,11 @@ def notify_post_followers(sender, instance, created, **kwargs):
         ).count()
 
         if comments_since_follow > 0 and comments_since_follow % 5 == 0:
+            follower_msg = f'{comments_since_follow} new comments on "{post.title}" since you followed it.'
             Notification.objects.create(
                 user=follow.user,
                 post=post,
                 notification_type='post_activity',
-                message=f'{comments_since_follow} new comments on "{post.title}" since you followed it.'
+                message=follower_msg,
             )
+            _push(follow.user, 'PickASide', follower_msg, f'{getattr(settings, "SITE_URL", "")}/discussion/{post.id}/')

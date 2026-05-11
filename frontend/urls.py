@@ -303,4 +303,9 @@ urlpatterns = [
     # Edit history
     path('posts/<str:post_id>/edit-history/', views.post_edit_history, name='post_edit_history'),
     path('comments/<str:comment_id>/edit-history/', views.comment_edit_history, name='comment_edit_history'),
+    # Login activity log
+    path('account/login-activity/', views.login_activity, name='login_activity'),
+    # Active sessions
+    path('account/sessions/', views.active_sessions, name='active_sessions'),
+    path('account/sessions/revoke/', views.revoke_session, name='revoke_session'),
 ]

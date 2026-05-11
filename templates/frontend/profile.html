@@ -1367,6 +1367,24 @@
         {% endif %}
     </div>
 
+    <!-- Login Activity -->
+    <div class="mt-4 rounded-2xl border border-border/70 bg-card p-4">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-bold">Login Activity</h3>
+          <a href="{% url 'login_activity' %}" class="text-xs text-muted-foreground hover:text-primary transition">View →</a>
+        </div>
+        <p class="text-xs text-muted-foreground">Review recent sign-in attempts to spot unauthorized access.</p>
+    </div>
+
+    <!-- Active Sessions -->
+    <div class="mt-4 rounded-2xl border border-border/70 bg-card p-4">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-bold">Active Sessions</h3>
+          <a href="{% url 'active_sessions' %}" class="text-xs text-muted-foreground hover:text-primary transition">Manage →</a>
+        </div>
+        <p class="text-xs text-muted-foreground">See and revoke all devices currently signed into your account.</p>
+    </div>
+
     <!-- Export My Data -->
     <div class="mt-4 rounded-2xl border border-border/70 bg-card p-4">
         <div class="flex items-center justify-between mb-2">
