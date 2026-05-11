@@ -2021,7 +2021,7 @@ def user_profile(request, username):
         'user_reviews': user_reviews if can_see_content else [],
         'user_questions': user_questions if can_see_content else [],
         'user_polls': user_polls if can_see_content else [],
-        'pinned_post': Post.objects.filter(user=profile_user, is_pinned=True, is_draft=False).first() if can_see_content else None,
+        'pinned_posts': list(Post.objects.filter(user=profile_user, is_pinned=True, is_draft=False).order_by('-updated_at')[:3]) if can_see_content else [],
         'avatar_url': avatar_url,
         'is_online': is_online,
         'presence_label': presence_label,
@@ -3167,14 +3167,16 @@ def reschedule_draft(request, post_id):
 @login_required
 @require_POST
 def pin_post(request, post_id):
-    """Toggle pin on a post for the author's profile. Only one post can be pinned at a time."""
+    """Toggle pin on a post for the author's profile. Up to 3 posts can be pinned."""
+    MAX_PINS = 3
     post = get_object_or_404(Post, id=post_id, user=request.user, is_draft=False)
     if post.is_pinned:
         post.is_pinned = False
         post.save(update_fields=['is_pinned', 'updated_at'])
         return JsonResponse({'success': True, 'is_pinned': False})
-    # Unpin any existing pinned post first
-    Post.objects.filter(user=request.user, is_pinned=True).update(is_pinned=False)
+    current_pins = Post.objects.filter(user=request.user, is_pinned=True).count()
+    if current_pins >= MAX_PINS:
+        return JsonResponse({'success': False, 'error': f'You can pin at most {MAX_PINS} posts. Unpin one first.'}, status=400)
     post.is_pinned = True
     post.save(update_fields=['is_pinned', 'updated_at'])
     return JsonResponse({'success': True, 'is_pinned': True})
