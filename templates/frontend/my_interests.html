@@ -1,0 +1,191 @@
+{% extends "frontend/base.html" %}
+{% block title %}My Interests — PickASide{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-8 space-y-10">
+
+  <div class="flex items-center gap-3">
+    <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-2xl">✨</span>
+    <div>
+      <h1 class="text-xl font-bold text-foreground">My Interests</h1>
+      <p class="text-sm text-muted-foreground">Manage the hashtags and categories that shape your feed</p>
+    </div>
+  </div>
+
+  <!-- ── Followed Hashtags ── -->
+  <section>
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-base font-bold text-foreground">Hashtags I follow</h2>
+      <span class="text-xs text-muted-foreground" id="tag-count">{{ followed_tags|length }} tag{{ followed_tags|length|pluralize }}</span>
+    </div>
+
+    <!-- Add hashtag -->
+    <div class="flex gap-2 mb-4">
+      <div class="relative flex-1">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">#</span>
+        <input id="new-tag-input" type="text" maxlength="40" placeholder="Add a hashtag…"
+          class="w-full pl-7 pr-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addHashtag();}">
+      </div>
+      <button onclick="addHashtag()"
+        class="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition">
+        Follow
+      </button>
+    </div>
+
+    <!-- Tag chips -->
+    <div id="followed-tags-list" class="flex flex-wrap gap-2">
+      {% if followed_tags %}
+        {% for hf in followed_tags %}
+        <div id="tag-chip-{{ hf.tag }}" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/30 bg-primary/8 text-sm font-medium" style="background:hsl(var(--primary)/0.08)">
+          <a href="{% url 'hashtag_search' %}?tag={{ hf.tag }}" class="text-primary hover:underline">#{{ hf.tag }}</a>
+          <button onclick="removeHashtag('{{ hf.tag }}')" class="text-muted-foreground hover:text-destructive transition text-xs leading-none ml-0.5" title="Unfollow">✕</button>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p id="no-tags-msg" class="text-sm text-muted-foreground">You're not following any hashtags yet. Add one above to personalise your feed.</p>
+      {% endif %}
+    </div>
+
+    <p id="tag-error" class="text-xs text-destructive mt-2 hidden"></p>
+  </section>
+
+  <hr class="border-border">
+
+  <!-- ── Followed Categories ── -->
+  <section>
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-base font-bold text-foreground">Categories I follow</h2>
+      <span class="text-xs text-muted-foreground" id="cat-count">{{ followed_categories|length }} followed</span>
+    </div>
+    <p class="text-xs text-muted-foreground mb-4">Followed categories appear higher in your feed. Click any category to toggle.</p>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2" id="category-grid">
+      {% for cat in all_categories %}
+      {% with is_followed=cat|lower %}
+      <button type="button"
+        id="cat-btn-{{ cat|slugify }}"
+        onclick="toggleCategory('{{ cat }}')"
+        class="cat-btn flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm font-medium transition-all
+          {% if cat in followed_categories %}border-primary bg-primary/10 text-primary{% else %}border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5{% endif %}">
+        <span>{{ cat }}</span>
+        <span id="cat-icon-{{ cat|slugify }}" class="text-base ml-2">{% if cat in followed_categories %}✓{% else %}+{% endif %}</span>
+      </button>
+      {% endwith %}
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- Link to feed -->
+  <div class="rounded-2xl border border-border bg-card p-4 flex items-center justify-between gap-4">
+    <div>
+      <p class="text-sm font-semibold text-foreground">Your personalised feed</p>
+      <p class="text-xs text-muted-foreground mt-0.5">Posts tagged with your interests appear boosted in For You</p>
+    </div>
+    <a href="{% url 'for_you_feed' %}" class="flex-shrink-0 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition">
+      For You →
+    </a>
+  </div>
+
+</div>
+
+<script>
+function getCsrf() {
+  return document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+}
+
+// ── Hashtags ──────────────────────────────────────────────────────────────────
+function addHashtag() {
+  var inp = document.getElementById('new-tag-input');
+  var tag = inp.value.trim().replace(/^#/, '').toLowerCase();
+  var errEl = document.getElementById('tag-error');
+  errEl.classList.add('hidden');
+  if (!tag) return;
+  if (document.getElementById('tag-chip-' + tag)) {
+    errEl.textContent = 'You already follow #' + tag;
+    errEl.classList.remove('hidden');
+    return;
+  }
+  var fd = new FormData();
+  fd.append('tag', tag);
+  fetch('{% url "follow_hashtag" %}', { method: 'POST', headers: {'X-CSRFToken': getCsrf()}, body: fd })
+    .then(r => r.json()).then(d => {
+      if (d.success && d.following) {
+        inp.value = '';
+        var noMsg = document.getElementById('no-tags-msg');
+        if (noMsg) noMsg.remove();
+        var chip = document.createElement('div');
+        chip.id = 'tag-chip-' + tag;
+        chip.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/30 text-sm font-medium';
+        chip.style.background = 'hsl(var(--primary)/0.08)';
+        chip.innerHTML = '<a href="/hashtags/?tag=' + encodeURIComponent(tag) + '" class="text-primary hover:underline">#' + escH(tag) + '</a>' +
+          '<button onclick="removeHashtag(\'' + escH(tag) + '\')" class="text-muted-foreground hover:text-destructive transition text-xs leading-none ml-0.5" title="Unfollow">✕</button>';
+        document.getElementById('followed-tags-list').appendChild(chip);
+        updateTagCount(1);
+      } else {
+        errEl.textContent = d.error || 'Could not follow tag.';
+        errEl.classList.remove('hidden');
+      }
+    });
+}
+
+function removeHashtag(tag) {
+  var fd = new FormData();
+  fd.append('tag', tag);
+  fetch('{% url "follow_hashtag" %}', { method: 'POST', headers: {'X-CSRFToken': getCsrf()}, body: fd })
+    .then(r => r.json()).then(d => {
+      if (d.success && !d.following) {
+        var chip = document.getElementById('tag-chip-' + tag);
+        if (chip) chip.remove();
+        updateTagCount(-1);
+        if (!document.querySelector('#followed-tags-list [id^="tag-chip-"]')) {
+          var list = document.getElementById('followed-tags-list');
+          list.innerHTML = '<p id="no-tags-msg" class="text-sm text-muted-foreground">You\'re not following any hashtags yet.</p>';
+        }
+      }
+    });
+}
+
+function updateTagCount(delta) {
+  var el = document.getElementById('tag-count');
+  if (!el) return;
+  var n = parseInt(el.textContent) + delta;
+  el.textContent = n + ' tag' + (n === 1 ? '' : 's');
+}
+
+// ── Categories ────────────────────────────────────────────────────────────────
+function toggleCategory(cat) {
+  var fd = new FormData();
+  fd.append('category', cat);
+  fetch('{% url "follow_category" %}', { method: 'POST', headers: {'X-CSRFToken': getCsrf()}, body: fd })
+    .then(r => r.json()).then(d => {
+      if (!d.success) return;
+      var slug = cat.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      var btn = document.getElementById('cat-btn-' + slug);
+      var icon = document.getElementById('cat-icon-' + slug);
+      var countEl = document.getElementById('cat-count');
+      var following = d.action === 'followed';
+      if (btn) {
+        btn.className = btn.className
+          .replace(/border-primary bg-primary\/10 text-primary/g, '')
+          .replace(/border-border bg-card text-foreground hover:border-primary\/40 hover:bg-primary\/5/g, '');
+        if (following) {
+          btn.classList.add('border-primary', 'bg-primary/10', 'text-primary');
+          btn.classList.remove('border-border', 'bg-card', 'text-foreground');
+        } else {
+          btn.classList.add('border-border', 'bg-card', 'text-foreground', 'hover:border-primary/40', 'hover:bg-primary/5');
+          btn.classList.remove('border-primary', 'bg-primary/10', 'text-primary');
+        }
+      }
+      if (icon) icon.textContent = following ? '✓' : '+';
+      if (countEl) {
+        var n = parseInt(countEl.textContent) + (following ? 1 : -1);
+        countEl.textContent = n + ' followed';
+      }
+    });
+}
+
+function escH(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+{% endblock %}

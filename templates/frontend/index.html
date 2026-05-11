@@ -533,7 +533,13 @@ function toggleFollowAuthor(username, btn) {
                 <div>
                     <label class="block text-sm font-medium mb-1">Content (Optional)</label>
                     <textarea id="create-post-content" name="content" rows="4"
-                              class="w-full px-3 py-2 border border-border rounded-md bg-background"></textarea>
+                              class="w-full px-3 py-2 border border-border rounded-md bg-background"
+                              oninput="debounceLinkPreview(this.value)"></textarea>
+                    <!-- Live link preview -->
+                    <div id="compose-link-preview" class="hidden mt-2 rounded-xl border border-border/70 bg-muted/30 overflow-hidden relative">
+                      <button type="button" onclick="document.getElementById('compose-link-preview').classList.add('hidden')"
+                        class="absolute top-2 right-2 z-10 text-muted-foreground hover:text-foreground text-xs bg-background/80 rounded-full w-5 h-5 flex items-center justify-center leading-none">✕</button>
+                    </div>
                 </div>
                 <!-- Mood / Tone tag -->
                 <div>
@@ -1425,6 +1431,44 @@ function clearQuote() {
   if (form) form.addEventListener('submit', clearDraft);
   window._clearPostDraft = clearDraft;
   window._restorePostDraft = restoreDraft;
+})();
+</script>
+
+<script>
+// Live link preview in compose form
+(function() {
+  var _lpTimer = null;
+  var _lpLast = '';
+  window.debounceLinkPreview = function(text) {
+    clearTimeout(_lpTimer);
+    _lpTimer = setTimeout(function() {
+      var urls = (text || '').match(/https?:\/\/[^\s<>"'{}|\\^`\[\]]{8,}/g) || [];
+      var url = (urls.find(function(u){ return u.length < 500; }) || '').trim();
+      if (!url || url === _lpLast) return;
+      _lpLast = url;
+      var container = document.getElementById('compose-link-preview');
+      if (!container) return;
+      fetch('/link-preview/?url=' + encodeURIComponent(url))
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (!d.title) { container.classList.add('hidden'); return; }
+          var host = '';
+          try { host = new URL(url).hostname.replace(/^www\./, ''); } catch(e) {}
+          var esc = function(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+          container.innerHTML =
+            '<button type="button" onclick="document.getElementById(\'compose-link-preview\').classList.add(\'hidden\')" ' +
+            'class="absolute top-2 right-2 z-10 text-muted-foreground hover:text-foreground text-xs bg-background/80 rounded-full w-5 h-5 flex items-center justify-center leading-none">✕</button>' +
+            '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" class="flex gap-3 p-3 no-underline" style="text-decoration:none">' +
+            (d.image ? '<img src="' + esc(d.image) + '" class="w-20 h-16 object-cover rounded-lg flex-shrink-0 bg-muted" loading="lazy" onerror="this.remove()">' : '') +
+            '<div class="min-w-0 flex flex-col justify-center gap-0.5">' +
+            (d.site_name || host ? '<p class="text-[10px] font-semibold text-primary uppercase tracking-wide m-0">' + esc(d.site_name || host) + '</p>' : '') +
+            '<p class="text-sm font-semibold text-foreground line-clamp-2 leading-snug m-0">' + esc(d.title) + '</p>' +
+            (d.description ? '<p class="text-xs text-muted-foreground line-clamp-2 leading-relaxed m-0">' + esc(d.description) + '</p>' : '') +
+            '</div></a>';
+          container.classList.remove('hidden');
+        }).catch(function(){ container.classList.add('hidden'); });
+    }, 600);
+  };
 })();
 </script>
 

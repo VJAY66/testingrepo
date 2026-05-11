@@ -33,6 +33,7 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('interests/', views.interests_onboarding, name='interests_onboarding'),
     path('interests/save/', views.save_interests, name='save_interests'),
+    path('my-interests/', views.my_interests, name='my_interests'),
     path('onboarding/follow/', views.onboarding_step2, name='onboarding_step2'),
     path('onboarding/profile/', views.onboarding_step3, name='onboarding_step3'),
     path('presence/offline/', views.mark_offline, name='mark_offline'),

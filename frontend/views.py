@@ -2841,6 +2841,19 @@ def register_view(request):
     return render(request, 'frontend/register.html', {'next': next_url})
 
 @login_required
+def my_interests(request):
+    followed_tags = list(HashtagFollow.objects.filter(user=request.user).order_by('tag'))
+    from discussions.models import CategoryFollow as _CF
+    followed_categories = list(_CF.objects.filter(user=request.user).values_list('category', flat=True))
+    all_categories = [c[0] for c in CATEGORY_CHOICES]
+    return render(request, 'frontend/my_interests.html', {
+        'followed_tags': followed_tags,
+        'followed_categories': followed_categories,
+        'all_categories': all_categories,
+    })
+
+
+@login_required
 def interests_onboarding(request):
     """Post-signup category interest selection page."""
     all_categories = [c[0] for c in CATEGORY_CHOICES]
