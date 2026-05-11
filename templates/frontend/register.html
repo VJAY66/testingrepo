@@ -42,6 +42,15 @@
                 <div class="mt-1 text-xs text-muted-foreground">
                     At least 8 chars with uppercase, lowercase, number, and special character.
                 </div>
+                <div class="mt-2 space-y-1">
+                  <div class="flex gap-1 h-1.5" id="strength-bars">
+                    <div class="flex-1 rounded-full bg-border transition-colors duration-200" id="sb1"></div>
+                    <div class="flex-1 rounded-full bg-border transition-colors duration-200" id="sb2"></div>
+                    <div class="flex-1 rounded-full bg-border transition-colors duration-200" id="sb3"></div>
+                    <div class="flex-1 rounded-full bg-border transition-colors duration-200" id="sb4"></div>
+                  </div>
+                  <p id="strength-label" class="text-xs text-muted-foreground"></p>
+                </div>
                 <p id="password-error" class="mt-1 text-xs text-red-600 hidden">Password does not meet criteria.</p>
             </div>
 
@@ -147,6 +156,36 @@ function validateUsernameAvailability() {
         });
 }
 
+function passwordStrength(value) {
+    let score = 0;
+    if (value.length >= 8)  score++;
+    if (value.length >= 12) score++;
+    if (/[A-Z]/.test(value) && /[a-z]/.test(value)) score++;
+    if (/[0-9]/.test(value)) score++;
+    if (/[!@#$%^&*(),.?":{}|<>_\-]/.test(value)) score++;
+    return Math.min(4, Math.floor(score * 4 / 5));
+}
+
+const STRENGTH_CONFIG = [
+    { color: '', label: '' },
+    { color: 'bg-red-500',    label: 'Weak' },
+    { color: 'bg-orange-400', label: 'Fair' },
+    { color: 'bg-yellow-400', label: 'Good' },
+    { color: 'bg-green-500',  label: 'Strong' },
+];
+
+function updateStrengthMeter(value) {
+    const level = value.length === 0 ? 0 : Math.max(1, passwordStrength(value));
+    const cfg = STRENGTH_CONFIG[level];
+    const bars = [document.getElementById('sb1'), document.getElementById('sb2'), document.getElementById('sb3'), document.getElementById('sb4')];
+    const label = document.getElementById('strength-label');
+    bars.forEach((b, i) => {
+        b.className = 'flex-1 rounded-full transition-colors duration-200 ' + (i < level && cfg.color ? cfg.color : 'bg-border');
+    });
+    label.textContent = cfg.label;
+    label.className = 'text-xs ' + (level <= 1 ? 'text-red-500' : level === 2 ? 'text-orange-500' : level === 3 ? 'text-yellow-600' : 'text-green-600');
+}
+
 function isPasswordCriteriaMet(value) {
     return value.length >= 8
         && /[A-Z]/.test(value)
@@ -197,7 +236,7 @@ usernameInput.addEventListener('input', function() {
 
 usernameInput.addEventListener('blur', validateUsernameAvailability);
 
-passwordInput.addEventListener('input', validateRegistrationPasswords);
+passwordInput.addEventListener('input', function() { updateStrengthMeter(this.value); validateRegistrationPasswords(); });
 confirmPasswordInput.addEventListener('input', validateRegistrationPasswords);
 
 registerForm.addEventListener('submit', function(event) {

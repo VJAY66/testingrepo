@@ -80,6 +80,7 @@ MIDDLEWARE = [
     'users.middleware.BanMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'utils.csp_middleware.ContentSecurityPolicyMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -177,6 +178,11 @@ CELERY_BEAT_SCHEDULE = {
     'cleanup-expired-stories': {
         'task': 'frontend.tasks.cleanup_expired_stories',
         'schedule': 600.0,
+    },
+    # Normalize post content whitespace — nightly at 2 AM
+    'normalize-post-content': {
+        'task': 'frontend.tasks.normalize_post_content',
+        'schedule': crontab(hour=2, minute=0),
     },
 }
 

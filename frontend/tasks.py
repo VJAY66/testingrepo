@@ -165,3 +165,10 @@ def cleanup_expired_stories():
     from discussions.models import Story
     deleted, _ = Story.objects.filter(expires_at__lt=timezone.now()).delete()
     return f'Deleted {deleted} expired story/stories'
+
+
+@shared_task
+def normalize_post_content():
+    """Normalize whitespace in Post.content (trim, collapse blank lines)."""
+    from django.core.management import call_command
+    call_command('normalize_post_content', apply=True)
