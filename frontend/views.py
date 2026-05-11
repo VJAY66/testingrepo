@@ -6048,6 +6048,7 @@ def create_review(request):
             content=content,
             category=category,
             hashtags=','.join(Post.parse_hashtags(hashtags_raw)),
+            is_verified=request.POST.get('is_verified') == '1',
         )
         return redirect('review_detail', review_id=review.id)
 

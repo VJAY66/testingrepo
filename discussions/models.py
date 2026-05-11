@@ -656,6 +656,7 @@ class Review(models.Model):
     hashtags = models.TextField(blank=True, default='')
     agree_count = models.IntegerField(default=0)
     disagree_count = models.IntegerField(default=0)
+    is_verified = models.BooleanField(default=False, help_text='Author confirms they actually used/watched/visited the subject')
     is_deleted_by_moderation = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

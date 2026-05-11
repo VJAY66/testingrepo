@@ -141,6 +141,23 @@
                 </div>
             </div>
 
+            <!-- Verified toggle -->
+            <div id="verified-toggle-wrap" class="hidden rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-900/10 px-4 py-3">
+                <label class="flex items-center gap-3 cursor-pointer select-none">
+                    <div class="relative flex-shrink-0">
+                        <input type="checkbox" id="rv-is-verified" name="is_verified" value="1"
+                            {% if form_data.is_verified == '1' %}checked{% endif %}
+                            class="sr-only peer">
+                        <div class="w-10 h-6 rounded-full border-2 border-emerald-300 bg-white dark:bg-emerald-900/30 peer-checked:bg-emerald-500 peer-checked:border-emerald-500 transition-colors"></div>
+                        <div class="absolute left-0.5 top-0.5 w-5 h-5 rounded-full bg-emerald-300 peer-checked:bg-white peer-checked:translate-x-4 transition-all shadow-sm"></div>
+                    </div>
+                    <div>
+                        <p id="verified-label-text" class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">I've personally experienced this</p>
+                        <p class="text-xs text-muted-foreground mt-0.5">Adds a <span class="font-semibold text-emerald-600">✓ Verified</span> badge to your review</p>
+                    </div>
+                </label>
+            </div>
+
             <!-- Category — auto-suggested, still editable -->
             <div>
                 <label class="rf-label" for="rv-category">Category *
@@ -212,6 +229,19 @@ function buildTypeTiles() {
   });
 }
 
+const VERIFIED_LABELS = {
+  'Movie':         "I've watched this",
+  'TV Show':       "I've watched this",
+  'Book':          "I've read this",
+  'Music / Album': "I've listened to this",
+  'Product':       "I've bought / used this",
+  'Place':         "I've been here",
+  'Restaurant':    "I've eaten here",
+  'App / Game':    "I've used / played this",
+  'Person':        "I've met / interacted with this person",
+  'Other':         "I've personally experienced this",
+};
+
 function selectType(val) {
   document.getElementById('rv-subject-type').value = val;
   buildTypeTiles();
@@ -229,6 +259,11 @@ function selectType(val) {
   }
   // Show hashtag chips
   renderHashtagChips(meta.tags);
+  // Show verified toggle with contextual label
+  const wrap = document.getElementById('verified-toggle-wrap');
+  const lbl  = document.getElementById('verified-label-text');
+  wrap.classList.remove('hidden');
+  if (lbl) lbl.textContent = VERIFIED_LABELS[val] || "I've personally experienced this";
 }
 
 function renderHashtagChips(tags) {
@@ -279,6 +314,10 @@ document.addEventListener('DOMContentLoaded', function() {
   if (savedType && TYPE_META[savedType]) {
     document.getElementById('rv-subject').placeholder = TYPE_META[savedType].placeholder;
     renderHashtagChips(TYPE_META[savedType].tags);
+    const wrap = document.getElementById('verified-toggle-wrap');
+    const lbl  = document.getElementById('verified-label-text');
+    wrap.classList.remove('hidden');
+    if (lbl) lbl.textContent = VERIFIED_LABELS[savedType] || "I've personally experienced this";
   }
   if (currentRating > 0) renderStars(currentRating);
   const contentEl = document.getElementById('rv-content');
