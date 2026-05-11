@@ -88,31 +88,27 @@
             </div>
         </div>
 
-        <form method="post" autocomplete="off" class="space-y-5">
+        <form method="post" autocomplete="off" class="space-y-6">
             {% csrf_token %}
+
+            <!-- Subject Type — visual tiles -->
+            <div>
+                <label class="rf-label">What kind of review? *</label>
+                <div class="grid grid-cols-3 sm:grid-cols-5 gap-2" id="type-tiles">
+                    <!-- tiles injected by JS -->
+                </div>
+                <input type="hidden" id="rv-subject-type" name="subject_type" value="{{ form_data.subject_type|default:'' }}">
+                {% if errors.subject_type %}<span class="error-msg mt-1 block">{{ errors.subject_type }}</span>{% endif %}
+            </div>
 
             <!-- Subject -->
             <div>
-                <label class="rf-label" for="rv-subject">What are you reviewing? *</label>
+                <label class="rf-label" for="rv-subject">Name / Title *</label>
                 <input type="text" id="rv-subject" name="subject" maxlength="255"
-                       placeholder="e.g. Interstellar, iPhone 15, KFC Hyderabad…"
+                       placeholder="What are you reviewing?"
                        class="rf-input"
                        value="{{ form_data.subject|default:'' }}">
-                <div class="flex justify-between mt-1">
-                    {% if errors.subject %}<span class="error-msg">{{ errors.subject }}</span>{% else %}<span></span>{% endif %}
-                </div>
-            </div>
-
-            <!-- Subject Type -->
-            <div>
-                <label class="rf-label" for="rv-subject-type">Type *</label>
-                <select id="rv-subject-type" name="subject_type" class="rf-input" required>
-                    <option value="">Select a type</option>
-                    {% for val, label in subject_types %}
-                    <option value="{{ val }}" {% if form_data.subject_type == val %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-                {% if errors.subject_type %}<span class="error-msg">{{ errors.subject_type }}</span>{% endif %}
+                {% if errors.subject %}<span class="error-msg">{{ errors.subject }}</span>{% endif %}
             </div>
 
             <!-- Star Rating -->
@@ -145,9 +141,11 @@
                 </div>
             </div>
 
-            <!-- Category -->
+            <!-- Category — auto-suggested, still editable -->
             <div>
-                <label class="rf-label" for="rv-category">Category *</label>
+                <label class="rf-label" for="rv-category">Category *
+                    <span id="cat-suggested-badge" class="hidden ml-1 normal-case font-normal text-primary/70">(auto-suggested)</span>
+                </label>
                 <select id="rv-category" name="category" class="rf-input" required>
                     <option value="">Select a category</option>
                     {% for cat in categories %}
@@ -157,14 +155,15 @@
                 {% if errors.category %}<span class="error-msg">{{ errors.category }}</span>{% endif %}
             </div>
 
-            <!-- Hashtags -->
+            <!-- Hashtags with quick chips -->
             <div>
                 <label class="rf-label" for="rv-hashtags">Hashtags <span class="font-normal normal-case text-muted-foreground">(optional, up to 5)</span></label>
+                <div id="hashtag-chips" class="flex flex-wrap gap-1.5 mb-2"></div>
                 <input type="text" id="rv-hashtags" name="hashtags" maxlength="200"
-                       placeholder="#movies #review #bollywood"
+                       placeholder="#movies #review"
                        class="rf-input"
                        value="{{ form_data.hashtags|default:'' }}">
-                <p class="mt-1 text-xs text-muted-foreground">Space or comma separated.</p>
+                <p class="mt-1 text-xs text-muted-foreground">Tap a suggestion above or type your own. Space or comma separated.</p>
             </div>
 
             <button type="submit" class="submit-btn">
@@ -178,47 +177,127 @@
 <script>
 let currentRating = {{ form_data.rating|default:'0' }};
 
+// ── Type metadata ─────────────────────────────────────────────────────────────
+const TYPE_META = {
+  'Movie':        { icon: '🎬', label: 'Movie',       category: 'Entertainment', placeholder: 'e.g. Oppenheimer (2023), RRR…',          tags: ['#movies', '#film', '#cinema', '#review'] },
+  'TV Show':      { icon: '📺', label: 'TV Show',     category: 'Entertainment', placeholder: 'e.g. Breaking Bad, Mirzapur S3…',        tags: ['#tvshow', '#series', '#binge', '#review'] },
+  'Book':         { icon: '📚', label: 'Book',        category: 'Education',     placeholder: 'e.g. Atomic Habits by James Clear…',     tags: ['#books', '#reading', '#bookreview', '#mustread'] },
+  'Music / Album':{ icon: '🎵', label: 'Music',       category: 'Music',         placeholder: 'e.g. Midnights by Taylor Swift…',        tags: ['#music', '#album', '#newmusic', '#review'] },
+  'Product':      { icon: '📦', label: 'Product',     category: 'Technology',    placeholder: 'e.g. iPhone 15 Pro, boAt Airdopes…',     tags: ['#product', '#review', '#unboxing', '#worth'] },
+  'Place':        { icon: '📍', label: 'Place',       category: 'Travel',        placeholder: 'e.g. Eiffel Tower, Goa Beach, Shimla…',  tags: ['#travel', '#place', '#mustsee', '#explore'] },
+  'Restaurant':   { icon: '🍽️', label: 'Restaurant', category: 'Food',          placeholder: 'e.g. KFC Hyderabad, Pizza Hut MG Rd…',   tags: ['#food', '#restaurant', '#foodie', '#tasty'] },
+  'App / Game':   { icon: '🎮', label: 'App / Game',  category: 'Technology',    placeholder: 'e.g. Clash of Clans, Spotify, BGMI…',    tags: ['#gaming', '#app', '#mobileapp', '#gamereview'] },
+  'Person':       { icon: '👤', label: 'Person',      category: 'Others',        placeholder: 'e.g. Elon Musk, Your Professor…',        tags: ['#person', '#opinion', '#celebrity', '#review'] },
+  'Other':        { icon: '✏️', label: 'Other',       category: 'Others',        placeholder: 'e.g. A service, an experience…',         tags: ['#review', '#honest', '#opinion'] },
+};
+
+function buildTypeTiles() {
+  const container = document.getElementById('type-tiles');
+  const selected = document.getElementById('rv-subject-type').value;
+  container.innerHTML = '';
+  Object.entries(TYPE_META).forEach(([val, meta]) => {
+    const isActive = val === selected;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.type = val;
+    btn.className = [
+      'flex flex-col items-center gap-1 rounded-xl border-2 px-2 py-3 text-center transition-all duration-150 cursor-pointer',
+      isActive
+        ? 'border-primary bg-primary/10 shadow-sm'
+        : 'border-border bg-background hover:border-primary/50 hover:bg-primary/5',
+    ].join(' ');
+    btn.innerHTML = `<span class="text-2xl leading-none">${meta.icon}</span><span class="text-[11px] font-semibold leading-tight text-foreground">${meta.label}</span>`;
+    btn.addEventListener('click', () => selectType(val));
+    container.appendChild(btn);
+  });
+}
+
+function selectType(val) {
+  document.getElementById('rv-subject-type').value = val;
+  buildTypeTiles();
+  const meta = TYPE_META[val];
+  if (!meta) return;
+  // Update subject placeholder
+  document.getElementById('rv-subject').placeholder = meta.placeholder;
+  // Auto-suggest category
+  const catSel = document.getElementById('rv-category');
+  if (!catSel.value) {
+    for (let opt of catSel.options) {
+      if (opt.value === meta.category) { opt.selected = true; break; }
+    }
+    document.getElementById('cat-suggested-badge').classList.remove('hidden');
+  }
+  // Show hashtag chips
+  renderHashtagChips(meta.tags);
+}
+
+function renderHashtagChips(tags) {
+  const container = document.getElementById('hashtag-chips');
+  container.innerHTML = '';
+  tags.forEach(tag => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = tag;
+    btn.className = 'px-3 py-1 rounded-full border border-primary/30 bg-primary/8 text-primary text-xs font-semibold hover:bg-primary/20 transition';
+    btn.style.background = 'hsl(var(--primary) / 0.08)';
+    btn.addEventListener('click', () => addHashtagChip(tag));
+    container.appendChild(btn);
+  });
+}
+
+function addHashtagChip(tag) {
+  const input = document.getElementById('rv-hashtags');
+  const existing = input.value.trim();
+  if (existing.includes(tag)) return;
+  input.value = existing ? existing + ' ' + tag : tag;
+}
+
+// ── Stars ─────────────────────────────────────────────────────────────────────
 function setRating(value) {
-    currentRating = value;
-    document.getElementById('rating-input').value = value;
-    renderStars(value);
+  currentRating = value;
+  document.getElementById('rating-input').value = value;
+  renderStars(value);
 }
 
 function renderStars(filled) {
-    const btns = document.querySelectorAll('.star-btn');
-    btns.forEach((btn, idx) => {
-        const svg = btn.querySelector('svg');
-        if (idx < filled) {
-            svg.classList.add('star-filled');
-            svg.classList.remove('star-empty');
-        } else {
-            svg.classList.remove('star-filled');
-            svg.classList.add('star-empty');
-        }
-    });
+  document.querySelectorAll('.star-btn').forEach((btn, idx) => {
+    const svg = btn.querySelector('svg');
+    svg.classList.toggle('star-filled', idx < filled);
+    svg.classList.toggle('star-empty', idx >= filled);
+  });
 }
 
 function updateCharCount(el, max, id) {
-    const el2 = document.getElementById(id);
-    if (el2) el2.textContent = el.value.length + '/' + max;
+  const el2 = document.getElementById(id);
+  if (el2) el2.textContent = el.value.length + '/' + max;
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    if (currentRating > 0) renderStars(currentRating);
-    const contentEl = document.getElementById('rv-content');
-    if (contentEl) updateCharCount(contentEl, 2000, 'content-count');
+  buildTypeTiles();
+  // Restore selections from server (form re-render after error)
+  const savedType = document.getElementById('rv-subject-type').value;
+  if (savedType && TYPE_META[savedType]) {
+    document.getElementById('rv-subject').placeholder = TYPE_META[savedType].placeholder;
+    renderHashtagChips(TYPE_META[savedType].tags);
+  }
+  if (currentRating > 0) renderStars(currentRating);
+  const contentEl = document.getElementById('rv-content');
+  if (contentEl) updateCharCount(contentEl, 2000, 'content-count');
 
-    // Hover preview for stars
-    const picker = document.getElementById('star-picker');
-    if (picker) {
-        picker.addEventListener('mouseover', function(e) {
-            const btn = e.target.closest('.star-btn');
-            if (btn) renderStars(parseInt(btn.dataset.value));
-        });
-        picker.addEventListener('mouseleave', function() {
-            renderStars(currentRating);
-        });
-    }
+  // Star hover preview
+  const picker = document.getElementById('star-picker');
+  if (picker) {
+    picker.addEventListener('mouseover', e => {
+      const btn = e.target.closest('.star-btn');
+      if (btn) renderStars(parseInt(btn.dataset.value));
+    });
+    picker.addEventListener('mouseleave', () => renderStars(currentRating));
+  }
+
+  // Clear auto-suggested badge if user manually changes category
+  document.getElementById('rv-category').addEventListener('change', () => {
+    document.getElementById('cat-suggested-badge').classList.add('hidden');
+  });
 });
 </script>
 {% endblock %}
