@@ -3000,6 +3000,8 @@ def onboarding_step3(request):
     if request.method == 'POST':
         bio = request.POST.get('bio', '').strip()[:280]
         website = request.POST.get('website', '').strip()
+        if website and not (website.startswith('https://') or website.startswith('http://')):
+            website = ''
         if profile:
             if bio:
                 profile.bio = bio
@@ -6870,6 +6872,8 @@ def muted_users_list(request):
 def update_profile_bio(request):
     bio = (request.POST.get('bio') or '').strip()[:280]
     website = (request.POST.get('website') or '').strip()[:200]
+    if website and not (website.startswith('https://') or website.startswith('http://')):
+        return JsonResponse({'success': False, 'error': 'Website must start with http:// or https://'}, status=400)
 
     if bio and check_content_moderation(bio):
         return JsonResponse({'success': False, 'error': 'Bio contains abusive language.'}, status=400)
@@ -7211,9 +7215,13 @@ def add_muted_keyword(request):
 @login_required
 @require_POST
 def remove_muted_keyword(request):
+    kw_id = request.POST.get('id', '').strip()
+    if kw_id:
+        MutedKeyword.objects.filter(user=request.user, id=kw_id).delete()
+        return JsonResponse({'success': True})
     keyword = (request.POST.get('keyword') or '').strip().lower()
     if not keyword:
-        return JsonResponse({'success': False, 'error': 'Keyword is required.'}, status=400)
+        return JsonResponse({'success': False, 'error': 'Keyword or id is required.'}, status=400)
     MutedKeyword.objects.filter(user=request.user, keyword=keyword).delete()
     return JsonResponse({'success': True, 'keyword': keyword})
 

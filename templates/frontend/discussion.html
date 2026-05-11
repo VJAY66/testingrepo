@@ -2151,10 +2151,11 @@ function showDiscussionReactions(postId, action) {
       var list = document.getElementById('disc-reaction-list');
       if (!d.success || !d.users.length) { list.innerHTML = '<div class="p-4 text-center text-sm text-muted-foreground">No reactions yet.</div>'; return; }
       list.innerHTML = d.users.map(function(u) {
-        return '<a href="/user/' + u.username + '/" class="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors">'
-          + (u.avatar_url ? '<img src="'+u.avatar_url+'" class="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0">'
-            : '<div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">'+u.username[0].toUpperCase()+'</div>')
-          + '<span class="text-sm font-semibold text-foreground">@' + u.username + '</span></a>';
+        var name = escHtml(u.username || '');
+        var avatar = u.avatar_url ? '<img src="'+escHtml(u.avatar_url)+'" class="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0">'
+            : '<div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">'+escHtml((u.username||'?')[0].toUpperCase())+'</div>';
+        return '<a href="/user/'+name+'/" class="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors">'
+          + avatar + '<span class="text-sm font-semibold text-foreground">@' + name + '</span></a>';
       }).join('');
     }).catch(function() {
       document.getElementById('disc-reaction-list').innerHTML = '<div class="p-4 text-center text-sm text-muted-foreground">Could not load.</div>';

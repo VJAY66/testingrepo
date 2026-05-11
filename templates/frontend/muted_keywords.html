@@ -19,7 +19,7 @@
     {% for kw in keywords %}
     <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-card text-sm font-medium text-foreground" id="kw-{{ kw.id }}">
       {{ kw.keyword }}
-      <button onclick="removeKeyword('{{ kw.keyword }}', {{ kw.id }})" class="ml-1 text-muted-foreground hover:text-red-500 transition leading-none">✕</button>
+      <button data-kw-id="{{ kw.id }}" onclick="removeKeyword(null, this.dataset.kwId)" class="ml-1 text-muted-foreground hover:text-red-500 transition leading-none">✕</button>
     </span>
     {% empty %}
     <p class="text-sm text-muted-foreground" id="empty-msg">No muted keywords yet.</p>
@@ -42,22 +42,30 @@ document.getElementById('add-keyword-form').addEventListener('submit', function(
       if (empty) empty.remove();
       var list = document.getElementById('keyword-list');
       var span = document.createElement('span');
-      span.id = 'kw-' + (d.id || Date.now());
+      var kwId = d.id || Date.now();
+      span.id = 'kw-' + kwId;
       span.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-card text-sm font-medium text-foreground';
-      span.innerHTML = keyword + ' <button onclick="removeKeyword(\'' + keyword.replace(/'/g,"\\'")+'\', this.parentElement)" class="ml-1 text-muted-foreground hover:text-red-500 transition leading-none">✕</button>';
+      span.appendChild(document.createTextNode(keyword + ' '));
+      var btn = document.createElement('button');
+      btn.className = 'ml-1 text-muted-foreground hover:text-red-500 transition leading-none';
+      btn.dataset.kwId = kwId;
+      btn.textContent = '✕';
+      btn.onclick = function() { removeKeyword(null, this.dataset.kwId); };
+      span.appendChild(btn);
       list.appendChild(span);
       input.value = '';
     }
   });
 });
-function removeKeyword(keyword, idOrEl) {
+function removeKeyword(keyword, kwId) {
+  var body = kwId ? 'id=' + encodeURIComponent(kwId) : 'keyword=' + encodeURIComponent(keyword);
   fetch('{% url "remove_muted_keyword" %}', {
     method: 'POST',
     headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
-    body: 'keyword=' + encodeURIComponent(keyword)
+    body: body
   }).then(r => r.json()).then(d => {
     if (d.success) {
-      var el = typeof idOrEl === 'number' ? document.getElementById('kw-' + idOrEl) : idOrEl;
+      var el = document.getElementById('kw-' + kwId);
       if (el) el.remove();
     }
   });
