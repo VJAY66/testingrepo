@@ -183,4 +183,57 @@ urlpatterns = [
     path('posts/<str:post_id>/related/', views.related_posts_api, name='related_posts_api'),
     # SSE v2 (notifications + DM count)
     path('notifications/stream/v2/', views.notification_stream_v2, name='notification_stream_v2'),
+    # Blocked users management
+    path('profile/blocked/', views.blocked_users_list, name='blocked_users'),
+    # Muted keywords management
+    path('profile/muted-keywords/', views.muted_keywords_page, name='muted_keywords_page'),
+    # Post report
+    path('posts/<str:post_id>/report/', views.report_post, name='report_post'),
+    # Notification preferences page (GET)
+    path('profile/notification-prefs/page/', views.notification_prefs_page, name='notification_prefs_page'),
+    # Pinned comments
+    path('comments/<str:comment_id>/pin/', views.pin_comment, name='pin_comment'),
+    path('comments/<str:comment_id>/unpin/', views.unpin_comment, name='unpin_comment'),
+    # Trending debates
+    path('trending/', views.trending_debates, name='trending_debates'),
+    # What you missed
+    path('what-you-missed/', views.what_you_missed, name='what_you_missed'),
+    # Share post to DM
+    path('posts/<str:post_id>/share-dm/', views.share_post_to_dm, name='share_post_to_dm'),
+    # User activity heatmap
+    path('profile/<str:username>/heatmap/', views.user_activity_heatmap, name='user_activity_heatmap'),
+    # Bulk notification management
+    path('notifications/bulk/', views.bulk_notifications, name='bulk_notifications'),
+    # Export my data
+    path('account/export/', views.export_my_data, name='export_my_data'),
+    # Two-factor authentication
+    path('account/2fa/', views.totp_setup, name='totp_setup'),
+    path('account/2fa/verify-setup/', views.totp_verify_setup, name='totp_verify_setup'),
+    path('account/2fa/disable/', views.totp_disable, name='totp_disable'),
+    path('account/2fa/login/', views.totp_login_verify, name='totp_login_verify'),
+    # Post similarity check
+    path('posts/similarity-check/', views.post_similarity_check, name='post_similarity_check'),
+    # Debate Hall of Fame
+    path('debates/hall-of-fame/', views.debate_hall_of_fame, name='debate_hall_of_fame'),
+    # Live Debate Rooms
+    path('live-debates/', views.live_debate_rooms, name='live_debate_rooms'),
+    path('live-debates/create/', views.create_live_debate_room, name='create_live_debate_room'),
+    path('live-debates/<str:room_id>/', views.live_debate_room_detail, name='live_debate_room_detail'),
+    path('live-debates/<str:room_id>/join/', views.join_live_debate_room, name='join_live_debate_room'),
+    path('live-debates/<str:room_id>/messages/', views.live_debate_poll_messages, name='live_debate_poll_messages'),
+    path('live-debates/<str:room_id>/send/', views.live_debate_send_message, name='live_debate_send_message'),
+    path('live-debates/<str:room_id>/vote/', views.live_debate_vote, name='live_debate_vote'),
+    # Bookmarks
+    path('bookmarks/', views.bookmarks, name='bookmarks'),
+    path('posts/<str:post_id>/bookmark/', views.toggle_bookmark, name='toggle_bookmark'),
+    # User-curated lists
+    path('lists/', views.user_lists, name='user_lists'),
+    path('lists/create/', views.create_list, name='create_list'),
+    path('lists/<str:list_id>/', views.list_detail, name='list_detail'),
+    path('lists/<str:list_id>/delete/', views.delete_list, name='delete_list'),
+    path('lists/<str:list_id>/add-member/', views.add_list_member, name='add_list_member'),
+    path('lists/<str:list_id>/remove-member/', views.remove_list_member, name='remove_list_member'),
+    path('lists/add-from-profile/', views.add_to_list_from_profile, name='add_to_list_from_profile'),
+    # My Reminders
+    path('reminders/', views.my_reminders, name='my_reminders'),
 ]

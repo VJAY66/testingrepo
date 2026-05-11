@@ -967,6 +967,27 @@ def index(request):
     _enrich_posts_for_feed(posts, request.user)
     posts = _filter_muted_posts(posts, request.user)
 
+    # Stories bar: active (non-expired) stories from followed users + own
+    stories_bar = []
+    if request.user.is_authenticated:
+        following_ids = list(
+            Follow.objects.filter(follower=request.user).values_list('following_id', flat=True)
+        )
+        story_user_ids = following_ids + [request.user.id]
+        now_ts = timezone.now()
+        stories_bar = list(
+            Story.objects.filter(user_id__in=story_user_ids, expires_at__gt=now_ts)
+            .select_related('user')
+            .order_by('-created_at')[:30]
+        )
+        # Annotate whether current user has viewed each story
+        viewed_ids = set(
+            StoryView.objects.filter(viewer=request.user, story__in=stories_bar)
+            .values_list('story_id', flat=True)
+        )
+        for s in stories_bar:
+            s.viewer_has_seen = s.id in viewed_ids
+
     context = {
         'posts': posts,
         'page_obj': page_obj,
@@ -976,6 +997,9 @@ def index(request):
         'is_suggested_page': False,
         'follow_suggestions': _follow_suggestions(request.user),
         'trending_sidebar': _get_trending_hashtags(),
+        'rising_creators': _get_rising_creators(limit=5),
+        'user_followed_tags': user_followed_tags,
+        'stories_bar': stories_bar,
     }
     return render(request, 'frontend/index.html', context)
 
@@ -1295,9 +1319,38 @@ def discussion(request, post_id):
     else:
         analytics = None
 
+    # Series membership for navigator
+    series_context = None
+    series_item = post.series_items.select_related('series').first()
+    if series_item:
+        all_items = list(series_item.series.items.select_related('post').order_by('order'))
+        current_idx = next((i for i, it in enumerate(all_items) if it.post_id == post.id), None)
+        series_context = {
+            'series': series_item.series,
+            'items': all_items,
+            'current_idx': current_idx,
+            'prev_item': all_items[current_idx - 1] if current_idx and current_idx > 0 else None,
+            'next_item': all_items[current_idx + 1] if current_idx is not None and current_idx < len(all_items) - 1 else None,
+        }
+
+    # Post reminder state for authenticated user
+    from discussions.models import PostReminder as _PR
+    post.has_reminder = (
+        request.user.is_authenticated
+        and _PR.objects.filter(user=request.user, post=post, is_sent=False).exists()
+    )
+
+    # Accepted co-authors for display
+    from discussions.models import PostCoAuthor as _PCADisc
+    accepted_coauthors = list(
+        _PCADisc.objects.filter(post=post, accepted=True)
+        .select_related('user').order_by('created_at')
+    )
+
     context = {
         'post': post,
-        'post_display_content': _normalize_post_content(post.content),
+        'accepted_coauthors': accepted_coauthors,
+        'post_display_content': _render_markdown(_normalize_post_content(post.content)),
         'yes_comments': yes_comments,
         'no_comments': no_comments,
         'yes_vote_count': yes_vote_count,
@@ -1665,12 +1718,96 @@ def user_profile(request, username):
         for d in ACHIEVEMENT_DEFS if d[0] in up_achievements_set
     ]
 
+    # Profile highlights
+    from users.models import ProfileHighlight
+    highlights = list(
+        ProfileHighlight.objects.filter(user=profile_user)
+        .select_related('post', 'post__user')
+        .order_by('order', '-created_at')[:6]
+    )
+    user_highlight_post_ids = set()
+    if request.user.is_authenticated:
+        user_highlight_post_ids = set(
+            ProfileHighlight.objects.filter(user=request.user).values_list('post_id', flat=True)
+        )
+
+    # Activity heatmap for public profile (post + comment counts per day, last 364 days)
+    import json as _upjson, datetime as _updt
+    from django.db.models.functions import TruncDate as _UpTruncDate
+    _up_heatmap_start = timezone.now().date() - timedelta(days=363)
+    _up_post_counts = {
+        str(r['day']): r['n']
+        for r in Post.objects.filter(
+            user=profile_user, is_draft=False,
+            created_at__date__gte=_up_heatmap_start,
+        ).annotate(day=_UpTruncDate('created_at')).values('day').annotate(n=Count('id'))
+    }
+    _up_comment_counts = {
+        str(r['day']): r['n']
+        for r in Comment.objects.filter(
+            user=profile_user,
+            created_at__date__gte=_up_heatmap_start,
+        ).annotate(day=_UpTruncDate('created_at')).values('day').annotate(n=Count('id'))
+    }
+    _up_all_days = {}
+    _up_d = _up_heatmap_start
+    while _up_d <= timezone.now().date():
+        _up_key = str(_up_d)
+        _up_all_days[_up_key] = _up_post_counts.get(_up_key, 0) + _up_comment_counts.get(_up_key, 0)
+        _up_d += _updt.timedelta(days=1)
+    up_activity_heatmap_json = _upjson.dumps(_up_all_days)
+
+    # Mutual followers — people the viewer follows who also follow profile_user
+    mutual_followers = []
+    mutual_followers_count = 0
+    if request.user.is_authenticated and request.user != profile_user:
+        viewer_following_ids = set(
+            Follow.objects.filter(follower=request.user).values_list('following_id', flat=True)
+        )
+        profile_follower_ids = set(
+            Follow.objects.filter(following=profile_user).values_list('follower_id', flat=True)
+        )
+        mutual_ids = viewer_following_ids & profile_follower_ids
+        mutual_followers_count = len(mutual_ids)
+        if mutual_ids:
+            mutual_followers = list(
+                User.objects.filter(id__in=list(mutual_ids)[:3]).values_list('username', flat=True)
+            )
+
+    # Debate win/loss/draw record (derived from observer votes)
+    _dp_qs = DebateParticipant.objects.filter(user=profile_user, debate__status='completed')
+    _debate_played = _dp_qs.values('debate_id').distinct().count()
+    _yes_wins = ObserverVote.objects.filter(
+        debate__participants__user=profile_user,
+        debate__participants__side='yes',
+        winner_side='yes',
+    ).values('debate').distinct().count()
+    _no_wins = ObserverVote.objects.filter(
+        debate__participants__user=profile_user,
+        debate__participants__side='no',
+        winner_side='no',
+    ).values('debate').distinct().count()
+    _debate_wins = _yes_wins + _no_wins
+    _debate_draws = _dp_qs.filter(debate__outcome='draw').values('debate_id').distinct().count()
+    _debate_losses = max(0, _debate_played - _debate_wins - _debate_draws)
+
+    # Public series for this profile
+    user_series = []
+    if can_see_content:
+        user_series = list(
+            PostSeries.objects.filter(user=profile_user)
+            .annotate(post_count=Count('items'))
+            .order_by('-created_at')
+        )
+
     context = {
         'profile_user': profile_user,
-        'user_posts': user_posts,
-        'user_reviews': user_reviews,
-        'user_questions': user_questions,
-        'user_polls': user_polls,
+        'user_posts': user_posts if can_see_content else [],
+        'user_reviews': user_reviews if can_see_content else [],
+        'user_questions': user_questions if can_see_content else [],
+        'user_polls': user_polls if can_see_content else [],
+        'user_series': user_series,
+        'pinned_posts': list(Post.objects.filter(user=profile_user, is_pinned=True, is_draft=False).order_by('-updated_at')[:3]) if can_see_content else [],
         'avatar_url': avatar_url,
         'is_online': is_online,
         'presence_label': presence_label,
@@ -2390,6 +2527,31 @@ def register_view(request):
             messages.error(request, f'Registration failed: {str(e)}')
 
     return render(request, 'frontend/register.html', {'next': next_url})
+
+@login_required
+def my_interests(request):
+    followed_tags = list(HashtagFollow.objects.filter(user=request.user).order_by('tag'))
+    from discussions.models import CategoryFollow as _CF
+    followed_categories = list(_CF.objects.filter(user=request.user).values_list('category', flat=True))
+    all_categories = [c[0] for c in CATEGORY_CHOICES]
+    return render(request, 'frontend/my_interests.html', {
+        'followed_tags': followed_tags,
+        'followed_categories': followed_categories,
+        'all_categories': all_categories,
+    })
+
+
+@login_required
+def my_reminders(request):
+    """Show all pending (unsent) post reminders for the logged-in user."""
+    from discussions.models import PostReminder as _RemView
+    reminders = list(
+        _RemView.objects.filter(user=request.user, is_sent=False)
+        .select_related('post', 'post__user')
+        .order_by('remind_at')
+    )
+    return render(request, 'frontend/my_reminders.html', {'reminders': reminders})
+
 
 @login_required
 def interests_onboarding(request):

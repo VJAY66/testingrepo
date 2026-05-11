@@ -267,6 +267,13 @@
             <span>Polls</span>
             <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_polls.count }}</span>
         </button>
+        {% if user_series %}
+        <button type="button" id="up-tab-btn-series" onclick="switchUserTab('series')"
+            class="up-tab-btn flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-secondary/60">
+            <span>Series</span>
+            <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_series|length }}</span>
+        </button>
+        {% endif %}
     </div>
 
     <!-- Tab: Posts -->
@@ -382,6 +389,31 @@
         </div>
         {% endif %}
     </section>
+
+    {% if user_series %}
+    <!-- Tab: Series -->
+    <section id="up-tab-series" class="hidden">
+        <div class="space-y-4">
+            {% for series in user_series %}
+            <article class="group rounded-2xl border border-border/70 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
+                <div class="flex items-start justify-between gap-3 mb-2">
+                    <h3 class="text-base font-bold text-foreground leading-snug flex-1">
+                        <a href="{% url 'series_detail' series.id %}" class="hover:text-primary transition-colors">{{ series.title }}</a>
+                    </h3>
+                    <span class="shrink-0 px-2.5 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 rounded-full text-xs font-bold">{{ series.post_count }} post{{ series.post_count|pluralize }}</span>
+                </div>
+                {% if series.description %}
+                <p class="text-sm text-muted-foreground line-clamp-2 mb-3">{{ series.description }}</p>
+                {% endif %}
+                <div class="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{{ series.created_at|date:"M j, Y" }}</span>
+                    <a href="{% url 'series_detail' series.id %}" class="ml-auto text-primary/70 font-medium hover:text-primary">Read series →</a>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
 </div>
 
 <div id="rp-modal-backdrop" class="rp-modal-backdrop" aria-hidden="true">
@@ -584,7 +616,7 @@ function submitProfileReport() {
 })();
 
 function switchUserTab(name) {
-    const tabs = ['posts', 'reviews', 'questions', 'polls'];
+    const tabs = ['posts', 'reviews', 'questions', 'polls', 'series'];
     tabs.forEach(function(t) {
         const section = document.getElementById('up-tab-' + t);
         const btn = document.getElementById('up-tab-btn-' + t);

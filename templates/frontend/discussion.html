@@ -20,6 +20,14 @@
                 <div>
                     <p class="font-medium text-foreground">{{ post.user.username }}</p>
                     <p class="text-sm text-muted-foreground">{{ post.created_at|date:"M j, Y g:i A" }}</p>
+                    {% if accepted_coauthors %}
+                    <p class="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 flex-wrap">
+                        <span>with</span>
+                        {% for ca in accepted_coauthors %}
+                        <a href="{% url 'user_profile' ca.user.username %}" class="text-primary font-medium hover:underline">@{{ ca.user.username }}</a>{% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    </p>
+                    {% endif %}
                 </div>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
