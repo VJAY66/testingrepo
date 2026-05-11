@@ -28,6 +28,7 @@ from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
 from utils.moderation import check_content_moderation
 import markdown as _markdown
+import bleach as _bleach
 from django.utils.safestring import mark_safe
 
 
@@ -1870,9 +1871,20 @@ def upload_profile_picture(request):
     if file.size > 5 * 1024 * 1024:
         return JsonResponse({'success': False, 'error': 'File size exceeds 5MB'}, status=400)
     
-    # Validate file type
-    allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-    if file.content_type not in allowed_types:
+    # Validate file type via magic bytes (not just the client-supplied Content-Type header)
+    header = file.read(12)
+    file.seek(0)
+    _MAGIC = [
+        b'\xff\xd8\xff',                            # JPEG
+        b'\x89PNG\r\n\x1a\n',                       # PNG
+        b'GIF87a', b'GIF89a',                       # GIF
+        b'RIFF',                                    # WebP (verified below)
+    ]
+    is_webp = header[:4] == b'RIFF' and header[8:12] == b'WEBP'
+    if not any(header.startswith(sig) for sig in _MAGIC[:4]) and not is_webp:
+        return JsonResponse({'success': False, 'error': 'Invalid file type. Only JPEG, PNG, GIF, and WebP allowed'}, status=400)
+    # Also reject RIFF that is NOT WebP
+    if header[:4] == b'RIFF' and not is_webp:
         return JsonResponse({'success': False, 'error': 'Invalid file type. Only JPEG, PNG, GIF, and WebP allowed'}, status=400)
     
     # Delete old picture if exists
@@ -8090,6 +8102,16 @@ def create_story(request):
         if not content and not image:
             return JsonResponse({'error': 'Provide text or an image.'}, status=400)
 
+        if image:
+            if image.size > 10 * 1024 * 1024:
+                return JsonResponse({'error': 'Image must be under 10 MB.'}, status=400)
+            header = image.read(12)
+            image.seek(0)
+            is_webp = header[:4] == b'RIFF' and header[8:12] == b'WEBP'
+            _STORY_MAGIC = [b'\xff\xd8\xff', b'\x89PNG\r\n\x1a\n', b'GIF87a', b'GIF89a']
+            if not any(header.startswith(sig) for sig in _STORY_MAGIC) and not is_webp:
+                return JsonResponse({'error': 'Image must be JPEG, PNG, GIF, or WebP.'}, status=400)
+
         story = Story.objects.create(
             user=request.user,
             content=content,
@@ -8992,8 +9014,25 @@ def privacy_policy(request):
 
 # ── Markdown Post Rendering ──────────────────────────────────────────────────
 
+_MD_ALLOWED_TAGS = [
+    'a', 'abbr', 'acronym', 'b', 'blockquote', 'br', 'caption', 'code', 'col',
+    'colgroup', 'dd', 'del', 'details', 'dfn', 'div', 'dl', 'dt', 'em',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'ins', 'kbd',
+    'li', 'ol', 'p', 'pre', 'q', 's', 'samp', 'small', 'span', 'strong',
+    'sub', 'summary', 'sup', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead',
+    'tr', 'tt', 'u', 'ul', 'var',
+]
+_MD_ALLOWED_ATTRS = {
+    '*': ['class'],
+    'a': ['href', 'title', 'rel'],
+    'img': ['src', 'alt', 'title', 'width', 'height'],
+    'td': ['align'], 'th': ['align'],
+}
+_MD_ALLOWED_PROTOCOLS = ['http', 'https', 'mailto']
+
+
 def _render_markdown(content):
-    """Convert markdown content to safe HTML."""
+    """Convert markdown content to sanitized safe HTML (bleach allowlist prevents XSS)."""
     if not content:
         return ''
     html = _markdown.markdown(
@@ -9003,7 +9042,14 @@ def _render_markdown(content):
             'codehilite': {'css_class': 'highlight', 'guess_lang': False},
         },
     )
-    return mark_safe(html)
+    clean = _bleach.clean(
+        html,
+        tags=_MD_ALLOWED_TAGS,
+        attributes=_MD_ALLOWED_ATTRS,
+        protocols=_MD_ALLOWED_PROTOCOLS,
+        strip=True,
+    )
+    return mark_safe(clean)
 
 
 def dm_request_respond(request, request_id):
@@ -9667,7 +9713,8 @@ def totp_login_verify(request):
         if totp.verify(code, valid_window=1):
             del request.session['totp_pending_user_id']
             login(request, pending_user, backend='django.contrib.auth.backends.ModelBackend')
-            return redirect(request.POST.get('next', '/'))
+            next_url = _safe_next_url(request, request.POST.get('next', ''))
+            return redirect(next_url or '/')
         messages.error(request, 'Invalid authenticator code.')
     return render(request, 'frontend/totp_login.html', {'next': request.GET.get('next', '/')})
 
