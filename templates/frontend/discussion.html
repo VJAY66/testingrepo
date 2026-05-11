@@ -142,7 +142,7 @@
             </div>
             {% endif %}
         </div>
-        {% if post.is_edited %}<span id="post-edited-badge" class="inline-block text-[10px] text-muted-foreground mb-3">edited</span>{% else %}<span id="post-edited-badge" class="hidden inline-block text-[10px] text-muted-foreground mb-3">edited</span>{% endif %}
+        {% if post.is_edited %}<button type="button" id="post-edited-badge" onclick="openEditHistory('post','{{ post.id }}')" class="inline-block text-[10px] text-muted-foreground mb-3 hover:text-primary hover:underline transition-colors">edited ↗</button>{% else %}<button type="button" id="post-edited-badge" class="hidden text-[10px] text-muted-foreground mb-3 hover:text-primary hover:underline transition-colors">edited ↗</button>{% endif %}
 
         {% if post.quoted_post %}
         <div class="mb-4 p-3 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 transition-colors">
@@ -725,7 +725,7 @@
                     <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm">
                         <div class="px-2.5 py-2">
                             <p id="comment-content-{{ comment.id }}" class="text-xs leading-relaxed font-medium text-foreground break-words {% if not comment.content %}hidden{% endif %}">{{ comment.content }}</p>
-                            {% if comment.is_edited %}<span id="comment-edited-badge-{{ comment.id }}" class="text-[9px] text-muted-foreground">edited</span>{% else %}<span id="comment-edited-badge-{{ comment.id }}" class="hidden text-[9px] text-muted-foreground">edited</span>{% endif %}
+                            {% if comment.is_edited %}<button type="button" id="comment-edited-badge-{{ comment.id }}" onclick="openEditHistory('comment','{{ comment.id }}')" class="text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% else %}<button type="button" id="comment-edited-badge-{{ comment.id }}" class="hidden text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% endif %}
                             <div class="mt-1.5 flex flex-wrap items-center gap-1 text-muted-foreground">
                                 {% if comment.is_anonymous and comment.user != user %}
                                 <div class="flex h-5 w-5 flex-none items-center justify-center rounded-full border border-dashed border-border bg-muted text-[9px] text-muted-foreground">?</div>
@@ -815,7 +815,7 @@
                     <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm">
                         <div class="px-2.5 py-2">
                             <p id="comment-content-{{ comment.id }}" class="text-xs leading-relaxed font-medium text-foreground break-words {% if not comment.content %}hidden{% endif %}">{{ comment.content }}</p>
-                            {% if comment.is_edited %}<span id="comment-edited-badge-{{ comment.id }}" class="text-[9px] text-muted-foreground">edited</span>{% else %}<span id="comment-edited-badge-{{ comment.id }}" class="hidden text-[9px] text-muted-foreground">edited</span>{% endif %}
+                            {% if comment.is_edited %}<button type="button" id="comment-edited-badge-{{ comment.id }}" onclick="openEditHistory('comment','{{ comment.id }}')" class="text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% else %}<button type="button" id="comment-edited-badge-{{ comment.id }}" class="hidden text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% endif %}
                             <div class="mt-1.5 flex flex-wrap items-center gap-1 text-muted-foreground">
                                 {% if comment.is_anonymous and comment.user != user %}
                                 <div class="flex h-5 w-5 flex-none items-center justify-center rounded-full border border-dashed border-border bg-muted text-[9px] text-muted-foreground">?</div>
@@ -2210,5 +2210,68 @@ function setReminder(postId, preset) {
     }
   });
 }
+
+// ── Edit History drawer ───────────────────────────────────────────────────────
+function openEditHistory(type, id) {
+  var url = type === 'post' ? '/posts/' + id + '/edit-history/' : '/comments/' + id + '/edit-history/';
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var drawer = document.getElementById('edit-history-drawer');
+      var title = document.getElementById('edit-history-title');
+      var body = document.getElementById('edit-history-body');
+      if (!drawer || !body) return;
+      title.textContent = type === 'post' ? 'Post Edit History' : 'Comment Edit History';
+      var html = '';
+      if (!d.history || d.history.length === 0) {
+        html = '<p class="text-sm text-muted-foreground">No history available.</p>';
+      } else {
+        html += '<div class="rounded-xl border border-primary/30 bg-primary/5 p-3 mb-3">' +
+          '<p class="text-[10px] uppercase tracking-wide font-semibold text-primary mb-1">Current version</p>';
+        if (type === 'post' && d.current_title) {
+          html += '<p class="text-sm font-bold text-foreground mb-1">' + escHist(d.current_title) + '</p>';
+        }
+        if (d.current_content) {
+          html += '<p class="text-xs text-foreground/80 whitespace-pre-wrap">' + escHist(d.current_content.substring(0, 300)) + (d.current_content.length > 300 ? '…' : '') + '</p>';
+        }
+        html += '</div>';
+        d.history.forEach(function(entry) {
+          html += '<div class="rounded-xl border border-border bg-card/60 p-3 mb-2">' +
+            '<p class="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1">Before edit · ' + escHist(entry.edited_at) + '</p>';
+          if (type === 'post' && entry.original_title) {
+            html += '<p class="text-sm font-bold text-foreground mb-1">' + escHist(entry.original_title) + '</p>';
+          }
+          if (entry.original_content) {
+            html += '<p class="text-xs text-foreground/80 whitespace-pre-wrap">' + escHist(entry.original_content.substring(0, 300)) + (entry.original_content.length > 300 ? '…' : '') + '</p>';
+          }
+          html += '</div>';
+        });
+      }
+      body.innerHTML = html;
+      drawer.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    });
+}
+function closeEditHistory() {
+  var drawer = document.getElementById('edit-history-drawer');
+  if (drawer) drawer.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+function escHist(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeEditHistory(); });
 </script>
+
+<!-- Edit History Drawer -->
+<div id="edit-history-drawer" class="hidden fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm" onclick="if(event.target===this)closeEditHistory()">
+  <div class="w-full sm:max-w-lg bg-card border border-border rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
+      <h3 id="edit-history-title" class="text-base font-bold text-foreground">Edit History</h3>
+      <button onclick="closeEditHistory()" class="text-muted-foreground hover:text-foreground transition text-xl leading-none">&times;</button>
+    </div>
+    <div id="edit-history-body" class="overflow-y-auto p-5 space-y-2 flex-1"></div>
+  </div>
+</div>
+
 {% endblock %}

@@ -3281,6 +3281,32 @@ def update_post(request, post_id):
     return JsonResponse({'success': True, 'message': 'Post updated successfully.'})
 
 
+def post_edit_history(request, post_id):
+    """Return edit history for a post as JSON."""
+    post = get_object_or_404(Post, id=post_id)
+    entries = list(
+        PostEditHistory.objects.filter(post=post).order_by('-edited_at').values(
+            'original_title', 'original_content', 'edited_at'
+        )
+    )
+    for e in entries:
+        e['edited_at'] = e['edited_at'].strftime('%b %-d, %Y %I:%M %p')
+    return JsonResponse({'history': entries, 'current_title': post.title, 'current_content': post.content})
+
+
+def comment_edit_history(request, comment_id):
+    """Return edit history for a comment as JSON."""
+    comment = get_object_or_404(Comment, id=comment_id)
+    entries = list(
+        CommentEditHistory.objects.filter(comment=comment).order_by('-edited_at').values(
+            'original_content', 'edited_at'
+        )
+    )
+    for e in entries:
+        e['edited_at'] = e['edited_at'].strftime('%b %-d, %Y %I:%M %p')
+    return JsonResponse({'history': entries, 'current_content': comment.content})
+
+
 @login_required
 @require_POST
 def delete_post(request, post_id):

@@ -300,4 +300,7 @@ urlpatterns = [
     path('lists/add-from-profile/', views.add_to_list_from_profile, name='add_to_list_from_profile'),
     # My Reminders
     path('reminders/', views.my_reminders, name='my_reminders'),
+    # Edit history
+    path('posts/<str:post_id>/edit-history/', views.post_edit_history, name='post_edit_history'),
+    path('comments/<str:comment_id>/edit-history/', views.comment_edit_history, name='comment_edit_history'),
 ]
