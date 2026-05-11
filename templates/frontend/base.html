@@ -3667,31 +3667,31 @@ function acceptCookies() {
 
             function renderResults(items, query) {
                 if (!items.length) {
-                    resultsBox.innerHTML = `<div class="nav-search-empty">No posts found for "${query}".</div>`;
+                    resultsBox.innerHTML = `<div class="nav-search-empty">No posts found for &ldquo;${escapeHtml(query)}&rdquo;.</div>`;
                     return;
                 }
 
                 resultsBox.innerHTML = items.map(item => `
-                    <a href="${item.url}" class="nav-search-item">
-                        <p class="text-sm font-semibold text-foreground">${item.title}</p>
-                        <p class="mt-1 text-xs text-muted-foreground">${item.category} • ${item.author} • ${item.created_at}</p>
+                    <a href="${escapeHtml(item.url)}" class="nav-search-item">
+                        <p class="text-sm font-semibold text-foreground">${escapeHtml(item.title)}</p>
+                        <p class="mt-1 text-xs text-muted-foreground">${escapeHtml(item.category)} • ${escapeHtml(item.author)} • ${escapeHtml(item.created_at)}</p>
                     </a>
                 `).join('');
             }
 
             function renderUsers(users, query) {
                 if (!users.length) {
-                    usersBox.innerHTML = `<div class="nav-search-empty">No accounts found for "${query}".</div>`;
+                    usersBox.innerHTML = `<div class="nav-search-empty">No accounts found for &ldquo;${escapeHtml(query)}&rdquo;.</div>`;
                     return;
                 }
                 usersBox.innerHTML = users.map(u => `
-                    <a href="${u.url}" class="nav-search-item flex items-center gap-3">
+                    <a href="${escapeHtml(u.url)}" class="nav-search-item flex items-center gap-3">
                         <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                            ${u.avatar_url ? `<img src="${u.avatar_url}" class="w-8 h-8 rounded-full object-cover" alt="${u.username}">` : u.username.charAt(0).toUpperCase()}
+                            ${u.avatar_url ? `<img src="${escapeHtml(u.avatar_url)}" class="w-8 h-8 rounded-full object-cover" alt="${escapeHtml(u.username)}">` : escapeHtml(u.username.charAt(0).toUpperCase())}
                         </div>
                         <div>
-                            <p class="text-sm font-semibold text-foreground">@${u.username}</p>
-                            <p class="text-xs text-muted-foreground">${u.posts_count} posts · ${u.followers_count} followers</p>
+                            <p class="text-sm font-semibold text-foreground">@${escapeHtml(u.username)}</p>
+                            <p class="text-xs text-muted-foreground">${escapeHtml(String(u.posts_count))} posts · ${escapeHtml(String(u.followers_count))} followers</p>
                         </div>
                     </a>
                 `).join('');

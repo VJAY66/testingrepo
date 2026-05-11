@@ -655,6 +655,9 @@ def post_action(request, post_id):
 
     post = get_object_or_404(Post, id=post_id)
 
+    if post.user == request.user and action in ['like', 'hot', 'debatable', 'agree', 'surprising']:
+        return JsonResponse({'success': False, 'error': 'Cannot react to your own post.'}, status=400)
+
     if action in ['hot', 'debatable', 'agree', 'surprising']:
         existing_action = PostAction.objects.filter(user=request.user, post=post, action=action).first()
         if existing_action:
@@ -2798,6 +2801,7 @@ def login_view(request):
             try:
                 _profile = user.profile
                 if _profile.totp_enabled and _profile.totp_secret:
+                    request.session.cycle_key()
                     request.session['totp_pending_user_id'] = user.id
                     _redir = next_url or '/'
                     return redirect(f'/account/2fa/login/?next={_redir}')
@@ -5611,6 +5615,9 @@ def poll_vote(request, poll_id):
 
     poll = get_object_or_404(Poll, id=poll_id, is_deleted_by_moderation=False)
 
+    if poll.user == request.user:
+        return JsonResponse({'error': 'Cannot vote on your own poll.'}, status=403)
+
     try:
         data = json.loads(request.body)
         option_id = int(data.get('option_id', 0))
@@ -8106,6 +8113,9 @@ def stories_list(request):
 @login_required
 def create_story(request):
     if request.method == 'POST':
+        _story_key = f'story_rate_{request.user.id}'
+        if cache.get(_story_key, 0) >= 10:
+            return JsonResponse({'error': 'Story limit reached. You can post up to 10 stories per day.'}, status=429)
         content = request.POST.get('content', '').strip()
         bg_color = request.POST.get('bg_color', '#0ea5e9')
         image = request.FILES.get('image')
@@ -8130,6 +8140,7 @@ def create_story(request):
             bg_color=bg_color,
             expires_at=timezone.now() + timedelta(hours=24),
         )
+        cache.set(_story_key, cache.get(_story_key, 0) + 1, 86400)
         return JsonResponse({'success': True, 'story_id': story.id})
     return JsonResponse({'error': 'POST required'}, status=405)
 
@@ -8153,6 +8164,7 @@ def view_story(request, story_id):
 
 
 @login_required
+@require_POST
 def delete_story(request, story_id):
     story = get_object_or_404(Story, id=story_id, user=request.user)
     story.delete()
@@ -8661,6 +8673,12 @@ from django.contrib.auth import update_session_auth_hash
 @login_required
 def password_change(request):
     if request.method == 'POST':
+        _pw_key = f'pw_change_rate_{request.user.id}'
+        _pw_count = cache.get(_pw_key, 0)
+        if _pw_count >= 5:
+            messages.error(request, 'Too many attempts. Please wait 15 minutes.')
+            return redirect('password_change')
+        cache.set(_pw_key, _pw_count + 1, 900)
         current = request.POST.get('current_password', '')
         new_pw = request.POST.get('new_password', '')
         confirm = request.POST.get('confirm_password', '')
@@ -8718,6 +8736,11 @@ def dm_thread(request, username):
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
     if request.method == 'POST':
+        _dm_key = f'dm_rate_{request.user.id}'
+        _dm_count = cache.get(_dm_key, 0)
+        if _dm_count >= 30:
+            return JsonResponse({'error': 'Too many messages. Please wait a minute.'}, status=429)
+        cache.set(_dm_key, _dm_count + 1, 60)
         content = request.POST.get('content', '').strip()[:2000]
         if content:
             msg = DirectMessage.objects.create(sender=request.user, recipient=partner, content=content)

@@ -21,31 +21,34 @@ class PostViewSet(viewsets.ModelViewSet):
             self.permission_classes = [IsAuthenticated]
         return super().get_permissions()
 
+    def get_queryset(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return Post.objects.filter(user=self.request.user)
+        return Post.objects.all()
+
     def perform_create(self, serializer):
         limit_reached, _, limit = has_reached_daily_post_limit(self.request.user)
         if limit_reached:
             raise ValidationError({'detail': f'You can create up to {limit} posts per day.'})
-        
-        # Check content moderation
+
         title = serializer.validated_data.get('title', '')
         content = serializer.validated_data.get('content', '')
         combined_text = f"{title} {content}".strip()
-        
+
         if combined_text and check_content_moderation(combined_text):
             raise ValidationError({'detail': 'Your post contains abusive language and cannot be posted.'})
 
         serializer.save(user=self.request.user, id=str(uuid.uuid4()))
 
     def perform_update(self, serializer):
-        # Check content moderation for updates
         title = serializer.validated_data.get('title', '')
         content = serializer.validated_data.get('content', '')
         combined_text = f"{title} {content}".strip()
-        
+
         if combined_text and check_content_moderation(combined_text):
             raise ValidationError({'detail': 'Your post edit contains abusive language and cannot be saved.'})
-        
-        serializer.save(user=self.request.user)
+
+        serializer.save()
 
     @action(detail=False, methods=['get'])
     def by_category(self, request):
@@ -90,6 +93,11 @@ class CommentViewSet(viewsets.ModelViewSet):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             self.permission_classes = [IsAuthenticated]
         return super().get_permissions()
+
+    def get_queryset(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return Comment.objects.filter(user=self.request.user)
+        return Comment.objects.all()
 
     def perform_create(self, serializer):
         post = serializer.validated_data.get('post')
@@ -182,6 +190,11 @@ class DebateViewSet(viewsets.ModelViewSet):
     queryset = Debate.objects.all()
     serializer_class = DebateSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return Debate.objects.filter(initiator=self.request.user)
+        return Debate.objects.all()
 
     def perform_create(self, serializer):
         serializer.save(id=str(uuid.uuid4()))
