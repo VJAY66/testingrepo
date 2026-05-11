@@ -2,6 +2,7 @@ import os
 import socket
 from pathlib import Path
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 load_dotenv()
 
@@ -264,7 +265,7 @@ MANUAL_EDITOR_EMAIL = os.getenv('MANUAL_EDITOR_EMAIL', '').strip()
 
 # Backend-only moderator accounts for chat abuse reports.
 # Example: MODERATOR_USERNAMES=alice,bob,charlie
-MODERATOR_USERNAMES = _split_env_list('MODERATOR_USERNAMES', 'seshu')
+MODERATOR_USERNAMES = _split_env_list('MODERATOR_USERNAMES', '')
 
 # ── Email ─────────────────────────────────────────────────────────────────────
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
@@ -275,3 +276,44 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'PickASide <noreply@pickside.app>')
 SITE_URL = os.getenv('SITE_URL', 'https://pickside.app')
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        },
+    },
+    'loggers': {
+        'django.security': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'pickside.security': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
+# ── CORS Safety ───────────────────────────────────────────────────────────────
+if CORS_ALLOW_CREDENTIALS and '*' in CORS_ALLOWED_ORIGINS:
+    raise ImproperlyConfigured(
+        'CORS_ALLOW_CREDENTIALS=True cannot be combined with a wildcard CORS_ALLOWED_ORIGINS. '
+        'This would allow any site to make credentialed cross-origin requests.'
+    )

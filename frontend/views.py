@@ -646,6 +646,7 @@ def _check_like_milestone(post):
     )
 
 
+@login_required
 @require_POST
 def post_action(request, post_id):
     action = request.POST.get('action')
@@ -2822,6 +2823,8 @@ def login_view(request):
 
 def check_username(request):
     """AJAX endpoint — returns availability of a username."""
+    if _is_public_rate_limited(request, 'check_username', limit=20, window_seconds=60):
+        return JsonResponse({'available': False, 'message': 'Too many requests'}, status=429)
     username = request.GET.get('username', '').strip()
     if not username:
         return JsonResponse({'available': False, 'message': 'Enter a username'})
@@ -8924,10 +8927,31 @@ def push_vapid_public_key(request):
 
 # ── Link Preview ─────────────────────────────────────────────────────────────
 
+def _is_ssrf_safe_url(url):
+    """Return False if the URL resolves to a private/loopback/link-local address."""
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.scheme not in ('http', 'https'):
+        return False
+    host = parsed.hostname or ''
+    if not host:
+        return False
+    try:
+        ip = ipaddress.ip_address(socket.gethostbyname(host))
+    except Exception:
+        return False
+    return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_unspecified)
+
+
+@login_required
 def link_preview(request):
     url = request.GET.get('url', '').strip()
     if not url:
         return JsonResponse({'error': 'No URL'}, status=400)
+    if not _is_ssrf_safe_url(url):
+        return JsonResponse({'error': 'Invalid URL'}, status=400)
     try:
         preview = LinkPreview.objects.filter(url=url, fetch_failed=False).first()
         if preview and (timezone.now() - preview.fetched_at).days < 7:
@@ -8939,8 +8963,16 @@ def link_preview(request):
             })
         import requests as _req
         from bs4 import BeautifulSoup as _BS
-        resp = _req.get(url, timeout=5, headers={'User-Agent': 'PickAsideBot/1.0'}, allow_redirects=True)
-        soup = _BS(resp.text, 'html.parser')
+        resp = _req.get(
+            url, timeout=5, headers={'User-Agent': 'PickAsideBot/1.0'},
+            allow_redirects=False, stream=True,
+        )
+        raw = b''
+        for chunk in resp.iter_content(1024):
+            raw += chunk
+            if len(raw) >= 1024 * 1024:
+                break
+        soup = _BS(raw, 'html.parser')
         def og(prop):
             t = soup.find('meta', property=prop) or soup.find('meta', attrs={'name': prop})
             return (t.get('content') or '') if t else ''
@@ -8948,6 +8980,11 @@ def link_preview(request):
         desc = og('og:description') or og('twitter:description') or og('description') or ''
         image = og('og:image') or og('twitter:image') or ''
         site_name = og('og:site_name') or ''
+        # Strip any HTML tags from OG values before storing
+        import html
+        title = html.unescape(re.sub(r'<[^>]+>', '', title)).strip()
+        desc = html.unescape(re.sub(r'<[^>]+>', '', desc)).strip()
+        site_name = html.unescape(re.sub(r'<[^>]+>', '', site_name)).strip()
         LinkPreview.objects.update_or_create(url=url, defaults={
             'title': title[:300], 'description': desc[:500],
             'image_url': image[:500], 'site_name': site_name[:100], 'fetch_failed': False,
@@ -9052,10 +9089,10 @@ def _render_markdown(content):
     return mark_safe(clean)
 
 
+@login_required
+@require_POST
 def dm_request_respond(request, request_id):
     """Accept or reject a DM request."""
-    if request.method != 'POST':
-        return JsonResponse({'error': 'POST required'}, status=405)
     dm_req = get_object_or_404(DMRequest, id=request_id, recipient=request.user)
     action = request.POST.get('action', '')
     if action == 'accept':
@@ -9703,6 +9740,15 @@ def totp_login_verify(request):
     if not pending_user_id:
         return redirect('login')
     pending_user = get_object_or_404(User, id=pending_user_id)
+
+    _totp_fail_key = f'totp_fails_{pending_user_id}'
+    _totp_fails = cache.get(_totp_fail_key, 0)
+    if _totp_fails >= 5:
+        del request.session['totp_pending_user_id']
+        cache.delete(_totp_fail_key)
+        messages.error(request, 'Too many failed attempts. Please log in again.')
+        return redirect('login')
+
     if request.method == 'POST':
         code = request.POST.get('code', '').strip().replace(' ', '')
         try:
@@ -9712,8 +9758,10 @@ def totp_login_verify(request):
         totp = pyotp.TOTP(profile.totp_secret)
         if totp.verify(code, valid_window=1):
             del request.session['totp_pending_user_id']
+            cache.delete(_totp_fail_key)
             login(request, pending_user, backend='django.contrib.auth.backends.ModelBackend')
             return redirect(request.POST.get('next', '/'))
+        cache.set(_totp_fail_key, _totp_fails + 1, 900)
         messages.error(request, 'Invalid authenticator code.')
     return render(request, 'frontend/totp_login.html', {'next': request.GET.get('next', '/')})
 

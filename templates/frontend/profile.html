@@ -1256,7 +1256,7 @@
         <div id="muted-keywords-list" class="flex flex-wrap gap-2 mb-3">
             {% for kw in muted_keywords %}
             <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted text-muted-foreground text-xs font-medium">
-                {{ kw }}<button onclick="removeMutedKeyword('{{ kw }}', this)" class="ml-1 text-muted-foreground hover:text-destructive">×</button>
+                {{ kw }}<button data-keyword="{{ kw|escapejs }}" onclick="removeMutedKeyword(this.dataset.keyword, this)" class="ml-1 text-muted-foreground hover:text-destructive">×</button>
             </span>
             {% endfor %}
         </div>
@@ -1979,7 +1979,13 @@ function addMutedKeyword() {
             var list = document.getElementById('muted-keywords-list');
             var span = document.createElement('span');
             span.className = 'inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted text-muted-foreground text-xs font-medium';
-            span.innerHTML = keyword + '<button onclick="removeMutedKeyword(\'' + keyword + '\', this)" class="ml-1 text-muted-foreground hover:text-destructive">×</button>';
+            span.appendChild(document.createTextNode(keyword));
+            var btn = document.createElement('button');
+            btn.className = 'ml-1 text-muted-foreground hover:text-destructive';
+            btn.dataset.keyword = keyword;
+            btn.textContent = '×';
+            btn.onclick = function() { removeMutedKeyword(this.dataset.keyword, this); };
+            span.appendChild(btn);
             list.appendChild(span);
             input.value = '';
         }
