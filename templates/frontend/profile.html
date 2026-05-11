@@ -890,6 +890,10 @@
                 {% endif %}
                 <div class="flex items-center gap-2 mt-2 flex-wrap">
                     <button type="button" onclick="publishDraft('{{ post.id }}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition">Publish</button>
+                    <button type="button" onclick="toggleCoauthorForm('{{ post.id }}')"
+                      class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-medium text-muted-foreground hover:text-primary hover:border-primary transition">
+                      👥 Invite Co-author
+                    </button>
                     <span class="text-xs text-muted-foreground">Saved {{ post.created_at|date:"M j, Y" }}</span>
                     <button type="button" onclick="toggleReschedule('{{ post.id }}')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-medium text-muted-foreground hover:text-primary hover:border-primary transition">
                         📅 {% if post.scheduled_for %}{{ post.scheduled_for|date:"M j, g:i A" }}{% else %}Schedule{% endif %}
@@ -902,6 +906,13 @@
                     <button type="button" onclick="saveReschedule('{{ post.id }}')" class="px-3 py-1.5 rounded-full bg-sky-500 text-white text-xs font-bold hover:bg-sky-600 transition">Save</button>
                     <button type="button" onclick="clearSchedule('{{ post.id }}')" class="px-3 py-1.5 rounded-full border border-border text-xs text-muted-foreground hover:text-destructive transition">Clear</button>
                     <span id="reschedule-msg-{{ post.id }}" class="text-xs text-muted-foreground"></span>
+                </div>
+                <div id="coauthor-form-{{ post.id }}" class="hidden mt-2 flex items-center gap-2">
+                  <input type="text" id="coauthor-input-{{ post.id }}" placeholder="@username"
+                    class="rounded-lg border border-border bg-background text-foreground text-xs px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/40 w-36">
+                  <button type="button" onclick="sendCoauthorInvite('{{ post.id }}')"
+                    class="px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition">Invite</button>
+                  <span id="coauthor-msg-{{ post.id }}" class="text-xs text-muted-foreground"></span>
                 </div>
             </article>
             {% endfor %}
@@ -1548,6 +1559,31 @@ function publishDraft(postId) {
 function toggleReschedule(postId) {
     var form = document.getElementById('reschedule-form-' + postId);
     if (form) form.classList.toggle('hidden');
+}
+
+function toggleCoauthorForm(postId) {
+    var form = document.getElementById('coauthor-form-' + postId);
+    if (form) form.classList.toggle('hidden');
+}
+
+function sendCoauthorInvite(postId) {
+    var inp = document.getElementById('coauthor-input-' + postId);
+    var msg = document.getElementById('coauthor-msg-' + postId);
+    var username = inp ? inp.value.trim().replace(/^@/, '') : '';
+    if (!username) return;
+    var fd = new FormData();
+    fd.append('username', username);
+    fetch('/posts/' + postId + '/coauthor/invite/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+        body: fd,
+    }).then(r => r.json()).then(d => {
+        if (msg) {
+            msg.textContent = d.success ? (d.created ? '✓ Invite sent to @' + username : 'Already invited') : (d.error || 'Error');
+            msg.className = 'text-xs ' + (d.success ? 'text-green-600 dark:text-green-400' : 'text-destructive');
+        }
+        if (d.success && inp) inp.value = '';
+    }).catch(() => { if (msg) { msg.textContent = 'Network error'; msg.className = 'text-xs text-destructive'; } });
 }
 
 function saveReschedule(postId) {

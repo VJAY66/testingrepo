@@ -9606,19 +9606,193 @@ def post_similarity_check(request):
 
 
 
-# ─── Live Debate Rooms (coming soon — hidden from nav) ───────────────────────
-# All URLs preserved so existing bookmarks don't 404; all render coming-soon.
+# ─── Live Debate Rooms ────────────────────────────────────────────────────────
 
-def _live_debate_coming_soon(request, **kwargs):
-    return render(request, 'frontend/live_debate_coming_soon.html')
+def _check_live_room_transitions(room):
+    now = timezone.now()
+    if room.status == LiveDebateRoom.STATUS_LIVE and room.ends_at and room.ends_at <= now:
+        room.status = LiveDebateRoom.STATUS_VOTING
+        room.ended_at = now + timedelta(minutes=5)
+        room.save(update_fields=['status', 'ended_at'])
+        LiveDebateMessage.objects.create(
+            room=room, sender=room.creator,
+            content='⏱️ Time is up! Vote for the side that argued best.',
+            is_system=True,
+        )
+    elif room.status == LiveDebateRoom.STATUS_VOTING and room.ended_at and room.ended_at <= now:
+        yes_v = room.yes_votes
+        no_v = room.no_votes
+        winner = 'yes' if yes_v > no_v else ('no' if no_v > yes_v else '')
+        room.status = LiveDebateRoom.STATUS_CLOSED
+        room.winner_side = winner
+        room.save(update_fields=['status', 'winner_side'])
 
-live_debate_rooms        = _live_debate_coming_soon
-live_debate_room_detail  = _live_debate_coming_soon
-create_live_debate_room  = _live_debate_coming_soon
-join_live_debate_room    = _live_debate_coming_soon
-live_debate_send_message = _live_debate_coming_soon
-live_debate_poll_messages = _live_debate_coming_soon
-live_debate_vote         = _live_debate_coming_soon
+
+def live_debate_rooms(request):
+    live_rooms = list(LiveDebateRoom.objects.filter(status=LiveDebateRoom.STATUS_LIVE).select_related('yes_debater', 'no_debater'))
+    voting_rooms = list(LiveDebateRoom.objects.filter(status=LiveDebateRoom.STATUS_VOTING).select_related('yes_debater', 'no_debater'))
+    open_rooms = list(LiveDebateRoom.objects.filter(status=LiveDebateRoom.STATUS_OPEN).select_related('creator', 'yes_debater', 'no_debater'))
+    return render(request, 'frontend/live_debate_rooms.html', {
+        'live_rooms': live_rooms,
+        'voting_rooms': voting_rooms,
+        'open_rooms': open_rooms,
+    })
+
+
+def live_debate_room_detail(request, room_id):
+    room = get_object_or_404(LiveDebateRoom, id=room_id)
+    _check_live_room_transitions(room)
+    msgs = list(room.messages.select_related('sender').order_by('created_at'))
+    can_join = (
+        request.user.is_authenticated
+        and room.status == LiveDebateRoom.STATUS_OPEN
+        and request.user != room.yes_debater
+        and request.user != room.no_debater
+        and not room.is_full
+    )
+    user_is_debater = request.user.is_authenticated and (
+        request.user == room.yes_debater or request.user == room.no_debater
+    )
+    user_vote = None
+    if request.user.is_authenticated:
+        _vote = LiveDebateVote.objects.filter(room=room, voter=request.user).first()
+        if _vote:
+            user_vote = _vote.winner_side
+    return render(request, 'frontend/live_debate_room.html', {
+        'room': room,
+        'messages': msgs,
+        'can_join': can_join,
+        'user_is_debater': user_is_debater,
+        'user_vote': user_vote,
+    })
+
+
+@login_required
+@require_POST
+def create_live_debate_room(request):
+    title = request.POST.get('title', '').strip()
+    description = request.POST.get('description', '').strip()
+    creator_side = request.POST.get('creator_side', 'yes')
+    duration_raw = request.POST.get('duration', '10')
+    if not title:
+        return JsonResponse({'success': False, 'error': 'Title is required.'}, status=400)
+    try:
+        duration = max(5, min(60, int(duration_raw)))
+    except (ValueError, TypeError):
+        duration = 10
+    room = LiveDebateRoom.objects.create(
+        id=str(uuid.uuid4()),
+        title=title,
+        description=description,
+        creator=request.user,
+        duration_minutes=duration,
+        yes_debater=request.user if creator_side == 'yes' else None,
+        no_debater=request.user if creator_side == 'no' else None,
+    )
+    LiveDebateMessage.objects.create(
+        room=room, sender=request.user,
+        content=f'🎙️ Room created by @{request.user.username}. Waiting for an opponent to join.',
+        is_system=True,
+    )
+    return JsonResponse({'success': True, 'room_id': room.id})
+
+
+@login_required
+@require_POST
+def join_live_debate_room(request, room_id):
+    room = get_object_or_404(LiveDebateRoom, id=room_id)
+    if room.status != LiveDebateRoom.STATUS_OPEN:
+        return JsonResponse({'success': False, 'error': 'Room is no longer open.'}, status=400)
+    if room.yes_debater == request.user or room.no_debater == request.user:
+        return JsonResponse({'success': False, 'error': 'You are already in this room.'}, status=400)
+    if room.is_full:
+        return JsonResponse({'success': False, 'error': 'Room is full.'}, status=400)
+    if not room.yes_debater:
+        room.yes_debater = request.user
+    else:
+        room.no_debater = request.user
+    if room.is_full:
+        room.status = LiveDebateRoom.STATUS_LIVE
+        room.started_at = timezone.now()
+        room.ends_at = room.started_at + timedelta(minutes=room.duration_minutes)
+        room.save(update_fields=['yes_debater', 'no_debater', 'status', 'started_at', 'ends_at'])
+        LiveDebateMessage.objects.create(
+            room=room, sender=request.user,
+            content=f'🔴 Debate started! @{room.yes_debater.username} (Yes) vs @{room.no_debater.username} (No). You have {room.duration_minutes} minutes.',
+            is_system=True,
+        )
+    else:
+        room.save(update_fields=['yes_debater', 'no_debater'])
+        LiveDebateMessage.objects.create(
+            room=room, sender=request.user,
+            content=f'👋 @{request.user.username} joined. Waiting for one more debater…',
+            is_system=True,
+        )
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_POST
+def live_debate_send_message(request, room_id):
+    room = get_object_or_404(LiveDebateRoom, id=room_id)
+    if room.status != LiveDebateRoom.STATUS_LIVE:
+        return JsonResponse({'success': False, 'error': 'Debate is not live.'}, status=400)
+    if request.user != room.yes_debater and request.user != room.no_debater:
+        return JsonResponse({'success': False, 'error': 'Only debaters can send messages.'}, status=403)
+    content = request.POST.get('content', '').strip()
+    if not content:
+        return JsonResponse({'success': False, 'error': 'Message is empty.'}, status=400)
+    if len(content) > 1000:
+        return JsonResponse({'success': False, 'error': 'Message too long.'}, status=400)
+    msg = LiveDebateMessage.objects.create(room=room, sender=request.user, content=content)
+    side = 'yes' if request.user == room.yes_debater else 'no'
+    return JsonResponse({'success': True, 'message': {
+        'id': msg.id,
+        'content': msg.content,
+        'username': request.user.username,
+        'side': side,
+        'is_system': False,
+        'created_at': msg.created_at.strftime('%H:%M'),
+    }})
+
+
+def live_debate_poll_messages(request, room_id):
+    room = get_object_or_404(LiveDebateRoom, id=room_id)
+    _check_live_room_transitions(room)
+    since_id = int(request.GET.get('since', 0) or 0)
+    new_msgs = list(room.messages.filter(id__gt=since_id).select_related('sender').order_by('created_at'))
+    msgs_data = []
+    for m in new_msgs:
+        side = 'yes' if m.sender == room.yes_debater else ('no' if m.sender == room.no_debater else '')
+        msgs_data.append({
+            'id': m.id,
+            'content': m.content,
+            'username': m.sender.username,
+            'side': side,
+            'is_system': m.is_system,
+            'created_at': m.created_at.strftime('%H:%M'),
+        })
+    return JsonResponse({
+        'messages': msgs_data,
+        'status': room.status,
+        'yes_votes': room.yes_votes,
+        'no_votes': room.no_votes,
+    })
+
+
+@login_required
+@require_POST
+def live_debate_vote(request, room_id):
+    room = get_object_or_404(LiveDebateRoom, id=room_id)
+    if room.status != LiveDebateRoom.STATUS_VOTING:
+        return JsonResponse({'success': False, 'error': 'Voting is not open.'}, status=400)
+    if request.user == room.yes_debater or request.user == room.no_debater:
+        return JsonResponse({'success': False, 'error': 'Debaters cannot vote.'}, status=403)
+    side = request.POST.get('side', '')
+    if side not in ('yes', 'no'):
+        return JsonResponse({'success': False, 'error': 'Invalid side.'}, status=400)
+    LiveDebateVote.objects.get_or_create(room=room, voter=request.user, defaults={'winner_side': side})
+    return JsonResponse({'success': True, 'yes_votes': room.yes_votes, 'no_votes': room.no_votes})
 
 
 @login_required
