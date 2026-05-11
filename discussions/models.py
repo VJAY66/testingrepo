@@ -339,7 +339,7 @@ class Notification(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
-    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES)
+    notification_type = models.CharField(max_length=30, choices=NOTIFICATION_TYPES)
     message = models.TextField()
     is_read = models.BooleanField(default=False, db_index=True)
     count = models.PositiveIntegerField(default=1)
