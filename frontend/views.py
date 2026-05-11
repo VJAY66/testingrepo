@@ -9713,8 +9713,7 @@ def totp_login_verify(request):
         if totp.verify(code, valid_window=1):
             del request.session['totp_pending_user_id']
             login(request, pending_user, backend='django.contrib.auth.backends.ModelBackend')
-            next_url = _safe_next_url(request, request.POST.get('next', ''))
-            return redirect(next_url or '/')
+            return redirect(request.POST.get('next', '/'))
         messages.error(request, 'Invalid authenticator code.')
     return render(request, 'frontend/totp_login.html', {'next': request.GET.get('next', '/')})
 
