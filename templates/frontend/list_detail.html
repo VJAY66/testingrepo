@@ -1,0 +1,169 @@
+{% extends "frontend/base.html" %}
+{% block title %}{{ lst.name }} — List{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-8">
+
+  <!-- Header -->
+  <div class="mb-6">
+    <div class="flex items-start justify-between gap-4">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-1">
+          <a href="{% url 'user_lists' %}" class="text-xs text-muted-foreground hover:text-foreground transition">← My Lists</a>
+          {% if lst.is_private %}<span class="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">🔒 Private</span>{% endif %}
+        </div>
+        <h1 class="text-2xl font-black text-foreground">{{ lst.name }}</h1>
+        {% if lst.description %}<p class="text-sm text-muted-foreground mt-1">{{ lst.description }}</p>{% endif %}
+        <p class="text-xs text-muted-foreground mt-1">by <a href="{% url 'user_profile' lst.creator.username %}" class="text-primary hover:underline">@{{ lst.creator.username }}</a> · <span id="member-count">{{ members|length }}</span> member{{ members|length|pluralize }}</p>
+      </div>
+      {% if is_owner %}
+      <button onclick="document.getElementById('add-member-modal').classList.remove('hidden')"
+        class="flex-shrink-0 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition">
+        + Add Member
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Members strip -->
+  {% if members %}
+  <div class="rounded-2xl border border-border bg-card p-4 mb-6">
+    <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Members</h2>
+    <div class="flex flex-wrap gap-2" id="members-list">
+      {% for m in members %}
+      <div class="flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-sm" id="member-chip-{{ m.user.username }}">
+        {% if m.user.profile.avatar %}
+        <img src="{{ m.user.profile.avatar.url }}" class="w-5 h-5 rounded-full object-cover" alt="">
+        {% else %}
+        <span class="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">{{ m.user.username|first|upper }}</span>
+        {% endif %}
+        <a href="{% url 'user_profile' m.user.username %}" class="font-medium text-foreground hover:text-primary">@{{ m.user.username }}</a>
+        {% if is_owner %}
+        <button onclick="removeMember('{{ m.user.username }}')" class="text-muted-foreground hover:text-destructive transition text-xs ml-1" title="Remove">✕</button>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="rounded-2xl border border-dashed border-border bg-card p-8 text-center mb-6">
+    <p class="text-muted-foreground text-sm">No members yet.</p>
+    {% if is_owner %}<p class="text-xs text-muted-foreground mt-1">Add people to start curating their posts.</p>{% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Post feed -->
+  {% if posts %}
+  <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Posts from members</h2>
+  <div class="space-y-3">
+    {% for post in posts %}
+    <div class="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <div class="flex items-center gap-2 mb-2">
+        {% if post.display_avatar %}
+        <img src="{{ post.display_avatar }}" class="w-7 h-7 rounded-full object-cover" alt="">
+        {% elif post.is_anonymous %}
+        <span class="w-7 h-7 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/50 text-xs">?</span>
+        {% else %}
+        <span class="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">{{ post.user.username|first|upper }}</span>
+        {% endif %}
+        <div>
+          {% if post.is_anonymous %}
+          <span class="text-xs font-semibold italic text-muted-foreground">Anonymous</span>
+          {% else %}
+          <a href="{% url 'user_profile' post.display_username %}" class="text-xs font-semibold text-foreground hover:text-primary">@{{ post.display_username }}</a>
+          {% endif %}
+          <span class="text-[10px] text-muted-foreground ml-1">{{ post.created_at|timesince }} ago</span>
+        </div>
+      </div>
+      <a href="{% url 'discussion' post.id %}" class="block text-sm text-foreground hover:text-primary transition-colors leading-relaxed">
+        {{ post.title }}
+      </a>
+      {% if post.hashtags %}
+      <p class="text-[11px] text-primary/70 mt-1">{{ post.hashtags }}</p>
+      {% endif %}
+      <div class="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+        <span>👍 {{ post.like_count }}</span>
+        <span>💬 {{ post.comment_count }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div class="flex justify-center gap-2 mt-6">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}" class="px-4 py-2 rounded-full border border-border text-sm hover:bg-muted transition">← Prev</a>
+    {% endif %}
+    <span class="px-4 py-2 text-sm text-muted-foreground">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}" class="px-4 py-2 rounded-full border border-border text-sm hover:bg-muted transition">Next →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% elif members %}
+  <div class="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+    <p class="text-muted-foreground text-sm">No posts from list members yet.</p>
+  </div>
+  {% endif %}
+
+</div>
+
+{% if is_owner %}
+<!-- Add Member Modal -->
+<div id="add-member-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+  <div class="w-full max-w-sm rounded-2xl bg-card border border-border shadow-xl p-6">
+    <h2 class="text-lg font-bold text-foreground mb-4">Add a member</h2>
+    <input id="add-member-username" type="text" placeholder="@username"
+      class="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 mb-4">
+    <div id="add-member-error" class="text-xs text-destructive mb-2 hidden"></div>
+    <div class="flex gap-3 justify-end">
+      <button onclick="document.getElementById('add-member-modal').classList.add('hidden')"
+        class="px-4 py-2 rounded-full text-sm font-semibold text-muted-foreground hover:text-foreground transition">Cancel</button>
+      <button onclick="submitAddMember()"
+        class="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition">Add</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function getCsrf() {
+  return document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+}
+function submitAddMember() {
+  var username = document.getElementById('add-member-username').value.trim().replace(/^@/, '');
+  if (!username) return;
+  var errEl = document.getElementById('add-member-error');
+  errEl.classList.add('hidden');
+  var fd = new FormData();
+  fd.append('username', username);
+  fetch('{% url "add_list_member" lst.id %}', {method: 'POST', headers: {'X-CSRFToken': getCsrf()}, body: fd})
+    .then(r => r.json()).then(d => {
+      if (d.success) {
+        document.getElementById('add-member-modal').classList.add('hidden');
+        document.getElementById('add-member-username').value = '';
+        document.getElementById('member-count').textContent = d.member_count;
+        window.location.reload();
+      } else {
+        errEl.textContent = d.error || 'Failed to add member.';
+        errEl.classList.remove('hidden');
+      }
+    });
+}
+function removeMember(username) {
+  if (!confirm('Remove @' + username + ' from this list?')) return;
+  var fd = new FormData();
+  fd.append('username', username);
+  fetch('{% url "remove_list_member" lst.id %}', {method: 'POST', headers: {'X-CSRFToken': getCsrf()}, body: fd})
+    .then(r => r.json()).then(d => {
+      if (d.success) {
+        var chip = document.getElementById('member-chip-' + username);
+        if (chip) chip.remove();
+        document.getElementById('member-count').textContent = d.member_count;
+      }
+    });
+}
+</script>
+{% endif %}
+
+{% endblock %}

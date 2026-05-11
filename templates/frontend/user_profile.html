@@ -319,6 +319,25 @@
                                 class="inline-flex items-center rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 dark:bg-red-900/20 dark:border-red-700 dark:text-red-400">
                             Report Profile
                         </button>
+                        {% if viewer_lists %}
+                        <div class="relative" id="add-to-list-wrapper">
+                            <button type="button" onclick="document.getElementById('add-to-list-dropdown').classList.toggle('hidden')"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:border-primary/40 hover:text-primary">
+                                📋 Add to list
+                            </button>
+                            <div id="add-to-list-dropdown" class="hidden absolute left-0 top-full mt-1 z-50 w-56 rounded-xl border border-border bg-card shadow-lg py-1">
+                                {% for vl in viewer_lists %}
+                                <button type="button" onclick="addToList('{{ vl.id }}', '{{ profile_user.username|escapejs }}')"
+                                        class="w-full text-left px-4 py-2 text-sm hover:bg-muted transition truncate">
+                                    {{ vl.name }}
+                                </button>
+                                {% endfor %}
+                                <div class="border-t border-border mt-1 pt-1">
+                                    <a href="{% url 'user_lists' %}" class="block px-4 py-2 text-xs text-muted-foreground hover:text-foreground transition">Manage lists →</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                     {% endif %}
 
@@ -955,6 +974,30 @@ function toggleMute(username) {
 </script>
 
 <script>
+function addToList(listId, username) {
+    var fd = new FormData();
+    fd.append('list_id', listId);
+    fd.append('username', username);
+    fetch('{% url "add_to_list_from_profile" %}', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+        body: fd
+    }).then(r => r.json()).then(d => {
+        document.getElementById('add-to-list-dropdown').classList.add('hidden');
+        if (d.success) {
+            alert(d.created ? 'Added to "' + d.list_name + '"!' : 'Already in "' + d.list_name + '".');
+        } else {
+            alert(d.error || 'Could not add to list.');
+        }
+    });
+}
+document.addEventListener('click', function(e) {
+    var wrapper = document.getElementById('add-to-list-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+        var dd = document.getElementById('add-to-list-dropdown');
+        if (dd) dd.classList.add('hidden');
+    }
+});
 function submitEndorsement(username) {
     var topic = (document.getElementById('endorse-topic-input') || {}).value || '';
     topic = topic.trim();

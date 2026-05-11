@@ -142,6 +142,7 @@ class Comment(models.Model):
     is_deleted_by_moderation = models.BooleanField(default=False, help_text='Automatically deleted by moderation')
     is_flagged = models.BooleanField(default=False, help_text='Flagged by moderation system')
     moderation_reason = models.TextField(blank=True, default='', help_text='Reason for moderation action')
+    is_anonymous = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

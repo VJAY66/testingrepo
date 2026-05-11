@@ -1,0 +1,106 @@
+{% extends "frontend/base.html" %}
+{% block title %}My Lists{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-8">
+
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-black text-foreground">My Lists</h1>
+    <button onclick="document.getElementById('create-list-modal').classList.remove('hidden')"
+      class="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition">
+      + New List
+    </button>
+  </div>
+
+  {% if lists %}
+  <div class="space-y-3 mb-10">
+    {% for lst in lists %}
+    <div class="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <div class="flex-1 min-w-0">
+        <a href="{% url 'list_detail' lst.id %}" class="font-bold text-foreground hover:text-primary transition-colors">{{ lst.name }}</a>
+        {% if lst.description %}<p class="text-xs text-muted-foreground mt-0.5 truncate">{{ lst.description }}</p>{% endif %}
+        <p class="text-xs text-muted-foreground mt-1">{{ lst.member_count }} member{{ lst.member_count|pluralize }} · {% if lst.is_private %}🔒 Private{% else %}🌐 Public{% endif %}</p>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <a href="{% url 'list_detail' lst.id %}" class="text-xs text-primary hover:underline">View feed</a>
+        <button onclick="deleteList('{{ lst.id }}', this)"
+          class="text-xs text-destructive hover:underline">Delete</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="rounded-2xl border border-dashed border-border bg-card p-10 text-center mb-10">
+    <p class="text-muted-foreground text-sm">You haven't created any lists yet.</p>
+    <p class="text-xs text-muted-foreground mt-1">Create a list to curate posts from specific users.</p>
+  </div>
+  {% endif %}
+
+  {% if memberships %}
+  <h2 class="text-lg font-bold text-foreground mb-3">Lists you appear in</h2>
+  <div class="space-y-2">
+    {% for m in memberships %}
+    <div class="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm">
+      <a href="{% url 'user_profile' m.lst.creator.username %}" class="font-semibold text-primary hover:underline">@{{ m.lst.creator.username }}</a>
+      <span class="text-muted-foreground">added you to</span>
+      {% if not m.lst.is_private %}
+      <a href="{% url 'list_detail' m.lst.id %}" class="font-semibold text-foreground hover:text-primary">{{ m.lst.name }}</a>
+      {% else %}
+      <span class="font-semibold text-foreground">{{ m.lst.name }} <span class="text-[10px] text-muted-foreground">(private)</span></span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Create List Modal -->
+<div id="create-list-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+  <div class="w-full max-w-md rounded-2xl bg-card border border-border shadow-xl p-6">
+    <h2 class="text-lg font-bold text-foreground mb-4">Create a new list</h2>
+    <div class="space-y-3">
+      <input id="new-list-name" type="text" maxlength="60" placeholder="List name (required)"
+        class="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
+      <input id="new-list-desc" type="text" maxlength="200" placeholder="Short description (optional)"
+        class="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
+      <label class="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground">
+        <input id="new-list-private" type="checkbox" class="rounded border-border">
+        Make this list private
+      </label>
+    </div>
+    <div class="mt-5 flex gap-3 justify-end">
+      <button onclick="document.getElementById('create-list-modal').classList.add('hidden')"
+        class="px-4 py-2 rounded-full text-sm font-semibold text-muted-foreground hover:text-foreground transition">Cancel</button>
+      <button onclick="submitCreateList()"
+        class="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition">Create</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function getCsrf() {
+  return document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+}
+function submitCreateList() {
+  var name = document.getElementById('new-list-name').value.trim();
+  if (!name) { alert('Please enter a list name.'); return; }
+  var fd = new FormData();
+  fd.append('name', name);
+  fd.append('description', document.getElementById('new-list-desc').value.trim());
+  fd.append('is_private', document.getElementById('new-list-private').checked ? '1' : '0');
+  fetch('{% url "create_list" %}', {method:'POST', headers:{'X-CSRFToken':getCsrf()}, body:fd})
+    .then(r=>r.json()).then(d=>{
+      if (d.success) { window.location.reload(); }
+      else { alert(d.error || 'Failed to create list.'); }
+    });
+}
+function deleteList(listId, btn) {
+  if (!confirm('Delete this list?')) return;
+  var fd = new FormData();
+  fetch('/lists/' + listId + '/delete/', {method:'POST', headers:{'X-CSRFToken':getCsrf()}, body:fd})
+    .then(r=>r.json()).then(d=>{
+      if (d.success) { btn.closest('.flex').parentElement.remove(); }
+    });
+}
+</script>
+{% endblock %}

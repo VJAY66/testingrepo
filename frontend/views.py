@@ -23,7 +23,7 @@ import uuid
 
 from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest, PostReport, LiveDebateRoom, LiveDebateMessage, LiveDebateVote, PollPrediction
 from discussions.signals import notify_post_author
-from users.models import Follow, UserBlock, UserMute, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription, UserBan, ProfileView, FollowRequest
+from users.models import Follow, UserBlock, UserMute, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription, UserBan, ProfileView, FollowRequest, UserList
 from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
 from utils.moderation import check_content_moderation
@@ -838,10 +838,18 @@ def _annotated_feed_posts_queryset():
 
 
 def _enrich_posts_for_feed(posts, user):
+    _auth_user_id = getattr(user, 'id', None) if getattr(user, 'is_authenticated', False) else None
     for post in posts:
         yes_count = getattr(post, 'yes_count', 0) or 0
         no_count = getattr(post, 'no_count', 0) or 0
         post.author_avatar = _safe_avatar_url(post.user)
+        # Anonymous masking — hide identity unless it's your own post or you're a moderator
+        if post.is_anonymous and post.user_id != _auth_user_id:
+            post.display_username = 'Anonymous'
+            post.display_avatar = None
+        else:
+            post.display_username = post.user.username
+            post.display_avatar = post.author_avatar
         total_votes = yes_count + no_count
         if total_votes > 0:
             post.yes_percentage = (yes_count * 100.0) / total_votes
@@ -2054,6 +2062,10 @@ def user_profile(request, username):
         'streak_days': profile_obj.streak_days if profile_obj else 0,
         'mutual_followers': mutual_followers,
         'mutual_followers_count': mutual_followers_count,
+        'viewer_lists': (
+            list(UserList.objects.filter(creator=request.user).values('id', 'name'))
+            if request.user.is_authenticated and not is_own_profile else []
+        ),
     }
     return render(request, 'frontend/user_profile.html', context)
 
@@ -3362,6 +3374,7 @@ def create_comment(request, post_id):
                 vote_type=vote_type,
                 content=content if content else '',
                 reply_to=reply_to_comment,
+                is_anonymous=request.POST.get('is_anonymous') == '1',
             )
             try:
                 _update_streak(request.user.profile)
@@ -9122,6 +9135,147 @@ def toggle_bookmark(request, post_id):
         saved = True
     save_count = PostAction.objects.filter(post=post, action='save').count()
     return JsonResponse({'success': True, 'saved': saved, 'save_count': save_count})
+
+
+# ─── User-Curated Lists ───────────────────────────────────────────────────────
+
+@login_required
+def user_lists(request):
+    from users.models import UserList as _UL, UserListMember as _ULM
+    lists = _UL.objects.filter(creator=request.user).annotate(
+        member_count=Count('members', distinct=True)
+    )
+    # Membership counts for lists the user is IN (from others)
+    memberships = _ULM.objects.filter(user=request.user).select_related('lst__creator')
+    return render(request, 'frontend/user_lists.html', {
+        'lists': lists,
+        'memberships': memberships,
+    })
+
+
+@login_required
+@require_POST
+def create_list(request):
+    from users.models import UserList as _UL
+    name = request.POST.get('name', '').strip()[:60]
+    description = request.POST.get('description', '').strip()[:200]
+    is_private = request.POST.get('is_private') == '1'
+    if not name:
+        return JsonResponse({'success': False, 'error': 'List name is required.'}, status=400)
+    lst = _UL.objects.create(
+        id=str(uuid.uuid4()),
+        creator=request.user,
+        name=name,
+        description=description,
+        is_private=is_private,
+    )
+    return JsonResponse({'success': True, 'list_id': lst.id, 'name': lst.name})
+
+
+@login_required
+@require_POST
+def delete_list(request, list_id):
+    from users.models import UserList as _UL
+    lst = get_object_or_404(_UL, id=list_id, creator=request.user)
+    lst.delete()
+    return JsonResponse({'success': True})
+
+
+@login_required
+def list_detail(request, list_id):
+    from users.models import UserList as _UL
+    lst = get_object_or_404(_UL, id=list_id)
+    if lst.is_private and lst.creator != request.user:
+        from django.http import Http404
+        raise Http404
+    members = lst.members.select_related('user', 'user__profile')
+    member_ids = [m.user_id for m in members]
+    blocked_ids = _blocked_user_ids(request.user)
+    muted_ids = _muted_user_ids(request.user)
+    excluded = blocked_ids | muted_ids
+    safe_member_ids = [uid for uid in member_ids if uid not in excluded]
+
+    posts = []
+    if safe_member_ids:
+        posts_qs = (
+            _annotated_feed_posts_queryset()
+            .filter(user_id__in=safe_member_ids, is_draft=False, is_deleted_by_moderation=False)
+            .order_by('-created_at')
+        )
+        paginator = Paginator(posts_qs, 15)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        posts = list(page_obj.object_list)
+        _enrich_posts_for_feed(posts, request.user)
+        posts = _filter_muted_posts(posts, request.user)
+    else:
+        page_obj = Paginator([], 15).get_page(1)
+
+    # Is the viewing user a member of this list?
+    is_member = request.user.is_authenticated and lst.members.filter(user=request.user).exists()
+    user_lists_for_add = []
+    if request.user.is_authenticated:
+        from users.models import UserList as _UL2
+        user_lists_for_add = list(_UL2.objects.filter(creator=request.user).values('id', 'name'))
+
+    return render(request, 'frontend/list_detail.html', {
+        'lst': lst,
+        'members': members,
+        'posts': posts,
+        'page_obj': page_obj,
+        'is_owner': lst.creator == request.user,
+        'is_member': is_member,
+        'user_lists_for_add': user_lists_for_add,
+    })
+
+
+@login_required
+@require_POST
+def add_list_member(request, list_id):
+    from users.models import UserList as _UL, UserListMember as _ULM
+    lst = get_object_or_404(_UL, id=list_id, creator=request.user)
+    username = request.POST.get('username', '').strip()
+    try:
+        target = User.objects.get(username=username)
+    except User.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'User not found.'}, status=404)
+    if target == request.user:
+        return JsonResponse({'success': False, 'error': 'You cannot add yourself to your own list.'}, status=400)
+    _ULM.objects.get_or_create(lst=lst, user=target)
+    count = lst.members.count()
+    return JsonResponse({'success': True, 'username': target.username, 'member_count': count})
+
+
+@login_required
+@require_POST
+def remove_list_member(request, list_id):
+    from users.models import UserList as _UL, UserListMember as _ULM
+    lst = get_object_or_404(_UL, id=list_id, creator=request.user)
+    username = request.POST.get('username', '').strip()
+    try:
+        target = User.objects.get(username=username)
+    except User.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'User not found.'}, status=404)
+    _ULM.objects.filter(lst=lst, user=target).delete()
+    count = lst.members.count()
+    return JsonResponse({'success': True, 'member_count': count})
+
+
+@login_required
+@require_POST
+def add_to_list_from_profile(request):
+    """Add a user to one of the viewer's lists from a profile page."""
+    from users.models import UserList as _UL, UserListMember as _ULM
+    list_id = request.POST.get('list_id', '').strip()
+    username = request.POST.get('username', '').strip()
+    lst = get_object_or_404(_UL, id=list_id, creator=request.user)
+    try:
+        target = User.objects.get(username=username)
+    except User.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'User not found.'}, status=404)
+    if target == request.user:
+        return JsonResponse({'success': False, 'error': 'Cannot add yourself.'}, status=400)
+    _, created = _ULM.objects.get_or_create(lst=lst, user=target)
+    return JsonResponse({'success': True, 'created': created, 'list_name': lst.name})
 
 
 # ─── Blocked Users Management ─────────────────────────────────────────────────

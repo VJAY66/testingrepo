@@ -289,4 +289,12 @@ urlpatterns = [
     # Bookmarks
     path('bookmarks/', views.bookmarks, name='bookmarks'),
     path('posts/<str:post_id>/bookmark/', views.toggle_bookmark, name='toggle_bookmark'),
+    # User-curated lists
+    path('lists/', views.user_lists, name='user_lists'),
+    path('lists/create/', views.create_list, name='create_list'),
+    path('lists/<str:list_id>/', views.list_detail, name='list_detail'),
+    path('lists/<str:list_id>/delete/', views.delete_list, name='delete_list'),
+    path('lists/<str:list_id>/add-member/', views.add_list_member, name='add_list_member'),
+    path('lists/<str:list_id>/remove-member/', views.remove_list_member, name='remove_list_member'),
+    path('lists/add-from-profile/', views.add_to_list_from_profile, name='add_to_list_from_profile'),
 ]

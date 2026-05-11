@@ -406,3 +406,29 @@ class ProfileView(models.Model):
         ordering = ['-viewed_at']
         constraints = [models.UniqueConstraint(fields=['viewer', 'viewed'], name='unique_profile_view')]
         indexes = [models.Index(fields=['viewed', 'viewed_at'])]
+
+
+class UserList(models.Model):
+    id = models.CharField(max_length=36, primary_key=True)
+    creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_lists')
+    name = models.CharField(max_length=60)
+    description = models.CharField(max_length=200, blank=True, default='')
+    is_private = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.creator.username}: {self.name}"
+
+
+class UserListMember(models.Model):
+    lst = models.ForeignKey(UserList, on_delete=models.CASCADE, related_name='members')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='list_memberships')
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-added_at']
+        constraints = [models.UniqueConstraint(fields=['lst', 'user'], name='unique_list_member')]
