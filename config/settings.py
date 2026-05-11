@@ -153,6 +153,31 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'frontend.tasks.cleanup_deleted_accounts',
         'schedule': crontab(hour=3, minute=0),
     },
+    # Notify poll followers when a poll expires — every 5 minutes
+    'notify-expired-polls': {
+        'task': 'frontend.tasks.notify_expired_polls',
+        'schedule': 300.0,
+    },
+    # Fire due post reminders — every minute
+    'send-post-reminders': {
+        'task': 'frontend.tasks.send_post_reminders',
+        'schedule': 60.0,
+    },
+    # Auto-reject stale pending debate requests — every 15 minutes
+    'expire-pending-debates': {
+        'task': 'frontend.tasks.expire_pending_debates',
+        'schedule': 900.0,
+    },
+    # Recompute personalised feed scores — every hour
+    'compute-feed-scores': {
+        'task': 'frontend.tasks.compute_feed_scores',
+        'schedule': crontab(minute=0),
+    },
+    # Delete expired stories — every 10 minutes
+    'cleanup-expired-stories': {
+        'task': 'frontend.tasks.cleanup_expired_stories',
+        'schedule': 600.0,
+    },
 }
 
 # Elasticsearch

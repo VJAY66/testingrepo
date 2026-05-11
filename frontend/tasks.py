@@ -129,3 +129,39 @@ def fetch_link_preview_task(url, post_id):
         },
     )
     return f'LinkPreview saved for {url} on post {post_id}.'
+
+
+@shared_task
+def notify_expired_polls():
+    """Notify poll followers of closed polls and resolve predictions."""
+    from django.core.management import call_command
+    call_command('notify_expired_polls')
+
+
+@shared_task
+def send_post_reminders():
+    """Fire in-app notifications for due post reminders."""
+    from django.core.management import call_command
+    call_command('send_post_reminders')
+
+
+@shared_task
+def expire_pending_debates():
+    """Auto-reject debate requests that have been pending for over 48 hours."""
+    from django.core.management import call_command
+    call_command('expire_pending_debates')
+
+
+@shared_task
+def compute_feed_scores():
+    """Recompute personalised feed scores for active users."""
+    from django.core.management import call_command
+    call_command('compute_feed_scores')
+
+
+@shared_task
+def cleanup_expired_stories():
+    """Hard-delete stories that have passed their expires_at timestamp."""
+    from discussions.models import Story
+    deleted, _ = Story.objects.filter(expires_at__lt=timezone.now()).delete()
+    return f'Deleted {deleted} expired story/stories'
