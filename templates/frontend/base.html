@@ -4098,7 +4098,7 @@ function acceptCookies() {
             return `
                             <div class="chat-fp-header" data-chat-header="${id}">
                                 <div id="cfp-avatar-${id}">${avatar}</div>
-                                <div class="chat-fp-header-info ${db.post_id ? 'clickable' : ''}" data-chat-title="${id}" onclick="ChatManager.openPost('${id}', event)">
+                                <div class="chat-fp-header-info ${db.context_url || db.post_id ? 'clickable' : ''}" data-chat-title="${id}" onclick="ChatManager.openPost('${id}', event)">
                                                                         <p class="chat-fp-htitle" title="${esc(db.title)}">${esc(db.title)}</p>
                                     <p class="chat-fp-hmeta" id="cfp-meta-${id}">${db.current_controller_name ? `Controller: ${esc(db.current_controller_name)}${db.current_controller_side ? ' (' + esc(String(db.current_controller_side).toUpperCase()) + ')' : ''}` : `vs @${esc(db.opponent)}`}</p>
                 </div>
@@ -4841,20 +4841,21 @@ function acceptCookies() {
                 }
                 const id = String(debateId);
                 const panel = panels.get(id);
-                const postId = panel && panel.debate ? panel.debate.post_id : null;
-                if (postId) {
-                    window.location.href = '/discussion/' + encodeURIComponent(String(postId)) + '/';
+                const contextUrl = panel && panel.debate ? panel.debate.context_url : null;
+                if (contextUrl) {
+                    window.location.href = contextUrl;
                     return;
                 }
+                // Fallback: fetch info to get context_url (handles stale localStorage data)
                 try {
                     const r = await fetch('/debates/' + id + '/info/');
                     const d = await r.json();
-                    if (d && d.success && d.debate && d.debate.post_id) {
+                    if (d && d.success && d.debate && d.debate.context_url) {
                         if (panel) {
-                            panel.debate.post_id = String(d.debate.post_id);
+                            panel.debate.context_url = d.debate.context_url;
                             save();
                         }
-                        window.location.href = '/discussion/' + encodeURIComponent(String(d.debate.post_id)) + '/';
+                        window.location.href = d.debate.context_url;
                     }
                 } catch {}
             },

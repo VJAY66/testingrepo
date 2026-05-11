@@ -2702,9 +2702,17 @@ def _build_chat_payload_for_user(user, only_active=False):
 
         opp_is_online = _is_user_online(opponent)
 
+        if debate.post_id:
+            context_url = f'/discussion/{debate.post_id}/'
+        elif debate.poll_id:
+            context_url = f'/polls/{debate.poll_id}/'
+        else:
+            context_url = ''
+
         chats.append({
             'id': str(debate.id),
             'post_id': str(debate.post_id) if debate.post_id else '',
+            'context_url': context_url,
             'title': debate.context_title,
             'opponent': opponent.username,
             'opponent_avatar': opp_avatar,
@@ -5140,6 +5148,21 @@ def debate_info(request, debate_id):
 
     opponent = debate.target if request.user == debate.initiator else debate.initiator
     can_post = debate.status == 'accepted' and participation.is_active and not participation.is_banned
+
+    # Build the URL the user should land on when clicking the chat title.
+    if debate.post_id:
+        context_url = f'/discussion/{debate.post_id}/'
+    elif debate.poll_id:
+        context_url = f'/polls/{debate.poll_id}/'
+    elif debate.review_comment_id:
+        try:
+            review_id = debate.review_comment.review_id
+            context_url = f'/reviews/{review_id}/'
+        except Exception:
+            context_url = ''
+    else:
+        context_url = ''
+
     return JsonResponse({
         'success': True,
         'debate': {
@@ -5151,6 +5174,7 @@ def debate_info(request, debate_id):
             'yes_supporters': debate.yes_supporters,
             'no_supporters': debate.no_supporters,
             'post_id': str(debate.post_id) if debate.post_id else '',
+            'context_url': context_url,
             'user_is_active': can_post,
             'can_post': can_post,
             'can_rejoin': debate.status == 'accepted' and (not participation.is_active) and (not participation.is_banned),
