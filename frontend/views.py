@@ -131,6 +131,37 @@ def _send_notification_email(user, subject, body, notif_type='mention'):
         pass
 
 
+def _check_new_ip_login(request, user):
+    """Send a security alert email when a user logs in from an IP address we haven't seen before."""
+    if not getattr(user, 'email', None):
+        return
+    from users.security import client_ip
+    from users.models import LoginAttempt
+    ip = client_ip(request)
+    ip_count = LoginAttempt.objects.filter(username=user.username, ip_address=ip, successful=True).count()
+    total_count = LoginAttempt.objects.filter(username=user.username, successful=True).count()
+    if ip_count == 1 and total_count > 1:
+        user_agent = request.META.get('HTTP_USER_AGENT', 'Unknown')[:200]
+        subject = 'New sign-in to your PickASide account'
+        body = (
+            f'Hi {user.username},\n\n'
+            f'We noticed a sign-in to your PickASide account from a new location.\n\n'
+            f'IP address: {ip}\n'
+            f'Device: {user_agent}\n'
+            f'Time: {timezone.now().strftime("%Y-%m-%d %H:%M UTC")}\n\n'
+            f'If this was you, you can ignore this email.\n'
+            f'If you did not sign in, please change your password immediately:\n'
+            f'{settings.SITE_URL}/account/password-change/\n\n'
+            f'You can also review recent sign-ins at:\n'
+            f'{settings.SITE_URL}/account/login-activity/\n\n'
+            f'— The PickASide team'
+        )
+        try:
+            send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [user.email], fail_silently=True)
+        except Exception:
+            pass
+
+
 def _normalize_post_content(content):
     """Trim post content and collapse repeated empty lines to reduce visual gaps."""
     text = (content or '').replace('\r\n', '\n').replace('\r', '\n').strip()
@@ -2794,6 +2825,7 @@ def login_view(request):
 
         if user is not None:
             record_login_attempt(request, user.username, successful=True, source='web')
+            _check_new_ip_login(request, user)
             try:
                 _profile = user.profile
                 if _profile.totp_enabled and _profile.totp_secret:

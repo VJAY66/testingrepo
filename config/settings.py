@@ -245,6 +245,9 @@ REST_FRAMEWORK = {
         'anon': os.getenv('DRF_THROTTLE_ANON', '60/min'),
         'user': os.getenv('DRF_THROTTLE_USER', '300/min'),
         'login': os.getenv('DRF_THROTTLE_LOGIN', '12/min'),
+        'post': os.getenv('DRF_THROTTLE_POST', '30/hour'),
+        'comment': os.getenv('DRF_THROTTLE_COMMENT', '60/hour'),
+        'debate': os.getenv('DRF_THROTTLE_DEBATE', '10/hour'),
     },
 }
 

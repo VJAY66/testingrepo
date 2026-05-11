@@ -251,7 +251,9 @@
                             </div>
 
                             {% if user.is_authenticated %}
-                                <div class="mt-3 flex items-center sm:gap-6 gap-3">
+                                <div class="post-action-wrapper mt-3">
+                                  <!-- Primary action row -->
+                                  <div class="flex items-center gap-2 sm:gap-4">
                                     <button type="button" data-action="like" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-like feed-star-like {% if post.is_liked %}active text-amber-500 shadow-md shadow-amber-500/20 bg-amber-50/60 dark:bg-amber-950/30{% else %}text-muted-foreground hover:text-amber-500{% endif %} hover:bg-amber-50/70 dark:hover:bg-amber-950/20 hover:shadow-md overflow-hidden">
                                         <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_liked %}scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="{% if post.is_liked %}url(#dh-like-gradient){% else %}none{% endif %}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <defs>
@@ -279,39 +281,79 @@
                                         </svg>
                                         <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.save_count|default:0 }}</span>
                                     </button>
-                                    {% if user.is_authenticated %}
-                                    <button type="button" onclick="toggleReadLater('{{ post.id|escapejs }}', this)"
-                                      title="{% if post.is_read_later %}Remove from Read Later{% else %}Read Later{% endif %}"
-                                      class="group relative flex items-center justify-center gap-1 w-auto h-8 sm:px-2.5 px-2 rounded-full transition-all pointer-events-auto text-xs font-medium
-                                        {% if post.is_read_later %}text-teal-600 bg-teal-50 dark:bg-teal-900/20 border border-teal-300{% else %}text-muted-foreground border border-transparent hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20{% endif %}">
-                                      {% if post.is_read_later %}🕐{% else %}🕐{% endif %}
-                                    </button>
-                                    {% endif %}
-                                    <button type="button" onclick="openSharePanel(this)" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced text-muted-foreground hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/20 hover:shadow-md overflow-hidden">
-                                        <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <circle cx="18" cy="5" r="3"></circle>
-                                            <circle cx="6" cy="12" r="3"></circle>
-                                            <circle cx="18" cy="19" r="3"></circle>
-                                            <path d="M8.59 13.51L15.42 17.49"></path>
-                                            <path d="M15.41 6.51L8.59 10.49"></path>
-                                        </svg>
-                                        <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Share</span>
-                                    </button>
-                                    {% if user.is_authenticated %}
-                                    <button type="button" onclick="openQuoteModal('{{ post.id|escapejs }}','{{ post.title|escapejs }}','{{ post.user.username|escapejs }}')"
-                                      class="group relative flex items-center justify-center gap-1 w-auto h-8 px-2 rounded-full transition-all duration-300 pointer-events-auto text-muted-foreground hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 overflow-hidden text-xs font-medium">
-                                      💬 <span class="hidden sm:inline">Quote</span>
-                                    </button>
-                                    {% endif %}
-                                    <button type="button" data-action="hot" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_hot %}active text-orange-500 bg-orange-50/60 border-orange-300/60{% else %}text-muted-foreground hover:text-orange-500 hover:bg-orange-50/60{% endif %}">🔥 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','hot')">{{ post.hot_count|default:0 }}</span></button>
-                                    <button type="button" data-action="debatable" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_debatable %}active text-purple-500 bg-purple-50/60 border-purple-300/60{% else %}text-muted-foreground hover:text-purple-500 hover:bg-purple-50/60{% endif %}">🤔 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','debatable')">{{ post.debatable_count|default:0 }}</span></button>
-                                    <button type="button" data-action="agree" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_agree %}active text-green-600 bg-green-50/60 border-green-300/60{% else %}text-muted-foreground hover:text-green-600 hover:bg-green-50/60{% endif %}">👏 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','agree')">{{ post.agree_count|default:0 }}</span></button>
-                                    <button type="button" data-action="surprising" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_surprising %}active text-blue-500 bg-blue-50/60 border-blue-300/60{% else %}text-muted-foreground hover:text-blue-500 hover:bg-blue-50/60{% endif %}">😮 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','surprising')">{{ post.surprising_count|default:0 }}</span></button>
+                                    <!-- Desktop-only: read later, share, quote, reactions -->
+                                    <div class="hidden sm:flex items-center gap-3">
+                                      {% if user.is_authenticated %}
+                                      <button type="button" onclick="toggleReadLater('{{ post.id|escapejs }}', this)"
+                                        title="{% if post.is_read_later %}Remove from Read Later{% else %}Read Later{% endif %}"
+                                        class="group relative flex items-center justify-center gap-1 w-auto h-8 px-2.5 rounded-full transition-all pointer-events-auto text-xs font-medium
+                                          {% if post.is_read_later %}text-teal-600 bg-teal-50 dark:bg-teal-900/20 border border-teal-300{% else %}text-muted-foreground border border-transparent hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20{% endif %}">
+                                        🕐
+                                      </button>
+                                      {% endif %}
+                                      <button type="button" onclick="openSharePanel(this)" class="group relative flex items-center justify-center gap-1.5 w-auto h-10 px-3 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced text-muted-foreground hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/20 hover:shadow-md overflow-hidden">
+                                          <svg class="w-5 h-5 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                              <circle cx="18" cy="5" r="3"></circle>
+                                              <circle cx="6" cy="12" r="3"></circle>
+                                              <circle cx="18" cy="19" r="3"></circle>
+                                              <path d="M8.59 13.51L15.42 17.49"></path>
+                                              <path d="M15.41 6.51L8.59 10.49"></path>
+                                          </svg>
+                                          <span class="text-sm font-medium relative z-10">Share</span>
+                                      </button>
+                                      {% if user.is_authenticated %}
+                                      <button type="button" onclick="openQuoteModal('{{ post.id|escapejs }}','{{ post.title|escapejs }}','{{ post.user.username|escapejs }}')"
+                                        class="group relative flex items-center justify-center gap-1 w-auto h-8 px-2 rounded-full transition-all duration-300 pointer-events-auto text-muted-foreground hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 overflow-hidden text-xs font-medium">
+                                        💬 Quote
+                                      </button>
+                                      {% endif %}
+                                      <button type="button" data-action="hot" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_hot %}active text-orange-500 bg-orange-50/60 border-orange-300/60{% else %}text-muted-foreground hover:text-orange-500 hover:bg-orange-50/60{% endif %}">🔥 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','hot')">{{ post.hot_count|default:0 }}</span></button>
+                                      <button type="button" data-action="debatable" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_debatable %}active text-purple-500 bg-purple-50/60 border-purple-300/60{% else %}text-muted-foreground hover:text-purple-500 hover:bg-purple-50/60{% endif %}">🤔 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','debatable')">{{ post.debatable_count|default:0 }}</span></button>
+                                      <button type="button" data-action="agree" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_agree %}active text-green-600 bg-green-50/60 border-green-300/60{% else %}text-muted-foreground hover:text-green-600 hover:bg-green-50/60{% endif %}">👏 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','agree')">{{ post.agree_count|default:0 }}</span></button>
+                                      <button type="button" data-action="surprising" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_surprising %}active text-blue-500 bg-blue-50/60 border-blue-300/60{% else %}text-muted-foreground hover:text-blue-500 hover:bg-blue-50/60{% endif %}">😮 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','surprising')">{{ post.surprising_count|default:0 }}</span></button>
+                                    </div>
+                                    <!-- Mobile: share + overflow toggle -->
+                                    <div class="sm:hidden flex items-center gap-2">
+                                      <button type="button" onclick="openSharePanel(this)" class="group relative flex items-center justify-center gap-1.5 h-8 px-2 rounded-full transition-all pointer-events-auto text-muted-foreground hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/20">
+                                          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                              <circle cx="18" cy="5" r="3"></circle>
+                                              <circle cx="6" cy="12" r="3"></circle>
+                                              <circle cx="18" cy="19" r="3"></circle>
+                                              <path d="M8.59 13.51L15.42 17.49"></path>
+                                              <path d="M15.41 6.51L8.59 10.49"></path>
+                                          </svg>
+                                      </button>
+                                      {% if user.is_authenticated %}
+                                      <button type="button" onclick="toggleMobileOverflow(this)"
+                                        class="flex items-center justify-center h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all text-sm font-bold tracking-wider"
+                                        aria-label="More actions">•••</button>
+                                      {% endif %}
+                                    </div>
                                     <a href="{% url 'discussion' post.id %}" class="ml-auto group inline-flex items-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full border border-primary/35 bg-primary/12 text-primary shadow-sm shadow-primary/20 transition-all duration-300 hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/35 focus:outline-none focus:ring-2 focus:ring-primary/35 whitespace-nowrap">
                                         <span class="sm:hidden text-xs font-medium">Open</span>
                                         <span class="hidden sm:inline sm:text-sm font-medium">Open discussion</span>
                                         <span class="sm:text-sm text-xs">→</span>
                                     </a>
+                                  </div>
+                                  <!-- Mobile secondary actions (toggle with ••• button) -->
+                                  {% if user.is_authenticated %}
+                                  <div class="mobile-overflow-panel hidden sm:hidden mt-2 flex flex-wrap gap-2">
+                                    <button type="button" onclick="toggleReadLater('{{ post.id|escapejs }}', this)"
+                                      title="{% if post.is_read_later %}Remove from Read Later{% else %}Read Later{% endif %}"
+                                      class="flex items-center gap-1 h-8 px-3 rounded-full text-xs font-medium transition-all
+                                        {% if post.is_read_later %}text-teal-600 bg-teal-50 dark:bg-teal-900/20 border border-teal-300{% else %}text-muted-foreground border border-border/60 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20{% endif %}">
+                                      🕐 {% if post.is_read_later %}Saved{% else %}Read Later{% endif %}
+                                    </button>
+                                    <button type="button" onclick="openQuoteModal('{{ post.id|escapejs }}','{{ post.title|escapejs }}','{{ post.user.username|escapejs }}')"
+                                      class="flex items-center gap-1 h-8 px-3 rounded-full border border-border/60 text-xs font-medium text-muted-foreground hover:text-indigo-500 hover:bg-indigo-50 transition-all">
+                                      💬 Quote
+                                    </button>
+                                    <button type="button" data-action="hot" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_hot %}active text-orange-500 bg-orange-50/60 border-orange-300/60{% else %}text-muted-foreground hover:text-orange-500 hover:bg-orange-50/60{% endif %}">🔥 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','hot')">{{ post.hot_count|default:0 }}</span></button>
+                                    <button type="button" data-action="debatable" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_debatable %}active text-purple-500 bg-purple-50/60 border-purple-300/60{% else %}text-muted-foreground hover:text-purple-500 hover:bg-purple-50/60{% endif %}">🤔 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','debatable')">{{ post.debatable_count|default:0 }}</span></button>
+                                    <button type="button" data-action="agree" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_agree %}active text-green-600 bg-green-50/60 border-green-300/60{% else %}text-muted-foreground hover:text-green-600 hover:bg-green-50/60{% endif %}">👏 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','agree')">{{ post.agree_count|default:0 }}</span></button>
+                                    <button type="button" data-action="surprising" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_surprising %}active text-blue-500 bg-blue-50/60 border-blue-300/60{% else %}text-muted-foreground hover:text-blue-500 hover:bg-blue-50/60{% endif %}">😮 <span class="action-count text-xs" onclick="event.stopPropagation();showReactionUsers('{{ post.id }}','surprising')">{{ post.surprising_count|default:0 }}</span></button>
+                                  </div>
+                                  {% endif %}
                                 </div>
                             {% else %}
                             <div class="mt-3 flex items-center sm:gap-6 gap-3">
@@ -1602,4 +1644,13 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
   </div>
 </div>
 
+<script>
+function toggleMobileOverflow(btn) {
+  var wrapper = btn.closest('.post-action-wrapper');
+  if (!wrapper) return;
+  var panel = wrapper.querySelector('.mobile-overflow-panel');
+  if (!panel) return;
+  panel.classList.toggle('hidden');
+}
+</script>
 {% endblock %}
