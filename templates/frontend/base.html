@@ -1022,6 +1022,11 @@
             border: 2px solid rgba(255,255,255,0.42); letter-spacing: 0;
             box-shadow: 0 0 0 3px rgba(255,255,255,0.10), 0 2px 8px rgba(0,0,0,0.20);
         }
+        .chat-fp-avatar-link {
+            display: flex; flex-shrink: 0; border-radius: 50%;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+        .chat-fp-avatar-link:hover { opacity: 0.82; transform: scale(1.06); }
         .chat-fp-header-info { flex: 1; min-width: 0; }
         .chat-fp-header-info.clickable { cursor: pointer; }
         .chat-fp-htitle {
@@ -4087,10 +4092,11 @@ function acceptCookies() {
             const opponent = esc((debate && debate.opponent) || 'User');
             const initial = opponent.charAt(0).toUpperCase() || '?';
             const avatarUrl = (debate && debate.opponent_avatar) || '';
-            if (avatarUrl) {
-                return `<img src="${esc(avatarUrl)}" alt="${opponent}" class="chat-fp-avatar" loading="lazy">`;
-            }
-            return `<div class="chat-fp-avatar">${initial}</div>`;
+            const profileUrl = '/user/' + encodeURIComponent((debate && debate.opponent) || '') + '/';
+            const inner = avatarUrl
+                ? `<img src="${esc(avatarUrl)}" alt="${opponent}" class="chat-fp-avatar" loading="lazy">`
+                : `<div class="chat-fp-avatar">${initial}</div>`;
+            return `<a href="${profileUrl}" class="chat-fp-avatar-link" title="View @${opponent}'s profile" onclick="event.stopPropagation()">${inner}</a>`;
         }
 
         function buildHTML(id, db) {
