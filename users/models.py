@@ -267,3 +267,19 @@ class UserSuggestion(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=['user', 'suggested_user'], name='unique_user_suggestion')]
         ordering = ['-score']
+
+
+class PushSubscription(models.Model):
+    """Browser/mobile push notification subscription (Web Push API)."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='push_subscriptions')
+    endpoint = models.URLField(max_length=800, unique=True)
+    p256dh = models.TextField()
+    auth = models.TextField()
+    user_agent = models.CharField(max_length=300, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Push({self.user.username}) {self.endpoint[:60]}"

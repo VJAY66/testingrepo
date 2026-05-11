@@ -23,7 +23,7 @@ import uuid
 
 from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, DMRequest
 from discussions.signals import notify_post_author
-from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, UserBan
+from users.models import Follow, UserBlock, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, UserBan, PushSubscription
 from users.security import is_login_rate_limited, record_login_attempt
 from discussions.limits import has_reached_daily_post_limit
 from utils.moderation import check_content_moderation
@@ -7085,3 +7085,150 @@ def notification_stream_v2(request):
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
     return response
+
+
+# ── Push Notifications ────────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def push_subscribe(request):
+    try:
+        data = json.loads(request.body)
+        endpoint = data.get('endpoint', '').strip()
+        p256dh = data.get('keys', {}).get('p256dh', '').strip()
+        auth = data.get('keys', {}).get('auth', '').strip()
+        if not (endpoint and p256dh and auth):
+            return JsonResponse({'error': 'Invalid subscription data'}, status=400)
+        ua = request.META.get('HTTP_USER_AGENT', '')[:300]
+        PushSubscription.objects.update_or_create(
+            endpoint=endpoint,
+            defaults={'user': request.user, 'p256dh': p256dh, 'auth': auth, 'user_agent': ua},
+        )
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@login_required
+@require_POST
+def push_unsubscribe(request):
+    try:
+        data = json.loads(request.body)
+        endpoint = data.get('endpoint', '')
+        PushSubscription.objects.filter(user=request.user, endpoint=endpoint).delete()
+        return JsonResponse({'success': True})
+    except Exception:
+        return JsonResponse({'success': False})
+
+
+def push_vapid_public_key(request):
+    return JsonResponse({'publicKey': getattr(settings, 'VAPID_PUBLIC_KEY', '')})
+
+
+def _send_web_push(user, title, body, url=''):
+    """Send a web push to all of a user's subscribed browsers.
+
+    Requires pywebpush and VAPID keys in settings. Silently skips if unavailable.
+    """
+    try:
+        from pywebpush import webpush
+    except ImportError:
+        return
+
+    vapid_private = getattr(settings, 'VAPID_PRIVATE_KEY', '')
+    vapid_email = getattr(settings, 'VAPID_ADMIN_EMAIL', '')
+    if not vapid_private or not vapid_email:
+        return
+
+    import json as _json
+    payload = _json.dumps({'title': title, 'body': body, 'url': url})
+    stale_ids = []
+    for sub in PushSubscription.objects.filter(user=user):
+        try:
+            webpush(
+                subscription_info={
+                    'endpoint': sub.endpoint,
+                    'keys': {'p256dh': sub.p256dh, 'auth': sub.auth},
+                },
+                data=payload,
+                vapid_private_key=vapid_private,
+                vapid_claims={'sub': f'mailto:{vapid_email}'},
+            )
+        except Exception as exc:
+            if hasattr(exc, 'response') and getattr(exc.response, 'status_code', None) == 410:
+                stale_ids.append(sub.id)
+    if stale_ids:
+        PushSubscription.objects.filter(id__in=stale_ids).delete()
+
+
+# ── Login Activity Log ────────────────────────────────────────────────────────
+
+@login_required
+def login_activity(request):
+    from users.models import LoginAttempt
+    attempts = LoginAttempt.objects.filter(
+        username=request.user.username
+    ).order_by('-created_at')[:100]
+    return render(request, 'frontend/login_activity.html', {'attempts': attempts})
+
+
+# ── Active Sessions ───────────────────────────────────────────────────────────
+
+@login_required
+def active_sessions(request):
+    from django.contrib.sessions.models import Session
+    now = timezone.now()
+    current_key = request.session.session_key
+    user_sessions = []
+    for s in Session.objects.filter(expire_date__gt=now):
+        try:
+            data = s.get_decoded()
+        except Exception:
+            continue
+        if str(data.get('_auth_user_id')) == str(request.user.id):
+            user_sessions.append({
+                'session_key': s.session_key,
+                'expire_date': s.expire_date,
+                'is_current': s.session_key == current_key,
+            })
+    user_sessions.sort(key=lambda x: (not x['is_current'], x['expire_date']))
+    return render(request, 'frontend/active_sessions.html', {'sessions': user_sessions})
+
+
+@login_required
+@require_POST
+def revoke_session(request):
+    from django.contrib.sessions.models import Session
+    from django.contrib import messages as django_messages
+
+    if request.POST.get('revoke_all'):
+        current_key = request.session.session_key
+        now = timezone.now()
+        revoked = 0
+        for s in Session.objects.filter(expire_date__gt=now):
+            if s.session_key == current_key:
+                continue
+            try:
+                if str(s.get_decoded().get('_auth_user_id')) == str(request.user.id):
+                    s.delete()
+                    revoked += 1
+            except Exception:
+                pass
+        django_messages.success(request, f'Revoked {revoked} other session(s).')
+        return redirect('active_sessions')
+
+    key = request.POST.get('session_key', '')
+    if not key or key == request.session.session_key:
+        django_messages.error(request, 'Cannot revoke the current session.')
+        return redirect('active_sessions')
+    try:
+        s = Session.objects.get(session_key=key)
+        decoded = s.get_decoded()
+        if str(decoded.get('_auth_user_id')) != str(request.user.id):
+            django_messages.error(request, 'Not your session.')
+            return redirect('active_sessions')
+        s.delete()
+        django_messages.success(request, 'Session revoked.')
+    except Session.DoesNotExist:
+        django_messages.error(request, 'Session not found.')
+    return redirect('active_sessions')

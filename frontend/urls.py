@@ -236,4 +236,13 @@ urlpatterns = [
     path('lists/add-from-profile/', views.add_to_list_from_profile, name='add_to_list_from_profile'),
     # My Reminders
     path('reminders/', views.my_reminders, name='my_reminders'),
+    # Push notifications
+    path('push/subscribe/', views.push_subscribe, name='push_subscribe'),
+    path('push/unsubscribe/', views.push_unsubscribe, name='push_unsubscribe'),
+    path('push/vapid-key/', views.push_vapid_public_key, name='push_vapid_key'),
+    # Login activity log
+    path('account/login-activity/', views.login_activity, name='login_activity'),
+    # Active sessions
+    path('account/sessions/', views.active_sessions, name='active_sessions'),
+    path('account/sessions/revoke/', views.revoke_session, name='revoke_session'),
 ]

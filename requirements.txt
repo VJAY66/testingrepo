@@ -7,3 +7,4 @@ Pillow==12.2.0
 djangorestframework-simplejwt==5.3.2
 dj-database-url==2.1.0
 openai==1.51.2
+pywebpush>=2.0.0

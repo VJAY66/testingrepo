@@ -1,7 +1,21 @@
-﻿from django.db.models.signals import post_save
+from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
+from django.conf import settings
 from .models import Comment, Notification, PostFollow
+
+# ---------------------------------------------------------------------------
+# Push helper
+# ---------------------------------------------------------------------------
+
+def _push(user, title, body, url=''):
+    """Fire-and-forget web push; imports lazily to avoid circular imports."""
+    try:
+        from frontend.views import _send_web_push
+        _send_web_push(user, title, body, url)
+    except Exception:
+        pass
+
 
 # ---------------------------------------------------------------------------
 # Author notification helpers
@@ -51,16 +65,19 @@ def notify_post_author(post, notification_type, actor_user):
     ).order_by('created_at')
 
     first_notif = existing_qs.first()
+    site_url = getattr(settings, 'SITE_URL', '')
 
     if first_notif is None:
         # Very first event — notify immediately
+        msg = _AUTHOR_FIRST_MESSAGES[notification_type](actor_user)
         Notification.objects.create(
             user=post.user,
             post=post,
             notification_type=notification_type,
-            message=_AUTHOR_FIRST_MESSAGES[notification_type](actor_user),
+            message=msg,
             count=1,
         )
+        _push(post.user, 'PickASide', msg, f'{site_url}/discussion/{post.id}/')
         return
 
     batch_window = _batch_window_seconds(first_notif.created_at)
@@ -69,13 +86,15 @@ def notify_post_author(post, notification_type, actor_user):
 
     if time_since_last >= batch_window:
         # Batch window expired — start a fresh notification
+        msg = _AUTHOR_FIRST_MESSAGES[notification_type](actor_user)
         Notification.objects.create(
             user=post.user,
             post=post,
             notification_type=notification_type,
-            message=_AUTHOR_FIRST_MESSAGES[notification_type](actor_user),
+            message=msg,
             count=1,
         )
+        _push(post.user, 'PickASide', msg, f'{site_url}/discussion/{post.id}/')
     else:
         # Still within the window — increment the existing batch counter
         new_count = last_notif.count + 1
@@ -102,6 +121,7 @@ def notify_post_followers(sender, instance, created, **kwargs):
 
     # 2. Notify followers (existing every-5-comments logic)
     followers = PostFollow.objects.filter(post=post).exclude(user=instance.user).select_related('user')
+    site_url = getattr(settings, 'SITE_URL', '')
 
     for follow in followers:
         comments_since_follow = Comment.objects.filter(
@@ -110,9 +130,11 @@ def notify_post_followers(sender, instance, created, **kwargs):
         ).count()
 
         if comments_since_follow > 0 and comments_since_follow % 5 == 0:
+            follower_msg = f'{comments_since_follow} new comments on "{post.title}" since you followed it.'
             Notification.objects.create(
                 user=follow.user,
                 post=post,
                 notification_type='post_activity',
-                message=f'{comments_since_follow} new comments on "{post.title}" since you followed it.'
+                message=follower_msg,
             )
+            _push(follow.user, 'PickASide', follower_msg, f'{site_url}/discussion/{post.id}/')
