@@ -1853,13 +1853,9 @@ def profile(request):
     }
     return render(request, 'frontend/profile.html', context)
 
+@login_required
+@require_POST
 def upload_profile_picture(request):
-    """Handle profile picture upload"""
-    if not request.user.is_authenticated:
-        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
-    
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
     
     if 'profile_picture' not in request.FILES:
         return JsonResponse({'success': False, 'error': 'No file provided'}, status=400)
@@ -5632,7 +5628,10 @@ def poll_vote(request, poll_id):
     if PollVote.objects.filter(poll=poll, user=request.user).exists():
         return JsonResponse({'error': 'You have already voted on this poll.'}, status=400)
 
-    PollVote.objects.create(user=request.user, poll=poll, option=option)
+    try:
+        PollVote.objects.create(user=request.user, poll=poll, option=option)
+    except IntegrityError:
+        return JsonResponse({'error': 'You have already voted on this poll.'}, status=400)
 
     opts_annotated = list(poll.options.annotate(vote_count=Count('votes')))
     total = sum(o.vote_count for o in opts_annotated)
@@ -6162,7 +6161,7 @@ def create_review(request):
             content=content,
             category=category,
             hashtags=','.join(Post.parse_hashtags(hashtags_raw)),
-            is_verified=request.POST.get('is_verified') == '1',
+            is_verified=False,
         )
         return redirect('review_detail', review_id=review.id)
 
@@ -8117,7 +8116,10 @@ def create_story(request):
         if cache.get(_story_key, 0) >= 10:
             return JsonResponse({'error': 'Story limit reached. You can post up to 10 stories per day.'}, status=429)
         content = request.POST.get('content', '').strip()
+        _VALID_BG = {'#0ea5e9','#8b5cf6','#10b981','#f97316','#ef4444','#ec4899','#f59e0b','#1e293b','#6366f1','#14b8a6'}
         bg_color = request.POST.get('bg_color', '#0ea5e9')
+        if bg_color not in _VALID_BG:
+            bg_color = '#0ea5e9'
         image = request.FILES.get('image')
 
         if not content and not image:
@@ -8492,9 +8494,8 @@ def people_you_may_know(request):
 # ─── Post Audience Update ─────────────────────────────────────────────────────
 
 @login_required
+@require_POST
 def update_post_audience(request, post_id):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'POST required'}, status=405)
     post = get_object_or_404(Post, id=post_id, user=request.user)
     audience = request.POST.get('audience', 'public')
     if audience not in ('public', 'followers', 'close_friends'):

@@ -1306,11 +1306,12 @@ function showReactionUsers(postId, action) {
         document.getElementById('reaction-modal-body').innerHTML = '<p class="text-sm text-muted-foreground">No reactions yet.</p>';
         return;
       }
+      var escR = function(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
       document.getElementById('reaction-modal-body').innerHTML = d.users.map(u =>
-        '<a href="/user/' + u.username + '/" class="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-muted/60 transition-colors">' +
-        (u.avatar_url ? '<img src="' + u.avatar_url + '" class="h-7 w-7 rounded-full object-cover border border-border">' :
-          '<div class="h-7 w-7 rounded-full bg-primary/15 flex items-center justify-center text-primary text-xs font-bold">' + u.username[0].toUpperCase() + '</div>') +
-        '<span class="text-sm font-medium text-foreground">@' + u.username + '</span></a>'
+        '<a href="/user/' + escR(u.username) + '/" class="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-muted/60 transition-colors">' +
+        (u.avatar_url ? '<img src="' + escR(u.avatar_url) + '" class="h-7 w-7 rounded-full object-cover border border-border">' :
+          '<div class="h-7 w-7 rounded-full bg-primary/15 flex items-center justify-center text-primary text-xs font-bold">' + escR(u.username[0].toUpperCase()) + '</div>') +
+        '<span class="text-sm font-medium text-foreground">@' + escR(u.username) + '</span></a>'
       ).join('');
     });
 }
@@ -1524,7 +1525,8 @@ function clearQuote() {
             list.innerHTML = '';
             d.similar.forEach(function(p) {
               var li = document.createElement('li');
-              li.innerHTML = '<a href="/discussion/' + p.id + '/" target="_blank" class="underline hover:text-amber-800">' + p.title.substring(0,60) + '…</a> <span class="text-amber-600">by @' + p.username + '</span>';
+              var escI = function(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
+              li.innerHTML = '<a href="/discussion/' + escI(p.id) + '/" target="_blank" class="underline hover:text-amber-800">' + escI(p.title.substring(0,60)) + '…</a> <span class="text-amber-600">by @' + escI(p.username) + '</span>';
               list.appendChild(li);
             });
             warning.classList.remove('hidden');
@@ -1550,7 +1552,8 @@ function clearQuote() {
         d.posts.forEach(function(p) {
           var li = document.createElement('li');
           li.className = 'text-xs';
-          li.innerHTML = '<a href="/discussion/' + p.id + '/" class="font-medium text-foreground hover:text-primary underline">' + p.title.substring(0,60) + '</a> <span class="text-muted-foreground">· ' + p.like_count + ' likes</span>';
+          var escW = function(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
+          li.innerHTML = '<a href="/discussion/' + escW(p.id) + '/" class="font-medium text-foreground hover:text-primary underline">' + escW(p.title.substring(0,60)) + '</a> <span class="text-muted-foreground">· ' + escW(String(p.like_count)) + ' likes</span>';
           list.appendChild(li);
         });
         banner.classList.remove('hidden');

@@ -84,8 +84,8 @@
     </div>
     <div class="story-row">
       {% for story in group.stories %}
-      <div class="story-bubble" onclick="openStory({{ story.id }}, '{{ story.content|escapejs }}', '{{ story.bg_color }}', '{{ story.image.url|default:'' }}', '{{ group.user.username }}', {{ story.views.count }})">
-        <div class="story-thumb" style="background:{{ story.bg_color }}">
+      <div class="story-bubble" onclick="openStory({{ story.id }}, '{{ story.content|escapejs }}', '{{ story.bg_color|escapejs }}', '{{ story.image.url|default:''|escapejs }}', '{{ group.user.username|escapejs }}', {{ story.views.count }})">
+        <div class="story-thumb" style="background:{{ story.bg_color|escapejs }}">
           {% if story.image %}
           <img src="{{ story.image.url }}" class="absolute inset-0 w-full h-full object-cover" loading="lazy" alt="">
           {% else %}
