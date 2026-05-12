@@ -6,22 +6,48 @@
 <style>
     html { scroll-behavior: smooth; }
 
-    /* ── Sticky filter bar ── */
+    /* ── Classic feed tabs (For You / Following / All) ── */
+    .feed-tabs {
+        display: flex;
+        align-items: flex-end;
+        gap: 0;
+        border-bottom: 2px solid hsl(var(--border) / 0.6);
+        margin-bottom: 1.25rem;
+    }
+    .feed-tab {
+        padding: 8px 18px 10px;
+        font-size: 14px;
+        font-weight: 600;
+        color: hsl(var(--muted-foreground));
+        text-decoration: none;
+        white-space: nowrap;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        transition: color 0.15s, border-color 0.15s;
+        letter-spacing: 0.01em;
+    }
+    .feed-tab:hover { color: hsl(var(--foreground)); }
+    .feed-tab.feed-tab-active {
+        color: hsl(var(--foreground));
+        border-bottom-color: hsl(var(--primary));
+        font-weight: 700;
+    }
+
+    /* ── Sticky category bar ── */
     .home-filter-bar {
         position: sticky;
         top: 56px;
         z-index: 90;
-        background: hsl(var(--background) / 0.82);
-        backdrop-filter: blur(20px) saturate(160%);
-        -webkit-backdrop-filter: blur(20px) saturate(160%);
+        background: hsl(var(--background) / 0.92);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
         border-bottom: 1px solid hsl(var(--border) / 0.5);
     }
-    .hfb-inner { display:flex; align-items:center; gap:8px; overflow-x:auto; scrollbar-width:none; padding: 10px 16px; }
+    .hfb-inner { display:flex; align-items:center; gap:0; overflow-x:auto; scrollbar-width:none; padding: 0 16px; }
     .hfb-inner::-webkit-scrollbar { display:none; }
-    .hfb-pill { flex-shrink:0; display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:999px; font-size:12px; font-weight:600; white-space:nowrap; border:1px solid hsl(var(--border)); background:hsl(var(--card)/0.6); color:hsl(var(--muted-foreground)); transition:all 0.18s ease; text-decoration:none; }
-    .hfb-pill:hover { background:hsl(var(--background)); border-color:hsl(var(--primary)/0.55); color:hsl(var(--foreground)); transform:translateY(-1px); box-shadow:0 4px 14px -6px hsl(var(--primary)/0.22); }
-    .hfb-pill.hfb-active { background-image:var(--float-gradient); background-color:transparent!important; border-color:transparent; color:hsl(var(--primary-foreground)); box-shadow:0 4px 18px -6px hsl(var(--primary)/0.52); }
-    .hfb-pill.hfb-active:hover { transform:translateY(-1px); }
+    .hfb-pill { flex-shrink:0; display:inline-flex; align-items:center; padding:10px 14px; font-size:12px; font-weight:500; white-space:nowrap; color:hsl(var(--muted-foreground)); text-decoration:none; border-bottom:2px solid transparent; transition:color 0.15s, border-color 0.15s; }
+    .hfb-pill:hover { color:hsl(var(--foreground)); }
+    .hfb-pill.hfb-active { color:hsl(var(--foreground)); border-bottom-color:hsl(var(--primary)); font-weight:600; }
 
     /* ── Post cards ── */
     .glass-panel {
@@ -88,13 +114,9 @@
 <div class="home-filter-bar">
     <div class="relative max-w-5xl mx-auto">
         <div class="hfb-inner">
-            {% if user.is_authenticated %}
-            <a href="{% url 'for_you_feed' %}" class="hfb-pill {% if active_tab == 'for_you' %}hfb-active{% endif %}"><span>🎯</span> For You</a>
-            <a href="{% url 'following_feed' %}" class="hfb-pill {% if active_tab == 'following' %}hfb-active{% endif %}"><span>👥</span> Following</a>
-            {% endif %}
-            <a href="{% url 'index' %}" class="hfb-pill {% if not active_category and active_tab != 'for_you' and active_tab != 'following' %}hfb-active{% endif %}"><span>✨</span> All</a>
+            <a href="{% url 'index' %}" class="hfb-pill {% if not active_category and active_tab != 'for_you' and active_tab != 'following' %}hfb-active{% endif %}">All</a>
             {% for cat in categories %}
-            <a href="?category={{ cat.name|urlencode }}" class="hfb-pill {% if active_category == cat.name %}hfb-active{% endif %}"><span>{{ cat.icon }}</span> {{ cat.name }}</a>
+            <a href="?category={{ cat.name|urlencode }}" class="hfb-pill {% if active_category == cat.name %}hfb-active{% endif %}">{{ cat.name }}</a>
             {% endfor %}
             {% if user.is_authenticated and active_category %}
             <button id="cat-follow-btn" onclick="toggleCategoryFollow('{{ active_category }}')"
@@ -125,6 +147,14 @@
 {% endif %}
 
 <div style="max-width:48rem;margin:0 auto;padding:1.5rem 1rem 2rem;" id="posts-section">
+
+  {% if user.is_authenticated %}
+  <div class="feed-tabs">
+    <a href="{% url 'for_you_feed' %}" class="feed-tab {% if active_tab == 'for_you' %}feed-tab-active{% endif %}">For You</a>
+    <a href="{% url 'following_feed' %}" class="feed-tab {% if active_tab == 'following' %}feed-tab-active{% endif %}">Following</a>
+    <a href="{% url 'index' %}" class="feed-tab {% if not active_category and active_tab != 'for_you' and active_tab != 'following' %}feed-tab-active{% endif %}">All</a>
+  </div>
+  {% endif %}
 
   <!-- Quick navigation row -->
   {% if user.is_authenticated %}
