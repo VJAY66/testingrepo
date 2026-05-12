@@ -3,8 +3,11 @@
 
 {% block content %}
 <style>
-.lb-card { background:hsl(var(--card)); border:1px solid hsl(var(--border)); border-radius:1.2rem; transition:border-color 180ms,box-shadow 180ms; }
+.lb-card { background:hsl(var(--card)); border:1px solid hsl(var(--border)); border-radius:1.2rem; transition:border-color 180ms,box-shadow 180ms; position:relative; }
 .lb-card:hover { border-color:hsl(var(--primary)/0.4); box-shadow:0 8px 32px -12px hsl(var(--primary)/0.2); }
+.lb-card-link { position:absolute;inset:0;border-radius:1.2rem;z-index:0; }
+.lb-card-body { position:relative;z-index:1;display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem; }
+@media(min-width:640px){.lb-card-body{gap:1rem;padding:1rem 1.25rem;}}
 .rank-badge { display:inline-flex;align-items:center;justify-content:center;width:2.2rem;height:2.2rem;border-radius:999px;font-weight:800;font-size:.9rem;flex-shrink:0; }
 .rank-1 { background:linear-gradient(135deg,hsl(38 92% 50%),hsl(44 96% 60%));color:#fff;box-shadow:0 4px 12px hsl(38 92% 50%/0.5); }
 .rank-2 { background:linear-gradient(135deg,hsl(220 14% 72%),hsl(220 14% 80%));color:#fff; }
@@ -18,7 +21,46 @@
 .cat-chip { padding:.3rem .75rem;border-radius:999px;font-size:.75rem;font-weight:600;cursor:pointer;border:1px solid hsl(var(--border));white-space:nowrap;transition:all 150ms;background:hsl(var(--card));color:hsl(var(--muted-foreground)); }
 .cat-chip.active { background:hsl(var(--primary)/0.12);border-color:hsl(var(--primary)/0.5);color:hsl(var(--primary)); }
 .cat-chip:not(.active):hover { background:hsl(var(--muted)/0.5); }
+
+/* ── Follow button ── */
+.lb-follow-btn {
+  position:relative;z-index:2;
+  display:inline-flex;align-items:center;gap:.3rem;
+  padding:.3rem .8rem;border-radius:999px;
+  font-size:.72rem;font-weight:700;
+  white-space:nowrap;cursor:pointer;
+  transition:background 150ms,color 150ms,border-color 150ms,transform 100ms;
+  flex-shrink:0;
+}
+.lb-follow-btn:active { transform:scale(.95); }
+.lb-follow-btn.state-follow {
+  border:1px solid hsl(var(--primary)/0.5);
+  background:transparent;
+  color:hsl(var(--primary));
+}
+.lb-follow-btn.state-follow:hover {
+  background:hsl(var(--primary));
+  color:hsl(var(--primary-foreground));
+  border-color:hsl(var(--primary));
+}
+.lb-follow-btn.state-following {
+  border:1px solid hsl(var(--border));
+  background:hsl(var(--secondary));
+  color:hsl(var(--secondary-foreground));
+}
+.lb-follow-btn.state-following:hover {
+  border-color:hsl(var(--destructive)/0.5);
+  color:hsl(var(--destructive));
+  background:hsl(var(--destructive)/0.07);
+}
+.lb-follow-btn.state-requested {
+  border:1px solid hsl(var(--border));
+  background:transparent;
+  color:hsl(var(--muted-foreground));
+}
 </style>
+
+{% comment %}Macro-like include for the follow button{% endcomment %}
 
 <div class="max-w-3xl mx-auto px-4 py-6 sm:py-10 space-y-5">
 
@@ -59,29 +101,44 @@
   {% if debate_board %}
   <div class="space-y-3">
     {% for entry in debate_board %}
-    <a href="{% url 'user_profile' entry.username %}" class="lb-card flex items-center gap-3 sm:gap-4 p-3 sm:p-4 no-underline block group">
-      <div class="rank-badge {% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
-        {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else %}{{ entry.rank }}{% endif %}
-      </div>
-      {% if entry.avatar_url %}
-      <img src="{{ entry.avatar_url }}" alt="{{ entry.username }}" class="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0">
-      {% else %}
-      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-white flex items-center justify-center font-black text-base flex-shrink-0">{{ entry.username|first|upper }}</div>
-      {% endif %}
-      <div class="flex-1 min-w-0">
-        <p class="font-bold text-foreground group-hover:text-primary transition-colors truncate">{{ entry.username }}</p>
-        <div class="mt-1 flex flex-wrap gap-1.5">
-          <span class="stat-pill">⚔️ {{ entry.played }} debates</span>
-          <span class="stat-pill">🏆 {{ entry.wins }} wins</span>
-          <span class="stat-pill">📈 {{ entry.win_rate }}% win rate</span>
-          {% if entry.spectators %}<span class="stat-pill">👁️ {{ entry.spectators }} spectators</span>{% endif %}
+    <div class="lb-card">
+      <a href="{% url 'user_profile' entry.username %}" class="lb-card-link" aria-label="View {{ entry.username }}'s profile"></a>
+      <div class="lb-card-body">
+        <div class="rank-badge {% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
+          {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else %}{{ entry.rank }}{% endif %}
+        </div>
+        {% if entry.avatar_url %}
+        <img src="{{ entry.avatar_url }}" alt="{{ entry.username }}" class="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0">
+        {% else %}
+        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-white flex items-center justify-center font-black text-base flex-shrink-0">{{ entry.username|first|upper }}</div>
+        {% endif %}
+        <div class="flex-1 min-w-0">
+          <p class="font-bold text-foreground truncate">{{ entry.username }}</p>
+          <div class="mt-1 flex flex-wrap gap-1.5">
+            <span class="stat-pill">⚔️ {{ entry.played }} debates</span>
+            <span class="stat-pill">🏆 {{ entry.wins }} wins</span>
+            <span class="stat-pill">📈 {{ entry.win_rate }}% win rate</span>
+            {% if entry.spectators %}<span class="stat-pill">👁️ {{ entry.spectators }}</span>{% endif %}
+          </div>
+        </div>
+        <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+          <div class="text-right">
+            <p class="total-score">{{ entry.wins }}</p>
+            <p class="text-[10px] text-muted-foreground uppercase tracking-wide">wins</p>
+          </div>
+          {% if user.is_authenticated and entry.follow_state != 'self' %}
+          <button class="lb-follow-btn state-{{ entry.follow_state }}"
+                  data-username="{{ entry.username }}"
+                  data-state="{{ entry.follow_state }}"
+                  onclick="lbToggleFollow(this)">
+            {% if entry.follow_state == 'following' %}✓ Following
+            {% elif entry.follow_state == 'requested' %}Requested
+            {% else %}+ Follow{% endif %}
+          </button>
+          {% endif %}
         </div>
       </div>
-      <div class="text-right flex-shrink-0">
-        <p class="total-score">{{ entry.wins }}</p>
-        <p class="text-[10px] text-muted-foreground uppercase tracking-wide">wins</p>
-      </div>
-    </a>
+    </div>
     {% endfor %}
   </div>
   {% else %}
@@ -98,27 +155,42 @@
   {% if streak_board %}
   <div class="space-y-3">
     {% for entry in streak_board %}
-    <a href="{% url 'user_profile' entry.username %}" class="lb-card flex items-center gap-3 sm:gap-4 p-3 sm:p-4 no-underline block group">
-      <div class="rank-badge {% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
-        {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else %}{{ entry.rank }}{% endif %}
-      </div>
-      {% if entry.avatar_url %}
-      <img src="{{ entry.avatar_url }}" alt="{{ entry.username }}" class="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0">
-      {% else %}
-      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-red-500 text-white flex items-center justify-center font-black text-base flex-shrink-0">{{ entry.username|first|upper }}</div>
-      {% endif %}
-      <div class="flex-1 min-w-0">
-        <p class="font-bold text-foreground group-hover:text-primary transition-colors truncate">{{ entry.username }}</p>
-        <div class="mt-1 flex flex-wrap gap-1.5">
-          <span class="stat-pill">🔥 {{ entry.streak_days }} day streak</span>
-          {% if entry.reputation %}<span class="stat-pill">🌟 {{ entry.reputation }} rep</span>{% endif %}
+    <div class="lb-card">
+      <a href="{% url 'user_profile' entry.username %}" class="lb-card-link" aria-label="View {{ entry.username }}'s profile"></a>
+      <div class="lb-card-body">
+        <div class="rank-badge {% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
+          {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else %}{{ entry.rank }}{% endif %}
+        </div>
+        {% if entry.avatar_url %}
+        <img src="{{ entry.avatar_url }}" alt="{{ entry.username }}" class="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0">
+        {% else %}
+        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-red-500 text-white flex items-center justify-center font-black text-base flex-shrink-0">{{ entry.username|first|upper }}</div>
+        {% endif %}
+        <div class="flex-1 min-w-0">
+          <p class="font-bold text-foreground truncate">{{ entry.username }}</p>
+          <div class="mt-1 flex flex-wrap gap-1.5">
+            <span class="stat-pill">🔥 {{ entry.streak_days }} day streak</span>
+            {% if entry.reputation %}<span class="stat-pill">🌟 {{ entry.reputation }} rep</span>{% endif %}
+          </div>
+        </div>
+        <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+          <div class="text-right">
+            <p class="total-score">{{ entry.streak_days }}</p>
+            <p class="text-[10px] text-muted-foreground uppercase tracking-wide">days</p>
+          </div>
+          {% if user.is_authenticated and entry.follow_state != 'self' %}
+          <button class="lb-follow-btn state-{{ entry.follow_state }}"
+                  data-username="{{ entry.username }}"
+                  data-state="{{ entry.follow_state }}"
+                  onclick="lbToggleFollow(this)">
+            {% if entry.follow_state == 'following' %}✓ Following
+            {% elif entry.follow_state == 'requested' %}Requested
+            {% else %}+ Follow{% endif %}
+          </button>
+          {% endif %}
         </div>
       </div>
-      <div class="text-right flex-shrink-0">
-        <p class="total-score">{{ entry.streak_days }}</p>
-        <p class="text-[10px] text-muted-foreground uppercase tracking-wide">days</p>
-      </div>
-    </a>
+    </div>
     {% endfor %}
   </div>
   {% else %}
@@ -134,28 +206,43 @@
   {% if reputation_board %}
   <div class="space-y-3">
     {% for entry in reputation_board %}
-    <a href="{% url 'user_profile' entry.username %}" class="lb-card flex items-center gap-3 sm:gap-4 p-3 sm:p-4 no-underline block group">
-      <div class="rank-badge {% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
-        {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else %}{{ entry.rank }}{% endif %}
-      </div>
-      {% if entry.avatar_url %}
-      <img src="{{ entry.avatar_url }}" alt="{{ entry.username }}" class="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0">
-      {% else %}
-      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-base flex-shrink-0">{{ entry.username|first|upper }}</div>
-      {% endif %}
-      <div class="flex-1 min-w-0">
-        <p class="font-bold text-foreground group-hover:text-primary transition-colors truncate">{{ entry.username }}</p>
-        <div class="mt-1 flex flex-wrap gap-1.5">
-          <span class="stat-pill">🌟 {{ entry.reputation }} reputation</span>
-          {% if entry.streak_days %}<span class="stat-pill">🔥 {{ entry.streak_days }}d streak</span>{% endif %}
-          <span class="stat-pill">{{ entry.trust_level }} member</span>
+    <div class="lb-card">
+      <a href="{% url 'user_profile' entry.username %}" class="lb-card-link" aria-label="View {{ entry.username }}'s profile"></a>
+      <div class="lb-card-body">
+        <div class="rank-badge {% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
+          {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else %}{{ entry.rank }}{% endif %}
+        </div>
+        {% if entry.avatar_url %}
+        <img src="{{ entry.avatar_url }}" alt="{{ entry.username }}" class="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0">
+        {% else %}
+        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-base flex-shrink-0">{{ entry.username|first|upper }}</div>
+        {% endif %}
+        <div class="flex-1 min-w-0">
+          <p class="font-bold text-foreground truncate">{{ entry.username }}</p>
+          <div class="mt-1 flex flex-wrap gap-1.5">
+            <span class="stat-pill">🌟 {{ entry.reputation }} reputation</span>
+            {% if entry.streak_days %}<span class="stat-pill">🔥 {{ entry.streak_days }}d streak</span>{% endif %}
+            <span class="stat-pill">{{ entry.trust_level }} member</span>
+          </div>
+        </div>
+        <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+          <div class="text-right">
+            <p class="total-score">{{ entry.reputation }}</p>
+            <p class="text-[10px] text-muted-foreground uppercase tracking-wide">rep</p>
+          </div>
+          {% if user.is_authenticated and entry.follow_state != 'self' %}
+          <button class="lb-follow-btn state-{{ entry.follow_state }}"
+                  data-username="{{ entry.username }}"
+                  data-state="{{ entry.follow_state }}"
+                  onclick="lbToggleFollow(this)">
+            {% if entry.follow_state == 'following' %}✓ Following
+            {% elif entry.follow_state == 'requested' %}Requested
+            {% else %}+ Follow{% endif %}
+          </button>
+          {% endif %}
         </div>
       </div>
-      <div class="text-right flex-shrink-0">
-        <p class="total-score">{{ entry.reputation }}</p>
-        <p class="text-[10px] text-muted-foreground uppercase tracking-wide">rep</p>
-      </div>
-    </a>
+    </div>
     {% endfor %}
   </div>
   {% else %}
@@ -178,28 +265,43 @@
   {% if board %}
   <div class="space-y-3">
     {% for entry in board %}
-    <a href="{% url 'user_profile' entry.username %}" class="lb-card flex items-center gap-3 sm:gap-4 p-3 sm:p-4 no-underline block group">
-      <div class="rank-badge {% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
-        {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else %}{{ entry.rank }}{% endif %}
-      </div>
-      {% if entry.avatar_url %}
-      <img src="{{ entry.avatar_url }}" alt="{{ entry.username }}" class="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0">
-      {% else %}
-      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 text-white flex items-center justify-center font-black text-base flex-shrink-0">{{ entry.username|first|upper }}</div>
-      {% endif %}
-      <div class="flex-1 min-w-0">
-        <p class="font-bold text-foreground group-hover:text-primary transition-colors truncate">{{ entry.username }}</p>
-        <div class="mt-1 flex flex-wrap gap-1.5">
-          <span class="stat-pill">🗳️ {{ entry.post_count }} posts</span>
-          {% if entry.total_likes %}<span class="stat-pill">⭐ {{ entry.total_likes }} likes</span>{% endif %}
-          {% if entry.reputation %}<span class="stat-pill">🌟 {{ entry.reputation }} rep</span>{% endif %}
+    <div class="lb-card">
+      <a href="{% url 'user_profile' entry.username %}" class="lb-card-link" aria-label="View {{ entry.username }}'s profile"></a>
+      <div class="lb-card-body">
+        <div class="rank-badge {% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
+          {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else %}{{ entry.rank }}{% endif %}
+        </div>
+        {% if entry.avatar_url %}
+        <img src="{{ entry.avatar_url }}" alt="{{ entry.username }}" class="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0">
+        {% else %}
+        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 text-white flex items-center justify-center font-black text-base flex-shrink-0">{{ entry.username|first|upper }}</div>
+        {% endif %}
+        <div class="flex-1 min-w-0">
+          <p class="font-bold text-foreground truncate">{{ entry.username }}</p>
+          <div class="mt-1 flex flex-wrap gap-1.5">
+            <span class="stat-pill">🗳️ {{ entry.post_count }} posts</span>
+            {% if entry.total_likes %}<span class="stat-pill">⭐ {{ entry.total_likes }} likes</span>{% endif %}
+            {% if entry.reputation %}<span class="stat-pill">🌟 {{ entry.reputation }} rep</span>{% endif %}
+          </div>
+        </div>
+        <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+          <div class="text-right">
+            <p class="total-score">{{ entry.post_count }}</p>
+            <p class="text-[10px] text-muted-foreground uppercase tracking-wide">posts</p>
+          </div>
+          {% if user.is_authenticated and entry.follow_state != 'self' %}
+          <button class="lb-follow-btn state-{{ entry.follow_state }}"
+                  data-username="{{ entry.username }}"
+                  data-state="{{ entry.follow_state }}"
+                  onclick="lbToggleFollow(this)">
+            {% if entry.follow_state == 'following' %}✓ Following
+            {% elif entry.follow_state == 'requested' %}Requested
+            {% else %}+ Follow{% endif %}
+          </button>
+          {% endif %}
         </div>
       </div>
-      <div class="text-right flex-shrink-0">
-        <p class="total-score">{{ entry.post_count }}</p>
-        <p class="text-[10px] text-muted-foreground uppercase tracking-wide">posts</p>
-      </div>
-    </a>
+    </div>
     {% endfor %}
   </div>
   {% else %}
@@ -213,4 +315,43 @@
   {% endif %}{# end tab if/elif/else #}
 
 </div>
+
+<script>
+function lbToggleFollow(btn) {
+  var username = btn.dataset.username;
+  var state    = btn.dataset.state;
+  var action   = (state === 'following' || state === 'requested') ? 'unfollow' : 'follow';
+  btn.disabled = true;
+  btn.style.opacity = '0.5';
+
+  fetch('/api/users/follow/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': (document.cookie.match('(^|;) ?csrftoken=([^;]*)(;|$)') || [])[2] || '',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action: action, username: username }),
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    btn.disabled = false;
+    btn.style.opacity = '';
+    if (!d.success) return;
+    if (d.request_pending) {
+      btn.dataset.state = 'requested';
+      btn.className = 'lb-follow-btn state-requested';
+      btn.textContent = 'Requested';
+    } else if (d.is_following) {
+      btn.dataset.state = 'following';
+      btn.className = 'lb-follow-btn state-following';
+      btn.textContent = '✓ Following';
+    } else {
+      btn.dataset.state = 'follow';
+      btn.className = 'lb-follow-btn state-follow';
+      btn.textContent = '+ Follow';
+    }
+  })
+  .catch(function() { btn.disabled = false; btn.style.opacity = ''; });
+}
+</script>
 {% endblock %}

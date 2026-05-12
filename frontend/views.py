@@ -6647,6 +6647,39 @@ def leaderboard(request):
             'trust_level': p.trust_level,
         })
 
+    # Collect usernames the current user already follows so the template
+    # can render the correct initial follow button state.
+    followed_usernames = set()
+    requested_usernames = set()
+    if request.user.is_authenticated:
+        from users.models import Follow as _Follow, FollowRequest as _FollowRequest
+        followed_usernames = set(
+            _Follow.objects.filter(follower=request.user)
+            .values_list('following__username', flat=True)
+        )
+        requested_usernames = set(
+            _FollowRequest.objects.filter(from_user=request.user, status='pending')
+            .values_list('to_user__username', flat=True)
+        )
+
+    def _follow_state(username):
+        if username == (request.user.username if request.user.is_authenticated else ''):
+            return 'self'
+        if username in followed_usernames:
+            return 'following'
+        if username in requested_usernames:
+            return 'requested'
+        return 'follow'
+
+    for entry in board:
+        entry['follow_state'] = _follow_state(entry['username'])
+    for entry in debate_board:
+        entry['follow_state'] = _follow_state(entry['username'])
+    for entry in streak_board:
+        entry['follow_state'] = _follow_state(entry['username'])
+    for entry in reputation_board:
+        entry['follow_state'] = _follow_state(entry['username'])
+
     return render(request, 'frontend/leaderboard.html', {
         'board': board,
         'debate_board': debate_board,
