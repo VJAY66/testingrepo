@@ -88,6 +88,23 @@
        class="tab-btn {% if tab == 'reputation' %}active{% endif %}">🌟 Reputation</a>
   </div>
 
+  <!-- Active tab description -->
+  <div class="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-muted/40 border border-border/50 text-sm text-muted-foreground">
+    {% if tab == 'debates' %}
+    <span class="text-base mt-px flex-shrink-0">⚔️</span>
+    <div><strong class="text-foreground">Top Debaters</strong> — ranked by debate wins. A win is awarded when the community votes your side as the stronger argument after a completed debate. Win rate shows how consistently you come out on top.</div>
+    {% elif tab == 'streaks' %}
+    <span class="text-base mt-px flex-shrink-0">🔥</span>
+    <div><strong class="text-foreground">Streaks</strong> — ranked by consecutive days active. You earn a streak day by posting or engaging at least once. Missing a day resets your streak, so keep showing up!</div>
+    {% elif tab == 'reputation' %}
+    <span class="text-base mt-px flex-shrink-0">🌟</span>
+    <div><strong class="text-foreground">Reputation</strong> — a combined score reflecting your overall contribution quality. It grows when others like your posts, when you win debates, maintain long streaks, and earn trust through consistent engagement.</div>
+    {% else %}
+    <span class="text-base mt-px flex-shrink-0">🗳️</span>
+    <div><strong class="text-foreground">Top Posters</strong> — ranked by number of posts published{% if active_category %} in <strong class="text-foreground">{{ active_category }}</strong>{% endif %}. Likes are shown as a secondary signal of post quality alongside volume.</div>
+    {% endif %}
+  </div>
+
   <!-- Period tabs (only for posts / debates) -->
   {% if tab != 'streaks' and tab != 'reputation' %}
   <div class="flex items-center gap-2 flex-wrap">
