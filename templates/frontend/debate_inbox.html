@@ -32,12 +32,19 @@
           {% if d.status == 'countered' %}↩ Counter Proposed{% else %}{{ d.status|title }}{% endif %}
         </span>
       </div>
-      <div class="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+      <div class="flex items-center gap-2 text-xs text-muted-foreground mb-3 flex-wrap">
         <span>vs <a href="{% url 'user_profile' item.opponent.username %}" class="font-semibold text-foreground hover:text-primary">@{{ item.opponent.username }}</a></span>
         <span>·</span>
         <span>Your side: <strong class="{% if item.side == 'yes' %}text-emerald-600{% else %}text-rose-600{% endif %}">{{ item.side|upper }}</strong></span>
         <span>·</span>
         <span>{{ d.created_at|date:"M j, Y" }}</span>
+        {% if d.status == 'pending' and item.expires_at %}
+        <span>·</span>
+        <span class="debate-expiry-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-400 font-semibold"
+              data-expires="{{ item.expires_at|date:'c' }}">
+          ⏳ <span class="expiry-text">calculating…</span>
+        </span>
+        {% endif %}
       </div>
 
       <!-- Counter-proposal details banner -->
@@ -64,6 +71,9 @@
           <form method="post" action="{% url 'reject_debate' d.id %}" class="inline">{% csrf_token %}
             <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:text-destructive hover:border-destructive transition">Reject</button>
           </form>
+
+        {% elif d.status == 'pending' and item.is_initiator %}
+          <button onclick="cancelDebate('{{ d.id }}')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:text-destructive hover:border-destructive transition">✕ Cancel Challenge</button>
 
         {% elif d.status == 'countered' and d.initiator == request.user %}
           <button onclick="acceptCounter('{{ d.id }}')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition">Accept Counter</button>
@@ -168,6 +178,46 @@ function requestRematch(debateId, btn) {
     else { btn.textContent = '⚔️ Rematch'; btn.disabled = false; alert(d.error || 'Could not request rematch.'); }
   });
 }
+function cancelDebate(id) {
+  if (!confirm('Cancel this debate challenge? This cannot be undone.')) return;
+  fetch('/cancel-debate/' + id + '/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': getCookie('csrftoken')},
+  }).then(r => r.json()).then(d => {
+    if (d.success) {
+      var card = document.getElementById('debate-card-' + id);
+      if (card) card.remove();
+    } else {
+      alert(d.error || 'Could not cancel.');
+    }
+  });
+}
+
 function getCookie(n) { var v = document.cookie.match('(^|;) ?'+n+'=([^;]*)(;|$)'); return v ? v[2] : null; }
+
+// Expiry countdown for pending debates
+(function() {
+  function fmtRemaining(ms) {
+    if (ms <= 0) return 'Expired';
+    var h = Math.floor(ms / 3600000);
+    var m = Math.floor((ms % 3600000) / 60000);
+    if (h > 0) return 'Expires in ' + h + 'h ' + m + 'm';
+    if (m > 0) return 'Expires in ' + m + 'm';
+    return 'Expires soon';
+  }
+  function updateCountdowns() {
+    document.querySelectorAll('.debate-expiry-pill[data-expires]').forEach(function(el) {
+      var exp = new Date(el.dataset.expires);
+      var ms = exp - Date.now();
+      el.querySelector('.expiry-text').textContent = fmtRemaining(ms);
+      if (ms <= 0) {
+        el.classList.remove('bg-amber-50','border-amber-200','text-amber-600','dark:bg-amber-900/20','dark:border-amber-700','dark:text-amber-400');
+        el.classList.add('bg-red-50','border-red-200','text-red-600','dark:bg-red-900/20','dark:border-red-700','dark:text-red-400');
+      }
+    });
+  }
+  updateCountdowns();
+  setInterval(updateCountdowns, 60000);
+})();
 </script>
 {% endblock %}

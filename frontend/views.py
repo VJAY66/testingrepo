@@ -4291,6 +4291,19 @@ def reject_debate(request, debate_id):
 
 @login_required
 @require_POST
+def cancel_debate(request, debate_id):
+    """Initiator cancels their own pending debate challenge."""
+    try:
+        debate = Debate.objects.get(id=debate_id, initiator=request.user, status='pending')
+    except Debate.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Debate not found or cannot be cancelled.'}, status=404)
+    debate.status = 'rejected'
+    debate.save(update_fields=['status', 'updated_at'])
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_POST
 def counter_debate(request, debate_id):
     """Target user proposes a counter-topic/side instead of accepting or rejecting."""
     try:
@@ -4373,12 +4386,15 @@ def debate_inbox(request):
     for p in participations:
         d = p.debate
         opponent = d.target if d.initiator == request.user else d.initiator
+        expires_at = (d.created_at + timedelta(hours=48)) if d.status == 'pending' else None
         debates_with_status.append({
             'debate': d,
             'opponent': opponent,
             'side': p.side,
             'status': d.status,
             'post': d.post,
+            'expires_at': expires_at,
+            'is_initiator': d.initiator == request.user,
         })
 
     pending_count = sum(1 for x in debates_with_status if x['status'] == 'pending')
