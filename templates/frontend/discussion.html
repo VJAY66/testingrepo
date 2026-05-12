@@ -763,8 +763,10 @@
                                 <a href="{{ comment.debate_chat_url }}" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ comment.debate_action_label }}</a>
                                 {% elif comment.debate_action_mode == 'blocked' %}
                                 <button type="button" onclick="showInlineActionPopup(this, 'You were removed from this comment debate and cannot start it again.', 'error')" class="rounded-full bg-slate-400 px-1.5 py-0.5 text-[9px] text-white cursor-not-allowed opacity-80" aria-disabled="true" title="You were removed from this comment debate and cannot start it again.">{{ comment.debate_action_label }}</button>
+                                {% elif comment.debate_action_mode == 'waiting' %}
+                                <button type="button" class="inline-flex items-center gap-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] text-white cursor-default opacity-90" title="Waiting for opponent to accept">⏳ Waiting{% if comment.debate_pre_join_yes is not None %} · ✅{{ comment.debate_pre_join_yes }} ❌{{ comment.debate_pre_join_no }}{% endif %}</button>
                                 {% else %}
-                                <button onclick="startDebate('{{ comment.id }}', this)" class="rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ comment.debate_action_label }}</button>
+                                <button onclick="startDebate('{{ comment.id }}', this)" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ comment.debate_action_label }}{% if comment.debate_action_mode == 'join' and comment.debate_pre_join_yes is not None %} · ✅{{ comment.debate_pre_join_yes }} ❌{{ comment.debate_pre_join_no }}{% endif %}</button>
                                 {% endif %}
                                 {% endif %}
                                 {% endif %}
@@ -853,8 +855,10 @@
                                 <a href="{{ comment.debate_chat_url }}" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ comment.debate_action_label }}</a>
                                 {% elif comment.debate_action_mode == 'blocked' %}
                                 <button type="button" onclick="showInlineActionPopup(this, 'You were removed from this comment debate and cannot start it again.', 'error')" class="rounded-full bg-slate-400 px-1.5 py-0.5 text-[9px] text-white cursor-not-allowed opacity-80" aria-disabled="true" title="You were removed from this comment debate and cannot start it again.">{{ comment.debate_action_label }}</button>
+                                {% elif comment.debate_action_mode == 'waiting' %}
+                                <button type="button" class="inline-flex items-center gap-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] text-white cursor-default opacity-90" title="Waiting for opponent to accept">⏳ Waiting{% if comment.debate_pre_join_yes is not None %} · ✅{{ comment.debate_pre_join_yes }} ❌{{ comment.debate_pre_join_no }}{% endif %}</button>
                                 {% else %}
-                                <button onclick="startDebate('{{ comment.id }}', this)" class="rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ comment.debate_action_label }}</button>
+                                <button onclick="startDebate('{{ comment.id }}', this)" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ comment.debate_action_label }}{% if comment.debate_action_mode == 'join' and comment.debate_pre_join_yes is not None %} · ✅{{ comment.debate_pre_join_yes }} ❌{{ comment.debate_pre_join_no }}{% endif %}</button>
                                 {% endif %}
                                 {% endif %}
                                 {% endif %}

@@ -1386,12 +1386,64 @@ def discussion(request, post_id):
             if debate.target_id not in completed_lookup:
                 completed_lookup[debate.target_id] = debate
 
+        # Pending debates — show "Join Debate" to everyone except the target
+        # (accepted debates already in debate_lookup take priority)
+        pending_debates_qs = list(
+            Debate.objects.filter(
+                post=post,
+                target_id__in=visible_comment_owners,
+                status='pending',
+            ).order_by('target_id', '-created_at')
+        )
+        if pending_debates_qs:
+            pending_ids = [d.id for d in pending_debates_qs]
+            user_prejoined_set = set(
+                DebateParticipant.objects.filter(
+                    debate_id__in=pending_ids,
+                    user=request.user,
+                ).values_list('debate_id', flat=True)
+            )
+            pending_counts = {
+                (row['debate_id'], row['side']): row['total']
+                for row in DebateParticipant.objects.filter(
+                    debate_id__in=pending_ids,
+                    is_active=True,
+                ).values('debate_id', 'side').annotate(total=Count('id'))
+            }
+            pending_by_target = {}
+            for d in pending_debates_qs:
+                if d.target_id not in pending_by_target:
+                    pending_by_target[d.target_id] = d
+
+            for target_id, debate in pending_by_target.items():
+                if target_id in debate_lookup:
+                    continue  # accepted debate already there
+                yes_pre = pending_counts.get((debate.id, 'yes'), 0)
+                no_pre  = pending_counts.get((debate.id, 'no'),  0)
+                already_in = debate.id in user_prejoined_set or debate.initiator_id == request.user.id
+                if already_in:
+                    mode  = 'waiting'
+                    label = 'Waiting…'
+                else:
+                    mode  = 'join'
+                    label = 'Join Debate'
+                debate_lookup[target_id] = {
+                    'id': debate.id,
+                    'mode': mode,
+                    'label': label,
+                    'chat_url': f'/debates/{debate.id}/chat/',
+                    'pre_join_yes': yes_pre,
+                    'pre_join_no':  no_pre,
+                }
+
     for comment in yes_comments:
         debate_state = debate_lookup.get(comment.user_id)
         completed_state = completed_lookup.get(comment.user_id) if request.user.is_authenticated else None
         comment.debate_action_mode = debate_state['mode'] if debate_state else 'start'
         comment.debate_action_label = debate_state['label'] if debate_state else 'Start Debate'
         comment.debate_chat_url = debate_state['chat_url'] if debate_state else ''
+        comment.debate_pre_join_yes = debate_state.get('pre_join_yes') if debate_state else None
+        comment.debate_pre_join_no  = debate_state.get('pre_join_no')  if debate_state else None
         comment.show_debate_action = False
         if request.user.is_authenticated and request.user != comment.user:
             comment.show_debate_action = bool(debate_state) or is_post_creator or (user_has_voted and user_vote_type != comment.vote_type)
@@ -1418,6 +1470,8 @@ def discussion(request, post_id):
         comment.debate_action_mode = debate_state['mode'] if debate_state else 'start'
         comment.debate_action_label = debate_state['label'] if debate_state else 'Start Debate'
         comment.debate_chat_url = debate_state['chat_url'] if debate_state else ''
+        comment.debate_pre_join_yes = debate_state.get('pre_join_yes') if debate_state else None
+        comment.debate_pre_join_no  = debate_state.get('pre_join_no')  if debate_state else None
         comment.show_debate_action = False
         if request.user.is_authenticated and request.user != comment.user:
             comment.show_debate_action = bool(debate_state) or is_post_creator or (user_has_voted and user_vote_type != comment.vote_type)
