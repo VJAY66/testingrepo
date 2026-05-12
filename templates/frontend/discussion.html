@@ -1277,11 +1277,57 @@ function startDebate(commentId, triggerEl) {
                 var initialNo  = data.pre_join_no  || null;
                 _startDebateStatusPolling(data.debate_id, triggerEl, initialYes, initialNo);
             }
+        } else if (data.can_view && data.debate_id) {
+            // Balance rule blocked join — show message with a View Debate link
+            _showCanViewPopup(triggerEl, data.error, data.debate_id);
         } else {
             showInlineActionPopup(triggerEl, data.error || 'Failed to start debate.', 'error');
         }
     })
     .catch(() => window.showToast('Failed to start debate.', 'error'));
+}
+
+function _showCanViewPopup(triggerEl, message, debateId) {
+    var old = document.getElementById('debate-canview-popup');
+    if (old) old.remove();
+    var box = document.createElement('div');
+    box.id = 'debate-canview-popup';
+    box.style.cssText = [
+        'position:fixed','bottom:20px','right:20px','z-index:9999',
+        'background:hsl(var(--card))','color:hsl(var(--foreground))',
+        'border:1px solid hsl(var(--border))','border-radius:14px',
+        'padding:14px 16px','font-size:13px','font-weight:500',
+        'box-shadow:0 4px 24px rgba(0,0,0,.18)','max-width:320px',
+        'display:flex','flex-direction:column','gap:10px'
+    ].join(';');
+    var msg = document.createElement('p');
+    msg.style.cssText = 'margin:0;line-height:1.5;color:hsl(var(--foreground))';
+    msg.textContent = message;
+    var actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:8px;align-items:center';
+    var viewBtn = document.createElement('a');
+    viewBtn.href = '/debates/' + debateId + '/chat/';
+    viewBtn.textContent = 'View Debate';
+    viewBtn.style.cssText = [
+        'display:inline-flex','align-items:center','padding:6px 14px',
+        'border-radius:999px','background:hsl(var(--primary))',
+        'color:hsl(var(--primary-foreground))','font-size:12px',
+        'font-weight:700','text-decoration:none'
+    ].join(';');
+    var closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Dismiss';
+    closeBtn.style.cssText = [
+        'padding:6px 12px','border-radius:999px','border:1px solid hsl(var(--border))',
+        'background:transparent','color:hsl(var(--muted-foreground))',
+        'font-size:12px','font-weight:600','cursor:pointer'
+    ].join(';');
+    closeBtn.onclick = function() { box.remove(); };
+    actions.appendChild(viewBtn);
+    actions.appendChild(closeBtn);
+    box.appendChild(msg);
+    box.appendChild(actions);
+    document.body.appendChild(box);
+    setTimeout(function() { if (box.parentNode) box.remove(); }, 10000);
 }
 
 function _startDebateStatusPolling(debateId, triggerEl, initYes, initNo) {

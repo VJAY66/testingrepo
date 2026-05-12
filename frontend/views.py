@@ -4128,12 +4128,29 @@ def start_debate(request):
                                      'error': 'Please vote yes or no on the post before pre-joining.'}, status=400)
             yes_pre, no_pre = _pending_side_counts(pending_debate)
             if not _can_pre_join(yes_pre, no_pre, desired_side):
-                my_count = yes_pre if desired_side == 'yes' else no_pre
+                my_count    = yes_pre if desired_side == 'yes' else no_pre
+                other_count = no_pre  if desired_side == 'yes' else yes_pre
+                my_label    = desired_side.upper()
+                other_label = 'NO' if desired_side == 'yes' else 'YES'
                 if my_count >= PRE_JOIN_LIMIT:
-                    return JsonResponse({'success': False,
-                                         'error': f'Your side is already full ({PRE_JOIN_LIMIT}/{PRE_JOIN_LIMIT} pre-joined).'})
-                return JsonResponse({'success': False,
-                                     'error': 'The other side needs to catch up first. Try again shortly.'})
+                    return JsonResponse({
+                        'success': False, 'can_view': True,
+                        'debate_id': pending_debate.id,
+                        'error': (
+                            f'The {my_label} side is already full ({PRE_JOIN_LIMIT}/{PRE_JOIN_LIMIT}). '
+                            f'You can view the debate while you wait for a spot.'
+                        ),
+                    })
+                return JsonResponse({
+                    'success': False, 'can_view': True,
+                    'debate_id': pending_debate.id,
+                    'error': (
+                        f"You can't join the {my_label} side yet — there "
+                        f"{'is only' if other_count == 1 else 'are only'} {other_count} "
+                        f"{other_label} user{'s' if other_count != 1 else ''} so far. "
+                        f"You can view the debate until a {other_label} user joins to keep it balanced."
+                    ),
+                })
             DebateParticipant.objects.create(debate=pending_debate, user=request.user,
                                              side=desired_side, is_active=True)
             yes_pre2, no_pre2 = _pending_side_counts(pending_debate)
