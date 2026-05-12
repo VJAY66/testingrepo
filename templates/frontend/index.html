@@ -254,7 +254,7 @@
                                 <div class="post-action-wrapper mt-3">
                                   <!-- Primary action row -->
                                   <div class="flex items-center gap-2 sm:gap-4">
-                                    <button type="button" data-action="like" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-like feed-star-like {% if post.is_liked %}active text-amber-500 shadow-md shadow-amber-500/20 bg-amber-50/60 dark:bg-amber-950/30{% else %}text-muted-foreground hover:text-amber-500{% endif %} hover:bg-amber-50/70 dark:hover:bg-amber-950/20 hover:shadow-md overflow-hidden">
+                                    <button type="button" data-action="like" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-like feed-star-like {% if post.is_liked %}active text-amber-500 shadow-md shadow-amber-500/20 bg-amber-50/60 dark:bg-amber-950/30{% else %}text-rose-400 dark:text-rose-400 hover:text-amber-500{% endif %} hover:bg-amber-50/70 dark:hover:bg-amber-950/20 hover:shadow-md overflow-hidden">
                                         <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_liked %}scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="{% if post.is_liked %}url(#dh-like-gradient){% else %}none{% endif %}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <defs>
                                                 <linearGradient id="dh-like-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -264,24 +264,24 @@
                                             </defs>
                                             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L4.22 13.45 12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                                         </svg>
-                                        <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.like_count|default:0 }}</span>
+                                        <span class="action-count sm:text-sm text-xs font-semibold relative z-10">{{ post.like_count|default:0 }}</span>
                                     </button>
-                                    <button type="button" data-action="repost" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-repost {% if post.is_reposted %}text-green-500 shadow-md shadow-green-500/20 bg-green-50/50 dark:bg-green-950/30{% else %}text-muted-foreground hover:text-green-500{% endif %} hover:bg-green-50 dark:hover:bg-green-950/20 hover:shadow-md overflow-hidden">
+                                    <button type="button" data-action="repost" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-repost {% if post.is_reposted %}text-green-500 shadow-md shadow-green-500/20 bg-green-50/50 dark:bg-green-950/30{% else %}text-emerald-600 dark:text-emerald-400 hover:text-green-500{% endif %} hover:bg-green-50 dark:hover:bg-green-950/20 hover:shadow-md overflow-hidden">
                                         <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <path d="M17 1l4 4-4 4"/>
                                             <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
                                             <path d="M7 23l-4-4 4-4"/>
                                             <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
                                         </svg>
-                                        <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.repost_count|default:0 }}</span>
+                                        <span class="action-count sm:text-sm text-xs font-semibold relative z-10">{{ post.repost_count|default:0 }}</span>
                                     </button>
-                                    <button type="button" data-action="save" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-save {% if post.is_saved %}active text-primary shadow-md shadow-primary/20 bg-primary/5{% else %}text-muted-foreground hover:text-primary{% endif %} hover:bg-primary/10 hover:shadow-md overflow-hidden">
+                                    <button type="button" data-action="save" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-save {% if post.is_saved %}active text-primary shadow-md shadow-primary/20 bg-primary/5{% else %}text-blue-500 dark:text-blue-400 hover:text-primary{% endif %} hover:bg-primary/10 hover:shadow-md overflow-hidden">
                                         <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_saved %}fill-current scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="{% if post.is_saved %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2">
                                             <path d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/>
                                         </svg>
-                                        <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.save_count|default:0 }}</span>
+                                        <span class="action-count sm:text-sm text-xs font-semibold relative z-10">{{ post.save_count|default:0 }}</span>
                                     </button>
-                                    <!-- Desktop-only: read later, share, quote, reactions -->
+                                    <!-- Desktop-only: read later, share, reactions -->
                                     <div class="hidden sm:flex items-center gap-3">
                                       {% if user.is_authenticated %}
                                       <button type="button" onclick="toggleReadLater('{{ post.id|escapejs }}', this)"
@@ -347,31 +347,30 @@
                                 </div>
                             {% else %}
                             <div class="mt-3 flex items-center sm:gap-6 gap-3">
-                                <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 action-btn-enhanced action-btn-like feed-star-like text-muted-foreground hover:text-amber-500 hover:bg-amber-50/70 dark:hover:bg-amber-950/20 hover:shadow-md overflow-hidden cursor-pointer">
+                                <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 action-btn-enhanced action-btn-like feed-star-like text-rose-400 dark:text-rose-400 hover:text-amber-500 hover:bg-amber-50/70 dark:hover:bg-amber-950/20 hover:shadow-md overflow-hidden cursor-pointer">
                                     <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-sm relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L4.22 13.45 12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                                     </svg>
-                                    <span class="sm:text-sm text-xs font-medium relative z-10">{{ post.like_count|default:0 }}</span>
+                                    <span class="sm:text-sm text-xs font-semibold relative z-10">{{ post.like_count|default:0 }}</span>
                                 </button>
-                                <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full text-muted-foreground hover:text-primary transition-all duration-300 action-btn-enhanced action-btn-repost hover:bg-primary/10 hover:shadow-md overflow-hidden cursor-pointer">
-                                    <div class="absolute inset-0 bg-gradient-to-r from-primary/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full text-emerald-600 dark:text-emerald-400 hover:text-green-500 transition-all duration-300 action-btn-enhanced action-btn-repost hover:bg-green-50 dark:hover:bg-green-950/20 hover:shadow-md overflow-hidden cursor-pointer">
                                     <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-sm relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M17 1l4 4-4 4"/>
                                         <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
                                         <path d="M7 23l-4-4 4-4"/>
                                         <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
                                     </svg>
-                                    <span class="sm:text-sm text-xs font-medium relative z-10">{{ post.repost_count|default:0 }}</span>
+                                    <span class="sm:text-sm text-xs font-semibold relative z-10">{{ post.repost_count|default:0 }}</span>
                                 </button>
-                                <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full text-muted-foreground hover:text-primary transition-all duration-300 action-btn-enhanced action-btn-save hover:bg-primary/10 hover:shadow-md overflow-hidden cursor-pointer">
+                                <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full text-blue-500 dark:text-blue-400 hover:text-primary transition-all duration-300 action-btn-enhanced action-btn-save hover:bg-primary/10 hover:shadow-md overflow-hidden cursor-pointer">
                                     <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-sm relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/>
                                         <circle cx="9" cy="9" r="1.5" class="fill-current"/>
                                         <circle cx="9" cy="9" r="0.5" class="fill-white"/>
                                     </svg>
-                                    <span class="sm:text-sm text-xs font-medium relative z-10">{{ post.save_count|default:0 }}</span>
+                                    <span class="sm:text-sm text-xs font-semibold relative z-10">{{ post.save_count|default:0 }}</span>
                                 </button>
-                                <button type="button" onclick="openSharePanel(this)" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full text-muted-foreground hover:text-sky-600 transition-all duration-300 action-btn-enhanced hover:bg-sky-50 dark:hover:bg-sky-950/20 hover:shadow-md overflow-hidden cursor-pointer">
+                                <button type="button" onclick="openSharePanel(this)" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full text-sky-600 dark:text-sky-400 hover:text-sky-700 transition-all duration-300 action-btn-enhanced hover:bg-sky-50 dark:hover:bg-sky-950/20 hover:shadow-md overflow-hidden cursor-pointer">
                                     <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <circle cx="18" cy="5" r="3"></circle>
                                         <circle cx="6" cy="12" r="3"></circle>
