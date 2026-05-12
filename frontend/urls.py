@@ -178,6 +178,7 @@ urlpatterns = [
     # For You feed (personalised algorithm)
     path('for-you/', views.for_you_feed, name='for_you_feed'),
     path('following/', views.following_feed, name='following_feed'),
+    path('latest/', views.latest_feed, name='latest_feed'),
     # Explore / Discover
     path('explore/', views.explore, name='explore'),
     # Stories

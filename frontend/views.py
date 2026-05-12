@@ -8066,6 +8066,49 @@ def following_feed(request):
     return render(request, 'frontend/index.html', context)
 
 
+def latest_feed(request):
+    """Chronological feed of all posts, newest first."""
+    active_category = request.GET.get('category', '').strip()
+    blocked_ids = _blocked_user_ids(request.user)
+    muted_ids = _muted_user_ids(request.user)
+    exclude_ids = blocked_ids | muted_ids
+
+    base_qs = _annotated_feed_posts_queryset().filter(
+        is_draft=False,
+        is_deleted_by_moderation=False,
+    ).order_by('-created_at')
+
+    if active_category:
+        base_qs = base_qs.filter(category=active_category)
+    if exclude_ids:
+        base_qs = base_qs.exclude(user_id__in=exclude_ids)
+
+    paginator = Paginator(base_qs, 10)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    posts = list(page_obj.object_list)
+    _enrich_posts_for_feed(posts, request.user)
+    posts = _filter_muted_posts(posts, request.user)
+
+    context = {
+        'posts': posts,
+        'page_obj': page_obj,
+        'active_tab': 'latest',
+        'is_suggested_page': False,
+        'categories': get_frontend_categories(),
+        'active_category': active_category,
+        'follow_suggestions': _follow_suggestions(request.user),
+        'trending_sidebar': _get_trending_hashtags(),
+        'rising_creators': _get_rising_creators(limit=5),
+        'user_followed_tags': set(),
+        'stories_bar': [],
+        'user_follows_category': False,
+    }
+    if active_category and request.user.is_authenticated:
+        from discussions.models import CategoryFollow as _CF
+        context['user_follows_category'] = _CF.objects.filter(user=request.user, category=active_category).exists()
+    return render(request, 'frontend/index.html', context)
+
+
 # ─── Explore / Discover Page ──────────────────────────────────────────────────
 
 def explore(request):

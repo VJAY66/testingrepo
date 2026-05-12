@@ -138,7 +138,13 @@
   <div class="feed-tabs">
     <a href="{% url 'for_you_feed' %}" class="feed-tab {% if active_tab == 'for_you' %}feed-tab-active{% endif %}">For You</a>
     <a href="{% url 'following_feed' %}" class="feed-tab {% if active_tab == 'following' %}feed-tab-active{% endif %}">Following</a>
-    <a href="{% url 'index' %}" class="feed-tab {% if not active_category and active_tab != 'for_you' and active_tab != 'following' %}feed-tab-active{% endif %}">All</a>
+    <a href="{% url 'index' %}" class="feed-tab {% if active_tab == 'trending' and not active_category %}feed-tab-active{% endif %}">Trending</a>
+    <a href="{% url 'latest_feed' %}" class="feed-tab {% if active_tab == 'latest' %}feed-tab-active{% endif %}">Latest</a>
+  </div>
+  {% else %}
+  <div class="feed-tabs">
+    <a href="{% url 'index' %}" class="feed-tab {% if active_tab == 'trending' %}feed-tab-active{% endif %}">Trending</a>
+    <a href="{% url 'latest_feed' %}" class="feed-tab {% if active_tab == 'latest' %}feed-tab-active{% endif %}">Latest</a>
   </div>
   {% endif %}
 
