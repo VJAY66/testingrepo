@@ -1189,40 +1189,9 @@ def index(request):
 
 @login_required
 def suggested(request):
-    """Suggested feed page based on follow graph and engagement preferences."""
-    annotated_posts = _annotated_feed_posts_queryset()
-    search_query = request.GET.get('q', '').strip()
-    if search_query:
-        annotated_posts = annotated_posts.filter(
-            Q(title__icontains=search_query)
-            | Q(content__icontains=search_query)
-            | Q(category__icontains=search_query)
-            | Q(user__username__icontains=search_query)
-            | Q(hashtags__icontains=search_query)
-        ).distinct()
-
-    blocked_ids = _blocked_user_ids(request.user)
-    muted_ids = _muted_user_ids(request.user)
-    exclude_ids = blocked_ids | muted_ids
-    if exclude_ids:
-        annotated_posts = annotated_posts.exclude(user_id__in=exclude_ids)
-
-    ordered_posts = _build_suggested_posts_for_user(request.user, annotated_posts)
-
-    paginator = Paginator(ordered_posts, 25)
-    page_obj = paginator.get_page(request.GET.get('page'))
-    posts = list(page_obj.object_list)
-    _enrich_posts_for_feed(posts, request.user)
-    posts = _filter_muted_posts(posts, request.user)
-
-    context = {
-        'posts': posts,
-        'page_obj': page_obj,
-        'active_tab': 'suggested',
-        'is_suggested_page': True,
-        'search_query': search_query,
-    }
-    return render(request, 'frontend/suggested.html', context)
+    """Redirects to For You feed — kept for backwards-compat with onboarding links."""
+    from django.shortcuts import redirect
+    return redirect('for_you_feed')
 
 def category(request, category_name):
     """Category page showing posts in a specific category"""

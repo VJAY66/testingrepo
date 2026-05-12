@@ -1,6 +1,6 @@
 {% extends 'frontend/base.html' %}
 
-{% block title %}{% if is_suggested_page %}Suggested For You - PickASide{% else %}PickASide — Pick a Side{% endif %}{% endblock %}
+{% block title %}PickASide — Pick a Side{% endblock %}
 
 {% block content %}
 <style>
@@ -110,7 +110,7 @@
 </style>
 
 <!-- Sticky Category Filter Bar -->
-{% if not is_suggested_page %}
+
 <div class="home-filter-bar">
     <div class="relative max-w-5xl mx-auto">
         <div class="hfb-inner">
@@ -459,7 +459,7 @@
             {% endfor %}
         </div>
 
-        {% if not is_suggested_page and page_obj and page_obj.has_next %}
+        {% if page_obj and page_obj.has_next %}
         <div id="inf-scroll-sentinel" style="height:1px;margin-top:2rem;"
              data-next-url="?{% if active_category %}category={{ active_category|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">
         </div>
@@ -469,7 +469,7 @@
                 Loading more…
             </span>
         </div>
-        {% elif not is_suggested_page and page_obj and page_obj.paginator.num_pages > 1 %}
+        {% elif page_obj and page_obj.paginator.num_pages > 1 %}
         <div class="mt-6 flex items-center justify-center">
             <span class="inline-flex items-center justify-center rounded-full border border-border/60 bg-card/60 px-4 py-2 text-xs font-semibold text-muted-foreground">All caught up</span>
         </div>
@@ -477,7 +477,7 @@
 </div>
 
 <!-- Create Post Modal -->
-{% if user.is_authenticated and follow_suggestions and not is_suggested_page %}
+{% if user.is_authenticated and follow_suggestions %}
 <div class="mt-6 rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
     <h3 class="text-sm font-bold text-foreground mb-3">People you may know</h3>
     <div class="space-y-3">
@@ -562,7 +562,7 @@ function toggleFollowAuthor(username, btn) {
 </script>
 {% endif %}
 
-{% if trending_sidebar and not is_suggested_page %}
+{% if trending_sidebar %}
 <div class="mt-4 rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
     <h3 class="text-sm font-bold text-foreground mb-3">Trending Today</h3>
     <div class="space-y-2">
@@ -592,7 +592,7 @@ function toggleFollowAuthor(username, btn) {
 </div>
 {% endif %}
 
-{% if rising_creators and not is_suggested_page %}
+{% if rising_creators %}
 <div class="mt-4 rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
     <div class="flex items-center justify-between mb-3">
         <h3 class="text-sm font-bold text-foreground">🚀 Rising This Week</h3>
@@ -618,7 +618,7 @@ function toggleFollowAuthor(username, btn) {
 </div>
 {% endif %}
 
-{% if user.is_authenticated and not is_suggested_page %}
+{% if user.is_authenticated %}
 <div id="create-post-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div class="bg-card p-6 rounded-lg w-full max-w-md mx-4">
         <h3 class="text-lg font-semibold mb-4">Create New Discussion</h3>
