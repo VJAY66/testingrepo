@@ -68,7 +68,14 @@ class BanMiddleware:
                             msg = f'Your account has been permanently banned. Reason: {active_ban.reason}'
                         _msgs.error(request, msg)
                         return redirect('/login/')
-                except (ImportError, AttributeError, Exception) as e:
-                    import logging
-                    logging.getLogger(__name__).error('BanMiddleware error: %s', e)
+                except ImportError:
+                    pass
+                except Exception as e:
+                    from django.db import OperationalError, ProgrammingError
+                    if isinstance(e, (OperationalError, ProgrammingError)) and 'userban' in str(e).lower():
+                        # Table not yet created — migration pending; skip ban check silently.
+                        pass
+                    else:
+                        import logging
+                        logging.getLogger(__name__).error('BanMiddleware error: %s', e)
         return self.get_response(request)
