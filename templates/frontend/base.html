@@ -2702,20 +2702,22 @@ function acceptCookies() {
                     });
                     </script>
                     {% if user.is_authenticated %}
+                    {% with url_n=request.resolver_match.url_name %}
+                    {% if url_n != 'index' and url_n != 'for_you_feed' and url_n != 'following_feed' and url_n != 'latest_feed' %}
                     <div class="nav-quick-links">
-                        {% if request.resolver_match.url_name != 'index' %}
                         <a href="{% url 'index' %}" class="nav-quick-link-mobile-home nav-quick-home-pill" aria-label="Home" title="Home">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 11.5L12 4l9 7.5V20a1 1 0 01-1 1h-5.5a1 1 0 01-1-1v-4.5a1 1 0 00-1-1h-3a1 1 0 00-1 1V20a1 1 0 01-1 1H4a1 1 0 01-1-1v-8.5z"></path>
                             </svg>
                         </a>
-                        {% endif %}
                         <a href="{% url 'for_you_feed' %}" class="nav-quick-link nav-quick-link-desktop">🎯 For You</a>
                         <a href="{% url 'explore' %}" class="nav-quick-link nav-quick-link-desktop">🔭 Explore</a>
                         <a href="{% url 'trending_debates' %}" class="nav-quick-link nav-quick-link-desktop">🔥 Trending</a>
                         <a href="{% url 'latest_feed' %}" class="nav-quick-link nav-quick-link-desktop">🆕 Latest</a>
                         <a href="{% url 'debate_inbox' %}" class="nav-quick-link nav-quick-link-desktop">Debates</a>
                     </div>
+                    {% endif %}
+                    {% endwith %}
                     {% endif %}
                 </div>
                 <div class="nav-controls">
