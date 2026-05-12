@@ -2721,6 +2721,7 @@ def _build_chat_payload_for_user(user, only_active=False):
             'last_message': _decode_chat_content_from_storage(last_msg.content)[:100] if last_msg else None,
             'last_message_sender': last_msg.sender.username if last_msg else None,
             'last_message_time': last_msg.created_at.strftime('%b %d, %H:%M') if last_msg else None,
+            'last_message_at': last_msg.created_at.isoformat() if last_msg else None,
             'last_message_id': last_msg.id if last_msg else 0,
             'updated_at': debate.updated_at.isoformat() if debate.updated_at else '',
         })
@@ -4688,6 +4689,7 @@ def debate_messages(request, debate_id):
         'current_controller_name': debate.end_controller.username if debate.end_controller else '',
         'current_controller_side': debate.end_controller_side,
         'can_moderate_chat': request.user.id == debate.target_id,
+        'last_message_at': raw_messages[-1].created_at.isoformat() if raw_messages else None,
         'spectator_count': spectator_count,
         'obs_yes': obs_yes,
         'obs_no': obs_no,
@@ -5163,6 +5165,9 @@ def debate_info(request, debate_id):
     else:
         context_url = ''
 
+    last_msg = DebateMessage.objects.filter(debate=debate, is_system=False).order_by('-created_at').first()
+    last_message_at = last_msg.created_at.isoformat() if last_msg else None
+
     return JsonResponse({
         'success': True,
         'debate': {
@@ -5175,6 +5180,7 @@ def debate_info(request, debate_id):
             'no_supporters': debate.no_supporters,
             'post_id': str(debate.post_id) if debate.post_id else '',
             'context_url': context_url,
+            'last_message_at': last_message_at,
             'user_is_active': can_post,
             'can_post': can_post,
             'can_rejoin': debate.status == 'accepted' and (not participation.is_active) and (not participation.is_banned),

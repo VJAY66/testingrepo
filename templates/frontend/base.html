@@ -4167,6 +4167,9 @@ function acceptCookies() {
             const canPost = typeof debate.can_post === 'boolean' ? debate.can_post : isActive;
             const canRejoin = !!debate.can_rejoin;
             const isViewOnly = !!debate.is_view_only;
+            const IDLE_MS = 48 * 60 * 60 * 1000;
+            const lastMsgAt = debate.last_message_at ? new Date(debate.last_message_at).getTime() : 0;
+            const isIdle = !lastMsgAt || (Date.now() - lastMsgAt) >= IDLE_MS;
             const canEnd = !!debate.can_end_chat;
             const canModerate = !!debate.can_moderate_chat;
             const input = document.getElementById('cfp-inp-' + id);
@@ -4180,7 +4183,7 @@ function acceptCookies() {
                 input.disabled = !canPost || status !== 'accepted';
                 input.placeholder = status !== 'accepted'
                     ? 'Conversation ended.'
-                    : (canPost ? 'Type a message…' : (isViewOnly ? 'View only mode. You cannot send messages.' : 'You left this conversation. Rejoin to send.'));
+                    : (canPost ? 'Type a message…' : (isViewOnly ? 'View only mode. You cannot send messages.' : (isIdle ? 'Debate has been idle for 48h — view only.' : 'You left this conversation. Rejoin to send.')));
             }
 
             if (send) {
@@ -4196,7 +4199,11 @@ function acceptCookies() {
                     if (canPost) {
                         buttons.push(`<button type="button" class="chat-fp-act-btn" onclick="ChatManager.leave('${id}')">Leave</button>`);
                     } else if (canRejoin) {
-                        buttons.push(`<button type="button" class="chat-fp-act-btn" onclick="ChatManager.rejoin('${id}')">Rejoin</button>`);
+                        if (isIdle && debate.context_url) {
+                            buttons.push(`<a href="${debate.context_url}" class="chat-fp-act-btn" style="text-decoration:none" title="Debate has been idle for 48h">View Debate</a>`);
+                        } else {
+                            buttons.push(`<button type="button" class="chat-fp-act-btn" onclick="ChatManager.rejoin('${id}')">Rejoin</button>`);
+                        }
                     }
                     if (canPost && canEnd) {
                         buttons.push(`<button type="button" class="chat-fp-act-btn danger" onclick="ChatManager.end('${id}')">End</button>`);
@@ -4342,6 +4349,9 @@ function acceptCookies() {
             if (Array.isArray(payload.active_participants)) {
                 panel.debate.active_participants = payload.active_participants;
                 renderParticipants(id, payload.active_participants);
+            }
+            if (payload.last_message_at !== undefined) {
+                panel.debate.last_message_at = payload.last_message_at;
             }
             save();
             syncPanelState(id);
