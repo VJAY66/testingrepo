@@ -71,10 +71,8 @@ class BanMiddleware:
                 except ImportError:
                     pass
                 except Exception as e:
-                    from django.db import OperationalError, ProgrammingError
-                    if isinstance(e, (OperationalError, ProgrammingError)) and 'userban' in str(e).lower():
-                        # Table not yet created — migration pending; skip ban check silently.
-                        pass
+                    if 'users_userban' in str(e):
+                        pass  # migration not yet applied — table missing, skip silently
                     else:
                         import logging
                         logging.getLogger(__name__).error('BanMiddleware error: %s', e)
