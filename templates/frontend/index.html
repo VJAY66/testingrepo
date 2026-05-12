@@ -6,16 +6,28 @@
 <style>
     html { scroll-behavior: smooth; }
 
+    /* ── Sticky feed-tab bar ── */
+    .feed-tabs-bar {
+        position: sticky;
+        top: 64px;
+        z-index: 95;
+        background: hsl(var(--background) / 0.95);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 2px solid hsl(var(--border) / 0.6);
+    }
+
     /* ── Classic feed tabs (For You / Following / All) ── */
     .feed-tabs {
         display: flex;
         align-items: flex-end;
         gap: 0;
-        border-bottom: 2px solid hsl(var(--border) / 0.6);
-        margin-bottom: 1.25rem;
+        max-width: 56rem;
+        margin: 0 auto;
+        padding: 0 1rem;
     }
     .feed-tab {
-        padding: 8px 18px 10px;
+        padding: 10px 18px 12px;
         font-size: 14px;
         font-weight: 600;
         color: hsl(var(--muted-foreground));
@@ -36,7 +48,7 @@
     /* ── Sticky category bar ── */
     .home-filter-bar {
         position: sticky;
-        top: 56px;
+        top: 106px;
         z-index: 90;
         background: hsl(var(--background) / 0.92);
         backdrop-filter: blur(16px);
@@ -117,6 +129,23 @@
     }
 </style>
 
+<!-- Sticky Feed Tabs Bar -->
+<div class="feed-tabs-bar">
+  {% if user.is_authenticated %}
+  <div class="feed-tabs">
+    <a href="{% url 'for_you_feed' %}" class="feed-tab {% if active_tab == 'for_you' %}feed-tab-active{% endif %}">For You</a>
+    <a href="{% url 'following_feed' %}" class="feed-tab {% if active_tab == 'following' %}feed-tab-active{% endif %}">Following</a>
+    <a href="{% url 'index' %}" class="feed-tab {% if active_tab == 'trending' and not active_category %}feed-tab-active{% endif %}">Trending</a>
+    <a href="{% url 'latest_feed' %}" class="feed-tab {% if active_tab == 'latest' %}feed-tab-active{% endif %}">Latest</a>
+  </div>
+  {% else %}
+  <div class="feed-tabs">
+    <a href="{% url 'index' %}" class="feed-tab {% if active_tab == 'trending' %}feed-tab-active{% endif %}">Trending</a>
+    <a href="{% url 'latest_feed' %}" class="feed-tab {% if active_tab == 'latest' %}feed-tab-active{% endif %}">Latest</a>
+  </div>
+  {% endif %}
+</div>
+
 <!-- Sticky Category Filter Bar -->
 <div class="home-filter-bar">
     <div class="relative max-w-5xl mx-auto">
@@ -139,20 +168,6 @@
 </div>
 
 <div style="max-width:56rem;margin:0 auto;padding:1.5rem 1rem 2rem;" id="posts-section">
-
-  {% if user.is_authenticated %}
-  <div class="feed-tabs">
-    <a href="{% url 'for_you_feed' %}" class="feed-tab {% if active_tab == 'for_you' %}feed-tab-active{% endif %}">For You</a>
-    <a href="{% url 'following_feed' %}" class="feed-tab {% if active_tab == 'following' %}feed-tab-active{% endif %}">Following</a>
-    <a href="{% url 'index' %}" class="feed-tab {% if active_tab == 'trending' and not active_category %}feed-tab-active{% endif %}">Trending</a>
-    <a href="{% url 'latest_feed' %}" class="feed-tab {% if active_tab == 'latest' %}feed-tab-active{% endif %}">Latest</a>
-  </div>
-  {% else %}
-  <div class="feed-tabs">
-    <a href="{% url 'index' %}" class="feed-tab {% if active_tab == 'trending' %}feed-tab-active{% endif %}">Trending</a>
-    <a href="{% url 'latest_feed' %}" class="feed-tab {% if active_tab == 'latest' %}feed-tab-active{% endif %}">Latest</a>
-  </div>
-  {% endif %}
 
   <!-- Quick navigation row -->
   {% if user.is_authenticated %}
