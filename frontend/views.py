@@ -1179,6 +1179,11 @@ def index(request):
         'user_followed_tags': user_followed_tags,
         'stories_bar': stories_bar,
     }
+    if active_category and request.user.is_authenticated:
+        from discussions.models import CategoryFollow as _CF
+        context['user_follows_category'] = _CF.objects.filter(user=request.user, category=active_category).exists()
+    else:
+        context['user_follows_category'] = False
     return render(request, 'frontend/index.html', context)
 
 
