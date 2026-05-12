@@ -6271,12 +6271,18 @@ def review_detail(request, review_id):
     agree_comments = [enrich(c) for c in comments if c.side == 'agree']
     disagree_comments = [enrich(c) for c in comments if c.side == 'disagree']
 
+    user_has_commented = (
+        request.user.is_authenticated and
+        comments.filter(user=request.user).exists()
+    )
+
     return render(request, 'frontend/review_detail.html', {
         'review': review,
         'user_reaction': user_reaction,
         'agree_comments': agree_comments,
         'disagree_comments': disagree_comments,
         'user_debate': user_debate,
+        'user_has_commented': user_has_commented,
     })
 
 
@@ -6348,16 +6354,28 @@ def create_review_comment(request, review_id):
     except ReviewReaction.DoesNotExist:
         return JsonResponse({'error': 'Please vote Agree or Disagree on the review before commenting.'}, status=400)
 
+    # One comment per user per review
+    if ReviewComment.objects.filter(review=review, user=request.user).exists():
+        return JsonResponse({'error': 'You have already posted a comment on this review.'}, status=400)
+
     if check_content_moderation(content):
         return JsonResponse({'error': 'Your comment contains inappropriate content.'}, status=400)
 
-    comment = ReviewComment.objects.create(
-        id=str(uuid.uuid4()),
-        review=review,
-        user=request.user,
-        content=content,
-        side=side,
-    )
+    try:
+        comment = ReviewComment.objects.create(
+            id=str(uuid.uuid4()),
+            review=review,
+            user=request.user,
+            content=content,
+            side=side,
+        )
+    except Exception:
+        return JsonResponse({'error': 'Failed to save comment. Please try again.'}, status=500)
+
+    try:
+        picture_url = request.user.profile.get_picture_url() if hasattr(request.user, 'profile') else ''
+    except Exception:
+        picture_url = ''
 
     return JsonResponse({
         'success': True,
@@ -6365,7 +6383,7 @@ def create_review_comment(request, review_id):
             'id': comment.id,
             'content': comment.content,
             'username': request.user.username,
-            'picture_url': request.user.profile.get_picture_url() if hasattr(request.user, 'profile') else '',
+            'picture_url': picture_url,
             'side': side,
             'likes': 0,
             'dislikes': 0,
