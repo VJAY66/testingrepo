@@ -93,57 +93,6 @@
   </div>
   {% endif %}
 
-  {% else %}
-  <!-- ── Posts leaderboard ── -->
-  <!-- Category chips (horizontal scroll on mobile) -->
-  <div class="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style="scrollbar-width:none">
-    <a href="?tab=posts&period={{ period }}" class="cat-chip {% if not active_category %}active{% endif %}">All</a>
-    {% for val, label in categories %}
-    <a href="?tab=posts&period={{ period }}&category={{ val }}" class="cat-chip {% if active_category == val %}active{% endif %}">{{ label }}</a>
-    {% endfor %}
-  </div>
-
-  {% if board %}
-  <div class="space-y-3">
-    {% for entry in board %}
-    <a href="{% url 'user_profile' entry.username %}" class="lb-card flex items-center gap-3 sm:gap-4 p-3 sm:p-4 no-underline block group">
-      <!-- Rank -->
-      <div class="rank-badge {% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
-        {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else %}{{ entry.rank }}{% endif %}
-      </div>
-
-      <!-- Avatar -->
-      {% if entry.avatar_url %}
-      <img src="{{ entry.avatar_url }}" alt="{{ entry.username }}" class="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0">
-      {% else %}
-      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 text-white flex items-center justify-center font-black text-base flex-shrink-0">{{ entry.username|first|upper }}</div>
-      {% endif %}
-
-      <!-- Info -->
-      <div class="flex-1 min-w-0">
-        <p class="font-bold text-foreground group-hover:text-primary transition-colors truncate">{{ entry.username }}</p>
-        <div class="mt-1 flex flex-wrap gap-1.5">
-          <span class="stat-pill">🗳️ {{ entry.post_count }} posts</span>
-          {% if entry.total_likes %}<span class="stat-pill">⭐ {{ entry.total_likes }} likes</span>{% endif %}
-          {% if entry.reputation %}<span class="stat-pill">🌟 {{ entry.reputation }} rep</span>{% endif %}
-        </div>
-      </div>
-
-      <!-- Score -->
-      <div class="text-right flex-shrink-0">
-        <p class="total-score">{{ entry.post_count }}</p>
-        <p class="text-[10px] text-muted-foreground uppercase tracking-wide">posts</p>
-      </div>
-    </a>
-    {% endfor %}
-  </div>
-  {% else %}
-  <div class="flex flex-col items-center justify-center py-20 text-center space-y-4">
-    <span class="text-5xl">🏆</span>
-    <h2 class="text-lg font-bold text-foreground">No contributors yet</h2>
-    <p class="text-sm text-muted-foreground">Be the first to post{% if active_category %} in {{ active_category }}{% endif %}!</p>
-  </div>
-  {% endif %}
   {% elif tab == 'streaks' %}
   <!-- ── Streak leaderboard ── -->
   {% if streak_board %}
@@ -217,7 +166,51 @@
   </div>
   {% endif %}
 
-  {% endif %}{# end tab == 'debates' / streaks / reputation / else #}
+  {% else %}
+  <!-- ── Posts leaderboard (default) ── -->
+  <div class="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style="scrollbar-width:none">
+    <a href="?tab=posts&period={{ period }}" class="cat-chip {% if not active_category %}active{% endif %}">All</a>
+    {% for val, label in categories %}
+    <a href="?tab=posts&period={{ period }}&category={{ val }}" class="cat-chip {% if active_category == val %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+
+  {% if board %}
+  <div class="space-y-3">
+    {% for entry in board %}
+    <a href="{% url 'user_profile' entry.username %}" class="lb-card flex items-center gap-3 sm:gap-4 p-3 sm:p-4 no-underline block group">
+      <div class="rank-badge {% if entry.rank == 1 %}rank-1{% elif entry.rank == 2 %}rank-2{% elif entry.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
+        {% if entry.rank == 1 %}🥇{% elif entry.rank == 2 %}🥈{% elif entry.rank == 3 %}🥉{% else %}{{ entry.rank }}{% endif %}
+      </div>
+      {% if entry.avatar_url %}
+      <img src="{{ entry.avatar_url }}" alt="{{ entry.username }}" class="w-10 h-10 rounded-full object-cover border-2 border-border flex-shrink-0">
+      {% else %}
+      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500 text-white flex items-center justify-center font-black text-base flex-shrink-0">{{ entry.username|first|upper }}</div>
+      {% endif %}
+      <div class="flex-1 min-w-0">
+        <p class="font-bold text-foreground group-hover:text-primary transition-colors truncate">{{ entry.username }}</p>
+        <div class="mt-1 flex flex-wrap gap-1.5">
+          <span class="stat-pill">🗳️ {{ entry.post_count }} posts</span>
+          {% if entry.total_likes %}<span class="stat-pill">⭐ {{ entry.total_likes }} likes</span>{% endif %}
+          {% if entry.reputation %}<span class="stat-pill">🌟 {{ entry.reputation }} rep</span>{% endif %}
+        </div>
+      </div>
+      <div class="text-right flex-shrink-0">
+        <p class="total-score">{{ entry.post_count }}</p>
+        <p class="text-[10px] text-muted-foreground uppercase tracking-wide">posts</p>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="flex flex-col items-center justify-center py-20 text-center space-y-4">
+    <span class="text-5xl">🏆</span>
+    <h2 class="text-lg font-bold text-foreground">No contributors yet</h2>
+    <p class="text-sm text-muted-foreground">Be the first to post{% if active_category %} in {{ active_category }}{% endif %}!</p>
+  </div>
+  {% endif %}
+
+  {% endif %}{# end tab if/elif/else #}
 
 </div>
 {% endblock %}
