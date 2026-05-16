@@ -180,6 +180,11 @@
     .fcard:hover { box-shadow:0 8px 32px -12px hsl(var(--primary)/0.2); border-color:hsl(var(--primary)/0.3); }
     .fcard-body { padding:14px 16px 10px; flex:1; }
     .fcard-footer { padding:9px 14px; border-top:1px solid hsl(var(--border)/0.5); display:flex; align-items:center; justify-content:space-between; gap:8px; }
+
+    /* ── Post card improvements ── */
+    .trend-card { cursor:default; }
+    #posts-list .glass-panel { transition: box-shadow 0.2s, border-color 0.2s, transform 0.15s; }
+    #posts-list .glass-panel:hover { transform: translateY(-1px); }
 </style>
 
 <!-- Sticky Feed Tabs Bar -->
@@ -262,7 +267,7 @@
     </div>
 </div>
 
-<div class="max-w-6xl mx-auto px-4 py-5">
+<div class="max-w-7xl mx-auto px-4 py-5">
   <div class="flex gap-6 items-start">
     <!-- Main feed column -->
     <div class="flex-1 min-w-0" id="posts-section">
@@ -381,7 +386,7 @@
                                 {% endif %}
                                 {% endif %}
                             </div>
-                            <p class="text-muted-foreground mb-3 line-clamp-2 sm:line-clamp-3 text-sm sm:text-base leading-6 sm:leading-7">
+                            <p class="text-muted-foreground mb-3 line-clamp-3 text-sm sm:text-base leading-6 sm:leading-7">
                                 {{ post.content|truncatechars:220 }}
                             </p>
                             <div class="mb-3" data-vote-card>
@@ -594,28 +599,99 @@
             <span class="inline-flex items-center justify-center rounded-full border border-border/60 bg-card/60 px-4 py-2 text-xs font-semibold text-muted-foreground">All caught up</span>
         </div>
         {% endif %}
-</div>
+    </div><!-- /posts-section -->
 
-<!-- Create Post Modal -->
-{% if user.is_authenticated and follow_suggestions %}
-<div class="mt-6 rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-    <h3 class="text-sm font-bold text-foreground mb-3">People you may know</h3>
-    <div class="space-y-3">
-        {% for suggestion in follow_suggestions %}
-        <div class="flex items-center justify-between gap-2">
-            <a href="{% url 'user_profile' suggestion.username %}" class="flex items-center gap-2 min-w-0">
-                {% if suggestion.get_picture_url %}
-                <img src="{{ suggestion.get_picture_url }}" alt="{{ suggestion.username }}" class="h-8 w-8 rounded-full object-cover border border-border flex-shrink-0">
-                {% else %}
-                <div class="h-8 w-8 rounded-full bg-primary/15 flex items-center justify-center text-primary text-xs font-bold flex-shrink-0">{{ suggestion.username|first|upper }}</div>
-                {% endif %}
-                <span class="text-sm font-medium text-foreground truncate">@{{ suggestion.username }}</span>
-            </a>
-            <button onclick="quickFollow('{{ suggestion.username }}', this)" class="shrink-0 px-3 py-1 rounded-full border border-primary/40 text-primary text-xs font-semibold hover:bg-primary hover:text-primary-foreground transition">Follow</button>
+    <!-- ── Right Sidebar ── -->
+    <aside class="w-72 flex-shrink-0 hidden lg:flex flex-col gap-4" style="position:sticky;top:216px;max-height:calc(100vh - 220px);overflow-y:auto;scrollbar-width:none;">
+
+      {% if user.is_authenticated and follow_suggestions %}
+      <div class="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
+        <div class="px-4 pt-4 pb-3 border-b border-border/40 flex items-center justify-between">
+          <h3 class="text-sm font-bold text-foreground tracking-tight">People You May Know</h3>
+          <a href="{% url 'people_you_may_know' %}" class="text-xs text-primary hover:underline font-medium">See more</a>
         </div>
-        {% endfor %}
-    </div>
-</div>
+        <div class="px-4 py-3 space-y-3">
+          {% for suggestion in follow_suggestions %}
+          <div class="flex items-center justify-between gap-2">
+            <a href="{% url 'user_profile' suggestion.username %}" class="flex items-center gap-2.5 min-w-0">
+              {% if suggestion.get_picture_url %}
+              <img src="{{ suggestion.get_picture_url }}" alt="{{ suggestion.username }}" class="h-9 w-9 rounded-full object-cover border border-border flex-shrink-0">
+              {% else %}
+              <div class="h-9 w-9 rounded-full bg-gradient-to-br from-primary/25 to-primary/10 flex items-center justify-center text-primary text-sm font-bold flex-shrink-0">{{ suggestion.username|first|upper }}</div>
+              {% endif %}
+              <p class="text-sm font-semibold text-foreground truncate">@{{ suggestion.username }}</p>
+            </a>
+            <button onclick="quickFollow('{{ suggestion.username }}', this)" class="shrink-0 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/25 text-primary text-xs font-semibold hover:bg-primary hover:text-primary-foreground transition-all duration-200">Follow</button>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if trending_sidebar %}
+      <div class="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
+        <div class="px-4 pt-4 pb-3 border-b border-border/40">
+          <h3 class="text-sm font-bold text-foreground tracking-tight">Trending Today</h3>
+        </div>
+        <div class="px-4 py-3 space-y-1">
+          {% for item in trending_sidebar %}
+          <div class="flex items-center gap-2 group py-1">
+            <a href="{% url 'hashtag_search' %}?tag={{ item.tag }}" class="flex-1 flex items-center justify-between hover:text-primary transition-colors min-w-0">
+              <span class="text-sm font-medium text-foreground group-hover:text-primary truncate">#{{ item.tag }}</span>
+              <span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2 flex-shrink-0 font-medium">{{ item.count }}</span>
+            </a>
+            {% if user.is_authenticated %}
+            <button type="button"
+                onclick="toggleFollowHashtag(this, '{{ item.tag|escapejs }}')"
+                class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs transition-colors {% if item.tag in user_followed_tags %}bg-primary text-primary-foreground{% else %}bg-muted text-muted-foreground hover:bg-primary/20 hover:text-primary{% endif %}"
+                title="{% if item.tag in user_followed_tags %}Unfollow #{{ item.tag }}{% else %}Follow #{{ item.tag }}{% endif %}">
+                {% if item.tag in user_followed_tags %}✓{% else %}+{% endif %}
+            </button>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% if user.is_authenticated and user_followed_tags %}
+        <div class="px-4 pb-3 border-t border-border/40 pt-2">
+          <a href="{% url 'hashtag_followed_feed' %}" class="flex items-center gap-1.5 text-xs text-primary hover:underline font-medium">
+            📌 Your topics ({{ user_followed_tags|length }} tag{{ user_followed_tags|length|pluralize }})
+          </a>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if rising_creators %}
+      <div class="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
+        <div class="px-4 pt-4 pb-3 border-b border-border/40 flex items-center justify-between">
+          <h3 class="text-sm font-bold text-foreground tracking-tight">🚀 Rising This Week</h3>
+          <a href="{% url 'trending_users' %}" class="text-xs text-primary hover:underline font-medium">See all</a>
+        </div>
+        <div class="px-4 py-3 space-y-3">
+          {% for item in rising_creators %}
+          <div class="flex items-center gap-2.5">
+            <a href="{% url 'user_profile' item.user.username %}" class="flex-shrink-0">
+              {% if item.user.profile.get_picture_url %}
+              <img src="{{ item.user.profile.get_picture_url }}" class="w-9 h-9 rounded-full object-cover border border-border">
+              {% else %}
+              <div class="w-9 h-9 rounded-full bg-gradient-to-br from-primary/25 to-primary/10 flex items-center justify-center text-primary text-sm font-bold">{{ item.user.username|first|upper }}</div>
+              {% endif %}
+            </a>
+            <div class="flex-1 min-w-0">
+              <a href="{% url 'user_profile' item.user.username %}" class="text-sm font-semibold text-foreground hover:text-primary truncate block">@{{ item.user.username }}</a>
+              {% if item.new_followers %}<span class="text-xs text-emerald-600 font-semibold">+{{ item.new_followers }} followers</span>{% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+    </aside><!-- /sidebar -->
+
+  </div><!-- /flex -->
+</div><!-- /outer wrapper -->
+
 <script>
 function quickFollow(username, btn) {
     fetch('/api/users/follow/', {
@@ -623,7 +699,7 @@ function quickFollow(username, btn) {
         headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') || ''},
         body: JSON.stringify({username: username, action: 'follow'})
     }).then(r => r.json()).then(d => {
-        if (d.success) { btn.textContent = 'Following'; btn.disabled = true; btn.className = btn.className.replace('border-primary/40 text-primary', 'border-border text-muted-foreground'); }
+        if (d.success) { btn.textContent = 'Following'; btn.disabled = true; btn.classList.remove('bg-primary/10','border-primary/25','text-primary'); btn.classList.add('border-border','text-muted-foreground'); }
     });
 }
 function toggleFollowHashtag(btn, tag) {
@@ -644,16 +720,6 @@ function toggleFollowHashtag(btn, tag) {
         } else {
             btn.classList.remove('bg-primary', 'text-primary-foreground');
             btn.classList.add('bg-muted', 'text-muted-foreground', 'hover:bg-primary/20', 'hover:text-primary');
-        }
-        // Update topic feed link count
-        var link = document.querySelector('a[href*="hashtag_followed_feed"], a[href*="hashtag-feed"]');
-        if (link) {
-            var match = link.textContent.match(/\((\d+) tag/);
-            if (match) {
-                var newCount = Math.max(0, parseInt(match[1]) + (following ? 1 : -1));
-                link.innerHTML = '📌 Your topic feed (' + newCount + ' tag' + (newCount === 1 ? '' : 's') + ')';
-                link.style.display = newCount > 0 ? '' : 'none';
-            }
         }
     });
 }
@@ -680,63 +746,6 @@ function toggleFollowAuthor(username, btn) {
     });
 }
 </script>
-{% endif %}
-
-{% if trending_sidebar %}
-<div class="mt-4 rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-    <h3 class="text-sm font-bold text-foreground mb-3">Trending Today</h3>
-    <div class="space-y-2">
-        {% for item in trending_sidebar %}
-        <div class="flex items-center gap-2 group">
-            <a href="{% url 'hashtag_search' %}?tag={{ item.tag }}" class="flex-1 flex items-center justify-between hover:text-primary transition-colors min-w-0">
-                <span class="text-sm font-medium text-foreground group-hover:text-primary truncate">#{{ item.tag }}</span>
-                <span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full ml-2 flex-shrink-0">{{ item.count }}</span>
-            </a>
-            {% if user.is_authenticated %}
-            <button type="button"
-                onclick="toggleFollowHashtag(this, '{{ item.tag|escapejs }}')"
-                data-tag="{{ item.tag }}"
-                class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs transition-colors {% if item.tag in user_followed_tags %}bg-primary text-primary-foreground{% else %}bg-muted text-muted-foreground hover:bg-primary/20 hover:text-primary{% endif %}"
-                title="{% if item.tag in user_followed_tags %}Unfollow #{{ item.tag }}{% else %}Follow #{{ item.tag }}{% endif %}">
-                {% if item.tag in user_followed_tags %}✓{% else %}+{% endif %}
-            </button>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-    {% if user.is_authenticated and user_followed_tags %}
-    <a href="{% url 'hashtag_followed_feed' %}" class="mt-3 flex items-center gap-1 text-xs text-primary hover:underline">
-        <span>📌</span> Your topic feed ({{ user_followed_tags|length }} tag{{ user_followed_tags|length|pluralize }})
-    </a>
-    {% endif %}
-</div>
-{% endif %}
-
-{% if rising_creators %}
-<div class="mt-4 rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
-    <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-bold text-foreground">🚀 Rising This Week</h3>
-        <a href="{% url 'trending_users' %}" class="text-xs text-primary hover:underline">See all</a>
-    </div>
-    <div class="space-y-3">
-        {% for item in rising_creators %}
-        <div class="flex items-center gap-2">
-            <a href="{% url 'user_profile' item.user.username %}" class="flex-shrink-0">
-                {% if item.user.profile.get_picture_url %}
-                <img src="{{ item.user.profile.get_picture_url }}" class="w-8 h-8 rounded-full object-cover border border-border">
-                {% else %}
-                <div class="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-primary text-xs font-bold">{{ item.user.username|first|upper }}</div>
-                {% endif %}
-            </a>
-            <div class="flex-1 min-w-0">
-                <a href="{% url 'user_profile' item.user.username %}" class="text-sm font-semibold text-foreground hover:text-primary truncate block">@{{ item.user.username }}</a>
-                {% if item.new_followers %}<span class="text-xs text-emerald-600 font-semibold">+{{ item.new_followers }} followers</span>{% endif %}
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-</div>
-{% endif %}
 
 {% if user.is_authenticated %}
 <div id="create-post-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
