@@ -1660,6 +1660,7 @@ def profile(request):
     user_questions = Question.objects.filter(user=request.user, is_deleted_by_moderation=False).order_by('-created_at')
     user_polls = Poll.objects.filter(user=request.user).order_by('-created_at')
     user_answers = Answer.objects.filter(user=request.user, is_deleted_by_moderation=False).select_related('question').order_by('-created_at')
+    user_stock_predictions = StockPrediction.objects.filter(post__user=request.user).select_related('post').order_by('-post__created_at')
 
     def _card(u):
         p = getattr(u, 'profile', None)
@@ -1873,6 +1874,7 @@ def profile(request):
         'user_questions': user_questions,
         'user_polls': user_polls,
         'user_answers': user_answers,
+        'user_stock_predictions': user_stock_predictions,
         'avatar_url': avatar_url,
         'profile_picture_url': profile_picture_url,
         'is_online': is_online,
