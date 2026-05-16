@@ -10686,8 +10686,8 @@ def create_stock_prediction(request):
         category='Investment',
         hashtags=', '.join(hashtag_list),
         post_type=Post.POST_TYPE_STOCK,
-        yes_label='Agree 👍',
-        no_label='Disagree 👎',
+        yes_label='Agree',
+        no_label='Disagree',
     )
 
     StockPrediction.objects.create(
