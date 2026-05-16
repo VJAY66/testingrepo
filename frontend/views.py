@@ -10758,7 +10758,7 @@ def stock_prediction_detail(request, post_id):
 
     moderator_usernames = {
         str(n).strip().lower()
-        for n in (getattr(__import__('django.conf', fromlist=['settings']).conf.settings, 'MODERATOR_USERNAMES', []) or [])
+        for n in (getattr(settings, 'MODERATOR_USERNAMES', []) or [])
         if str(n).strip()
     }
     is_moderator = request.user.is_authenticated and request.user.username.lower() in moderator_usernames
@@ -10875,7 +10875,7 @@ def resolve_stock_prediction(request, post_id):
 
     moderator_usernames = {
         str(n).strip().lower()
-        for n in (getattr(__import__('django.conf', fromlist=['settings']).conf.settings, 'MODERATOR_USERNAMES', []) or [])
+        for n in (getattr(settings, 'MODERATOR_USERNAMES', []) or [])
         if str(n).strip()
     }
     is_moderator = request.user.username.lower() in moderator_usernames
