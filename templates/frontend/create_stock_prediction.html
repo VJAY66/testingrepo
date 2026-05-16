@@ -327,18 +327,7 @@
                 <p class="text-xs text-muted-foreground mt-1">Snapshot of the price when you made this prediction.</p>
             </div>
 
-            <!-- 6. Category -->
-            <div>
-                <label class="spf-label" for="id_category">Category</label>
-                <select id="id_category" name="category" class="spf-input">
-                    <option value="">-- Select a category --</option>
-                    {% for cat in categories %}
-                    <option value="{{ cat.id }}">{% if cat.icon %}{{ cat.icon }} {% endif %}{{ cat.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- 7. Hashtags -->
+            <!-- 6. Hashtags -->
             <div>
                 <label class="spf-label" for="id_hashtags">Hashtags <span class="text-muted-foreground font-normal normal-case tracking-normal">(optional)</span></label>
                 <input

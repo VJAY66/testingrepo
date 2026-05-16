@@ -180,18 +180,6 @@
                 <p class="text-xs text-muted-foreground mt-2">Max 50 characters each. If left blank, defaults to "Yes" / "No".</p>
             </div>
 
-            <!-- ── Category ─────────────────────────────────────────────── -->
-            <div>
-                <label for="category" class="block text-sm font-semibold text-foreground mb-2">Category</label>
-                <select id="category" name="category" required
-                        class="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-sm text-foreground shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
-                    <option value="">Select a category</option>
-                    {% for category in categories %}
-                    <option value="{{ category.name }}">{{ category.icon }} {{ category.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
             <!-- ── Hashtags ──────────────────────────────────────────────── -->
             <div>
                 <label for="hashtags" class="block text-sm font-semibold text-foreground mb-2">Hashtags <span class="font-normal text-muted-foreground">(Optional)</span></label>
@@ -433,7 +421,11 @@
         if (!validateHashtagsInput()) {
             event.preventDefault();
             hashtagsInput.focus();
+            return;
         }
+
+        // Save draft before navigating away so it can be restored on server error
+        saveDraftToStorage();
     });
 
     // ── Draft auto-save (localStorage) ─────────────────────────────────────────
@@ -442,7 +434,6 @@
     function readDraftFields() {
         return {
             title: titleInput.value,
-            category: document.getElementById('category').value,
             hashtags: hashtagsInput.value,
             yes_label: yesLabelInput.value,
             no_label: noLabelInput.value,
@@ -466,17 +457,18 @@
         showDraftStatus('Draft saved');
     }
 
-    function restoreDraft(draft) {
+    function restoreDraft(draft, silent) {
         titleInput.value = draft.title || '';
         charCount.textContent = titleInput.value.length;
-        var catEl = document.getElementById('category');
-        if (draft.category) catEl.value = draft.category;
         if (draft.hashtags) { hashtagsInput.value = draft.hashtags; updateCurrentHashtagCounter(); }
         if (draft.yes_label) { yesLabelInput.value = draft.yes_label; }
         if (draft.no_label)  { noLabelInput.value  = draft.no_label;  }
         updateSidePreview();
         document.getElementById('anon-toggle').checked = !!draft.is_anonymous;
-        document.getElementById('draft-banner').remove();
+        if (!silent) {
+            var banner = document.getElementById('draft-banner');
+            if (banner) banner.remove();
+        }
     }
 
     (function initDraftBanner() {
@@ -485,6 +477,15 @@
         try {
             var draft = JSON.parse(raw);
             if (!draft.title) return;
+
+            // If server returned an error (flash message present), auto-restore silently
+            var hasErrorFlash = !!document.querySelector('.dh-flash.error, .dh-flash-stack .error');
+            if (hasErrorFlash) {
+                restoreDraft(draft, true);
+                localStorage.removeItem(DRAFT_KEY);
+                return;
+            }
+
             var when = draft.savedAt ? new Date(draft.savedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
             var banner = document.createElement('div');
             banner.id = 'draft-banner';
@@ -508,7 +509,6 @@
     setInterval(saveDraftToStorage, 30000);
     var draftDebounce = null;
     titleInput.addEventListener('input', () => { clearTimeout(draftDebounce); draftDebounce = setTimeout(saveDraftToStorage, 3000); });
-    askForm.addEventListener('submit', () => localStorage.removeItem(DRAFT_KEY));
 
     // ── Live link preview ───────────────────────────────────────────────────────
     var _lpDebounce = null, _lpLastUrl = '';

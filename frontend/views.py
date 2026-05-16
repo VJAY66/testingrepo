@@ -3161,7 +3161,7 @@ def create_post(request):
     if request.method == 'POST':
         title = request.POST.get('title', '').strip()
         content = _normalize_post_content(request.POST.get('content', ''))
-        category = request.POST.get('category', '').strip()
+        category = request.POST.get('category', '').strip() or 'Others'
         hashtags = request.POST.get('hashtags', '').strip()
         accepted_rules = request.POST.get('accepted_rules', '0').strip()
         save_as_draft = request.POST.get('save_draft') == '1'
@@ -3174,9 +3174,9 @@ def create_post(request):
         if reply_restriction not in valid_restrictions:
             reply_restriction = Post.REPLY_EVERYONE
 
-        if not title or not category:
-            messages.error(request, 'Title and category are required')
-            return redirect('index')
+        if not title:
+            messages.error(request, 'Please enter a question title.')
+            return redirect('ask_question')
 
         if not save_as_draft and accepted_rules != '1':
             messages.error(request, 'Please review and accept the ask question instructions before posting.')
@@ -10547,7 +10547,7 @@ def create_stock_prediction(request):
     target_date_raw = request.POST.get('target_date', '').strip()
     direction = request.POST.get('direction', '').strip()
     entry_price_raw = request.POST.get('entry_price', '').strip()
-    category = request.POST.get('category', '').strip()
+    category = request.POST.get('category', '').strip() or 'Investment'
     hashtags_raw = request.POST.get('hashtags', '').strip()
 
     errors = []
@@ -10561,8 +10561,6 @@ def create_stock_prediction(request):
         errors.append('Target date is required.')
     if direction not in ('above', 'below'):
         errors.append('Prediction direction is required.')
-    if not category:
-        errors.append('Category is required.')
 
     try:
         target_price = float(target_price_raw)
