@@ -346,12 +346,13 @@
             {% for post in posts %}
                 {% if forloop.counter == 4 %}{% include "frontend/_ad_unit.html" %}{% endif %}
                 {% if post.id %}
-                <div class="glass-panel trend-card transition hover:shadow-lg hover:shadow-primary/10" data-post-id="{{ post.id }}" data-share-url="{% url 'discussion' post.id %}">
+                {% if post.post_type == 'stock_prediction' %}{% url 'stock_prediction_detail' post.id as post_detail_url %}{% else %}{% url 'discussion' post.id as post_detail_url %}{% endif %}
+                <div class="glass-panel trend-card transition hover:shadow-lg hover:shadow-primary/10" data-post-id="{{ post.id }}" data-share-url="{{ post_detail_url }}">
                     <div class="trend-side"></div>
                     <div class="flex items-start justify-between w-full">
                         <div class="flex-1">
                             <h3 class="trend-title text-foreground mb-2">
-                                <a href="{% url 'discussion' post.id %}" class="hover:text-primary">
+                                <a href="{{ post_detail_url }}" class="hover:text-primary">
                                     {{ post.title }}
                                 </a>
                                 {% if post.is_hot_now %}<span class="ml-1 inline-flex items-center rounded-full bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 text-[10px] font-bold text-orange-600 dark:text-orange-400">🔥 Hot</span>{% endif %}
@@ -488,14 +489,14 @@
                                       {% endif %}
                                     </div>
                                     <!-- Desktop-only: Open discussion inline -->
-                                    <a href="{% url 'discussion' post.id %}" class="sm:ml-auto sm:inline-flex hidden items-center gap-1.5 h-10 px-3 rounded-full border border-primary/35 bg-primary/12 text-primary shadow-sm shadow-primary/20 transition-all duration-300 hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/35 whitespace-nowrap">
-                                        <span class="text-sm font-medium">Open discussion</span>
+                                    <a href="{{ post_detail_url }}" class="sm:ml-auto sm:inline-flex hidden items-center gap-1.5 h-10 px-3 rounded-full border border-primary/35 bg-primary/12 text-primary shadow-sm shadow-primary/20 transition-all duration-300 hover:bg-primary hover:text-primary-foreground hover:shadow-md hover:shadow-primary/35 whitespace-nowrap">
+                                        <span class="text-sm font-medium">{% if post.post_type == 'stock_prediction' %}View Prediction{% else %}Open discussion{% endif %}</span>
                                         <span class="text-sm">→</span>
                                     </a>
                                   </div>
                                   <!-- Mobile: Open discussion on its own row -->
-                                  <a href="{% url 'discussion' post.id %}" class="sm:hidden mt-2 flex items-center justify-center gap-1.5 w-full h-9 rounded-full border border-primary/40 bg-primary/8 text-primary text-xs font-semibold transition-all duration-200 hover:bg-primary hover:text-primary-foreground active:scale-95">
-                                      Open discussion →
+                                  <a href="{{ post_detail_url }}" class="sm:hidden mt-2 flex items-center justify-center gap-1.5 w-full h-9 rounded-full border border-primary/40 bg-primary/8 text-primary text-xs font-semibold transition-all duration-200 hover:bg-primary hover:text-primary-foreground active:scale-95">
+                                      {% if post.post_type == 'stock_prediction' %}View Prediction{% else %}Open discussion{% endif %} →
                                   </a>
                                   <!-- Mobile secondary actions (toggle with ••• button) -->
                                   {% if user.is_authenticated %}
@@ -549,14 +550,14 @@
                                     </svg>
                                     <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Share</span>
                                 </button>
-                                <a href="{% url 'discussion' post.id %}" class="sm:ml-auto sm:inline-flex hidden items-center gap-1.5 h-10 px-3 rounded-full border border-primary/35 bg-primary/12 text-primary shadow-sm transition-all duration-300 hover:bg-primary hover:text-primary-foreground whitespace-nowrap">
-                                    <span class="text-sm font-medium">Open discussion</span>
+                                <a href="{{ post_detail_url }}" class="sm:ml-auto sm:inline-flex hidden items-center gap-1.5 h-10 px-3 rounded-full border border-primary/35 bg-primary/12 text-primary shadow-sm transition-all duration-300 hover:bg-primary hover:text-primary-foreground whitespace-nowrap">
+                                    <span class="text-sm font-medium">{% if post.post_type == 'stock_prediction' %}View Prediction{% else %}Open discussion{% endif %}</span>
                                     <span class="text-sm">→</span>
                                 </a>
                               </div>
                               <!-- Mobile: Open discussion on its own row -->
-                              <a href="{% url 'discussion' post.id %}" class="sm:hidden mt-2 flex items-center justify-center gap-1.5 w-full h-9 rounded-full border border-primary/40 bg-primary/8 text-primary text-xs font-semibold transition-all duration-200 hover:bg-primary hover:text-primary-foreground active:scale-95">
-                                  Open discussion →
+                              <a href="{{ post_detail_url }}" class="sm:hidden mt-2 flex items-center justify-center gap-1.5 w-full h-9 rounded-full border border-primary/40 bg-primary/8 text-primary text-xs font-semibold transition-all duration-200 hover:bg-primary hover:text-primary-foreground active:scale-95">
+                                  {% if post.post_type == 'stock_prediction' %}View Prediction{% else %}Open discussion{% endif %} →
                               </a>
                             </div>
                             {% endif %}
