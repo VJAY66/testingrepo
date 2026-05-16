@@ -4049,6 +4049,13 @@ def start_debate(request):
                 is_system=True,
             )
 
+            Notification.objects.create(
+                user=target_user,
+                post=comment.post,
+                notification_type='author_debate',
+                message=f"@{request.user.username} wants to restart the debate with you.",
+            )
+
             return JsonResponse({'success': True, 'message': 'Debate restart request sent!', 'debate_id': reusable_completed.id})
 
         if accepted_debate:
@@ -4228,6 +4235,12 @@ def start_debate(request):
         DebateParticipant.objects.create(debate=debate, user=request.user,
                                          side=desired_side or _opposite_side(comment.vote_type),
                                          is_active=True)
+        Notification.objects.create(
+            user=target_user,
+            post=comment.post,
+            notification_type='author_debate',
+            message=f"@{request.user.username} challenged you to a debate.",
+        )
         return JsonResponse({'success': True, 'message': 'Challenge sent! Others can now pre-join while you wait.',
                              'debate_id': debate.id})
     except Comment.DoesNotExist:
