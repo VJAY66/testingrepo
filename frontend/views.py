@@ -10748,11 +10748,125 @@ def stock_prediction_detail(request, post_id):
     user_comment = None
     user_has_voted = False
     user_vote_type = None
+    user_has_commented = False
+    debate_lookup = {}
+    blocked_comment_ids = set()
     if request.user.is_authenticated:
         user_comment = Comment.objects.filter(post=post, user=request.user).first()
         if user_comment:
             user_has_voted = True
             user_vote_type = user_comment.vote_type
+            user_has_commented = bool((user_comment.content or '').strip())
+
+        visible_comment_owners = list(visible_comments.values_list('user_id', flat=True).distinct())
+        accepted_debates = list(
+            Debate.objects.filter(
+                post=post, target_id__in=visible_comment_owners, status='accepted',
+            ).order_by('target_id', '-updated_at')
+        )
+        latest_accepted_by_target = {}
+        for debate in accepted_debates:
+            if debate.target_id not in latest_accepted_by_target:
+                latest_accepted_by_target[debate.target_id] = debate
+        if latest_accepted_by_target:
+            debate_ids = [d.id for d in latest_accepted_by_target.values()]
+            active_side_counts = {
+                (item['debate_id'], item['side']): item['total']
+                for item in DebateParticipant.objects.filter(
+                    debate_id__in=debate_ids, is_active=True,
+                ).values('debate_id', 'side').annotate(total=Count('id'))
+            }
+            user_participation = {
+                p.debate_id: p
+                for p in DebateParticipant.objects.filter(debate_id__in=debate_ids, user=request.user)
+            }
+            for target_id, debate in latest_accepted_by_target.items():
+                mode = 'join'
+                label = 'Join Debate'
+                participant = user_participation.get(debate.id)
+                if participant:
+                    mode = 'view'
+                    label = 'View Debate'
+                else:
+                    yes_active = active_side_counts.get((debate.id, 'yes'), 0)
+                    no_active = active_side_counts.get((debate.id, 'no'), 0)
+                    if (debate.yes_supporters > 0 and debate.no_supporters > 0
+                            and yes_active >= debate.yes_supporters and no_active >= debate.no_supporters):
+                        mode = 'view'
+                        label = 'View Debate'
+                debate_lookup[target_id] = {'id': debate.id, 'mode': mode, 'label': label, 'chat_url': f'/debates/{debate.id}/chat/'}
+
+        completed_lookup = {}
+        for debate in Debate.objects.filter(post=post, target_id__in=visible_comment_owners, status='completed').order_by('target_id', '-updated_at'):
+            if debate.target_id not in completed_lookup:
+                completed_lookup[debate.target_id] = debate
+
+        pending_debates_qs = list(Debate.objects.filter(post=post, target_id__in=visible_comment_owners, status='pending').order_by('target_id', '-created_at'))
+        if pending_debates_qs:
+            pending_ids = [d.id for d in pending_debates_qs]
+            user_prejoined_set = set(DebateParticipant.objects.filter(debate_id__in=pending_ids, user=request.user).values_list('debate_id', flat=True))
+            pending_by_target = {}
+            for d in pending_debates_qs:
+                if d.target_id not in pending_by_target:
+                    pending_by_target[d.target_id] = d
+            for target_id, debate in pending_by_target.items():
+                if target_id in debate_lookup:
+                    continue
+                already_in = debate.id in user_prejoined_set or debate.initiator_id == request.user.id
+                mode = 'waiting' if already_in else 'join'
+                label = 'Waiting…' if already_in else 'Join Debate'
+                debate_lookup[target_id] = {'id': debate.id, 'mode': mode, 'label': label, 'chat_url': f'/debates/{debate.id}/chat/'}
+
+        all_visible_ids = [c.id for c in [*agree_comments, *disagree_comments]]
+        if all_visible_ids:
+            blocked_comment_ids = set(
+                DebateParticipant.objects.filter(
+                    user=request.user, is_banned=True, debate__comment_id__in=all_visible_ids,
+                ).values_list('debate__comment_id', flat=True)
+            )
+
+    def _annotate_stock_comments(cmt_list):
+        for cmt in cmt_list:
+            debate_state = debate_lookup.get(cmt.user_id)
+            completed_state = completed_lookup.get(cmt.user_id) if request.user.is_authenticated else None
+            cmt.debate_action_mode = debate_state['mode'] if debate_state else 'start'
+            cmt.debate_action_label = debate_state['label'] if debate_state else 'Start Debate'
+            cmt.debate_chat_url = debate_state.get('chat_url', '') if debate_state else ''
+            cmt.debate_pre_join_yes = None
+            cmt.debate_pre_join_no = None
+            cmt.show_debate_action = False
+            if request.user.is_authenticated and request.user != cmt.user:
+                cmt.show_debate_action = bool(debate_state) or is_post_creator or (user_has_voted and user_vote_type != cmt.vote_type)
+            cmt.show_debate_view_link = bool(completed_state and not debate_state)
+            cmt.debate_view_url = f'/debates/{completed_state.id}/chat/' if (completed_state and not debate_state) else ''
+            cmt.debate_start_blocked = cmt.id in blocked_comment_ids
+            if cmt.debate_start_blocked and cmt.debate_action_mode == 'start':
+                cmt.debate_action_mode = 'blocked'
+                cmt.debate_action_label = 'Debate Blocked'
+                cmt.show_debate_action = True
+
+    if request.user.is_authenticated:
+        _annotate_stock_comments(list(agree_comments))
+        _annotate_stock_comments(list(disagree_comments))
+    else:
+        for cmt in [*agree_comments, *disagree_comments]:
+            cmt.show_debate_action = False
+            cmt.debate_action_mode = 'start'
+            cmt.debate_action_label = 'Start Debate'
+            cmt.debate_chat_url = ''
+            cmt.debate_pre_join_yes = None
+            cmt.debate_pre_join_no = None
+            cmt.show_debate_view_link = False
+            cmt.debate_view_url = ''
+            cmt.debate_start_blocked = False
+
+    is_following_post = False
+    if request.user.is_authenticated and not is_post_creator:
+        is_following_post = PostFollow.objects.filter(user=request.user, post=post).exists()
+
+    is_saved = False
+    if request.user.is_authenticated:
+        is_saved = PostAction.objects.filter(user=request.user, post=post, action='save').exists()
 
     top_agree = agree_comments.first()
     top_disagree = disagree_comments.first()
@@ -10795,11 +10909,16 @@ def stock_prediction_detail(request, post_id):
         'disagree_pct': disagree_pct,
         'user_has_voted': user_has_voted,
         'user_vote_type': user_vote_type,
+        'user_has_commented': user_has_commented,
         'user_comment': user_comment,
         'top_agree_id': top_agree.id if top_agree else None,
         'top_disagree_id': top_disagree.id if top_disagree else None,
+        'top_bull_id': top_agree.id if top_agree else None,
+        'top_bear_id': top_disagree.id if top_disagree else None,
         'movement_pct': movement_pct,
         'live_pts': live_pts,
+        'is_following_post': is_following_post,
+        'is_saved': is_saved,
     }
     return render(request, 'frontend/stock_prediction.html', context)
 
