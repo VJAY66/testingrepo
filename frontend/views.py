@@ -22,7 +22,7 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest, PostReport, LiveDebateRoom, LiveDebateMessage, LiveDebateVote, PollPrediction, StockPrediction
+from discussions.models import CATEGORY_CHOICES, STOCK_CATEGORY_CHOICES, REVIEW_TYPE_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest, PostReport, LiveDebateRoom, LiveDebateMessage, LiveDebateVote, PollPrediction, StockPrediction
 from discussions.signals import notify_post_author
 from users.models import Follow, UserBlock, UserMute, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription, UserBan, ProfileView, FollowRequest, UserList
 from users.security import is_login_rate_limited, record_login_attempt
@@ -1114,11 +1114,16 @@ def index(request):
     """Home page with trending posts and categories"""
     active_category = request.GET.get('category', '').strip()
     active_content_type = request.GET.get('content_type', '').strip()
+    search_query = request.GET.get('q', '').strip()
     annotated_posts = _annotated_feed_posts_queryset()
     if active_category:
         annotated_posts = annotated_posts.filter(category=active_category)
     if active_content_type in ('discussion', 'stock_prediction'):
         annotated_posts = annotated_posts.filter(post_type=active_content_type)
+    if search_query:
+        annotated_posts = annotated_posts.filter(
+            Q(title__icontains=search_query) | Q(content__icontains=search_query)
+        )
     blocked_ids = _blocked_user_ids(request.user)
     muted_ids = _muted_user_ids(request.user)
     exclude_ids = blocked_ids | muted_ids
@@ -1177,6 +1182,7 @@ def index(request):
         'categories': get_frontend_categories(),
         'active_category': active_category,
         'active_content_type': active_content_type,
+        'search_query': search_query,
         'is_suggested_page': False,
         'follow_suggestions': _follow_suggestions(request.user),
         'trending_sidebar': _get_trending_hashtags(),
@@ -6065,9 +6071,12 @@ def like_poll_comment(request):
 
 def questions_list(request):
     category_filter = request.GET.get('category', '').strip()
+    search_query = request.GET.get('q', '').strip()
     qs = Question.objects.filter(is_deleted_by_moderation=False)
     if category_filter:
         qs = qs.filter(category=category_filter)
+    if search_query:
+        qs = qs.filter(Q(title__icontains=search_query) | Q(content__icontains=search_query))
 
     paginator = Paginator(qs, 20)
     page_obj = paginator.get_page(request.GET.get('page', 1))
@@ -6106,6 +6115,7 @@ def questions_list(request):
         'page_obj': page_obj,
         'categories': get_frontend_categories(),
         'active_category': category_filter,
+        'search_query': search_query,
     })
 
 
@@ -6290,10 +6300,13 @@ def mark_best_answer(request, answer_id):
 # ─── Review Views ────────────────────────────────────────────────────────────────
 
 def reviews_list(request):
-    category_filter = request.GET.get('category', '').strip()
+    type_filter = request.GET.get('type', '').strip()
+    search_query = request.GET.get('q', '').strip()
     qs = Review.objects.filter(is_deleted_by_moderation=False)
-    if category_filter:
-        qs = qs.filter(category=category_filter)
+    if type_filter:
+        qs = qs.filter(subject_type=type_filter)
+    if search_query:
+        qs = qs.filter(Q(subject__icontains=search_query) | Q(content__icontains=search_query))
 
     paginator = Paginator(qs, 20)
     page_obj = paginator.get_page(request.GET.get('page', 1))
@@ -6334,8 +6347,9 @@ def reviews_list(request):
     return render(request, 'frontend/reviews_list.html', {
         'reviews_data': reviews_data,
         'page_obj': page_obj,
-        'categories': get_frontend_categories(),
-        'active_category': category_filter,
+        'review_types': REVIEW_TYPE_CHOICES,
+        'active_type': type_filter,
+        'search_query': search_query,
     })
 
 
@@ -10784,14 +10798,20 @@ def _refresh_live_price(sp):
 @login_required
 def create_stock_prediction(request):
     """Render/process the stock prediction creation form."""
+    valid_stock_cats = [c[0] for c in STOCK_CATEGORY_CHOICES]
     if request.method == 'GET':
-        return render(request, 'frontend/create_stock_prediction.html', {})
+        return render(request, 'frontend/create_stock_prediction.html', {
+            'stock_categories': STOCK_CATEGORY_CHOICES,
+        })
 
     # POST
     stock_symbol = request.POST.get('stock_symbol', '').strip().upper()
     stock_name = request.POST.get('stock_name', '').strip()
     currency = request.POST.get('currency', 'USD').strip().upper() or 'USD'
     direction = request.POST.get('direction', '').strip()
+    stock_category = request.POST.get('stock_category', '').strip()
+    if stock_category not in valid_stock_cats:
+        stock_category = 'Other'
     target_price_raw = request.POST.get('target_price', '').strip()
     target_date_raw = request.POST.get('target_date', '').strip()
     entry_price_raw = request.POST.get('entry_price', '').strip()
@@ -10870,6 +10890,7 @@ def create_stock_prediction(request):
         'stock_name': stock_name,
         'currency': currency,
         'direction': direction,
+        'stock_category': stock_category,
         'target_price': target_price_raw,
         'target_date': target_date_raw,
         'entry_price': entry_price_raw,
@@ -10879,7 +10900,10 @@ def create_stock_prediction(request):
     if errors:
         for err in errors:
             messages.error(request, err)
-        return render(request, 'frontend/create_stock_prediction.html', {'form_data': _form_data})
+        return render(request, 'frontend/create_stock_prediction.html', {
+            'form_data': _form_data,
+            'stock_categories': STOCK_CATEGORY_CHOICES,
+        })
 
     if check_content_moderation(title):
         messages.error(request, 'Your post contains abusive language.')
@@ -10892,7 +10916,7 @@ def create_stock_prediction(request):
         user=request.user,
         title=title,
         content='',
-        category='Investment',
+        category=stock_category,
         hashtags=', '.join(hashtag_list),
         post_type=Post.POST_TYPE_STOCK,
         yes_label='Agree',
@@ -11332,12 +11356,20 @@ def stocks_list(request):
     """Browse all stock predictions with leaderboard sidebar."""
     status_filter = request.GET.get('status', 'active')
     symbol_filter = request.GET.get('symbol', '').strip().upper()
+    category_filter = request.GET.get('category', '').strip()
+    search_query = request.GET.get('q', '').strip()
 
     qs = StockPrediction.objects.select_related('post', 'post__user', 'post__user__profile')
     if status_filter in ('active', 'resolved', 'expired'):
         qs = qs.filter(status=status_filter)
     if symbol_filter:
         qs = qs.filter(stock_symbol__icontains=symbol_filter)
+    if category_filter:
+        qs = qs.filter(post__category=category_filter)
+    if search_query:
+        qs = qs.filter(
+            Q(post__title__icontains=search_query) | Q(stock_symbol__icontains=search_query)
+        )
 
     from django.db.models import Count
     qs = qs.annotate(
@@ -11354,6 +11386,9 @@ def stocks_list(request):
         'page_obj': page_obj,
         'status_filter': status_filter,
         'symbol_filter': symbol_filter,
+        'category_filter': category_filter,
+        'search_query': search_query,
+        'stock_categories': STOCK_CATEGORY_CHOICES,
         'leaderboard': leaderboard,
         'total_resolved': total_resolved,
     })

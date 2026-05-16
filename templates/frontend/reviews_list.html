@@ -60,12 +60,27 @@
         {% endif %}
     </div>
 
-    <!-- Category filter bar -->
+    <!-- Search bar -->
+    <form method="get" action="" class="relative group">
+        {% if active_type %}<input type="hidden" name="type" value="{{ active_type }}">{% endif %}
+        <div class="flex items-center gap-2 bg-card border border-border rounded-2xl px-4 py-2.5 shadow-sm transition-all duration-200 focus-within:border-primary/60 focus-within:shadow-md focus-within:shadow-primary/10">
+            <svg class="w-4 h-4 text-muted-foreground flex-shrink-0 transition-colors group-focus-within:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35"/></svg>
+            <input type="text" name="q" value="{{ search_query }}" placeholder="Search reviews{% if active_type %} in {{ active_type }}{% endif %}…"
+                   class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 outline-none min-w-0">
+            {% if search_query %}
+            <a href="?{% if active_type %}type={{ active_type }}&{% endif %}" class="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded-full hover:bg-muted">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            </a>
+            {% endif %}
+        </div>
+    </form>
+
+    <!-- Review type filter bar -->
     <div class="relative">
         <div class="cfb">
-            <a href="{% url 'reviews_list' %}" class="cfb-pill {% if not active_category %}cfb-active{% endif %}"><span>✨</span> All</a>
-            {% for cat in categories %}
-            <a href="{% url 'reviews_list' %}?category={{ cat.name|urlencode }}" class="cfb-pill {% if active_category == cat.name %}cfb-active{% endif %}"><span>{{ cat.icon }}</span> {{ cat.name }}</a>
+            <a href="{% url 'reviews_list' %}{% if search_query %}?q={{ search_query|urlencode }}{% endif %}" class="cfb-pill {% if not active_type %}cfb-active{% endif %}"><span>✨</span> All</a>
+            {% for rt_key, rt_label in review_types %}
+            <a href="{% url 'reviews_list' %}?type={{ rt_key|urlencode }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="cfb-pill {% if active_type == rt_key %}cfb-active{% endif %}">{{ rt_label }}</a>
             {% endfor %}
         </div>
         <div style="pointer-events:none;position:absolute;inset-y:0;left:0;width:24px;background:linear-gradient(to right,hsl(var(--background)),transparent);"></div>
@@ -92,7 +107,7 @@
                         Verified
                     </span>
                     {% endif %}
-                    <a href="{% url 'reviews_list' %}?category={{ rv.category|urlencode }}" class="px-2.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full text-xs font-bold uppercase tracking-wide hover:bg-amber-200 transition">{{ rv.category }}</a>
+                    <a href="{% url 'reviews_list' %}?type={{ rv.subject_type|urlencode }}" class="px-2.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full text-xs font-bold uppercase tracking-wide hover:bg-amber-200 transition">{{ rv.subject_type }}</a>
                 </div>
             </div>
 

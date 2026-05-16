@@ -2,6 +2,37 @@ from django.db import models
 from django.contrib.auth.models import User
 import re
 
+STOCK_CATEGORY_CHOICES = [
+    ('Technology', 'Technology'),
+    ('Energy', 'Energy'),
+    ('Healthcare', 'Healthcare'),
+    ('Finance & Banking', 'Finance & Banking'),
+    ('Consumer Goods', 'Consumer Goods'),
+    ('Automotive', 'Automotive'),
+    ('Real Estate', 'Real Estate'),
+    ('Cryptocurrency', 'Cryptocurrency'),
+    ('Commodities', 'Commodities'),
+    ('Market Indices', 'Market Indices'),
+    ('Pharmaceuticals', 'Pharmaceuticals'),
+    ('Retail & E-Commerce', 'Retail & E-Commerce'),
+    ('Telecom', 'Telecom'),
+    ('Infrastructure', 'Infrastructure'),
+    ('Other', 'Other'),
+]
+
+REVIEW_TYPE_CHOICES = [
+    ('Movie', 'Movie'),
+    ('TV Show', 'TV Show'),
+    ('Book', 'Book'),
+    ('Music / Album', 'Music / Album'),
+    ('Product', 'Product'),
+    ('Restaurant', 'Restaurant'),
+    ('Place', 'Place'),
+    ('App / Game', 'App / Game'),
+    ('Person', 'Person'),
+    ('Other', 'Other'),
+]
+
 CATEGORY_CHOICES = [
     ('Astrology', 'Astrology'),
     ('Beauty', 'Beauty'),
