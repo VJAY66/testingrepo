@@ -48,7 +48,7 @@
     /* ── Sticky category bar ── */
     .home-filter-bar {
         position: sticky;
-        top: 106px;
+        top: 149px; /* 64px nav + 42px feed-tabs + 43px ctb-bar */
         z-index: 90;
         background: hsl(var(--background) / 0.92);
         backdrop-filter: blur(16px);
@@ -127,6 +127,51 @@
     @media (prefers-reduced-motion:reduce) {
         .feed-star-like:hover svg, .feed-star-like.like-pop svg { animation:none!important; }
     }
+
+    /* ── Content-type filter chips ── */
+    .ctb-bar {
+        background: hsl(var(--background) / 0.96);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border-bottom: 1px solid hsl(var(--border) / 0.45);
+    }
+    .ctb-scroll { display:flex; align-items:center; gap:8px; overflow-x:auto; scrollbar-width:none; padding:10px 16px 11px; max-width:56rem; margin:0 auto; }
+    .ctb-scroll::-webkit-scrollbar { display:none; }
+    .ctb-chip {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        font-weight: 600;
+        white-space: nowrap;
+        text-decoration: none;
+        border: 1.5px solid hsl(var(--border) / 0.7);
+        background: hsl(var(--card) / 0.7);
+        color: hsl(var(--muted-foreground));
+        transition: color 0.15s, border-color 0.18s, background 0.18s, box-shadow 0.18s;
+        letter-spacing: 0.01em;
+    }
+    .ctb-chip:hover {
+        color: hsl(var(--foreground));
+        border-color: hsl(var(--primary) / 0.5);
+        background: hsl(var(--card));
+        box-shadow: 0 2px 12px -4px hsl(var(--primary) / 0.18);
+    }
+    .ctb-chip.ctb-active {
+        color: hsl(var(--primary-foreground));
+        background: hsl(var(--primary));
+        border-color: hsl(var(--primary));
+        box-shadow: 0 3px 14px -4px hsl(var(--primary) / 0.4);
+    }
+    .ctb-chip.ctb-active-soft {
+        color: hsl(var(--primary));
+        background: hsl(var(--primary) / 0.1);
+        border-color: hsl(var(--primary) / 0.4);
+    }
+    .ctb-icon { font-size: 13px; line-height: 1; }
 </style>
 
 <!-- Sticky Feed Tabs Bar -->
@@ -137,16 +182,56 @@
     <a href="{% url 'following_feed' %}" class="feed-tab {% if active_tab == 'following' %}feed-tab-active{% endif %}">Following</a>
     <a href="{% url 'index' %}" class="feed-tab {% if active_tab == 'trending' and not active_category %}feed-tab-active{% endif %}">Trending</a>
     <a href="{% url 'latest_feed' %}" class="feed-tab {% if active_tab == 'latest' %}feed-tab-active{% endif %}">Latest</a>
-    <a href="{% url 'stocks_list' %}" class="feed-tab">&#128200; Stocks</a>
   </div>
   {% else %}
   <div class="feed-tabs">
     <a href="{% url 'index' %}" class="feed-tab {% if active_tab == 'trending' %}feed-tab-active{% endif %}">Trending</a>
     <a href="{% url 'latest_feed' %}" class="feed-tab {% if active_tab == 'latest' %}feed-tab-active{% endif %}">Latest</a>
-    <a href="{% url 'stocks_list' %}" class="feed-tab">&#128200; Stocks</a>
   </div>
   {% endif %}
 </div>
+
+<!-- Content-Type Filter Chips -->
+{% with act=active_content_type|default:"" %}
+<div class="ctb-bar" style="position:sticky;top:106px;z-index:92;">
+  <div class="ctb-scroll">
+
+    {# Build base URL for filterable feeds; other content types always link to their pages #}
+    {% if active_tab == 'for_you' %}
+      {% url 'for_you_feed' as ctb_base %}
+    {% elif active_tab == 'latest' %}
+      {% url 'latest_feed' as ctb_base %}
+    {% else %}
+      {% url 'index' as ctb_base %}
+    {% endif %}
+
+    <a href="{{ ctb_base }}" class="ctb-chip {% if not act %}ctb-active{% endif %}">
+      <span class="ctb-icon">⚡</span> All
+    </a>
+    <a href="{{ ctb_base }}?content_type=discussion" class="ctb-chip {% if act == 'discussion' %}ctb-active{% endif %}">
+      <svg class="ctb-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+      Pick a Side
+    </a>
+    <a href="{{ ctb_base }}?content_type=stock_prediction" class="ctb-chip {% if act == 'stock_prediction' %}ctb-active{% endif %}">
+      <svg class="ctb-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      Stock Predictions
+    </a>
+    <a href="{% url 'reviews_list' %}" class="ctb-chip">
+      <svg class="ctb-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Reviews
+    </a>
+    <a href="{% url 'questions_list' %}" class="ctb-chip">
+      <svg class="ctb-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Questions
+    </a>
+    <a href="{% url 'polls_list' %}" class="ctb-chip">
+      <svg class="ctb-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Polls
+    </a>
+
+  </div>
+</div>
+{% endwith %}
 
 <!-- Sticky Category Filter Bar -->
 <div class="home-filter-bar">

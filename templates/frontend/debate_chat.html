@@ -11,9 +11,13 @@
 (function() {
     const isEmbedded = window.self !== window.top;
     if (isEmbedded) {
-      document.addEventListener('DOMContentLoaded', function() {
+      if (document.body) {
         document.body.classList.add('mc-embed');
-      });
+      } else {
+        document.addEventListener('DOMContentLoaded', function() {
+          document.body.classList.add('mc-embed');
+        });
+      }
     }
     if (window.innerWidth >= 768 && !isEmbedded) {
     const activeParticipantsNode = document.getElementById('dh-debate-active-participants');
@@ -43,7 +47,7 @@
         };
         window.addEventListener('DOMContentLoaded', function() {
             ChatManager.openWithData(debateData);
-            window.location.replace('{% url "discussion" debate.post.id %}');
+            window.location.replace('{{ context_url|escapejs }}');
         });
     }
 })();
@@ -734,7 +738,7 @@
       <div id="mc-online-dot"></div>
     </div>
     <div id="mc-header-info">
-      <p id="mc-opp-name"><a href="{% url 'discussion' debate.post.id %}" title="Open original discussion">{{ debate.post.title }}</a></p>
+      <p id="mc-opp-name"><a href="{{ context_url }}" title="Open original discussion">{{ context_title }}</a></p>
       <p id="mc-sub"><span id="mc-peer-name">{% if user == debate.initiator %}{{ debate.target.username }}{% else %}{{ debate.initiator.username }}{% endif %}</span><span>•</span><span id="mc-controller-text">{% if current_controller_name %}Controller: {{ current_controller_name }}{% if current_controller_side %} ({{ current_controller_side|upper }}){% endif %}{% else %}Controller: None{% endif %}</span><span>•</span><span id="mc-spectator-count" title="Current viewers">👁 <span id="mc-spectator-num">{{ spectator_count }}</span></span></p>
     </div>
     <div id="mc-hacts">
@@ -985,8 +989,8 @@
   if (window.innerWidth >= 768 && !isEmbedded) return;   // desktop uses ChatManager (unless inside iframe)
 
   const mobileDebateId = '{{ debate.id }}';
-  const mobilePostId = '{{ debate.post.id }}';
-  const mobilePostUrl = '{% url "discussion" debate.post.id %}';
+  const mobilePostId = '{{ debate.post.id|default:"" }}';
+  const mobilePostUrl = '{{ context_url|escapejs }}';
   const mobileHomeUrl = '{% url "index" %}';
 
   function resolveMobileReturnUrl() {

@@ -1113,9 +1113,12 @@ def _muted_user_ids(user):
 def index(request):
     """Home page with trending posts and categories"""
     active_category = request.GET.get('category', '').strip()
+    active_content_type = request.GET.get('content_type', '').strip()
     annotated_posts = _annotated_feed_posts_queryset()
     if active_category:
         annotated_posts = annotated_posts.filter(category=active_category)
+    if active_content_type in ('discussion', 'stock_prediction'):
+        annotated_posts = annotated_posts.filter(post_type=active_content_type)
     blocked_ids = _blocked_user_ids(request.user)
     muted_ids = _muted_user_ids(request.user)
     exclude_ids = blocked_ids | muted_ids
@@ -1173,6 +1176,7 @@ def index(request):
         'active_tab': 'trending',
         'categories': get_frontend_categories(),
         'active_category': active_category,
+        'active_content_type': active_content_type,
         'is_suggested_page': False,
         'follow_suggestions': _follow_suggestions(request.user),
         'trending_sidebar': _get_trending_hashtags(),
@@ -4568,6 +4572,17 @@ def debate_chat(request, debate_id):
         ov = _OV.objects.filter(debate=debate, voter=request.user).first()
         user_obs_vote = ov.winner_side if ov else None
 
+    from django.urls import reverse as _reverse
+    if debate.post_id:
+        _context_url = _reverse('discussion', args=[str(debate.post_id)])
+        _context_title = debate.post.title if debate.post else ''
+    elif debate.poll_id:
+        _context_url = _reverse('poll_detail', args=[str(debate.poll_id)])
+        _context_title = debate.poll.question if debate.poll else ''
+    else:
+        _context_url = _reverse('index')
+        _context_title = ''
+
     context = {
         'debate': debate,
         'messages_list': messages_list,
@@ -4586,6 +4601,8 @@ def debate_chat(request, debate_id):
         'obs_no': obs_no,
         'user_is_participant': user_is_participant,
         'user_obs_vote': user_obs_vote,
+        'context_url': _context_url,
+        'context_title': _context_title,
     }
     return render(request, 'frontend/debate_chat.html', context)
 
@@ -8063,6 +8080,7 @@ def _compute_spam_score(post):
 @login_required
 def for_you_feed(request):
     """Instagram-style personalised feed using pre-computed FeedScore."""
+    active_content_type = request.GET.get('content_type', '').strip()
     user_followed_tags = set(
         HashtagFollow.objects.filter(user=request.user).values_list('tag', flat=True)
     )
@@ -8077,6 +8095,8 @@ def for_you_feed(request):
     if scored_post_ids:
         id_list = list(scored_post_ids)
         annotated = _annotated_feed_posts_queryset().filter(id__in=id_list)
+        if active_content_type in ('discussion', 'stock_prediction'):
+            annotated = annotated.filter(post_type=active_content_type)
         id_to_post = {p.id: p for p in annotated}
         posts_qs = [id_to_post[pid] for pid in id_list if pid in id_to_post]
     else:
@@ -8084,10 +8104,12 @@ def for_you_feed(request):
         base_qs = _annotated_feed_posts_queryset().filter(is_draft=False, is_deleted_by_moderation=False)
         if interests:
             base_qs = base_qs.filter(category__in=interests)
+        if active_content_type in ('discussion', 'stock_prediction'):
+            base_qs = base_qs.filter(post_type=active_content_type)
         posts_qs = list(base_qs.order_by('-created_at')[:50])
 
     # Inject recent followed-hashtag posts not already in the scored list
-    if user_followed_tags:
+    if user_followed_tags and active_content_type not in ('discussion', 'stock_prediction'):
         scored_ids_set = {p.id for p in posts_qs}
         _tag_q = Q()
         for _t in list(user_followed_tags)[:20]:
@@ -8126,6 +8148,7 @@ def for_you_feed(request):
         'posts': posts,
         'page_obj': page_obj,
         'active_tab': 'for_you',
+        'active_content_type': active_content_type,
         'is_suggested_page': False,
         'categories': get_frontend_categories(),
         'active_category': '',
@@ -8177,6 +8200,7 @@ def following_feed(request):
 def latest_feed(request):
     """Chronological feed of all posts, newest first."""
     active_category = request.GET.get('category', '').strip()
+    active_content_type = request.GET.get('content_type', '').strip()
     blocked_ids = _blocked_user_ids(request.user)
     muted_ids = _muted_user_ids(request.user)
     exclude_ids = blocked_ids | muted_ids
@@ -8188,6 +8212,8 @@ def latest_feed(request):
 
     if active_category:
         base_qs = base_qs.filter(category=active_category)
+    if active_content_type in ('discussion', 'stock_prediction'):
+        base_qs = base_qs.filter(post_type=active_content_type)
     if exclude_ids:
         base_qs = base_qs.exclude(user_id__in=exclude_ids)
 
@@ -8201,6 +8227,7 @@ def latest_feed(request):
         'posts': posts,
         'page_obj': page_obj,
         'active_tab': 'latest',
+        'active_content_type': active_content_type,
         'is_suggested_page': False,
         'categories': get_frontend_categories(),
         'active_category': active_category,
