@@ -4,8 +4,15 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError
 from rest_framework.throttling import ScopedRateThrottle
+from django.core.cache import cache
 from django.db.models import Q
 import uuid
+
+_COMMENTS_CACHE_TTL = 30  # seconds
+
+
+def _comments_cache_key(post_id):
+    return f'comments_by_post:{post_id}'
 
 from discussions.limits import has_reached_daily_post_limit
 from discussions.models import Post, Comment, Debate, CommentReaction, Notification
@@ -94,6 +101,12 @@ class CommentViewSet(viewsets.ModelViewSet):
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'comment'
 
+    def get_throttles(self):
+        # Read-only actions don't count against the comment write throttle.
+        if self.action in ('by_post', 'list', 'retrieve'):
+            return []
+        return super().get_throttles()
+
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             self.permission_classes = [IsAuthenticated]
@@ -108,22 +121,30 @@ class CommentViewSet(viewsets.ModelViewSet):
         post = serializer.validated_data.get('post')
         if post and Comment.objects.filter(post=post, user=self.request.user).exists():
             raise ValidationError({'detail': 'You can comment only once on a post.'})
-        
-        # Check content moderation
+
         content = serializer.validated_data.get('content', '').strip()
         if content and check_content_moderation(content):
             raise ValidationError({'detail': 'Your comment contains abusive language and cannot be posted.'})
-        
+
         serializer.save(user=self.request.user, id=str(uuid.uuid4()))
+        # Bust the cache so the new comment appears immediately.
+        if post:
+            cache.delete(_comments_cache_key(str(post.id)))
 
     @action(detail=False, methods=['get'])
     def by_post(self, request):
         post_id = request.query_params.get('post_id')
-        if post_id:
+        if not post_id:
+            return Response({'error': 'post_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        cache_key = _comments_cache_key(post_id)
+        data = cache.get(cache_key)
+        if data is None:
             comments = Comment.objects.filter(post_id=post_id).order_by('created_at')
-            serializer = CommentSerializer(comments, many=True)
-            return Response(serializer.data)
-        return Response({'error': 'post_id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+            data = CommentSerializer(comments, many=True).data
+            cache.set(cache_key, data, _COMMENTS_CACHE_TTL)
+
+        return Response(data)
 
     @action(detail=False, methods=['post'])
     def like(self, request):
