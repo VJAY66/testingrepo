@@ -3066,7 +3066,7 @@ def onboarding_step2(request):
         for p in Profile.objects.filter(user__in=[u for u in suggested_users])
     }
     for u in suggested_users:
-        u._profile = profiles.get(u.id)
+        u.cached_profile = profiles.get(u.id)
 
     return render(request, 'frontend/onboarding_step2.html', {
         'suggested_users': suggested_users[:8],
