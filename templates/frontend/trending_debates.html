@@ -1,38 +1,127 @@
 {% extends 'frontend/base.html' %}
-{% block title %}Trending Debates — PickASide{% endblock %}
+{% block title %}Trending — PickASide{% endblock %}
 {% block content %}
-<div class="max-w-2xl mx-auto px-4 py-6 space-y-5">
+<div class="max-w-2xl mx-auto px-4 py-6 space-y-4">
+
+  <!-- Header -->
   <div class="flex items-center justify-between">
-    <h1 class="text-xl font-bold text-foreground">🔥 Trending Debates</h1>
-    <span class="text-xs text-muted-foreground">Last 48 hours</span>
+    <h1 class="text-xl font-bold text-foreground flex items-center gap-2">🔥 Trending</h1>
+    <span class="text-xs text-muted-foreground">Last 7 days</span>
   </div>
 
-  {% if posts %}
-  <div class="space-y-4">
-    {% for post in posts %}
-    <a href="{% url 'discussion' post.id %}" class="block bg-card border border-border rounded-2xl p-4 hover:border-primary/50 transition-colors">
-      <div class="flex items-start gap-3">
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">{{ post.category }}</span>
-            {% if post.mood %}<span class="text-xs text-muted-foreground">{{ post.get_mood_display }}</span>{% endif %}
-          </div>
-          <h2 class="text-sm font-semibold text-foreground line-clamp-2">{{ post.title }}</h2>
-          <div class="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-            <span>@{{ post.user.username }}</span>
-            <span>{{ post.comment_count }} comments</span>
-            <span>{{ post.like_count }} likes</span>
-          </div>
-        </div>
-        <div class="shrink-0 text-2xl font-bold text-primary/30 tabular-nums">
-          #{{ forloop.counter }}
-        </div>
-      </div>
+  <!-- Tab bar -->
+  <div class="flex gap-1 bg-muted/40 rounded-xl p-1 border border-border">
+    {% for tab_key, tab_label, tab_icon in tabs %}
+    <a href="?tab={{ tab_key }}"
+       class="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition-all
+              {% if active_tab == tab_key %}bg-card text-foreground shadow-sm border border-border{% else %}text-muted-foreground hover:text-foreground{% endif %}">
+      <span>{{ tab_icon }}</span>
+      <span class="hidden sm:inline">{{ tab_label }}</span>
     </a>
     {% endfor %}
   </div>
+
+  <!-- Items -->
+  {% if items %}
+  <div class="space-y-3">
+    {% for item in items %}
+
+    {% if item.kind == 'post' %}
+    {% with p=item.obj %}
+    <a href="{% url 'discussion' p.id %}"
+       class="flex items-start gap-3 bg-card border border-border rounded-2xl p-4 hover:border-primary/50 transition-colors group block">
+      <!-- Rank -->
+      <span class="shrink-0 text-2xl font-bold tabular-nums
+                   {% if item.rank == 1 %}text-yellow-400{% elif item.rank == 2 %}text-slate-400{% elif item.rank == 3 %}text-amber-600{% else %}text-muted-foreground/30{% endif %}">
+        #{{ item.rank }}
+      </span>
+      <div class="flex-1 min-w-0">
+        <!-- Meta row -->
+        <div class="flex items-center gap-2 mb-1 flex-wrap">
+          {% if p.mood %}<span class="text-xs">{{ p.get_mood_display }}</span>{% endif %}
+          <span class="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">{{ p.category }}</span>
+          {% if p.post_type == 'stock_prediction' %}
+          <span class="text-xs font-medium text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">📈 Stock</span>
+          {% endif %}
+        </div>
+        <!-- Title -->
+        <h2 class="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">{{ p.title }}</h2>
+        <!-- Stats -->
+        <div class="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
+          <span class="font-medium text-foreground">@{{ p.user.username }}</span>
+          {% if p.comment_count %}<span>💬 {{ p.comment_count }}</span>{% endif %}
+          {% if p.like_count %}<span>❤️ {{ p.like_count }}</span>{% endif %}
+          {% if p.debate_count %}<span>⚔️ {{ p.debate_count }}</span>{% endif %}
+          <span class="ml-auto">{{ p.created_at|timesince }} ago</span>
+        </div>
+      </div>
+    </a>
+    {% endwith %}
+
+    {% elif item.kind == 'review' %}
+    {% with r=item.obj %}
+    <a href="{% url 'review_detail' r.id %}"
+       class="flex items-start gap-3 bg-card border border-border rounded-2xl p-4 hover:border-primary/50 transition-colors group block">
+      <span class="shrink-0 text-2xl font-bold tabular-nums
+                   {% if item.rank == 1 %}text-yellow-400{% elif item.rank == 2 %}text-slate-400{% elif item.rank == 3 %}text-amber-600{% else %}text-muted-foreground/30{% endif %}">
+        #{{ item.rank }}
+      </span>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-1 flex-wrap">
+          <span class="text-xs font-medium text-violet-600 bg-violet-500/10 px-2 py-0.5 rounded-full">{{ r.subject_type }}</span>
+          <span class="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">{{ r.category }}</span>
+          <!-- Star rating -->
+          <span class="text-xs text-yellow-500">
+            {% for i in "12345" %}{% if forloop.counter <= r.rating %}★{% else %}☆{% endif %}{% endfor %}
+          </span>
+        </div>
+        <h2 class="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">{{ r.subject }}</h2>
+        <p class="text-xs text-muted-foreground mt-0.5 line-clamp-1">{{ r.content }}</p>
+        <div class="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
+          <span class="font-medium text-foreground">@{{ r.user.username }}</span>
+          {% if r.agree_count %}<span>👍 {{ r.agree_count }}</span>{% endif %}
+          {% if r.disagree_count %}<span>👎 {{ r.disagree_count }}</span>{% endif %}
+          {% if r.comment_count %}<span>💬 {{ r.comment_count }}</span>{% endif %}
+          <span class="ml-auto">{{ r.created_at|timesince }} ago</span>
+        </div>
+      </div>
+    </a>
+    {% endwith %}
+
+    {% elif item.kind == 'question' %}
+    {% with q=item.obj %}
+    <a href="{% url 'question_detail' q.id %}"
+       class="flex items-start gap-3 bg-card border border-border rounded-2xl p-4 hover:border-primary/50 transition-colors group block">
+      <span class="shrink-0 text-2xl font-bold tabular-nums
+                   {% if item.rank == 1 %}text-yellow-400{% elif item.rank == 2 %}text-slate-400{% elif item.rank == 3 %}text-amber-600{% else %}text-muted-foreground/30{% endif %}">
+        #{{ item.rank }}
+      </span>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 mb-1 flex-wrap">
+          <span class="text-xs font-medium text-blue-600 bg-blue-500/10 px-2 py-0.5 rounded-full">❓ Question</span>
+          <span class="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">{{ q.category }}</span>
+        </div>
+        <h2 class="text-sm font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">{{ q.title }}</h2>
+        <div class="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
+          <span class="font-medium text-foreground">@{{ q.user.username }}</span>
+          {% if q.answer_count %}<span>💡 {{ q.answer_count }} answers</span>{% endif %}
+          <span class="ml-auto">{{ q.created_at|timesince }} ago</span>
+        </div>
+      </div>
+    </a>
+    {% endwith %}
+    {% endif %}
+
+    {% endfor %}
+  </div>
+
   {% else %}
-  <div class="text-center py-16 text-muted-foreground text-sm">No trending debates in the last 48 hours yet.</div>
+  <div class="text-center py-16 space-y-2">
+    <div class="text-4xl">🔍</div>
+    <p class="text-muted-foreground text-sm">Nothing trending in this category yet.</p>
+    <p class="text-xs text-muted-foreground">Check back later or try another tab.</p>
+  </div>
   {% endif %}
+
 </div>
 {% endblock %}

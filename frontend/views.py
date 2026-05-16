@@ -9999,21 +9999,116 @@ def unpin_comment(request, comment_id):
 # ─── Trending Debates Page ────────────────────────────────────────────────────
 
 def trending_debates(request):
-    from django.db.models import Sum
-    cutoff = timezone.now() - timedelta(hours=48)
-    posts = (
-        Post.objects
-        .filter(is_draft=False, is_deleted_by_moderation=False, created_at__gte=cutoff)
-        .annotate(
-            comment_count=Count('comments', distinct=True),
-            like_count=Count('actions', filter=Q(actions__action='like'), distinct=True),
+    tab = request.GET.get('tab', 'pick_a_side')
+    now = timezone.now()
+    cutoff = now - timedelta(days=7)
+
+    def _score(created_at, raw):
+        hours = max(1.0, (now - created_at).total_seconds() / 3600.0)
+        return raw / (hours ** 0.6)
+
+    TABS = ['pick_a_side', 'stock', 'review', 'question']
+    if tab not in TABS:
+        tab = 'pick_a_side'
+
+    items = []
+
+    if tab == 'pick_a_side':
+        qs = (
+            Post.objects
+            .filter(is_draft=False, is_deleted_by_moderation=False,
+                    post_type=Post.POST_TYPE_DISCUSSION, created_at__gte=cutoff)
+            .annotate(
+                comment_count=Count('comments', distinct=True),
+                like_count=Count('actions', filter=Q(actions__action='like'), distinct=True),
+                debate_count=Count('debates', distinct=True),
+                view_count=Count('views', distinct=True),
+                hot_count=Count('actions', filter=Q(actions__action='hot'), distinct=True),
+            )
+            .select_related('user', 'user__profile')[:150]
         )
-        .order_by('-comment_count', '-like_count', '-created_at')
-        .select_related('user', 'user__profile')[:30]
-    )
-    if request.user.is_authenticated:
-        _enrich_posts_for_feed(list(posts), request.user)
-    return render(request, 'frontend/trending_debates.html', {'posts': posts})
+        if request.user.is_authenticated:
+            _enrich_posts_for_feed(list(qs), request.user)
+        scored = sorted(
+            qs,
+            key=lambda p: _score(p.created_at,
+                p.like_count * 3 + p.comment_count * 2 + p.debate_count * 5
+                + p.hot_count * 4 + p.view_count * 0.1),
+            reverse=True,
+        )[:30]
+        items = [{'kind': 'post', 'obj': p, 'rank': i + 1} for i, p in enumerate(scored)]
+
+    elif tab == 'stock':
+        qs = (
+            Post.objects
+            .filter(is_draft=False, is_deleted_by_moderation=False,
+                    post_type=Post.POST_TYPE_STOCK, created_at__gte=cutoff)
+            .annotate(
+                comment_count=Count('comments', distinct=True),
+                like_count=Count('actions', filter=Q(actions__action='like'), distinct=True),
+                debate_count=Count('debates', distinct=True),
+                view_count=Count('views', distinct=True),
+            )
+            .select_related('user', 'user__profile')[:150]
+        )
+        if request.user.is_authenticated:
+            _enrich_posts_for_feed(list(qs), request.user)
+        scored = sorted(
+            qs,
+            key=lambda p: _score(p.created_at,
+                p.like_count * 3 + p.comment_count * 2 + p.debate_count * 5
+                + p.view_count * 0.1),
+            reverse=True,
+        )[:30]
+        items = [{'kind': 'post', 'obj': p, 'rank': i + 1} for i, p in enumerate(scored)]
+
+    elif tab == 'review':
+        qs = (
+            Review.objects
+            .filter(is_deleted_by_moderation=False, created_at__gte=cutoff)
+            .annotate(
+                action_count=Count('actions', distinct=True),
+                comment_count=Count('comments', distinct=True),
+            )
+            .select_related('user', 'user__profile')[:150]
+        )
+        scored = sorted(
+            qs,
+            key=lambda r: _score(r.created_at,
+                r.agree_count * 3 + r.disagree_count * 2
+                + r.action_count * 2 + r.comment_count * 2),
+            reverse=True,
+        )[:30]
+        items = [{'kind': 'review', 'obj': r, 'rank': i + 1} for i, r in enumerate(scored)]
+
+    elif tab == 'question':
+        qs = (
+            Question.objects
+            .filter(is_deleted_by_moderation=False, created_at__gte=cutoff)
+            .annotate(
+                action_count=Count('actions', distinct=True),
+            )
+            .select_related('user', 'user__profile')[:150]
+        )
+        scored = sorted(
+            qs,
+            key=lambda q: _score(q.created_at,
+                q.answer_count * 4 + q.action_count * 2),
+            reverse=True,
+        )[:30]
+        items = [{'kind': 'question', 'obj': q, 'rank': i + 1} for i, q in enumerate(scored)]
+
+    tabs = [
+        ('pick_a_side', 'Pick a Side', '⚔️'),
+        ('stock', 'Stock', '📈'),
+        ('review', 'Review', '⭐'),
+        ('question', 'General Question', '❓'),
+    ]
+    return render(request, 'frontend/trending_debates.html', {
+        'items': items,
+        'active_tab': tab,
+        'tabs': tabs,
+    })
 
 
 # ─── "What You Missed" API ────────────────────────────────────────────────────
