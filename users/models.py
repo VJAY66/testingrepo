@@ -72,7 +72,11 @@ class Profile(models.Model):
     def get_picture_url(self):
         """Return the best available picture URL: uploaded file first, then external URL."""
         if self.profile_picture:
-            return self.profile_picture.url
+            try:
+                if self.profile_picture.storage.exists(self.profile_picture.name):
+                    return self.profile_picture.url
+            except Exception:
+                pass
         return self.avatar_url or ''
 
     @cached_property

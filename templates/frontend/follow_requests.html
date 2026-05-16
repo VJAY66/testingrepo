@@ -36,8 +36,8 @@
     <div class="fr-card" id="fr-{{ req.id }}">
       <div class="fr-avatar">
         {% with p=req.from_user.profile %}
-          {% if p.profile_picture %}
-          <img src="{{ p.profile_picture.url }}" alt="">
+          {% if p.get_picture_url %}
+          <img src="{{ p.get_picture_url }}" alt="">
           {% else %}
           {{ req.from_user.username|slice:":1"|upper }}
           {% endif %}

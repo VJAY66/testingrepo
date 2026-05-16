@@ -1642,7 +1642,12 @@ def profile(request):
 
     profile_obj = Profile.objects.filter(user=request.user).first()
     avatar_url = profile_obj.get_picture_url if profile_obj else ''
-    profile_picture_url = profile_obj.profile_picture.url if profile_obj and profile_obj.profile_picture else ''
+    profile_picture_url = (
+        profile_obj.profile_picture.url
+        if profile_obj and profile_obj.profile_picture
+        and profile_obj.profile_picture.storage.exists(profile_obj.profile_picture.name)
+        else ''
+    )
     profile_last_seen = profile_obj.last_seen if profile_obj else None
     now = timezone.now()
     is_online = bool(profile_last_seen and profile_last_seen >= now - timedelta(minutes=5))

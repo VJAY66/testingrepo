@@ -53,8 +53,8 @@
           <label class="user-card" id="card-{{ user.username }}">
             <input type="checkbox" name="follow" value="{{ user.username }}">
             <div class="user-avatar">
-              {% if user._profile and user._profile.profile_picture %}
-              <img src="{{ user._profile.profile_picture.url }}" alt="">
+              {% if user._profile and user._profile.get_picture_url %}
+              <img src="{{ user._profile.get_picture_url }}" alt="">
               {% else %}
               <span class="text-sm font-bold text-muted-foreground">{{ user.username|slice:":1"|upper }}</span>
               {% endif %}
