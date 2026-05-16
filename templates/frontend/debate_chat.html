@@ -6,7 +6,6 @@
 {% block content %}
 {{ active_participants|json_script:"dh-debate-active-participants" }}
 <link rel="stylesheet" href="{% static 'css/chatbox_modern.css' %}" defer>
-{# ── Desktop: open floating panel and redirect away ───────── #}
 <script>
 (function() {
     const isEmbedded = window.self !== window.top;
@@ -19,43 +18,11 @@
         });
       }
     }
-    if (window.innerWidth >= 768 && !isEmbedded) {
-    const activeParticipantsNode = document.getElementById('dh-debate-active-participants');
-    let activeParticipants = [];
-    if (activeParticipantsNode) {
-      try {
-        activeParticipants = JSON.parse(activeParticipantsNode.textContent || '[]');
-      } catch {}
-    }
-        const debateData = {
-            id: '{{ debate.id }}',
-            title: '{{ debate.context_title|escapejs }}',
-            opponent: '{% if user == debate.initiator %}{{ debate.target.username|escapejs }}{% else %}{{ debate.initiator.username|escapejs }}{% endif %}',
-          opponent_avatar: '{{ opponent_avatar|escapejs }}',
-      active_participants: activeParticipants,
-            yes_supporters: {{ debate.yes_supporters }},
-            no_supporters: {{ debate.no_supporters }},
-            user_is_active: {% if is_active_participant %}true{% else %}false{% endif %},
-            can_post: {% if can_post %}true{% else %}false{% endif %},
-            can_rejoin: {% if can_rejoin %}true{% else %}false{% endif %},
-            is_view_only: {% if is_view_only %}true{% else %}false{% endif %},
-            can_end_chat: {% if can_end_chat %}true{% else %}false{% endif %},
-            debate_status: '{{ debate.status }}',
-            current_controller_name: '{{ current_controller_name|escapejs }}',
-            current_controller_side: '{{ current_controller_side }}',
-            can_moderate_chat: {% if can_moderate_chat %}true{% else %}false{% endif %}
-        };
-        window.addEventListener('DOMContentLoaded', function() {
-            ChatManager.openWithData(debateData);
-            window.location.replace('{{ context_url|escapejs }}');
-        });
-    }
 })();
 </script>
 
-{# ── Mobile: full-screen Messenger-style chat ─────────────── #}
+{# ── Full-screen chat on all screen sizes ─────────────────── #}
 <style>
-  @media (min-width: 768px) { body:not(.mc-embed) #mc-shell, body:not(.mc-embed) #mc-chathead { display: none !important; } }
   @media all {
     html, body { height: 100%; }
     @keyframes mcSheetIn {
@@ -63,8 +30,7 @@
       to   { opacity: 1; transform: translateY(0) scale(1); }
     }
     body.mc-open { background: hsl(var(--background)); }
-    body.mc-open > main { padding-bottom: calc(100dvh - 120px) !important; }
-    body.mc-embed.mc-open > main { padding-bottom: 0 !important; }
+    body.mc-open > main { padding-bottom: 0 !important; }
     body.mc-embed {
       overflow: hidden;
       background: hsl(var(--background));
