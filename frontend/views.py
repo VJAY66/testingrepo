@@ -8342,52 +8342,130 @@ def latest_feed(request):
 # ─── Explore / Discover Page ──────────────────────────────────────────────────
 
 def explore(request):
-    """Discover content outside your network, ranked by engagement."""
+    """Discover content outside your network — all four content types."""
     category_filter = request.GET.get('category', '').strip()
     search_q = request.GET.get('q', '').strip()
+    section = request.GET.get('section', 'all').strip()
+    if section not in ('all', 'pick_a_side', 'reviews', 'questions', 'stocks'):
+        section = 'all'
 
-    base_qs = _annotated_feed_posts_queryset().filter(
-        is_draft=False,
-        is_deleted_by_moderation=False,
-    )
-
+    # Base exclusion filters for logged-in users
+    exclude_user_ids = set()
     if request.user.is_authenticated:
-        # Exclude posts from people you already follow
-        following_ids = list(Follow.objects.filter(follower=request.user).values_list('following_id', flat=True))
-        base_qs = base_qs.exclude(user_id__in=following_ids).exclude(user=request.user)
+        following_ids = set(Follow.objects.filter(follower=request.user).values_list('following_id', flat=True))
         blocked_ids = _blocked_user_ids(request.user)
         muted_ids = _muted_user_ids(request.user)
-        exclude_ids = blocked_ids | muted_ids
-        if exclude_ids:
-            base_qs = base_qs.exclude(user_id__in=exclude_ids)
+        exclude_user_ids = following_ids | blocked_ids | muted_ids
 
-    if category_filter:
-        base_qs = base_qs.filter(category=category_filter)
+    def _base_posts_qs():
+        qs = _annotated_feed_posts_queryset().filter(is_draft=False, is_deleted_by_moderation=False)
+        if request.user.is_authenticated:
+            qs = qs.exclude(user_id__in=exclude_user_ids).exclude(user=request.user)
+        return qs
 
-    if search_q:
-        base_qs = base_qs.filter(
-            Q(title__icontains=search_q) | Q(content__icontains=search_q) | Q(hashtags__icontains=search_q)
-        )
+    # ── Section: all ─────────────────────────────────────────────────────────
+    if section == 'all' and not search_q:
+        pick_posts_qs = _base_posts_qs().filter(post_type=Post.POST_TYPE_DISCUSSION)
+        if category_filter:
+            pick_posts_qs = pick_posts_qs.filter(category=category_filter)
+        pick_posts = list(pick_posts_qs.order_by('-is_hot', '-like_count', '-comment_count', '-created_at')[:6])
+        _enrich_posts_for_feed(pick_posts, request.user)
 
-    # Rank by engagement velocity (hot posts first, then engagement score)
-    explore_posts = base_qs.order_by('-is_hot', '-like_count', '-comment_count', '-created_at')
+        stock_qs = _base_posts_qs().filter(post_type=Post.POST_TYPE_STOCK)
+        stock_posts = list(stock_qs.order_by('-like_count', '-comment_count', '-created_at')[:4])
+        _enrich_posts_for_feed(stock_posts, request.user)
 
-    paginator = Paginator(explore_posts, 12)
-    page_obj = paginator.get_page(request.GET.get('page'))
-    posts = list(page_obj.object_list)
-    _enrich_posts_for_feed(posts, request.user)
-    posts = _filter_muted_posts(posts, request.user)
+        reviews_qs = Review.objects.filter(is_deleted_by_moderation=False).select_related('user', 'user__profile').order_by('-created_at')
+        if request.user.is_authenticated:
+            reviews_qs = reviews_qs.exclude(user_id__in=exclude_user_ids).exclude(user=request.user)
+        recent_reviews = list(reviews_qs[:4])
 
-    # Rising posts (high engagement in last 2h, not yet hot)
-    two_hours_ago = timezone.now() - timedelta(hours=2)
-    rising_posts = list(
-        _annotated_feed_posts_queryset()
-        .filter(created_at__gte=two_hours_ago, is_hot=False, is_draft=False)
-        .order_by('-like_count', '-comment_count')[:6]
-    )
-    _enrich_posts_for_feed(rising_posts, request.user)
+        questions_qs = Question.objects.filter(is_deleted_by_moderation=False).select_related('user', 'user__profile').order_by('-answer_count', '-created_at')
+        if request.user.is_authenticated:
+            questions_qs = questions_qs.exclude(user_id__in=exclude_user_ids).exclude(user=request.user)
+        recent_questions = list(questions_qs[:4])
 
-    # Trending hashtags (last 7 days, top 15)
+        context = {
+            'section': 'all',
+            'pick_posts': pick_posts,
+            'stock_posts': stock_posts,
+            'recent_reviews': recent_reviews,
+            'recent_questions': recent_questions,
+            'categories': get_frontend_categories(),
+            'active_category': category_filter,
+            'search_query': '',
+            'trending_tags': _get_explore_trending_tags(),
+            'hot_today': _get_explore_hot_today(),
+        }
+        return render(request, 'frontend/explore.html', context)
+
+    # ── Section: specific or search ──────────────────────────────────────────
+    posts = []
+    page_obj = None
+    reviews_data = []
+    questions_data = []
+    stock_data = []
+
+    if section in ('all', 'pick_a_side'):
+        base_qs = _base_posts_qs().filter(post_type=Post.POST_TYPE_DISCUSSION)
+        if category_filter:
+            base_qs = base_qs.filter(category=category_filter)
+        if search_q:
+            base_qs = base_qs.filter(Q(title__icontains=search_q) | Q(content__icontains=search_q) | Q(hashtags__icontains=search_q))
+        explore_posts = base_qs.order_by('-is_hot', '-like_count', '-comment_count', '-created_at')
+        paginator = Paginator(explore_posts, 12)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        posts = list(page_obj.object_list)
+        _enrich_posts_for_feed(posts, request.user)
+        posts = _filter_muted_posts(posts, request.user)
+
+    elif section == 'stocks':
+        base_qs = _base_posts_qs().filter(post_type=Post.POST_TYPE_STOCK)
+        if category_filter:
+            base_qs = base_qs.filter(category=category_filter)
+        if search_q:
+            base_qs = base_qs.filter(Q(title__icontains=search_q) | Q(hashtags__icontains=search_q))
+        paginator = Paginator(base_qs.order_by('-like_count', '-comment_count', '-created_at'), 12)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        posts = list(page_obj.object_list)
+        _enrich_posts_for_feed(posts, request.user)
+
+    elif section == 'reviews':
+        qs = Review.objects.filter(is_deleted_by_moderation=False).select_related('user', 'user__profile').order_by('-created_at')
+        if request.user.is_authenticated:
+            qs = qs.exclude(user_id__in=exclude_user_ids).exclude(user=request.user)
+        if search_q:
+            qs = qs.filter(Q(subject__icontains=search_q) | Q(content__icontains=search_q))
+        paginator = Paginator(qs, 12)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        reviews_data = list(page_obj.object_list)
+
+    elif section == 'questions':
+        qs = Question.objects.filter(is_deleted_by_moderation=False).select_related('user', 'user__profile').order_by('-answer_count', '-created_at')
+        if request.user.is_authenticated:
+            qs = qs.exclude(user_id__in=exclude_user_ids).exclude(user=request.user)
+        if search_q:
+            qs = qs.filter(Q(title__icontains=search_q) | Q(content__icontains=search_q))
+        paginator = Paginator(qs, 12)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        questions_data = list(page_obj.object_list)
+
+    context = {
+        'section': section,
+        'posts': posts,
+        'page_obj': page_obj,
+        'reviews_data': reviews_data,
+        'questions_data': questions_data,
+        'categories': get_frontend_categories(),
+        'active_category': category_filter,
+        'search_query': search_q,
+        'trending_tags': _get_explore_trending_tags(),
+        'hot_today': _get_explore_hot_today(),
+    }
+    return render(request, 'frontend/explore.html', context)
+
+
+def _get_explore_trending_tags():
     _tag_counts: dict = {}
     _tag_cutoff = timezone.now() - timedelta(days=7)
     for _model in [Post, Poll, Question, Review]:
@@ -8395,30 +8473,19 @@ def explore(request):
             for _t in Post.parse_hashtags(_raw, max_tags=20):
                 _tag_counts[_t] = _tag_counts.get(_t, 0) + 1
     _max_count = max(_tag_counts.values(), default=1)
-    trending_tags = sorted(
+    return sorted(
         [{'tag': t, 'count': c, 'weight': round(c / _max_count * 100)} for t, c in _tag_counts.items()],
         key=lambda x: x['count'], reverse=True,
     )[:15]
 
-    # Hot posts today (is_hot=True, last 24 h, max 5)
+
+def _get_explore_hot_today():
     _hot_cutoff = timezone.now() - timedelta(hours=24)
-    hot_today = list(
+    return list(
         _annotated_feed_posts_queryset()
         .filter(is_hot=True, created_at__gte=_hot_cutoff, is_draft=False, is_deleted_by_moderation=False)
         .order_by('-like_count')[:5]
     )
-
-    context = {
-        'posts': posts,
-        'page_obj': page_obj,
-        'rising_posts': rising_posts,
-        'categories': get_frontend_categories(),
-        'active_category': category_filter,
-        'search_query': search_q,
-        'trending_tags': trending_tags,
-        'hot_today': hot_today,
-    }
-    return render(request, 'frontend/explore.html', context)
 
 
 # ─── Stories ──────────────────────────────────────────────────────────────────
