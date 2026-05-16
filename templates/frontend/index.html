@@ -172,6 +172,14 @@
         border-color: hsl(var(--primary) / 0.4);
     }
     .ctb-icon { font-size: 13px; line-height: 1; }
+
+    /* ── Feed card grid ── */
+    .feed-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap:14px; }
+    @media(max-width:640px){ .feed-grid { grid-template-columns:1fr; } }
+    .fcard { border-radius:1.1rem; border:1px solid hsl(var(--border)/0.7); background:hsl(var(--card)); overflow:hidden; transition:box-shadow .2s, border-color .2s; display:flex; flex-direction:column; }
+    .fcard:hover { box-shadow:0 8px 32px -12px hsl(var(--primary)/0.2); border-color:hsl(var(--primary)/0.3); }
+    .fcard-body { padding:14px 16px 10px; flex:1; }
+    .fcard-footer { padding:9px 14px; border-top:1px solid hsl(var(--border)/0.5); display:flex; align-items:center; justify-content:space-between; gap:8px; }
 </style>
 
 <!-- Sticky Feed Tabs Bar -->
@@ -254,7 +262,10 @@
     </div>
 </div>
 
-<div style="max-width:56rem;margin:0 auto;padding:1.5rem 1rem 2rem;" id="posts-section">
+<div class="max-w-6xl mx-auto px-4 py-5">
+  <div class="flex gap-6 items-start">
+    <!-- Main feed column -->
+    <div class="flex-1 min-w-0" id="posts-section">
 
   <!-- Quick navigation row -->
   {% if user.is_authenticated %}
