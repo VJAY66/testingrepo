@@ -191,8 +191,25 @@
       justify-content: center;
       background: linear-gradient(90deg, hsl(var(--card) / 0.6), hsl(var(--card) / 0.85), hsl(var(--card) / 0.6));
       border-bottom: 1px solid hsl(var(--border) / 0.5);
-      flex-shrink: 0;
+      flex-shrink: 0; position: relative;
     }
+    #mc-collapse-btn {
+      position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+      background: none; border: 1px solid hsl(var(--border) / 0.6); border-radius: 6px;
+      color: hsl(var(--muted-foreground)); padding: 2px 6px; cursor: pointer;
+      font-size: 10px; font-weight: 600; display: flex; align-items: center; gap: 3px;
+      transition: all 0.14s; line-height: 1;
+    }
+    #mc-collapse-btn:hover { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+    #mc-collapse-btn svg { transition: transform 0.22s ease; }
+    #mc-collapse-btn.collapsed svg { transform: rotate(180deg); }
+    #mc-collapsible-panels {
+      overflow: hidden;
+      max-height: 300px;
+      transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
+      opacity: 1;
+    }
+    #mc-collapsible-panels.collapsed { max-height: 0; opacity: 0; pointer-events: none; }
     #mc-top-actions {
       display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
       padding: 5px 12px;
@@ -792,8 +809,12 @@
     <span id="mc-yes-limit" class="mc-badge mc-badge-y">✓ Yes {{ debate.yes_supporters }}</span>
     <span id="mc-no-limit" class="mc-badge mc-badge-n">✗ No {{ debate.no_supporters }}</span>
     <span id="mc-topic">{{ debate.post.title|truncatechars:36 }}</span>
+    <button id="mc-collapse-btn" onclick="mcTogglePanels()" title="Collapse/expand panels" aria-label="Toggle panels">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+    </button>
   </div>
 
+  <div id="mc-collapsible-panels">
   {% if debate.status == 'accepted' %}
   <div id="observer-vote-panel" style="padding:8px 12px 4px;border-bottom:1px solid hsl(var(--border)/0.5);background:hsl(var(--card)/0.7);flex-shrink:0;">
     <p style="font-size:10px;font-weight:700;color:hsl(var(--muted-foreground));text-transform:uppercase;letter-spacing:0.06em;margin:0 0 6px;">&#128065; Observer Poll — Who's winning?</p>
@@ -869,6 +890,7 @@
     <span>Please do not insult others, maintain respect and collaborate effectively.</span>
     <button type="button" id="mc-caution-accept">I Understand</button>
   </div>
+  </div>{# end #mc-collapsible-panels #}
 
   <div id="mc-top-actions"></div>
 
@@ -1202,6 +1224,34 @@
     if (overflowMenu) overflowMenu.classList.toggle('show', actionMenuOpen);
     if (menuBtn) menuBtn.classList.toggle('is-active', actionMenuOpen);
   };
+
+  // Collapse/expand the info panels above the chat messages
+  (function() {
+    var LS_KEY = 'mc_panels_collapsed';
+    function applyState(collapsed) {
+      var panels = document.getElementById('mc-collapsible-panels');
+      var btn = document.getElementById('mc-collapse-btn');
+      if (!panels || !btn) return;
+      if (collapsed) {
+        panels.classList.add('collapsed');
+        btn.classList.add('collapsed');
+        btn.title = 'Expand panels';
+      } else {
+        panels.classList.remove('collapsed');
+        btn.classList.remove('collapsed');
+        btn.title = 'Collapse panels';
+      }
+    }
+    // Restore saved state
+    try { applyState(localStorage.getItem(LS_KEY) === '1'); } catch(e) {}
+    window.mcTogglePanels = function() {
+      var panels = document.getElementById('mc-collapsible-panels');
+      if (!panels) return;
+      var nowCollapsed = !panels.classList.contains('collapsed');
+      applyState(nowCollapsed);
+      try { localStorage.setItem(LS_KEY, nowCollapsed ? '1' : '0'); } catch(e) {}
+    };
+  })();
 
   function refreshActionButtons() {
     if (canModerate && debateStatus === 'accepted') {
