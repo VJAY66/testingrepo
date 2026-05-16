@@ -1,129 +1,190 @@
 {% extends 'frontend/base.html' %}
 
-{% block title %}Ask Question - Discussion Hub{% endblock %}
+{% block title %}Pick a Side — Ask the Community{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto py-8">
+<div class="max-w-3xl mx-auto py-8 px-4">
+
+    <!-- ── Step 1: Rules / Guide Modal ─────────────────────────────────── -->
     <div id="ask-rules-modal" class="fixed inset-0 z-[220] flex items-start justify-center overflow-y-auto px-4 py-4 sm:items-center sm:py-8" role="dialog" aria-modal="true" aria-labelledby="ask-rules-title">
         <div class="absolute inset-0 bg-slate-950/65 backdrop-blur-sm"></div>
-        <div class="relative w-full max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-3xl border border-primary/30 bg-card shadow-2xl sm:max-h-[calc(100dvh-4rem)]" style="-webkit-overflow-scrolling: touch;">
+        <div class="relative w-full max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-3xl border border-primary/30 bg-card shadow-2xl sm:max-h-[calc(100dvh-4rem)]" style="-webkit-overflow-scrolling: touch; animation: rulesModalIn 0.25s cubic-bezier(.4,0,.2,1) both;">
             <div class="relative p-5 sm:p-9">
                 <div class="pointer-events-none absolute -top-20 -right-16 h-56 w-56 rounded-full bg-primary/25 blur-3xl"></div>
                 <div class="pointer-events-none absolute -bottom-24 -left-14 h-56 w-56 rounded-full bg-accent/20 blur-3xl"></div>
 
                 <div class="relative">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/90">Before You Post</p>
-                    <h2 id="ask-rules-title" class="mt-1 text-3xl font-bold text-foreground sm:text-[2.1rem]">Ask Better Questions</h2>
-                    <p class="mt-2 text-base text-muted-foreground">
-                        Please review and accept these quick posting tips before continuing.
+                    <!-- Header -->
+                    <div class="flex items-center gap-3 mb-1">
+                        <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/15 text-2xl">⚔️</span>
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/90">Before You Post</p>
+                            <h2 id="ask-rules-title" class="text-2xl font-bold text-foreground sm:text-3xl leading-tight">Pick a Side — Ask Better Questions</h2>
+                        </div>
+                    </div>
+                    <p class="mt-3 text-sm text-muted-foreground leading-relaxed">
+                        A <strong class="text-foreground">"Pick a Side"</strong> question must have <span class="text-primary font-semibold">two clear, opposing positions</span>. The community will split into two camps and debate. Make sure your question naturally has two sides people can stand on.
                     </p>
 
-                    <div class="mt-6 grid gap-4 text-sm text-foreground sm:grid-cols-2">
-                        <div class="rounded-2xl border border-emerald-300/40 bg-emerald-50/60 p-4">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Good Examples</p>
-                            <ul class="mt-3 space-y-2 text-sm font-semibold leading-relaxed text-foreground">
-                                <li class="flex items-start gap-2 rounded-lg border border-emerald-200/70 bg-white/75 px-2.5 py-2">
-                                    <span class="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-700">✓</span>
-                                    <span class="border-l-2 border-emerald-400 pl-2">Will IRAN US conflict leads to world war 3?</span>
+                    <!-- Good vs Bad examples -->
+                    <div class="mt-6 grid gap-4 sm:grid-cols-2">
+
+                        <!-- Good examples -->
+                        <div class="rounded-2xl border border-emerald-300/50 bg-emerald-50/70 p-4 dark:bg-emerald-950/30 dark:border-emerald-700/40">
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white text-xs font-bold">✓</span>
+                                <p class="text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Good Examples</p>
+                            </div>
+                            <p class="text-[11px] text-emerald-700 dark:text-emerald-400 mb-2.5 font-medium">Has two clear sides people can pick</p>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 rounded-xl border border-emerald-200/80 bg-white/80 px-3 py-2.5 dark:bg-emerald-900/20 dark:border-emerald-700/30">
+                                    <span class="mt-0.5 text-emerald-500 font-bold text-sm flex-shrink-0">1.</span>
+                                    <span class="text-sm font-medium text-foreground leading-snug">In Iran and US war, who initiated war?</span>
                                 </li>
-                                <li class="flex items-start gap-2 rounded-lg border border-emerald-200/70 bg-white/75 px-2.5 py-2">
-                                    <span class="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-700">✓</span>
-                                    <span class="border-l-2 border-emerald-400 pl-2">Is remote work better for productivity?</span>
-                                </li>
-                                <li class="flex items-start gap-2 rounded-lg border border-emerald-200/70 bg-white/75 px-2.5 py-2">
-                                    <span class="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[11px] text-emerald-700">✓</span>
-                                    <span class="border-l-2 border-emerald-400 pl-2">Can SIP beat lump sum over 10 years?</span>
+                                <li class="flex items-start gap-2 rounded-xl border border-emerald-200/80 bg-white/80 px-3 py-2.5 dark:bg-emerald-900/20 dark:border-emerald-700/30">
+                                    <span class="mt-0.5 text-emerald-500 font-bold text-sm flex-shrink-0">2.</span>
+                                    <span class="text-sm font-medium text-foreground leading-snug">What would be the best promoting application — Instagram or Twitter?</span>
                                 </li>
                             </ul>
                         </div>
-                        <div class="rounded-2xl border border-rose-300/40 bg-rose-50/60 p-4">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-rose-700">More Examples</p>
-                            <ul class="mt-3 space-y-2 text-sm font-semibold leading-relaxed text-foreground">
-                                <li class="flex items-start gap-2 rounded-lg border border-rose-200/70 bg-white/75 px-2.5 py-2">
-                                    <span class="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-[11px] text-rose-700">•</span>
-                                    <span class="border-l-2 border-rose-400 pl-2">Why is inflation increasing?</span>
+
+                        <!-- Bad examples -->
+                        <div class="rounded-2xl border border-rose-300/50 bg-rose-50/70 p-4 dark:bg-rose-950/30 dark:border-rose-700/40">
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-rose-500 text-white text-xs font-bold">✗</span>
+                                <p class="text-xs font-bold uppercase tracking-wide text-rose-700 dark:text-rose-400">Bad Examples</p>
+                            </div>
+                            <p class="text-[11px] text-rose-700 dark:text-rose-400 mb-2.5 font-medium">Open-ended — no clear two sides</p>
+                            <ul class="space-y-2">
+                                <li class="flex items-start gap-2 rounded-xl border border-rose-200/80 bg-white/80 px-3 py-2.5 dark:bg-rose-900/20 dark:border-rose-700/30">
+                                    <span class="mt-0.5 text-rose-500 font-bold text-sm flex-shrink-0">1.</span>
+                                    <span class="text-sm font-medium text-foreground leading-snug">Give me your opinion on today's stock price of HDFC.</span>
                                 </li>
-                                <li class="flex items-start gap-2 rounded-lg border border-rose-200/70 bg-white/75 px-2.5 py-2">
-                                    <span class="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-[11px] text-rose-700">•</span>
-                                    <span class="border-l-2 border-rose-400 pl-2">How do I learn coding fast?</span>
-                                </li>
-                                <li class="flex items-start gap-2 rounded-lg border border-rose-200/70 bg-white/75 px-2.5 py-2">
-                                    <span class="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-[11px] text-rose-700">•</span>
-                                    <span class="border-l-2 border-rose-400 pl-2">What are the best startup ideas?</span>
+                                <li class="flex items-start gap-2 rounded-xl border border-rose-200/80 bg-white/80 px-3 py-2.5 dark:bg-rose-900/20 dark:border-rose-700/30">
+                                    <span class="mt-0.5 text-rose-500 font-bold text-sm flex-shrink-0">2.</span>
+                                    <span class="text-sm font-medium text-foreground leading-snug">Who is the top scientist in the entire world?</span>
                                 </li>
                             </ul>
                         </div>
                     </div>
 
-                    <label for="rules-accept-checkbox" class="mt-6 flex items-start gap-2 rounded-xl border border-border bg-background/60 px-4 py-3 text-sm text-foreground">
-                        <input id="rules-accept-checkbox" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary" />
-                        <span>I understand these posting tips and I am ready to continue.</span>
+                    <!-- Key rule callout -->
+                    <div class="mt-5 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 flex items-start gap-2.5">
+                        <span class="text-primary text-lg flex-shrink-0">💡</span>
+                        <p class="text-sm text-foreground">
+                            After writing your question you will also <strong>define the two sides</strong> yourself — e.g. "Iran" vs "US", or "Instagram" vs "Twitter". The community then picks one and debates it.
+                        </p>
+                    </div>
+
+                    <!-- Accept checkbox -->
+                    <label for="rules-accept-checkbox" class="mt-5 flex items-start gap-3 rounded-xl border border-border bg-background/60 px-4 py-3 cursor-pointer hover:border-primary/40 transition-colors">
+                        <input id="rules-accept-checkbox" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-primary flex-shrink-0" />
+                        <span class="text-sm text-foreground">I understand — my question has two clear sides and I will define them.</span>
                     </label>
 
                     <div class="mt-5 flex items-center justify-end gap-2.5">
-                        <a href="{% url 'index' %}" class="inline-flex items-center rounded-full border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground">Not now</a>
-                        <button id="rules-accept-btn" type="button" disabled class="inline-flex items-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground opacity-60 transition disabled:cursor-not-allowed">
-                            I Understand, Continue
+                        <a href="{% url 'index' %}" class="inline-flex items-center rounded-full border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">Not now</a>
+                        <button id="rules-accept-btn" type="button" disabled class="inline-flex items-center gap-1.5 rounded-full bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground opacity-50 transition disabled:cursor-not-allowed">
+                            ⚔️ Pick a Side — Continue
                         </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+    <!-- ── End Rules Modal ─────────────────────────────────────────────── -->
 
     <div class="bg-card border border-border rounded-3xl p-6 shadow-lg">
-        <h1 class="text-2xl font-bold text-foreground mb-2">Ask the Community</h1>
-        <p class="text-muted-foreground mb-4 text-sm">
-            Post your question and get opinions from the community.
+        <div class="flex items-center gap-3 mb-1">
+            <span class="text-2xl">⚔️</span>
+            <h1 class="text-2xl font-bold text-foreground">Pick a Side</h1>
+        </div>
+        <p class="text-muted-foreground mb-6 text-sm">
+            Write your question, then define the two sides the community will debate.
         </p>
 
-        <!-- Examples banner -->
-        <div class="mb-6 rounded-2xl border border-primary/30 bg-secondary p-4">
-            <div class="mb-3 flex items-center gap-2">
-                <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary">💡</span>
-                <h3 class="text-sm font-semibold text-foreground">Question writing tips</h3>
-            </div>
-            <ul class="space-y-2 text-sm text-foreground mb-3">
-                <li class="rounded-xl border border-border bg-background/80 px-3 py-2">Is it worth buying Honda City in a village?</li>
-                <li class="rounded-xl border border-border bg-background/80 px-3 py-2">If we do SIP consistently, does SIP have the ability to beat lumpsum in the long term?</li>
-                <li class="rounded-xl border border-border bg-background/80 px-3 py-2">If there is a conflict between two countries, will it affect the world in any way?</li>
-            </ul>
-            <div class="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-                Keep your question clear, concise, and easy for others to respond to.
-            </div>
-        </div>
-
         {% if not user.is_authenticated %}
-        <div class="mb-4 rounded-2xl border border-yellow-300 bg-yellow-50 p-3 text-xs text-yellow-900">
+        <div class="mb-4 rounded-2xl border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-700/40 p-3 text-xs text-yellow-900 dark:text-yellow-300">
             <strong>Note:</strong> You need to log in before posting a question.
         </div>
         {% endif %}
 
         <div id="ask-form-shell" class="transition duration-300 opacity-35 pointer-events-none select-none blur-[1px]">
-        <form method="post" action="{% url 'create_post' %}" class="space-y-4" id="ask-form">
+        <form method="post" action="{% url 'create_post' %}" class="space-y-5" id="ask-form">
             {% csrf_token %}
             <input type="hidden" id="accepted-rules" name="accepted_rules" value="0">
-            <div>
-                <label for="title" class="block text-sm font-medium text-foreground mb-2">Your Question</label>
-                <textarea id="title" name="title" rows="2" required maxlength="200"
-                          class="w-full rounded-2xl border border-border bg-background px-4 py-3 text-foreground text-sm shadow-sm placeholder-muted-foreground/50 focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none"
-                          placeholder="Example: What are your thoughts on buying an electric car in 2026?"></textarea>
-                <div class="text-xs text-muted-foreground mt-1">
-                    <span id="char-count">0</span>/200 characters
-                </div>
-                <p id="title-format-hint" class="mt-2 text-xs text-muted-foreground">
-                    Ask in any format you prefer. Keep it clear and respectful.
-                </p>
-            </div>
-            <input type="hidden" name="content" value="">
 
-            <!-- Live link preview while composing -->
+            <!-- ── Question ─────────────────────────────────────────────── -->
+            <div>
+                <label for="title" class="block text-sm font-semibold text-foreground mb-2">Your Question</label>
+                <textarea id="title" name="title" rows="3" required maxlength="200"
+                          class="w-full rounded-2xl border border-border bg-background px-4 py-3 text-foreground text-sm shadow-sm placeholder-muted-foreground/50 focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none"
+                          placeholder="e.g. In Iran and US war, who initiated it?"></textarea>
+                <div class="flex items-center justify-between mt-1.5">
+                    <p id="title-format-hint" class="text-xs text-muted-foreground">Make sure it has two clear opposing sides.</p>
+                    <span class="text-xs text-muted-foreground"><span id="char-count">0</span>/200</span>
+                </div>
+            </div>
+
+            <input type="hidden" name="content" value="">
             <div id="compose-link-preview" class="hidden rounded-xl border border-border/70 bg-muted/30 overflow-hidden"></div>
 
+            <!-- ── Pick Your Two Sides ──────────────────────────────────── -->
+            <div class="rounded-2xl border-2 border-dashed border-primary/30 bg-gradient-to-br from-background to-primary/3 p-5">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="text-primary text-lg">⚔️</span>
+                    <p class="text-sm font-bold text-foreground">Define the Two Sides</p>
+                </div>
+                <p class="text-xs text-muted-foreground mb-4">Name each side. The community will pick one and debate it. Be specific — e.g. "Iran" &amp; "US", or "Instagram" &amp; "Twitter".</p>
+
+                <!-- Live preview strip -->
+                <div class="mb-4 rounded-xl overflow-hidden border border-border shadow-sm">
+                    <div class="flex">
+                        <div class="flex-1 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/50 dark:to-teal-950/40 px-4 py-3 text-center border-r border-border">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 mb-0.5">Left Side</p>
+                            <p id="preview-yes-label" class="text-base font-bold text-emerald-700 dark:text-emerald-300 truncate">—</p>
+                        </div>
+                        <div class="flex items-center justify-center px-2 bg-background text-muted-foreground text-xs font-black">VS</div>
+                        <div class="flex-1 bg-gradient-to-br from-rose-50 to-red-50 dark:from-rose-950/50 dark:to-red-950/40 px-4 py-3 text-center border-l border-border">
+                            <p class="text-[10px] font-bold uppercase tracking-wide text-rose-600 dark:text-rose-400 mb-0.5">Right Side</p>
+                            <p id="preview-no-label" class="text-base font-bold text-rose-700 dark:text-rose-300 truncate">—</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="yes-label" class="block text-xs font-bold text-emerald-700 dark:text-emerald-400 mb-1.5">
+                            <span class="inline-flex items-center gap-1">
+                                <span class="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
+                                Left Side Option
+                            </span>
+                        </label>
+                        <input type="text" id="yes-label" name="yes_label" maxlength="50" autocomplete="off"
+                               placeholder="e.g. Iran, Instagram, For…"
+                               class="w-full rounded-xl border-2 border-emerald-200 dark:border-emerald-700/60 bg-background px-3 py-2.5 text-sm text-foreground font-medium shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 placeholder-muted-foreground/60">
+                    </div>
+                    <div>
+                        <label for="no-label" class="block text-xs font-bold text-rose-700 dark:text-rose-400 mb-1.5">
+                            <span class="inline-flex items-center gap-1">
+                                <span class="h-2 w-2 rounded-full bg-rose-500 inline-block"></span>
+                                Right Side Option
+                            </span>
+                        </label>
+                        <input type="text" id="no-label" name="no_label" maxlength="50" autocomplete="off"
+                               placeholder="e.g. US, Twitter, Against…"
+                               class="w-full rounded-xl border-2 border-rose-200 dark:border-rose-700/60 bg-background px-3 py-2.5 text-sm text-foreground font-medium shadow-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 placeholder-muted-foreground/60">
+                    </div>
+                </div>
+                <p id="sides-error" class="hidden mt-2 text-xs text-red-500 font-medium"></p>
+                <p class="text-xs text-muted-foreground mt-2">Max 50 characters each. If left blank, defaults to "Yes" / "No".</p>
+            </div>
+
+            <!-- ── Category ─────────────────────────────────────────────── -->
             <div>
-                <label for="category" class="block text-sm font-medium text-foreground mb-2">Category</label>
+                <label for="category" class="block text-sm font-semibold text-foreground mb-2">Category</label>
                 <select id="category" name="category" required
-                        class="w-full rounded-2xl border border-border bg-background px-4 py-2 text-sm text-foreground shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
+                        class="w-full rounded-2xl border border-border bg-background px-4 py-2.5 text-sm text-foreground shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
                     <option value="">Select a category</option>
                     {% for category in categories %}
                     <option value="{{ category.name }}">{{ category.icon }} {{ category.name }}</option>
@@ -131,41 +192,19 @@
                 </select>
             </div>
 
+            <!-- ── Hashtags ──────────────────────────────────────────────── -->
             <div>
-                <label for="hashtags" class="block text-sm font-medium text-foreground mb-2">Hashtags (Optional)</label>
-                  <input type="text" id="hashtags" name="hashtags" autocomplete="off"
+                <label for="hashtags" class="block text-sm font-semibold text-foreground mb-2">Hashtags <span class="font-normal text-muted-foreground">(Optional)</span></label>
+                <input type="text" id="hashtags" name="hashtags" autocomplete="off"
                        class="w-full rounded-2xl border border-border bg-background px-4 py-3 text-foreground text-sm shadow-sm placeholder-muted-foreground/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
-                                            placeholder="#technology #ai #learning (space or comma separated, max 5)">
+                       placeholder="#technology #ai #learning (space or comma separated, max 5)">
                 <div id="hashtags-current-counter" class="mt-1 text-xs text-muted-foreground">Current tag: 0/40</div>
-                  <div id="hashtags-suggestions" class="hidden mt-2 rounded-xl border border-border bg-card shadow-md overflow-hidden"></div>
-                                    <p class="text-xs text-muted-foreground mt-1">Type hashtag words to get suggestions. Max 40 characters per hashtag. Example: #ai #business #travel</p>
-                                    <p id="hashtags-error" class="hidden text-xs text-red-500 mt-1"></p>
+                <div id="hashtags-suggestions" class="hidden mt-2 rounded-xl border border-border bg-card shadow-md overflow-hidden"></div>
+                <p class="text-xs text-muted-foreground mt-1">Max 40 characters per hashtag.</p>
+                <p id="hashtags-error" class="hidden text-xs text-red-500 mt-1"></p>
             </div>
 
-            <!-- Pick-a-Side custom option labels -->
-            <div class="rounded-2xl border border-border bg-background/60 px-4 py-4">
-                <p class="text-sm font-medium text-foreground mb-1">Pick a Side Options</p>
-                <p class="text-xs text-muted-foreground mb-3">Customize the two sides readers can pick. Left side is the first option, right side is the second.</p>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label for="yes-label" class="block text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">Left Side (Option 1)</label>
-                        <input type="text" id="yes-label" name="yes_label" maxlength="50"
-                               value="Yes"
-                               placeholder="e.g. Agree, Pro, For…"
-                               class="w-full rounded-xl border border-emerald-300/60 bg-background px-3 py-2 text-sm text-foreground shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
-                    </div>
-                    <div>
-                        <label for="no-label" class="block text-xs font-semibold text-rose-700 dark:text-rose-400 mb-1">Right Side (Option 2)</label>
-                        <input type="text" id="no-label" name="no_label" maxlength="50"
-                               value="No"
-                               placeholder="e.g. Disagree, Con, Against…"
-                               class="w-full rounded-xl border border-rose-300/60 bg-background px-3 py-2 text-sm text-foreground shadow-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20">
-                    </div>
-                </div>
-                <p class="text-xs text-muted-foreground mt-2">Max 50 characters each. Defaults to "Yes" / "No" if left blank.</p>
-            </div>
-
-            <!-- Anonymous toggle -->
+            <!-- ── Anonymous toggle ─────────────────────────────────────── -->
             <label class="flex items-center gap-3 rounded-2xl border border-border bg-background/60 px-4 py-3 cursor-pointer hover:border-primary/40 transition-colors">
                 <div class="relative flex-shrink-0">
                     <input type="checkbox" id="anon-toggle" name="is_anonymous" value="1" class="sr-only peer">
@@ -178,18 +217,20 @@
                 </div>
             </label>
 
+            <!-- ── Draft / Schedule ─────────────────────────────────────── -->
             <input type="hidden" name="save_draft" id="save-draft-flag" value="0">
             <div id="schedule-input-wrapper" class="hidden mt-2">
                 <label for="scheduled-for-input" class="block text-xs font-medium text-muted-foreground mb-1">Schedule publish time (optional)</label>
                 <input type="datetime-local" name="scheduled_for" id="scheduled-for-input"
-                       class="w-full rounded-2xl border border-border bg-background px-4 py-2 text-foreground text-sm shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20"
-                       placeholder="Schedule for...">
+                       class="w-full rounded-2xl border border-border bg-background px-4 py-2 text-foreground text-sm shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
             </div>
+
+            <!-- ── Submit ───────────────────────────────────────────────── -->
             <div class="flex gap-3 mt-3 items-center">
                 <span id="draft-status" class="text-xs text-muted-foreground opacity-0 transition-opacity duration-500 flex-shrink-0"></span>
                 <button type="submit" id="submit-btn"
-                        class="flex-1 rounded-full bg-primary text-primary-foreground px-6 py-3 text-sm font-semibold hover:bg-primary/90 transition">
-                    Post Question
+                        class="flex-1 rounded-full bg-primary text-primary-foreground px-6 py-3 text-sm font-bold hover:bg-primary/90 transition shadow-sm shadow-primary/30">
+                    ⚔️ Post &amp; Pick a Side
                 </button>
                 <button type="button" id="draft-btn"
                         class="rounded-full border border-border px-5 py-3 text-sm font-semibold text-muted-foreground hover:border-primary/40 hover:text-primary transition">
@@ -198,34 +239,44 @@
             </div>
         </form>
         </div>
-
-        <div class="mt-4 text-center text-xs text-muted-foreground border-t border-border pt-4">
-            💬 Keep it short, clear, and respectful
-        </div>
     </div>
 </div>
 
-<script>
-    const titleInput = document.getElementById('title');
-    const charCount = document.getElementById('char-count');
-    const submitBtn = document.getElementById('submit-btn');
-    const askForm = document.getElementById('ask-form');
-    const hashtagsInput = document.getElementById('hashtags');
-    const hashtagsCurrentCounter = document.getElementById('hashtags-current-counter');
-    const hashtagsSuggestions = document.getElementById('hashtags-suggestions');
-    const hashtagsError = document.getElementById('hashtags-error');
-    const titleFormatHint = document.getElementById('title-format-hint');
-    const askRulesModal = document.getElementById('ask-rules-modal');
-    const askFormShell = document.getElementById('ask-form-shell');
-    const rulesAcceptCheckbox = document.getElementById('rules-accept-checkbox');
-    const rulesAcceptBtn = document.getElementById('rules-accept-btn');
-    const acceptedRulesInput = document.getElementById('accepted-rules');
-    const HASHTAG_MAX_LENGTH = 40;
-    let hashtagDebounce = null;
-    let hasAcceptedAskRules = false;
+<style>
+@keyframes rulesModalIn {
+    from { opacity: 0; transform: scale(0.96) translateY(12px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+</style>
 
-    function setAskFormLocked(isLocked) {
-        if (isLocked) {
+<script>
+    // ── DOM refs ────────────────────────────────────────────────────────────────
+    const titleInput           = document.getElementById('title');
+    const charCount            = document.getElementById('char-count');
+    const submitBtn            = document.getElementById('submit-btn');
+    const askForm              = document.getElementById('ask-form');
+    const hashtagsInput        = document.getElementById('hashtags');
+    const hashtagsCurrentCounter = document.getElementById('hashtags-current-counter');
+    const hashtagsSuggestions  = document.getElementById('hashtags-suggestions');
+    const hashtagsError        = document.getElementById('hashtags-error');
+    const titleFormatHint      = document.getElementById('title-format-hint');
+    const askRulesModal        = document.getElementById('ask-rules-modal');
+    const askFormShell         = document.getElementById('ask-form-shell');
+    const rulesAcceptCheckbox  = document.getElementById('rules-accept-checkbox');
+    const rulesAcceptBtn       = document.getElementById('rules-accept-btn');
+    const acceptedRulesInput   = document.getElementById('accepted-rules');
+    const yesLabelInput        = document.getElementById('yes-label');
+    const noLabelInput         = document.getElementById('no-label');
+    const previewYes           = document.getElementById('preview-yes-label');
+    const previewNo            = document.getElementById('preview-no-label');
+    const sidesError           = document.getElementById('sides-error');
+    const HASHTAG_MAX_LENGTH   = 40;
+    let hashtagDebounce        = null;
+    let hasAcceptedAskRules    = false;
+
+    // ── Rules modal ─────────────────────────────────────────────────────────────
+    function setAskFormLocked(locked) {
+        if (locked) {
             askFormShell.classList.add('opacity-35', 'pointer-events-none', 'select-none', 'blur-[1px]');
         } else {
             askFormShell.classList.remove('opacity-35', 'pointer-events-none', 'select-none', 'blur-[1px]');
@@ -245,65 +296,41 @@
         titleInput.focus();
     }
 
-    function isQuestionTitleValid(value) {
-        const text = (value || '').trim().replace(/\s+/g, ' ');
-        return text.length > 0;
-    }
-
-    function updateTitleFormatState() {
-        const value = titleInput.value;
-        const hasValue = value.trim().length > 0;
-        const valid = isQuestionTitleValid(value);
-
-        titleFormatHint.classList.remove('text-muted-foreground', 'text-amber-600', 'text-red-600', 'text-emerald-600');
-
-        if (!hasValue) {
-            titleFormatHint.textContent = 'Ask in any format you prefer. Keep it clear and respectful.';
-            titleFormatHint.classList.add('text-muted-foreground');
-            submitBtn.disabled = false;
-            submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
-            return;
-        }
-
-        if (valid) {
-            titleFormatHint.textContent = 'Looks good.';
-            titleFormatHint.classList.add('text-emerald-600');
-            submitBtn.disabled = false;
-            submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
-            submitBtn.title = '';
-            return;
-        }
-
-        titleFormatHint.textContent = 'Please enter a question title.';
-        titleFormatHint.classList.add('text-red-600');
-        submitBtn.disabled = true;
-        submitBtn.classList.add('opacity-70', 'cursor-not-allowed');
-        submitBtn.title = 'Please enter a question title';
-    }
-
-    rulesAcceptCheckbox.addEventListener('change', function() {
+    rulesAcceptCheckbox.addEventListener('change', function () {
         rulesAcceptBtn.disabled = !this.checked;
-        if (this.checked) {
-            rulesAcceptBtn.classList.remove('opacity-60');
-        } else {
-            rulesAcceptBtn.classList.add('opacity-60');
-        }
+        rulesAcceptBtn.classList.toggle('opacity-50', !this.checked);
     });
 
-    rulesAcceptBtn.addEventListener('click', function() {
-        if (!rulesAcceptCheckbox.checked) {
-            return;
-        }
-        acceptRulesAndUnlock();
+    rulesAcceptBtn.addEventListener('click', function () {
+        if (rulesAcceptCheckbox.checked) acceptRulesAndUnlock();
     });
 
     openRulesModal();
 
-    titleInput.addEventListener('input', function() {
+    // ── Title char count & hint ─────────────────────────────────────────────────
+    titleInput.addEventListener('input', function () {
         charCount.textContent = this.value.length;
-        updateTitleFormatState();
+        const hasVal = this.value.trim().length > 0;
+        titleFormatHint.textContent = hasVal
+            ? 'Looks good — now define your two sides below.'
+            : 'Make sure it has two clear opposing sides.';
+        titleFormatHint.className = 'text-xs ' + (hasVal ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground');
     });
 
+    // ── Live side preview ───────────────────────────────────────────────────────
+    function updateSidePreview() {
+        const yVal = yesLabelInput.value.trim();
+        const nVal = noLabelInput.value.trim();
+        previewYes.textContent = yVal || '—';
+        previewNo.textContent  = nVal || '—';
+        previewYes.classList.toggle('opacity-40', !yVal);
+        previewNo.classList.toggle('opacity-40', !nVal);
+    }
+
+    yesLabelInput.addEventListener('input', updateSidePreview);
+    noLabelInput.addEventListener('input', updateSidePreview);
+
+    // ── Hashtag helpers ─────────────────────────────────────────────────────────
     function getHashtagFragment(value) {
         const match = value.match(/(?:^|[\s,])#?([A-Za-z0-9_]*)$/);
         return match ? match[1].toLowerCase() : '';
@@ -313,24 +340,16 @@
         const fragment = getHashtagFragment(hashtagsInput.value);
         const length = fragment.length;
         hashtagsCurrentCounter.textContent = `Current tag: ${length}/${HASHTAG_MAX_LENGTH}`;
-
-        hashtagsCurrentCounter.classList.remove('text-muted-foreground', 'text-amber-500', 'text-red-500');
-        if (length > HASHTAG_MAX_LENGTH) {
-            hashtagsCurrentCounter.classList.add('text-red-500');
-        } else if (length >= Math.floor(HASHTAG_MAX_LENGTH * 0.75)) {
-            hashtagsCurrentCounter.classList.add('text-amber-500');
-        } else {
-            hashtagsCurrentCounter.classList.add('text-muted-foreground');
-        }
+        hashtagsCurrentCounter.className = 'mt-1 text-xs ' + (
+            length > HASHTAG_MAX_LENGTH ? 'text-red-500' :
+            length >= Math.floor(HASHTAG_MAX_LENGTH * 0.75) ? 'text-amber-500' : 'text-muted-foreground'
+        );
     }
 
     function getLongHashtags(value) {
-        const tokens = (value.match(/#?[A-Za-z0-9_]+/g) || []).map(function(token) {
-            return token.replace(/^#/, '');
-        });
-        return tokens.filter(function(tag) {
-            return tag.length > HASHTAG_MAX_LENGTH;
-        });
+        return (value.match(/#?[A-Za-z0-9_]+/g) || [])
+            .map(t => t.replace(/^#/, ''))
+            .filter(t => t.length > HASHTAG_MAX_LENGTH);
     }
 
     function validateHashtagsInput() {
@@ -351,10 +370,8 @@
     }
 
     function applyHashtagSuggestion(tag) {
-        const current = hashtagsInput.value;
-        hashtagsInput.value = current.replace(/(?:^|[\s,])#?[A-Za-z0-9_]*$/, function(part) {
-            const prefixMatch = part.match(/^[\s,]*/);
-            const prefix = prefixMatch ? prefixMatch[0] : '';
+        hashtagsInput.value = hashtagsInput.value.replace(/(?:^|[\s,])#?[A-Za-z0-9_]*$/, part => {
+            const prefix = (part.match(/^[\s,]*/) || [''])[0];
             return `${prefix}#${tag} `;
         });
         hideHashtagSuggestions();
@@ -362,89 +379,54 @@
     }
 
     function renderHashtagSuggestions(items) {
-        if (!items.length) {
-            hideHashtagSuggestions();
-            return;
-        }
-
-        hashtagsSuggestions.innerHTML = items.map(function(item) {
-            return `
-                <button type="button" data-tag="${item.tag}" class="w-full text-left px-3 py-2 hover:bg-secondary/60 transition flex items-center justify-between">
-                    <span class="text-sm text-foreground">#${item.tag}</span>
-                    <span class="text-xs text-muted-foreground">${item.count} post${item.count === 1 ? '' : 's'}</span>
-                </button>
-            `;
-        }).join('');
-
+        if (!items.length) { hideHashtagSuggestions(); return; }
+        hashtagsSuggestions.innerHTML = items.map(item =>
+            `<button type="button" data-tag="${item.tag}" class="w-full text-left px-3 py-2 hover:bg-secondary/60 transition flex items-center justify-between">
+                <span class="text-sm text-foreground">#${item.tag}</span>
+                <span class="text-xs text-muted-foreground">${item.count} post${item.count === 1 ? '' : 's'}</span>
+            </button>`
+        ).join('');
         hashtagsSuggestions.classList.remove('hidden');
-
-        hashtagsSuggestions.querySelectorAll('button[data-tag]').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                applyHashtagSuggestion(this.getAttribute('data-tag'));
-            });
+        hashtagsSuggestions.querySelectorAll('button[data-tag]').forEach(btn => {
+            btn.addEventListener('click', () => applyHashtagSuggestion(btn.getAttribute('data-tag')));
         });
     }
 
-    hashtagsInput.addEventListener('input', function() {
+    hashtagsInput.addEventListener('input', function () {
         updateCurrentHashtagCounter();
         validateHashtagsInput();
         const fragment = getHashtagFragment(this.value);
-
-        if (hashtagDebounce) {
-            clearTimeout(hashtagDebounce);
-        }
-
-        if (!fragment) {
-            hideHashtagSuggestions();
-            return;
-        }
-
-        hashtagDebounce = setTimeout(function() {
+        clearTimeout(hashtagDebounce);
+        if (!fragment) { hideHashtagSuggestions(); return; }
+        hashtagDebounce = setTimeout(() => {
             fetch(`/search/hashtags/suggest/?q=${encodeURIComponent(fragment)}`)
-                .then(function(response) { return response.json(); })
-                .then(function(data) {
-                    if (!data.success) {
-                        hideHashtagSuggestions();
-                        return;
-                    }
-                    renderHashtagSuggestions(data.hashtags || []);
-                })
-                .catch(function() {
-                    hideHashtagSuggestions();
-                });
+                .then(r => r.json())
+                .then(data => renderHashtagSuggestions(data.success ? (data.hashtags || []) : []))
+                .catch(() => hideHashtagSuggestions());
         }, 180);
     });
 
-    hashtagsInput.addEventListener('blur', function() {
-        setTimeout(hideHashtagSuggestions, 120);
-    });
-
-    hashtagsInput.addEventListener('focus', function() {
+    hashtagsInput.addEventListener('blur', () => setTimeout(hideHashtagSuggestions, 120));
+    hashtagsInput.addEventListener('focus', function () {
         updateCurrentHashtagCounter();
-        if (getHashtagFragment(this.value)) {
-            this.dispatchEvent(new Event('input'));
-        }
+        if (getHashtagFragment(this.value)) this.dispatchEvent(new Event('input'));
     });
-
-    hashtagsInput.addEventListener('keyup', function() {
-        updateCurrentHashtagCounter();
-    });
-
-    // Initialize counter on first load.
+    hashtagsInput.addEventListener('keyup', updateCurrentHashtagCounter);
     updateCurrentHashtagCounter();
-    updateTitleFormatState();
 
-    askForm.addEventListener('submit', function(event) {
+    // ── Form submit validation ──────────────────────────────────────────────────
+    askForm.addEventListener('submit', function (event) {
         if (!hasAcceptedAskRules) {
             event.preventDefault();
             openRulesModal();
             return;
         }
 
-        if (!isQuestionTitleValid(titleInput.value)) {
+        if (!titleInput.value.trim()) {
             event.preventDefault();
             titleInput.focus();
-            updateTitleFormatState();
+            titleFormatHint.textContent = 'Please enter your question.';
+            titleFormatHint.className = 'text-xs text-red-600';
             return;
         }
 
@@ -454,7 +436,7 @@
         }
     });
 
-    // ── Draft auto-save (localStorage) ────────────────────────────────────────
+    // ── Draft auto-save (localStorage) ─────────────────────────────────────────
     var DRAFT_KEY = 'pickside_draft_v1';
 
     function readDraftFields() {
@@ -462,15 +444,11 @@
             title: titleInput.value,
             category: document.getElementById('category').value,
             hashtags: hashtagsInput.value,
+            yes_label: yesLabelInput.value,
+            no_label: noLabelInput.value,
             is_anonymous: document.getElementById('anon-toggle').checked,
             savedAt: new Date().toISOString(),
         };
-    }
-
-    function saveDraftToStorage() {
-        if (!titleInput.value.trim()) return;
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(readDraftFields()));
-        showDraftStatus('Draft saved');
     }
 
     function showDraftStatus(msg) {
@@ -479,19 +457,24 @@
         el.textContent = msg;
         el.classList.remove('opacity-0');
         clearTimeout(el._t);
-        el._t = setTimeout(function() { el.classList.add('opacity-0'); }, 2000);
+        el._t = setTimeout(() => el.classList.add('opacity-0'), 2000);
+    }
+
+    function saveDraftToStorage() {
+        if (!titleInput.value.trim()) return;
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(readDraftFields()));
+        showDraftStatus('Draft saved');
     }
 
     function restoreDraft(draft) {
         titleInput.value = draft.title || '';
         charCount.textContent = titleInput.value.length;
-        updateTitleFormatState();
         var catEl = document.getElementById('category');
         if (draft.category) catEl.value = draft.category;
-        if (draft.hashtags) {
-            hashtagsInput.value = draft.hashtags;
-            updateCurrentHashtagCounter();
-        }
+        if (draft.hashtags) { hashtagsInput.value = draft.hashtags; updateCurrentHashtagCounter(); }
+        if (draft.yes_label) { yesLabelInput.value = draft.yes_label; }
+        if (draft.no_label)  { noLabelInput.value  = draft.no_label;  }
+        updateSidePreview();
         document.getElementById('anon-toggle').checked = !!draft.is_anonymous;
         document.getElementById('draft-banner').remove();
     }
@@ -506,87 +489,79 @@
             var banner = document.createElement('div');
             banner.id = 'draft-banner';
             banner.className = 'mb-4 flex items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm';
-            banner.innerHTML = '<span class="text-foreground font-medium">📝 You have an unsaved draft' + (when ? ' from ' + when : '') + '</span>' +
+            banner.innerHTML =
+                '<span class="text-foreground font-medium">📝 You have an unsaved draft' + (when ? ' from ' + when : '') + '</span>' +
                 '<span class="flex gap-2 flex-shrink-0">' +
                 '<button type="button" id="draft-restore-btn" class="rounded-full bg-primary text-primary-foreground px-3 py-1 text-xs font-semibold hover:bg-primary/90">Restore</button>' +
                 '<button type="button" id="draft-discard-btn" class="rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground">Discard</button>' +
                 '</span>';
-            var form = document.getElementById('ask-form-shell');
-            form.parentNode.insertBefore(banner, form);
-            document.getElementById('draft-restore-btn').addEventListener('click', function() { restoreDraft(draft); });
-            document.getElementById('draft-discard-btn').addEventListener('click', function() {
+            var formParent = document.getElementById('ask-form-shell');
+            formParent.parentNode.insertBefore(banner, formParent);
+            document.getElementById('draft-restore-btn').addEventListener('click', () => restoreDraft(draft));
+            document.getElementById('draft-discard-btn').addEventListener('click', () => {
                 localStorage.removeItem(DRAFT_KEY);
                 banner.remove();
             });
         } catch(e) {}
     })();
 
-    // Auto-save every 30s
     setInterval(saveDraftToStorage, 30000);
-    // Also save on meaningful input pause
     var draftDebounce = null;
-    titleInput.addEventListener('input', function() { clearTimeout(draftDebounce); draftDebounce = setTimeout(saveDraftToStorage, 3000); });
+    titleInput.addEventListener('input', () => { clearTimeout(draftDebounce); draftDebounce = setTimeout(saveDraftToStorage, 3000); });
+    askForm.addEventListener('submit', () => localStorage.removeItem(DRAFT_KEY));
 
-    // Clear draft on successful submit
-    askForm.addEventListener('submit', function() { localStorage.removeItem(DRAFT_KEY); });
-
-    // ── Live Link Preview while composing ─────────────────────────────────────
-    var _lpDebounce = null;
-    var _lpLastUrl = '';
+    // ── Live link preview ───────────────────────────────────────────────────────
+    var _lpDebounce = null, _lpLastUrl = '';
     var _lpContainer = document.getElementById('compose-link-preview');
 
     function _escHtml(s) {
-      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
     function _extractUrl(text) {
-      var m = (text || '').match(/https?:\/\/[^\s<>"'{}|\\^`\[\]]{8,}/);
-      return m ? m[0] : null;
+        var m = (text || '').match(/https?:\/\/[^\s<>"'{}|\\^`\[\]]{8,}/);
+        return m ? m[0] : null;
     }
 
     function _renderComposePreview(url, d) {
-      if (!d || !d.title) { _lpContainer.classList.add('hidden'); _lpContainer.innerHTML = ''; return; }
-      var host = '';
-      try { host = new URL(url).hostname.replace(/^www\./,''); } catch(e){}
-      _lpContainer.innerHTML =
-        '<div class="flex gap-3 p-3 items-start">' +
-        (d.image ? '<img src="'+_escHtml(d.image)+'" class="w-16 h-12 object-cover rounded-lg flex-shrink-0 bg-muted" loading="lazy" onerror="this.remove()">' : '') +
-        '<div class="min-w-0 flex-1">' +
-        (d.site_name||host ? '<p class="text-[10px] font-bold text-primary uppercase tracking-wide mb-0.5">'+_escHtml(d.site_name||host)+'</p>' : '') +
-        '<p class="text-sm font-semibold text-foreground line-clamp-1">'+_escHtml(d.title)+'</p>' +
-        (d.description ? '<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2">'+_escHtml(d.description)+'</p>' : '') +
-        '</div>' +
-        '<button type="button" onclick="document.getElementById(\'compose-link-preview\').classList.add(\'hidden\')" ' +
-        'class="flex-shrink-0 text-muted-foreground hover:text-foreground text-lg leading-none ml-1" title="Dismiss">×</button>' +
-        '</div>';
-      _lpContainer.classList.remove('hidden');
+        if (!d || !d.title) { _lpContainer.classList.add('hidden'); _lpContainer.innerHTML = ''; return; }
+        var host = '';
+        try { host = new URL(url).hostname.replace(/^www\./, ''); } catch(e) {}
+        _lpContainer.innerHTML =
+            '<div class="flex gap-3 p-3 items-start">' +
+            (d.image ? `<img src="${_escHtml(d.image)}" class="w-16 h-12 object-cover rounded-lg flex-shrink-0 bg-muted" loading="lazy" onerror="this.remove()">` : '') +
+            '<div class="min-w-0 flex-1">' +
+            (d.site_name || host ? `<p class="text-[10px] font-bold text-primary uppercase tracking-wide mb-0.5">${_escHtml(d.site_name || host)}</p>` : '') +
+            `<p class="text-sm font-semibold text-foreground line-clamp-1">${_escHtml(d.title)}</p>` +
+            (d.description ? `<p class="text-xs text-muted-foreground mt-0.5 line-clamp-2">${_escHtml(d.description)}</p>` : '') +
+            '</div>' +
+            `<button type="button" onclick="document.getElementById('compose-link-preview').classList.add('hidden')" class="flex-shrink-0 text-muted-foreground hover:text-foreground text-lg leading-none ml-1" title="Dismiss">×</button>` +
+            '</div>';
+        _lpContainer.classList.remove('hidden');
     }
 
     function _onTitleChange() {
-      var url = _extractUrl(titleInput.value);
-      if (!url || url === _lpLastUrl) return;
-      _lpLastUrl = url;
-      clearTimeout(_lpDebounce);
-      _lpDebounce = setTimeout(function() {
-        fetch('/link-preview/?url=' + encodeURIComponent(url))
-          .then(function(r){ return r.json(); })
-          .then(function(d){ _renderComposePreview(url, d); })
-          .catch(function(){});
-      }, 600);
+        var url = _extractUrl(titleInput.value);
+        if (!url || url === _lpLastUrl) return;
+        _lpLastUrl = url;
+        clearTimeout(_lpDebounce);
+        _lpDebounce = setTimeout(() => {
+            fetch('/link-preview/?url=' + encodeURIComponent(url))
+                .then(r => r.json())
+                .then(d => _renderComposePreview(url, d))
+                .catch(() => {});
+        }, 600);
     }
 
     titleInput.addEventListener('input', _onTitleChange);
-    titleInput.addEventListener('paste', function(){ setTimeout(_onTitleChange, 50); });
-    // ──────────────────────────────────────────────────────────────────────────
-    // ──────────────────────────────────────────────────────────────────────────
+    titleInput.addEventListener('paste', () => setTimeout(_onTitleChange, 50));
 
-    // Save Draft button — show scheduling input, then submit on second click
+    // ── Draft btn (show schedule then submit) ───────────────────────────────────
     const draftBtn = document.getElementById('draft-btn');
     const scheduleWrapper = document.getElementById('schedule-input-wrapper');
-    const scheduledForInput = document.getElementById('scheduled-for-input');
     let draftBtnReady = false;
 
-    draftBtn.addEventListener('click', function() {
+    draftBtn.addEventListener('click', function () {
         if (!draftBtnReady) {
             scheduleWrapper.classList.remove('hidden');
             draftBtnReady = true;
