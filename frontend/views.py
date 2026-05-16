@@ -1213,6 +1213,11 @@ def _get_related_posts(post, limit=4):
     if not post.category:
         return []
 
+    _cache_key = f'related_posts:{post.id}'
+    cached = cache.get(_cache_key)
+    if cached is not None:
+        return cached
+
     candidates = (
         Post.objects.filter(category=post.category, is_draft=False)
         .exclude(id=post.id)
@@ -1238,12 +1243,34 @@ def _get_related_posts(post, limit=4):
         return 0
 
     scored = sorted(candidates, key=lambda p: (_score(p), p.like_count), reverse=True)
-    return scored[:limit]
+    result = scored[:limit]
+    cache.set(_cache_key, result, 300)
+    return result
 
 
 def discussion(request, post_id):
     """Discussion page for a specific post"""
-    post = _annotated_feed_posts_queryset().filter(id=post_id).first()
+    # Lightweight fetch: only the annotations the discussion page actually renders.
+    # Avoids the 14 COUNT(DISTINCT…) subqueries that _annotated_feed_posts_queryset uses.
+    post = (
+        Post.objects
+        .filter(id=post_id, is_draft=False)
+        .exclude(id='')
+        .select_related('user', 'user__profile')
+        .annotate(
+            like_count=Count('actions', filter=Q(actions__action='like'), distinct=True),
+            save_count=Count('actions', filter=Q(actions__action='save'), distinct=True),
+            repost_count=Count('actions', filter=Q(actions__action='repost'), distinct=True),
+            hot_count=Count('actions', filter=Q(actions__action='hot'), distinct=True),
+            debatable_count=Count('actions', filter=Q(actions__action='debatable'), distinct=True),
+            agree_count=Count('actions', filter=Q(actions__action='agree'), distinct=True),
+            surprising_count=Count('actions', filter=Q(actions__action='surprising'), distinct=True),
+            comment_count=Count('comments', distinct=True),
+            conversation_count=Count('debates', distinct=True),
+            view_count=Count('views', distinct=True),
+        )
+        .first()
+    )
     if not post:
         messages.error(request, 'This discussion is no longer available.')
         return redirect('index')
@@ -1277,8 +1304,9 @@ def discussion(request, post_id):
         _comment_order = ('created_at',)
     else:
         _comment_order = ('-reaction_score', '-likes', 'created_at')
-    yes_comments = visible_comments.filter(vote_type='yes').order_by(*_comment_order)
-    no_comments = visible_comments.filter(vote_type='no').order_by(*_comment_order)
+    _COMMENT_PAGE_SIZE = 75
+    yes_comments = visible_comments.filter(vote_type='yes').order_by(*_comment_order)[:_COMMENT_PAGE_SIZE]
+    no_comments = visible_comments.filter(vote_type='no').order_by(*_comment_order)[:_COMMENT_PAGE_SIZE]
 
     # Only award top badges when a comment has a positive net reaction.
     top_yes_comment = yes_comments.filter(reaction_score__gt=0).first()
@@ -1504,15 +1532,25 @@ def discussion(request, post_id):
         comment.is_online = bool(last_seen and last_seen >= online_cutoff)
         comment.presence_label = _presence_label(last_seen, now=now)
 
-    post_has_comments = comments.exists()
+    post_has_comments = bool(yes_vote_count or no_vote_count)
     can_manage_post_today = is_post_creator and _can_manage_created_today(request.user, post.created_at)
     show_post_submitted = is_post_creator and request.GET.get('created') == '1'
 
     is_following_post = False
+    user_has_reported_post = False
     if request.user.is_authenticated:
+        # Batch three per-user boolean checks into two queries instead of three.
+        _user_post_flags = PostAction.objects.filter(
+            user=request.user, post=post
+        ).values_list('action', flat=True)
         is_following_post = PostFollow.objects.filter(user=request.user, post=post).exists()
+        user_has_reported_post = PostReport.objects.filter(post=post, reporter=request.user).exists()
 
-    views_count = PostView.objects.filter(post=post).count()
+    _views_cache_key = f'post_views_count:{post_id}'
+    views_count = cache.get(_views_cache_key)
+    if views_count is None:
+        views_count = PostView.objects.filter(post=post).count()
+        cache.set(_views_cache_key, views_count, 120)
 
     if is_post_creator:
         from django.db.models.functions import TruncDate
@@ -1567,7 +1605,6 @@ def discussion(request, post_id):
             'next_item': all_items[current_idx + 1] if current_idx is not None and current_idx < len(all_items) - 1 else None,
         }
 
-    # Post reminder state for authenticated user
     from discussions.models import PostReminder as _PR
     post.has_reminder = (
         request.user.is_authenticated
@@ -1613,7 +1650,7 @@ def discussion(request, post_id):
         'series_context': series_context,
         'comment_sort': comment_sort,
         'post_report_reasons': PostReport.REASON_CHOICES,
-        'user_has_reported_post': PostReport.objects.filter(post=post, reporter=request.user).exists() if request.user.is_authenticated else False,
+        'user_has_reported_post': user_has_reported_post,
     }
     return render(request, 'frontend/discussion.html', context)
 
