@@ -2723,28 +2723,47 @@ def _build_chat_payload_for_user(user, only_active=False):
     if only_active:
         participations = participations.filter(is_active=True)
 
-    participations = participations.select_related(
+    participations = list(participations.select_related(
         'debate__post',
         'debate__poll',
-        'debate__initiator',
-        'debate__target',
+        'debate__initiator__profile',
+        'debate__target__profile',
+    ))
+
+    if not participations:
+        return []
+
+    # Batch-fetch the latest non-system message per debate in one query.
+    debate_ids = [p.debate_id for p in participations]
+    from django.db.models import Max
+    latest_ids = (
+        DebateMessage.objects
+        .filter(debate_id__in=debate_ids, is_system=False)
+        .values('debate_id')
+        .annotate(max_id=Max('id'))
+        .values_list('max_id', flat=True)
     )
+    last_msgs = {
+        m.debate_id: m
+        for m in DebateMessage.objects.filter(
+            id__in=latest_ids
+        ).select_related('sender')
+    }
+
+    cutoff = timezone.now() - timedelta(minutes=5)
 
     chats = []
     for p in participations:
         debate = p.debate
         opponent = debate.target if user.id == debate.initiator_id else debate.initiator
-        last_msg = DebateMessage.objects.filter(
-            debate=debate,
-            is_system=False,
-        ).order_by('-created_at').first()
+        last_msg = last_msgs.get(debate.id)
 
         try:
             opp_avatar = opponent.profile.get_picture_url
         except Exception:
             opp_avatar = ''
 
-        opp_is_online = _is_user_online(opponent)
+        opp_is_online = _is_user_online(opponent, cutoff=cutoff)
 
         if debate.post_id:
             context_url = f'/discussion/{debate.post_id}/'

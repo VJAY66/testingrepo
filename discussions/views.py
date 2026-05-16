@@ -140,7 +140,12 @@ class CommentViewSet(viewsets.ModelViewSet):
         cache_key = _comments_cache_key(post_id)
         data = cache.get(cache_key)
         if data is None:
-            comments = Comment.objects.filter(post_id=post_id).order_by('created_at')
+            comments = (
+                Comment.objects
+                .filter(post_id=post_id)
+                .select_related('user', 'user__profile')
+                .order_by('created_at')
+            )
             data = CommentSerializer(comments, many=True).data
             cache.set(cache_key, data, _COMMENTS_CACHE_TTL)
 
