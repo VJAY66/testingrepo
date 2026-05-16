@@ -40,8 +40,16 @@ class Post(models.Model):
         (AUDIENCE_CLOSE_FRIENDS, 'Close Friends'),
     ]
 
+    POST_TYPE_DISCUSSION = 'discussion'
+    POST_TYPE_STOCK = 'stock_prediction'
+    POST_TYPE_CHOICES = [
+        (POST_TYPE_DISCUSSION, 'Discussion'),
+        (POST_TYPE_STOCK, 'Stock Prediction'),
+    ]
+
     id = models.CharField(max_length=36, primary_key=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
+    post_type = models.CharField(max_length=20, choices=POST_TYPE_CHOICES, default=POST_TYPE_DISCUSSION, db_index=True)
     title = models.CharField(max_length=255)
     content = models.TextField()
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, db_index=True)
@@ -145,6 +153,7 @@ class Comment(models.Model):
     is_flagged = models.BooleanField(default=False, help_text='Flagged by moderation system')
     moderation_reason = models.TextField(blank=True, default='', help_text='Reason for moderation action')
     is_anonymous = models.BooleanField(default=False)
+    confidence_score = models.PositiveSmallIntegerField(null=True, blank=True, help_text='Confidence 1-10, used for stock predictions only')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1296,3 +1305,73 @@ class PostReminder(models.Model):
 
     def __str__(self):
         return f"{self.user.username} reminder for post {self.post_id} at {self.remind_at}"
+
+
+class StockPrediction(models.Model):
+    DIRECTION_ABOVE = 'above'
+    DIRECTION_BELOW = 'below'
+    DIRECTION_CHOICES = [
+        (DIRECTION_ABOVE, 'Above (will exceed target)'),
+        (DIRECTION_BELOW, 'Below (will fall under target)'),
+    ]
+    STATUS_ACTIVE = 'active'
+    STATUS_RESOLVED = 'resolved'
+    STATUS_EXPIRED = 'expired'
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, 'Active'),
+        (STATUS_RESOLVED, 'Resolved'),
+        (STATUS_EXPIRED, 'Expired'),
+    ]
+    OUTCOME_BULLISH = 'bullish_correct'
+    OUTCOME_BEARISH = 'bearish_correct'
+    OUTCOME_CHOICES = [
+        ('', 'Pending'),
+        (OUTCOME_BULLISH, 'Bullish Correct'),
+        (OUTCOME_BEARISH, 'Bearish Correct'),
+    ]
+
+    post = models.OneToOneField(Post, on_delete=models.CASCADE, related_name='stock_prediction')
+    stock_symbol = models.CharField(max_length=20, db_index=True)
+    stock_name = models.CharField(max_length=100, blank=True, default='')
+    target_price = models.DecimalField(max_digits=12, decimal_places=2)
+    target_date = models.DateField(db_index=True)
+    direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES)
+    entry_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text='Stock price when prediction was created')
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
+    outcome = models.CharField(max_length=20, choices=OUTCOME_CHOICES, blank=True, default='')
+    resolved_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='resolved_predictions')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['stock_symbol', 'status']),
+            models.Index(fields=['target_date', 'status']),
+        ]
+
+    def __str__(self):
+        return f"{self.stock_symbol} → ₹{self.target_price} by {self.target_date}"
+
+    @property
+    def days_remaining(self):
+        from django.utils import timezone as tz
+        delta = self.target_date - tz.now().date()
+        return delta.days
+
+    @property
+    def is_active(self):
+        return self.status == self.STATUS_ACTIVE
+
+    def compute_outcome(self, resolved_price):
+        """Determine which side wins based on resolved price."""
+        rp = float(resolved_price)
+        tp = float(self.target_price)
+        if self.direction == self.DIRECTION_ABOVE:
+            return self.OUTCOME_BULLISH if rp >= tp else self.OUTCOME_BEARISH
+        else:
+            return self.OUTCOME_BULLISH if rp <= tp else self.OUTCOME_BEARISH

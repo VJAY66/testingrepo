@@ -1,0 +1,494 @@
+{% extends 'frontend/base.html' %}
+{% block title %}Stock Prediction — PickASide{% endblock %}
+
+{% block content %}
+<style>
+.spf-card {
+    background: linear-gradient(152deg, hsl(var(--card) / 0.94), hsl(var(--card) / 0.76));
+    backdrop-filter: blur(18px);
+    box-shadow: 0 28px 72px -40px rgba(15,23,42,0.55), inset 0 1px 0 rgba(255,255,255,0.14);
+    border-radius: 1.5rem;
+    border: 1px solid hsl(var(--border) / 0.5);
+}
+.spf-section {
+    background: hsl(var(--background) / 0.55);
+    border: 1px solid hsl(var(--border) / 0.6);
+    border-radius: 1rem;
+    padding: 1.1rem 1.15rem;
+}
+.spf-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: 0.45rem;
+}
+.spf-input {
+    width: 100%;
+    padding: 0.78rem 1rem;
+    border-radius: 0.9rem;
+    border: 1.5px solid hsl(var(--border));
+    background: hsl(var(--background) / 0.72);
+    color: hsl(var(--foreground));
+    font-size: 0.95rem;
+    font-family: inherit;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+    outline: none;
+}
+.spf-input:focus {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+}
+.spf-input::placeholder { color: hsl(var(--muted-foreground) / 0.55); }
+.spf-input-prefix {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.spf-input-prefix .prefix-icon {
+    position: absolute;
+    left: 0.85rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: hsl(var(--muted-foreground));
+    pointer-events: none;
+}
+.spf-input-prefix .spf-input { padding-left: 2rem; }
+.spf-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.9rem 1.5rem;
+    border-radius: 999px;
+    background-image: var(--float-gradient);
+    color: hsl(var(--primary-foreground));
+    font-size: 1rem;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 12px 28px -14px hsl(var(--primary) / 0.7);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+}
+.spf-submit:hover { transform: translateY(-2px); box-shadow: 0 18px 36px -12px hsl(var(--primary) / 0.85); }
+.spf-submit:active { transform: translateY(0); }
+
+/* Direction cards */
+.dir-card {
+    position: relative;
+    border: 2px solid hsl(var(--border));
+    border-radius: 1.1rem;
+    padding: 1.2rem 1rem;
+    cursor: pointer;
+    transition: border-color 200ms ease, background 200ms ease, transform 160ms ease, box-shadow 200ms ease;
+    background: hsl(var(--background) / 0.5);
+    text-align: center;
+    user-select: none;
+}
+.dir-card:hover { transform: translateY(-2px); }
+.dir-card.dir-above:hover { border-color: hsl(142 71% 45% / 0.6); background: hsl(142 71% 45% / 0.07); }
+.dir-card.dir-below:hover { border-color: hsl(346 77% 50% / 0.6); background: hsl(346 77% 50% / 0.07); }
+.dir-card.dir-above.selected {
+    border-color: hsl(142 71% 45%);
+    background: hsl(142 71% 45% / 0.12);
+    box-shadow: 0 0 0 3px hsl(142 71% 45% / 0.2);
+}
+.dir-card.dir-below.selected {
+    border-color: hsl(346 77% 50%);
+    background: hsl(346 77% 50% / 0.12);
+    box-shadow: 0 0 0 3px hsl(346 77% 50% / 0.2);
+}
+.dir-card input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+.dir-arrow {
+    font-size: 2rem;
+    line-height: 1;
+    display: block;
+    margin-bottom: 0.4rem;
+}
+.dir-label {
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.dir-sublabel {
+    font-size: 0.72rem;
+    color: hsl(var(--muted-foreground));
+    margin-top: 0.2rem;
+    line-height: 1.4;
+}
+.dir-check {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.75rem;
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 50%;
+    border: 2px solid hsl(var(--border));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 180ms;
+}
+.dir-card.dir-above.selected .dir-check { background: hsl(142 71% 45%); border-color: hsl(142 71% 45%); }
+.dir-card.dir-below.selected .dir-check { background: hsl(346 77% 50%); border-color: hsl(346 77% 50%); }
+.dir-check-inner {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: white;
+    transform: scale(0);
+    transition: transform 160ms;
+}
+.dir-card.selected .dir-check-inner { transform: scale(1); }
+
+/* Live preview box */
+.preview-box {
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.06), hsl(var(--card) / 0.8));
+    border: 1.5px dashed hsl(var(--primary) / 0.35);
+    border-radius: 1rem;
+    padding: 1rem 1.2rem;
+    transition: border-color 300ms;
+}
+.preview-box.preview-active { border-color: hsl(var(--primary) / 0.6); border-style: solid; }
+.preview-symbol {
+    font-size: 1.5rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    color: hsl(var(--primary));
+    font-family: 'Playfair Display', serif;
+}
+.preview-dir-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+.preview-dir-above { background: hsl(142 71% 45% / 0.15); color: hsl(142 71% 38%); }
+.preview-dir-below { background: hsl(346 77% 50% / 0.15); color: hsl(346 65% 44%); }
+.preview-empty { color: hsl(var(--muted-foreground) / 0.6); font-size: 0.85rem; font-style: italic; }
+</style>
+
+<div class="max-w-2xl mx-auto py-8 px-4">
+
+    <!-- Back -->
+    <a href="{% url 'stocks_list' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors mb-6">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        Back to Stock Predictions
+    </a>
+
+    <!-- Header -->
+    <div class="flex items-center gap-4 mb-8">
+        <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-900/35 text-3xl shadow-inner flex-shrink-0">📈</div>
+        <div>
+            <h1 class="text-2xl font-bold text-foreground" style="font-family:'Playfair Display',serif;">Make a Stock Prediction</h1>
+            <p class="text-sm text-muted-foreground mt-0.5">Set a target, pick Bullish or Bearish, and let the community debate.</p>
+        </div>
+    </div>
+
+    <!-- Form card -->
+    <div class="spf-card p-6 sm:p-8 space-y-6">
+        <form method="POST" action="{% url 'create_stock_prediction' %}" id="spf-form" novalidate>
+            {% csrf_token %}
+
+            <!-- 1. Prediction Question -->
+            <div>
+                <label class="spf-label" for="id_title">Prediction Question</label>
+                <div class="relative">
+                    <textarea
+                        id="id_title"
+                        name="title"
+                        rows="2"
+                        maxlength="200"
+                        required
+                        placeholder="Will HDFC Bank go above ₹1800 by Dec 2026?"
+                        class="spf-input resize-none"
+                        oninput="updateCharCount(this)"
+                    ></textarea>
+                    <span id="title-count" class="absolute bottom-2.5 right-3 text-xs text-muted-foreground font-semibold tabular-nums">0/200</span>
+                </div>
+            </div>
+
+            <!-- 2. Stock Details -->
+            <div class="spf-section space-y-3">
+                <p class="text-xs font-700 uppercase tracking-widest text-muted-foreground mb-1" style="font-weight:700;letter-spacing:.06em;">Stock Details</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="spf-label" for="id_stock_symbol">Stock Symbol <span class="text-destructive">*</span></label>
+                        <input
+                            type="text"
+                            id="id_stock_symbol"
+                            name="stock_symbol"
+                            required
+                            placeholder="HDFC, RELIANCE, TCS"
+                            class="spf-input"
+                            style="text-transform:uppercase;"
+                            oninput="this.value=this.value.toUpperCase();updatePreview()"
+                        >
+                    </div>
+                    <div>
+                        <label class="spf-label" for="id_stock_name">Stock Name <span class="text-muted-foreground font-normal normal-case tracking-normal">(optional)</span></label>
+                        <input
+                            type="text"
+                            id="id_stock_name"
+                            name="stock_name"
+                            placeholder="HDFC Bank Ltd (optional)"
+                            class="spf-input"
+                        >
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Prediction Details -->
+            <div class="spf-section space-y-3">
+                <p class="text-xs uppercase tracking-widest text-muted-foreground mb-1" style="font-weight:700;letter-spacing:.06em;">Prediction Details</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="spf-label" for="id_target_price">Target Price in ₹ <span class="text-destructive">*</span></label>
+                        <div class="spf-input-prefix">
+                            <span class="prefix-icon">₹</span>
+                            <input
+                                type="number"
+                                id="id_target_price"
+                                name="target_price"
+                                step="0.01"
+                                min="0"
+                                required
+                                placeholder="1800.00"
+                                class="spf-input"
+                                oninput="updatePreview()"
+                            >
+                        </div>
+                    </div>
+                    <div>
+                        <label class="spf-label" for="id_target_date">Target Date <span class="text-destructive">*</span></label>
+                        <input
+                            type="date"
+                            id="id_target_date"
+                            name="target_date"
+                            required
+                            class="spf-input"
+                            oninput="validateFutureDate(this);updatePreview()"
+                        >
+                        <p id="date-error" class="hidden text-destructive text-xs mt-1 font-semibold">Please select a future date.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Direction toggle cards -->
+            <div>
+                <label class="spf-label">Prediction Direction <span class="text-destructive">*</span></label>
+                <div class="grid grid-cols-2 gap-3">
+                    <!-- Above -->
+                    <label class="dir-card dir-above" id="card-above" onclick="selectDirection('above')">
+                        <input type="radio" name="direction" value="above" id="dir-above" required>
+                        <div class="dir-check" id="check-above">
+                            <div class="dir-check-inner"></div>
+                        </div>
+                        <span class="dir-arrow">↑</span>
+                        <span class="dir-label" style="color:hsl(142 71% 38%);">Stock will go ABOVE</span>
+                        <p class="dir-sublabel">Price reaches or exceeds the target</p>
+                    </label>
+                    <!-- Below -->
+                    <label class="dir-card dir-below" id="card-below" onclick="selectDirection('below')">
+                        <input type="radio" name="direction" value="below" id="dir-below" required>
+                        <div class="dir-check" id="check-below">
+                            <div class="dir-check-inner"></div>
+                        </div>
+                        <span class="dir-arrow">↓</span>
+                        <span class="dir-label" style="color:hsl(346 65% 44%);">Stock will go BELOW</span>
+                        <p class="dir-sublabel">Price stays below the target</p>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 5. Entry price -->
+            <div>
+                <label class="spf-label" for="id_entry_price">Current Stock Price (Optional)</label>
+                <div class="spf-input-prefix">
+                    <span class="prefix-icon">₹</span>
+                    <input
+                        type="number"
+                        id="id_entry_price"
+                        name="entry_price"
+                        step="0.01"
+                        min="0"
+                        placeholder="Current market price for reference"
+                        class="spf-input"
+                    >
+                </div>
+                <p class="text-xs text-muted-foreground mt-1">Snapshot of the price when you made this prediction.</p>
+            </div>
+
+            <!-- 6. Category -->
+            <div>
+                <label class="spf-label" for="id_category">Category</label>
+                <select id="id_category" name="category" class="spf-input">
+                    <option value="">-- Select a category --</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}">{% if cat.icon %}{{ cat.icon }} {% endif %}{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 7. Hashtags -->
+            <div>
+                <label class="spf-label" for="id_hashtags">Hashtags <span class="text-muted-foreground font-normal normal-case tracking-normal">(optional)</span></label>
+                <input
+                    type="text"
+                    id="id_hashtags"
+                    name="hashtags"
+                    placeholder="#Nifty #Banking #LongTerm"
+                    class="spf-input"
+                >
+                <p class="text-xs text-muted-foreground mt-1">Separate with spaces. E.g. #Nifty #HDFC</p>
+            </div>
+
+            <!-- Live preview -->
+            <div class="preview-box" id="preview-box">
+                <p class="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Live Preview</p>
+                <div id="preview-content">
+                    <p class="preview-empty">Start filling in the form to see your prediction summary…</p>
+                </div>
+            </div>
+
+            <!-- Submit -->
+            <button type="submit" class="spf-submit" id="submit-btn">
+                🚀 Publish Prediction
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+// --- Char counter ---
+function updateCharCount(el) {
+    const count = el.value.length;
+    const max = parseInt(el.getAttribute('maxlength')) || 200;
+    const counter = document.getElementById('title-count');
+    if (counter) {
+        counter.textContent = count + '/' + max;
+        counter.style.color = count > max * 0.9 ? 'hsl(var(--destructive))' : '';
+    }
+    updatePreview();
+}
+
+// --- Direction selection ---
+let selectedDirection = null;
+
+function selectDirection(dir) {
+    selectedDirection = dir;
+    const cardAbove = document.getElementById('card-above');
+    const cardBelow = document.getElementById('card-below');
+    const radioAbove = document.getElementById('dir-above');
+    const radioBelow = document.getElementById('dir-below');
+
+    if (dir === 'above') {
+        cardAbove.classList.add('selected');
+        cardBelow.classList.remove('selected');
+        radioAbove.checked = true;
+        radioBelow.checked = false;
+    } else {
+        cardBelow.classList.add('selected');
+        cardAbove.classList.remove('selected');
+        radioBelow.checked = true;
+        radioAbove.checked = false;
+    }
+    updatePreview();
+}
+
+// --- Future date validation ---
+function validateFutureDate(input) {
+    const errEl = document.getElementById('date-error');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const chosen = new Date(input.value);
+    if (input.value && chosen <= today) {
+        errEl.classList.remove('hidden');
+        input.style.borderColor = 'hsl(var(--destructive))';
+    } else {
+        errEl.classList.add('hidden');
+        input.style.borderColor = '';
+    }
+}
+
+// --- Live preview ---
+function updatePreview() {
+    const symbol = (document.getElementById('id_stock_symbol').value || '').trim().toUpperCase();
+    const price = document.getElementById('id_target_price').value;
+    const dateRaw = document.getElementById('id_target_date').value;
+    const title = document.getElementById('id_title').value.trim();
+
+    const box = document.getElementById('preview-box');
+    const content = document.getElementById('preview-content');
+
+    const isEmpty = !symbol && !price && !dateRaw && !selectedDirection;
+
+    if (isEmpty) {
+        box.classList.remove('preview-active');
+        content.innerHTML = '<p class="preview-empty">Start filling in the form to see your prediction summary…</p>';
+        return;
+    }
+
+    box.classList.add('preview-active');
+
+    let dirBadge = '';
+    if (selectedDirection === 'above') {
+        dirBadge = '<span class="preview-dir-badge preview-dir-above">↑ Must go ABOVE</span>';
+    } else if (selectedDirection === 'below') {
+        dirBadge = '<span class="preview-dir-badge preview-dir-below">↓ Must go BELOW</span>';
+    }
+
+    let dateStr = '';
+    if (dateRaw) {
+        const d = new Date(dateRaw + 'T00:00:00');
+        dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    content.innerHTML = `
+        <div class="flex items-center gap-3 flex-wrap mb-2">
+            ${symbol ? `<span class="preview-symbol">${symbol}</span>` : ''}
+            ${dirBadge}
+            ${price ? `<span class="text-sm font-bold text-foreground">₹${parseFloat(price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>` : ''}
+            ${dateStr ? `<span class="text-xs text-muted-foreground font-semibold">by ${dateStr}</span>` : ''}
+        </div>
+        ${title ? `<p class="text-sm text-foreground leading-relaxed">${title}</p>` : '<p class="text-xs text-muted-foreground italic">Add your prediction question above…</p>'}
+    `;
+}
+
+// --- Form submit guard ---
+document.getElementById('spf-form').addEventListener('submit', function(e) {
+    const dateInput = document.getElementById('id_target_date');
+    if (dateInput.value) {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const chosen = new Date(dateInput.value);
+        if (chosen <= today) {
+            e.preventDefault();
+            document.getElementById('date-error').classList.remove('hidden');
+            dateInput.focus();
+            return;
+        }
+    }
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Publishing…';
+});
+
+// Set min date to tomorrow
+(function() {
+    const inp = document.getElementById('id_target_date');
+    if (inp) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        inp.min = tomorrow.toISOString().split('T')[0];
+    }
+})();
+</script>
+{% endblock %}

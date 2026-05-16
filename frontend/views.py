@@ -21,7 +21,7 @@ import random
 import re
 import uuid
 
-from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest, PostReport, LiveDebateRoom, LiveDebateMessage, LiveDebateVote, PollPrediction
+from discussions.models import CATEGORY_CHOICES, Post, Comment, Debate, DebateMessage, DebateParticipant, CommentModeratorBlock, CommentReaction, PostFollow, PostView, PostAction, Notification, PostEditHistory, CommentEditHistory, DebateMessageEditHistory, DebateMessageReaction, DebateMessageReport, ProfileReport, Poll, PollOption, PollVote, PollComment, PollCommentReaction, Question, Answer, AnswerVote, Review, ReviewReaction, ReviewComment, ReviewCommentReaction, PollAction, PollFollow, QuestionAction, QuestionFollow, ReviewAction, ReviewFollow, ObserverVote, CommentReport, HashtagFollow, DebateView, PostSeries, PostSeriesItem, Story, StoryView, FeedScore, PostInsight, ReadLater, DirectMessage, LinkPreview, DMRequest, PostReport, LiveDebateRoom, LiveDebateMessage, LiveDebateVote, PollPrediction, StockPrediction
 from discussions.signals import notify_post_author
 from users.models import Follow, UserBlock, UserMute, SaveCollection, CollectionItem, MutedKeyword, Achievement, ACHIEVEMENT_DEFS, DEFAULT_NOTIFICATION_PREFS, CloseFriend, UserSuggestion, PushSubscription, UserBan, ProfileView, FollowRequest, UserList
 from users.security import is_login_rate_limited, record_login_attempt
@@ -3487,6 +3487,11 @@ def create_comment(request, post_id):
     if request.method == 'POST':
         vote_type = request.POST.get('vote_type')
         content = request.POST.get('content', '').strip()
+        _raw_conf = request.POST.get('confidence_score', '')
+        try:
+            confidence_score = max(1, min(10, int(_raw_conf))) if _raw_conf else None
+        except (ValueError, TypeError):
+            confidence_score = None
 
         if not vote_type or vote_type not in ['yes', 'no']:
             return handle_error('Invalid vote type')
@@ -3558,6 +3563,7 @@ def create_comment(request, post_id):
                 content=content if content else '',
                 reply_to=reply_to_comment,
                 is_anonymous=request.POST.get('is_anonymous') == '1',
+                confidence_score=confidence_score,
             )
             try:
                 _update_streak(request.user.profile)
@@ -10520,3 +10526,386 @@ def toggle_profile_privacy(request):
             Follow.objects.get_or_create(follower=freq.from_user, following=request.user)
         pending.update(status=FollowRequest.STATUS_APPROVED)
     return JsonResponse({'success': True, 'is_private': profile.is_private})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STOCK PREDICTIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@login_required
+def create_stock_prediction(request):
+    """Render/process the stock prediction creation form."""
+    categories = [{'name': c[0], 'icon': ''} for c in CATEGORY_CHOICES]
+    if request.method == 'GET':
+        return render(request, 'frontend/create_stock_prediction.html', {'categories': categories})
+
+    # POST
+    title = request.POST.get('title', '').strip()
+    stock_symbol = request.POST.get('stock_symbol', '').strip().upper()
+    stock_name = request.POST.get('stock_name', '').strip()
+    target_price_raw = request.POST.get('target_price', '').strip()
+    target_date_raw = request.POST.get('target_date', '').strip()
+    direction = request.POST.get('direction', '').strip()
+    entry_price_raw = request.POST.get('entry_price', '').strip()
+    category = request.POST.get('category', '').strip()
+    hashtags_raw = request.POST.get('hashtags', '').strip()
+
+    errors = []
+    if not title:
+        errors.append('Question title is required.')
+    if not stock_symbol:
+        errors.append('Stock symbol is required.')
+    if not target_price_raw:
+        errors.append('Target price is required.')
+    if not target_date_raw:
+        errors.append('Target date is required.')
+    if direction not in ('above', 'below'):
+        errors.append('Prediction direction is required.')
+    if not category:
+        errors.append('Category is required.')
+
+    try:
+        target_price = float(target_price_raw)
+        if target_price <= 0:
+            errors.append('Target price must be positive.')
+    except (ValueError, TypeError):
+        errors.append('Invalid target price.')
+        target_price = 0
+
+    try:
+        from datetime import date
+        target_date = date.fromisoformat(target_date_raw)
+        if target_date <= timezone.now().date():
+            errors.append('Target date must be in the future.')
+    except (ValueError, TypeError):
+        errors.append('Invalid target date.')
+        target_date = None
+
+    entry_price = None
+    if entry_price_raw:
+        try:
+            entry_price = float(entry_price_raw)
+        except (ValueError, TypeError):
+            pass
+
+    if errors:
+        for err in errors:
+            messages.error(request, err)
+        return render(request, 'frontend/create_stock_prediction.html', {'categories': categories})
+
+    if check_content_moderation(title):
+        messages.error(request, 'Your post contains abusive language.')
+        return render(request, 'frontend/create_stock_prediction.html', {'categories': categories})
+
+    hashtag_list = Post.parse_hashtags(hashtags_raw, max_tags=5)
+
+    yes_label = 'Bullish 🐂'
+    no_label = 'Bearish 🐻'
+
+    post = Post.objects.create(
+        id=str(uuid.uuid4()),
+        user=request.user,
+        title=title,
+        content='',
+        category=category or 'Investment',
+        hashtags=', '.join(hashtag_list),
+        post_type=Post.POST_TYPE_STOCK,
+        yes_label=yes_label,
+        no_label=no_label,
+    )
+
+    StockPrediction.objects.create(
+        post=post,
+        stock_symbol=stock_symbol,
+        stock_name=stock_name,
+        target_price=target_price,
+        target_date=target_date,
+        direction=direction,
+        entry_price=entry_price,
+    )
+
+    return redirect('stock_prediction_detail', post_id=post.id)
+
+
+def stock_prediction_detail(request, post_id):
+    """Detail page for a stock prediction — mirrors discussion view."""
+    post = get_object_or_404(Post, id=post_id, post_type=Post.POST_TYPE_STOCK)
+    try:
+        sp = post.stock_prediction
+    except StockPrediction.DoesNotExist:
+        from django.http import Http404
+        raise Http404
+
+    is_post_creator = request.user.is_authenticated and request.user == post.user
+
+    _comment_order = ['-likes', 'created_at']
+    comments = Comment.objects.filter(post=post).select_related('user', 'user__profile')
+    visible_comments = comments.exclude(is_deleted_by_moderation=True)
+
+    bullish_comments = visible_comments.filter(vote_type='yes').order_by(*_comment_order)
+    bearish_comments = visible_comments.filter(vote_type='no').order_by(*_comment_order)
+
+    bull_count = comments.filter(vote_type='yes').count()
+    bear_count = comments.filter(vote_type='no').count()
+    total = bull_count + bear_count
+    bull_pct = round(bull_count / total * 100, 1) if total else 0
+    bear_pct = round(100 - bull_pct, 1) if total else 0
+
+    # Confidence averages
+    from django.db.models import Avg
+    bull_conf_avg = comments.filter(vote_type='yes', confidence_score__isnull=False).aggregate(a=Avg('confidence_score'))['a']
+    bear_conf_avg = comments.filter(vote_type='no', confidence_score__isnull=False).aggregate(a=Avg('confidence_score'))['a']
+    bull_conf_avg = round(float(bull_conf_avg), 1) if bull_conf_avg else None
+    bear_conf_avg = round(float(bear_conf_avg), 1) if bear_conf_avg else None
+
+    user_comment = None
+    user_has_voted = False
+    user_vote_type = None
+    user_confidence = None
+    if request.user.is_authenticated:
+        user_comment = Comment.objects.filter(post=post, user=request.user).first()
+        if user_comment:
+            user_has_voted = True
+            user_vote_type = user_comment.vote_type
+            user_confidence = user_comment.confidence_score
+
+    # Mark top comments
+    top_bull = bullish_comments.first()
+    top_bear = bearish_comments.first()
+
+    # Check if moderator
+    moderator_usernames = {
+        str(n).strip().lower()
+        for n in (getattr(__import__('django.conf', fromlist=['settings']).conf.settings, 'MODERATOR_USERNAMES', []) or [])
+        if str(n).strip()
+    }
+    is_moderator = request.user.is_authenticated and request.user.username.lower() in moderator_usernames
+
+    context = {
+        'post': post,
+        'sp': sp,
+        'is_post_creator': is_post_creator,
+        'is_moderator': is_moderator,
+        'bullish_comments': bullish_comments,
+        'bearish_comments': bearish_comments,
+        'bull_count': bull_count,
+        'bear_count': bear_count,
+        'total_votes': total,
+        'bull_pct': bull_pct,
+        'bear_pct': bear_pct,
+        'bull_conf_avg': bull_conf_avg,
+        'bear_conf_avg': bear_conf_avg,
+        'user_has_voted': user_has_voted,
+        'user_vote_type': user_vote_type,
+        'user_confidence': user_confidence,
+        'top_bull_id': top_bull.id if top_bull else None,
+        'top_bear_id': top_bear.id if top_bear else None,
+    }
+    return render(request, 'frontend/stock_prediction.html', context)
+
+
+@login_required
+def create_stock_comment(request, post_id):
+    """Vote + comment on a stock prediction (Bullish or Bearish)."""
+    post = get_object_or_404(Post, id=post_id, post_type=Post.POST_TYPE_STOCK)
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    def _payload():
+        bc = post.comments.filter(vote_type='yes').count()
+        nc = post.comments.filter(vote_type='no').count()
+        total = bc + nc
+        return {
+            'success': True,
+            'bull_count': bc,
+            'bear_count': nc,
+            'bull_pct': round(bc / total * 100, 1) if total else 0,
+            'bear_pct': round(nc / total * 100, 1) if total else 0,
+            'reload_required': True,
+        }
+
+    def _err(msg, status=400):
+        if is_ajax:
+            return JsonResponse({'success': False, 'error': msg}, status=status)
+        messages.error(request, msg)
+        return redirect('stock_prediction_detail', post_id=post_id)
+
+    if request.method != 'POST':
+        return _err('Method not allowed.', 405)
+
+    vote_type = request.POST.get('vote_type')
+    content = request.POST.get('content', '').strip()
+    _rc = request.POST.get('confidence_score', '')
+    try:
+        confidence = max(1, min(10, int(_rc))) if _rc else 5
+    except (ValueError, TypeError):
+        confidence = 5
+
+    if vote_type not in ('yes', 'no'):
+        return _err('Invalid side selected.')
+
+    if content and check_content_moderation(content):
+        return _err('Your comment contains abusive language.')
+
+    existing = Comment.objects.filter(post=post, user=request.user).first()
+    if existing:
+        if existing.content:
+            return _err('You have already commented on this prediction.')
+        existing.vote_type = vote_type
+        existing.confidence_score = confidence
+        if content:
+            existing.content = content
+        existing.save(update_fields=['vote_type', 'confidence_score', 'content', 'updated_at'])
+        if is_ajax:
+            return JsonResponse(_payload())
+        return redirect('stock_prediction_detail', post_id=post_id)
+
+    Comment.objects.create(
+        id=str(uuid.uuid4()),
+        post=post,
+        user=request.user,
+        vote_type=vote_type,
+        content=content,
+        confidence_score=confidence,
+        is_anonymous=request.POST.get('is_anonymous') == '1',
+    )
+    try:
+        _update_streak(request.user.profile)
+    except Exception:
+        pass
+
+    if is_ajax:
+        return JsonResponse(_payload())
+    return redirect('stock_prediction_detail', post_id=post_id)
+
+
+@login_required
+def resolve_stock_prediction(request, post_id):
+    """Admin/creator resolves the prediction with the actual stock price."""
+    post = get_object_or_404(Post, id=post_id, post_type=Post.POST_TYPE_STOCK)
+    sp = get_object_or_404(StockPrediction, post=post)
+
+    moderator_usernames = {
+        str(n).strip().lower()
+        for n in (getattr(__import__('django.conf', fromlist=['settings']).conf.settings, 'MODERATOR_USERNAMES', []) or [])
+        if str(n).strip()
+    }
+    is_moderator = request.user.username.lower() in moderator_usernames
+    if not (request.user == post.user or is_moderator):
+        return JsonResponse({'success': False, 'error': 'Not authorised.'}, status=403)
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required.'}, status=405)
+
+    raw_price = request.POST.get('resolved_price', '').strip()
+    try:
+        resolved_price = float(raw_price)
+        if resolved_price <= 0:
+            raise ValueError
+    except (ValueError, TypeError):
+        return JsonResponse({'success': False, 'error': 'Invalid price.'}, status=400)
+
+    outcome = sp.compute_outcome(resolved_price)
+    sp.status = StockPrediction.STATUS_RESOLVED
+    sp.outcome = outcome
+    sp.resolved_price = resolved_price
+    sp.resolved_at = timezone.now()
+    sp.resolved_by = request.user
+    sp.save()
+
+    return JsonResponse({
+        'success': True,
+        'outcome': outcome,
+        'resolved_price': resolved_price,
+        'redirect_url': f'/stocks/{post_id}/',
+    })
+
+
+def stocks_list(request):
+    """Browse all stock predictions."""
+    status_filter = request.GET.get('status', 'active')
+    symbol_filter = request.GET.get('symbol', '').strip().upper()
+
+    qs = StockPrediction.objects.select_related('post', 'post__user', 'post__user__profile')
+    if status_filter in ('active', 'resolved', 'expired'):
+        qs = qs.filter(status=status_filter)
+    if symbol_filter:
+        qs = qs.filter(stock_symbol__icontains=symbol_filter)
+
+    # Annotate with vote counts
+    from django.db.models import Count
+    qs = qs.annotate(
+        bull_count=Count('post__comments', filter=Q(post__comments__vote_type='yes')),
+        bear_count=Count('post__comments', filter=Q(post__comments__vote_type='no')),
+    ).order_by('-created_at')
+
+    paginator = Paginator(qs, 20)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    return render(request, 'frontend/stocks_list.html', {
+        'page_obj': page_obj,
+        'status_filter': status_filter,
+        'symbol_filter': symbol_filter,
+    })
+
+
+def stock_leaderboard(request):
+    """Accuracy leaderboard for stock predictors."""
+    from django.db.models import Count, Q, Case, When, FloatField, Value
+    from django.db.models.functions import Cast
+
+    resolved_sps = StockPrediction.objects.filter(status=StockPrediction.STATUS_RESOLVED).values_list('post_id', 'outcome')
+    resolved_map = {pid: outcome for pid, outcome in resolved_sps}
+
+    if not resolved_map:
+        return render(request, 'frontend/stock_leaderboard.html', {'leaderboard': [], 'total_resolved': 0})
+
+    comments = Comment.objects.filter(
+        post_id__in=resolved_map.keys()
+    ).select_related('user', 'user__profile').values(
+        'user_id', 'user__username', 'post_id', 'vote_type', 'confidence_score'
+    )
+
+    from collections import defaultdict
+    user_stats = defaultdict(lambda: {'username': '', 'total': 0, 'correct': 0, 'weighted_sum': 0, 'weighted_total': 0, 'avatar': ''})
+
+    for c in comments:
+        uid = c['user_id']
+        uname = c['user__username']
+        outcome = resolved_map.get(c['post_id'], '')
+        correct = (c['vote_type'] == 'yes' and outcome == StockPrediction.OUTCOME_BULLISH) or \
+                  (c['vote_type'] == 'no' and outcome == StockPrediction.OUTCOME_BEARISH)
+        conf = c['confidence_score'] or 5
+        user_stats[uid]['username'] = uname
+        user_stats[uid]['total'] += 1
+        if correct:
+            user_stats[uid]['correct'] += 1
+        user_stats[uid]['weighted_sum'] += conf if correct else 0
+        user_stats[uid]['weighted_total'] += conf
+
+    # Get avatars
+    profiles = {p.user_id: p for p in __import__('users.models', fromlist=['Profile']).Profile.objects.filter(user_id__in=user_stats.keys())}
+
+    leaderboard = []
+    for uid, stats in user_stats.items():
+        if stats['total'] == 0:
+            continue
+        accuracy = round(stats['correct'] / stats['total'] * 100, 1)
+        weighted = round(stats['weighted_sum'] / stats['weighted_total'] * 100, 1) if stats['weighted_total'] else 0
+        profile = profiles.get(uid)
+        leaderboard.append({
+            'username': stats['username'],
+            'total': stats['total'],
+            'correct': stats['correct'],
+            'accuracy': accuracy,
+            'weighted_accuracy': weighted,
+            'avatar': profile.get_picture_url if profile else '',
+        })
+
+    leaderboard.sort(key=lambda x: (-x['weighted_accuracy'], -x['accuracy'], -x['total']))
+    leaderboard = leaderboard[:50]
+
+    total_resolved = len(resolved_map)
+    return render(request, 'frontend/stock_leaderboard.html', {
+        'leaderboard': leaderboard,
+        'total_resolved': total_resolved,
+    })
