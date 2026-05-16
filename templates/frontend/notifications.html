@@ -1006,7 +1006,7 @@
                             <div class="nf-debate-actions">
                                 {% if debate.user_can_view_chat %}
                                 <button
-                                    onclick="openDebateChat('{{ debate.id }}', '{{ debate.post.title|escapejs }}', '{% if user == debate.initiator %}{{ debate.target.username|escapejs }}{% else %}{{ debate.initiator.username|escapejs }}{% endif %}', {{ debate.yes_supporters }}, {{ debate.no_supporters }}, {% if debate.user_is_active_participant %}true{% else %}false{% endif %}, {% if debate.user_can_end %}true{% else %}false{% endif %}, '{{ debate.status }}', {% if debate.user_can_post %}true{% else %}false{% endif %}, {% if debate.user_can_rejoin %}true{% else %}false{% endif %}, {% if debate.user_is_view_only %}true{% else %}false{% endif %}, {% if debate.user_can_moderate %}true{% else %}false{% endif %})"
+                                    onclick="openDebateChat('{{ debate.id }}')"
                                     class="nf-button"
                                 >
                                     {% if debate.status == 'completed' or debate.user_is_view_only %}View Conversation{% else %}Open Chat{% endif %}
@@ -1302,27 +1302,8 @@ function moderateProfileReport(reportId, action, triggerBtn) {
     }
 })();
 
-function openDebateChat(debateId, title, opponent, yesSupp, noSupp, userIsActive = true, canEndChat = false, debateStatus = 'accepted', canPost = true, canRejoin = false, isViewOnly = false, canModerate = false) {
-    if (window.innerWidth >= 768) {
-        // Desktop: open floating panel
-        ChatManager.openWithData({
-            id: String(debateId),
-            title: title,
-            opponent: opponent,
-            yes_supporters: yesSupp,
-            no_supporters: noSupp,
-            user_is_active: !!userIsActive,
-            can_post: !!canPost,
-            can_rejoin: !!canRejoin,
-            is_view_only: !!isViewOnly,
-            can_moderate_chat: !!canModerate,
-            can_end_chat: !!canEndChat,
-            debate_status: debateStatus || 'accepted'
-        });
-    } else {
-        // Mobile: navigate to full-page chat
-        window.location.href = '/debates/' + debateId + '/chat/';
-    }
+function openDebateChat(debateId) {
+    window.location.href = '/debates/' + debateId + '/chat/';
 }
 
 function openDebateCountsModal() {
@@ -1385,17 +1366,13 @@ function openDebateCountsModal() {
 }
 
 function _openAcceptedDebateChat(debateId) {
-    if (window.innerWidth >= 768 && window.ChatManager) {
-        window.ChatManager.open(String(debateId));
-    } else if (window.innerWidth < 768) {
-        window.location.href = '/debates/' + debateId + '/chat/';
-    }
+    window.location.href = '/debates/' + debateId + '/chat/';
 }
 
 function _markDebateRowAccepted(debateId) {
     const actionsEl = document.getElementById('debate-actions-' + debateId);
     if (actionsEl) {
-        actionsEl.outerHTML = '<div class="nf-debate-actions"><button type="button" onclick="window.ChatManager && window.ChatManager.open(\'' + debateId + '\')" class="nf-button">Open Chat</button></div>';
+        actionsEl.outerHTML = '<div class="nf-debate-actions"><button type="button" onclick="openDebateChat(\'' + debateId + '\')" class="nf-button">Open Chat</button></div>';
     }
     const statusEl = document.getElementById('debate-status-' + debateId);
     if (statusEl) {
