@@ -4,7 +4,7 @@ class ContentSecurityPolicyMiddleware:
     The policy is intentionally permissive for inline scripts/styles because
     the app uses extensive inline JS and CSS via Tailwind + Django templates.
     The critical wins are:
-      - frame-ancestors 'none'  → clickjacking protection (supersedes X-Frame-Options)
+      - frame-ancestors 'self'  → clickjacking protection; allows same-origin iframes (chat panel)
       - object-src 'none'       → blocks Flash/plugin attacks
       - base-uri 'self'         → prevents <base> tag injection
       - block-all-mixed-content → forces HTTPS sub-resources
@@ -20,8 +20,8 @@ class ContentSecurityPolicyMiddleware:
         "img-src 'self' data: blob: *",
         "media-src 'self' blob:",
         "connect-src 'self' tenor.googleapis.com",
-        "frame-src 'none'",
-        "frame-ancestors 'none'",
+        "frame-src 'self'",
+        "frame-ancestors 'self'",
         "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",
