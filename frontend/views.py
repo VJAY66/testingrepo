@@ -10808,7 +10808,8 @@ def stock_prediction_detail(request, post_id):
 def create_stock_comment(request, post_id):
     """Vote + comment on a stock prediction (Bullish or Bearish)."""
     post = get_object_or_404(Post, id=post_id, post_type=Post.POST_TYPE_STOCK)
-    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    is_json = request.content_type == 'application/json'
+    is_ajax = is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
     def _payload():
         bc = post.comments.filter(vote_type='yes').count()
@@ -10832,9 +10833,22 @@ def create_stock_comment(request, post_id):
     if request.method != 'POST':
         return _err('Method not allowed.', 405)
 
-    vote_type = request.POST.get('vote_type')
-    content = request.POST.get('content', '').strip()
-    _rc = request.POST.get('confidence_score', '')
+    if is_json:
+        import json as _json
+        try:
+            body = _json.loads(request.body)
+        except (ValueError, TypeError):
+            body = {}
+        vote_type = body.get('vote_type')
+        content = (body.get('content') or '').strip()
+        _rc = body.get('confidence_score', '')
+        is_anon = bool(body.get('is_anonymous', False))
+    else:
+        vote_type = request.POST.get('vote_type')
+        content = request.POST.get('content', '').strip()
+        _rc = request.POST.get('confidence_score', '')
+        is_anon = request.POST.get('is_anonymous') == '1'
+
     try:
         confidence = max(1, min(10, int(_rc))) if _rc else 5
     except (ValueError, TypeError):
@@ -10866,7 +10880,7 @@ def create_stock_comment(request, post_id):
         vote_type=vote_type,
         content=content,
         confidence_score=confidence,
-        is_anonymous=request.POST.get('is_anonymous') == '1',
+        is_anonymous=is_anon,
     )
     try:
         _update_streak(request.user.profile)
