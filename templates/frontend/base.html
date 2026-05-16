@@ -3306,7 +3306,14 @@ function acceptCookies() {
             }, 700);
         }
 
+        // Tracks in-flight post actions to prevent duplicate requests on rapid clicks.
+        const _postActionInFlight = new Set();
+
         function handlePostAction(postId, action) {
+            const key = `${postId}:${action}`;
+            if (_postActionInFlight.has(key)) return;
+            _postActionInFlight.add(key);
+
             fetch(`/posts/${encodeURIComponent(postId)}/action/`, {
                 method: 'POST',
                 headers: {
@@ -3343,6 +3350,9 @@ function acceptCookies() {
             })
             .catch((error) => {
                 console.warn('Post action failed:', error.message || error);
+            })
+            .finally(() => {
+                _postActionInFlight.delete(key);
             });
         }
 
