@@ -10656,14 +10656,25 @@ def create_stock_prediction(request):
     if not title:
         errors.append('Could not generate a title — please fill in all fields.')
 
+    _form_data = {
+        'stock_symbol': stock_symbol,
+        'stock_name': stock_name,
+        'currency': currency,
+        'direction': direction,
+        'target_price': target_price_raw,
+        'target_date': target_date_raw,
+        'entry_price': entry_price_raw,
+        'hashtags': hashtags_raw,
+    }
+
     if errors:
         for err in errors:
             messages.error(request, err)
-        return render(request, 'frontend/create_stock_prediction.html', {})
+        return render(request, 'frontend/create_stock_prediction.html', {'form_data': _form_data})
 
     if check_content_moderation(title):
         messages.error(request, 'Your post contains abusive language.')
-        return render(request, 'frontend/create_stock_prediction.html', {})
+        return render(request, 'frontend/create_stock_prediction.html', {'form_data': _form_data})
 
     hashtag_list = Post.parse_hashtags(hashtags_raw, max_tags=5)
 

@@ -52,7 +52,7 @@
                         Currency <span class="text-red-500">*</span>
                     </label>
                     <!-- Hidden real input submitted with form -->
-                    <input type="hidden" id="id_currency" name="currency" value="USD">
+                    <input type="hidden" id="id_currency" name="currency" value="{{ form_data.currency|default:'USD' }}">
                     <!-- Trigger button -->
                     <button type="button" id="curr-trigger"
                             onclick="toggleCurrencyDropdown()"
@@ -87,6 +87,7 @@
                                 maxlength="10"
                                 autocomplete="off"
                                 placeholder="AAPL, TSLA, RELIANCE…"
+                                value="{{ form_data.stock_symbol }}"
                                 class="w-full rounded-xl border border-border bg-background/70 px-3.5 py-2.5 pr-12 text-sm font-bold text-foreground uppercase tracking-widest placeholder:normal-case placeholder:tracking-normal placeholder:font-normal placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
                                 style="text-transform:uppercase;"
                                 oninput="this.value=this.value.toUpperCase();updatePreview()"
@@ -103,6 +104,7 @@
                             id="id_stock_name"
                             name="stock_name"
                             placeholder="Apple Inc. (optional)"
+                            value="{{ form_data.stock_name }}"
                             class="w-full rounded-xl border border-border bg-background/70 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
                         >
                     </div>
@@ -160,6 +162,7 @@
                                 min="0.0001"
                                 step="0.0001"
                                 placeholder="200.00"
+                                value="{{ form_data.target_price }}"
                                 class="w-full rounded-xl border border-border bg-background/70 pl-7 pr-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
                                 oninput="updatePreview()"
                             >
@@ -174,6 +177,7 @@
                             id="id_target_date"
                             name="target_date"
                             required
+                            value="{{ form_data.target_date }}"
                             class="w-full rounded-xl border border-border bg-background/70 px-3.5 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
                             oninput="validateFutureDate(this);updatePreview()"
                         >
@@ -196,6 +200,7 @@
                         step="0.0001"
                         min="0"
                         placeholder="150.0000"
+                        value="{{ form_data.entry_price }}"
                         class="w-full rounded-xl border border-border bg-background/70 pl-7 pr-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
                     >
                 </div>
@@ -212,6 +217,7 @@
                     id="id_hashtags"
                     name="hashtags"
                     placeholder="#Tech #Earnings #LongTerm"
+                    value="{{ form_data.hashtags }}"
                     class="w-full rounded-xl border border-border bg-background/70 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
                 >
                 <p class="text-[11px] text-muted-foreground mt-1">Separate with spaces. e.g. #FAANG #Semiconductors</p>
@@ -537,6 +543,17 @@ document.getElementById('spf-form').addEventListener('submit', function(e) {
         tomorrow.setDate(tomorrow.getDate() + 1);
         inp.min = tomorrow.toISOString().split('T')[0];
     }
+})();
+
+// ── Restore form state after validation error ────────────────
+(function() {
+    {% if form_data.direction %}
+    selectDirection('{{ form_data.direction }}');
+    {% endif %}
+    {% if form_data.currency and form_data.currency != 'USD' %}
+    selectCurrency('{{ form_data.currency }}');
+    {% endif %}
+    updatePreview();
 })();
 </script>
 {% endblock %}
