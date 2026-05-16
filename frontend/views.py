@@ -2640,6 +2640,7 @@ def notifications(request):
     # In-app notifications grouped by type
     raw_notifs = list(
         Notification.objects.filter(user=request.user)
+        .select_related('post')
         .order_by('notification_type', '-created_at')
     )
     # Group by notification_type
