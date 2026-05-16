@@ -1248,6 +1248,10 @@ def discussion(request, post_id):
         messages.error(request, 'This discussion is no longer available.')
         return redirect('index')
 
+    # Stock predictions have their own dedicated detail page.
+    if post.post_type == Post.POST_TYPE_STOCK:
+        return redirect('stock_prediction_detail', post_id=post_id)
+
     # Keep detail-page counters and action state in sync with home/suggested feeds.
     _enrich_posts_for_feed([post], request.user)
 
