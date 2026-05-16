@@ -46,30 +46,32 @@
             <!-- ── Stock symbol + name + currency ─────────────── -->
             <div class="rounded-xl border border-border bg-background/50 p-4 space-y-3">
                 <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Stock Details</p>
-                <!-- Currency selector (full width) -->
+                <!-- Currency searchable dropdown -->
                 <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5" for="id_currency">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
                         Currency <span class="text-red-500">*</span>
                     </label>
-                    <select id="id_currency" name="currency" required onchange="updatePreview()"
-                            class="w-full rounded-xl border border-border bg-background/70 px-3.5 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition">
-                        <option value="USD">$ USD — US Dollar</option>
-                        <option value="INR">₹ INR — Indian Rupee</option>
-                        <option value="EUR">€ EUR — Euro</option>
-                        <option value="GBP">£ GBP — British Pound</option>
-                        <option value="JPY">¥ JPY — Japanese Yen</option>
-                        <option value="CNY">¥ CNY — Chinese Yuan</option>
-                        <option value="AUD">A$ AUD — Australian Dollar</option>
-                        <option value="CAD">C$ CAD — Canadian Dollar</option>
-                        <option value="SGD">S$ SGD — Singapore Dollar</option>
-                        <option value="HKD">HK$ HKD — Hong Kong Dollar</option>
-                        <option value="BRL">R$ BRL — Brazilian Real</option>
-                        <option value="KRW">₩ KRW — South Korean Won</option>
-                        <option value="TRY">₺ TRY — Turkish Lira</option>
-                        <option value="MXN">MX$ MXN — Mexican Peso</option>
-                        <option value="BTC">₿ BTC — Bitcoin</option>
-                        <option value="ETH">Ξ ETH — Ethereum</option>
-                    </select>
+                    <!-- Hidden real input submitted with form -->
+                    <input type="hidden" id="id_currency" name="currency" value="USD">
+                    <!-- Trigger button -->
+                    <button type="button" id="curr-trigger"
+                            onclick="toggleCurrencyDropdown()"
+                            class="w-full flex items-center justify-between rounded-xl border border-border bg-background/70 px-3.5 py-2.5 text-sm text-foreground outline-none hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/15 transition text-left">
+                        <span id="curr-display" class="font-semibold">$ USD — US Dollar</span>
+                        <svg class="w-4 h-4 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <!-- Dropdown panel -->
+                    <div id="curr-dropdown" class="hidden absolute z-50 mt-1 w-full max-w-sm rounded-xl border border-border bg-card shadow-xl overflow-hidden" style="max-height:320px;">
+                        <!-- Search input -->
+                        <div class="p-2 border-b border-border bg-muted/30">
+                            <input type="text" id="curr-search" placeholder="Search currency or country…"
+                                   oninput="filterCurrencies(this.value)"
+                                   class="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition"
+                                   autocomplete="off">
+                        </div>
+                        <!-- List -->
+                        <div id="curr-list" class="overflow-y-auto" style="max-height:260px;"></div>
+                    </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
@@ -289,21 +291,186 @@ function validateFutureDate(input) {
     }
 }
 
-// ── Currency symbol map ──────────────────────────────────────
-var CURRENCY_SYMBOLS = {
-    USD:'$', INR:'₹', EUR:'€', GBP:'£', JPY:'¥', CNY:'¥',
-    AUD:'A$', CAD:'C$', SGD:'S$', HKD:'HK$', BRL:'R$',
-    KRW:'₩', TRY:'₺', MXN:'MX$', BTC:'₿', ETH:'Ξ'
-};
-function getCurrencySym() {
-    var sel = document.getElementById('id_currency');
-    return sel ? (CURRENCY_SYMBOLS[sel.value] || sel.value) : '$';
+// ── Searchable currency dropdown ─────────────────────────────
+var ALL_CURRENCIES = [
+    // Americas
+    {code:'USD', sym:'$',      label:'$ USD — US Dollar'},
+    {code:'CAD', sym:'C$',     label:'C$ CAD — Canadian Dollar'},
+    {code:'MXN', sym:'MX$',    label:'MX$ MXN — Mexican Peso'},
+    {code:'BRL', sym:'R$',     label:'R$ BRL — Brazilian Real'},
+    {code:'ARS', sym:'ARS$',   label:'ARS$ ARS — Argentine Peso'},
+    {code:'CLP', sym:'CLP$',   label:'CLP$ CLP — Chilean Peso'},
+    {code:'COP', sym:'COP$',   label:'COP$ COP — Colombian Peso'},
+    {code:'PEN', sym:'S/',     label:'S/ PEN — Peruvian Sol'},
+    {code:'UYU', sym:'$U',     label:'$U UYU — Uruguayan Peso'},
+    {code:'BOB', sym:'Bs.',    label:'Bs. BOB — Bolivian Boliviano'},
+    {code:'PYG', sym:'₲',      label:'₲ PYG — Paraguayan Guaraní'},
+    {code:'GTQ', sym:'Q',      label:'Q GTQ — Guatemalan Quetzal'},
+    {code:'CRC', sym:'₡',      label:'₡ CRC — Costa Rican Colón'},
+    {code:'DOP', sym:'RD$',    label:'RD$ DOP — Dominican Peso'},
+    {code:'JMD', sym:'J$',     label:'J$ JMD — Jamaican Dollar'},
+    {code:'TTD', sym:'TT$',    label:'TT$ TTD — Trinidad Dollar'},
+    // Europe
+    {code:'EUR', sym:'€',      label:'€ EUR — Euro'},
+    {code:'GBP', sym:'£',      label:'£ GBP — British Pound'},
+    {code:'CHF', sym:'Fr',     label:'Fr CHF — Swiss Franc'},
+    {code:'NOK', sym:'kr',     label:'kr NOK — Norwegian Krone'},
+    {code:'SEK', sym:'kr',     label:'kr SEK — Swedish Krona'},
+    {code:'DKK', sym:'kr',     label:'kr DKK — Danish Krone'},
+    {code:'PLN', sym:'zł',     label:'zł PLN — Polish Złoty'},
+    {code:'CZK', sym:'Kč',     label:'Kč CZK — Czech Koruna'},
+    {code:'HUF', sym:'Ft',     label:'Ft HUF — Hungarian Forint'},
+    {code:'RON', sym:'lei',    label:'lei RON — Romanian Leu'},
+    {code:'TRY', sym:'₺',      label:'₺ TRY — Turkish Lira'},
+    {code:'RUB', sym:'₽',      label:'₽ RUB — Russian Ruble'},
+    {code:'UAH', sym:'₴',      label:'₴ UAH — Ukrainian Hryvnia'},
+    {code:'GEL', sym:'₾',      label:'₾ GEL — Georgian Lari'},
+    {code:'ISK', sym:'kr',     label:'kr ISK — Icelandic Króna'},
+    {code:'BGN', sym:'лв',     label:'лв BGN — Bulgarian Lev'},
+    {code:'HRK', sym:'kn',     label:'kn HRK — Croatian Kuna'},
+    {code:'RSD', sym:'din',    label:'din RSD — Serbian Dinar'},
+    {code:'AMD', sym:'֏',      label:'֏ AMD — Armenian Dram'},
+    {code:'AZN', sym:'₼',      label:'₼ AZN — Azerbaijani Manat'},
+    // Asia-Pacific
+    {code:'INR', sym:'₹',      label:'₹ INR — Indian Rupee'},
+    {code:'JPY', sym:'¥',      label:'¥ JPY — Japanese Yen'},
+    {code:'CNY', sym:'¥',      label:'¥ CNY — Chinese Yuan'},
+    {code:'HKD', sym:'HK$',    label:'HK$ HKD — Hong Kong Dollar'},
+    {code:'SGD', sym:'S$',     label:'S$ SGD — Singapore Dollar'},
+    {code:'AUD', sym:'A$',     label:'A$ AUD — Australian Dollar'},
+    {code:'NZD', sym:'NZ$',    label:'NZ$ NZD — New Zealand Dollar'},
+    {code:'KRW', sym:'₩',      label:'₩ KRW — South Korean Won'},
+    {code:'TWD', sym:'NT$',    label:'NT$ TWD — Taiwan Dollar'},
+    {code:'THB', sym:'฿',      label:'฿ THB — Thai Baht'},
+    {code:'MYR', sym:'RM',     label:'RM MYR — Malaysian Ringgit'},
+    {code:'IDR', sym:'Rp',     label:'Rp IDR — Indonesian Rupiah'},
+    {code:'PHP', sym:'₱',      label:'₱ PHP — Philippine Peso'},
+    {code:'VND', sym:'₫',      label:'₫ VND — Vietnamese Dong'},
+    {code:'PKR', sym:'₨',      label:'₨ PKR — Pakistani Rupee'},
+    {code:'BDT', sym:'৳',      label:'৳ BDT — Bangladeshi Taka'},
+    {code:'LKR', sym:'Rs',     label:'Rs LKR — Sri Lankan Rupee'},
+    {code:'NPR', sym:'Rs',     label:'Rs NPR — Nepalese Rupee'},
+    {code:'MMK', sym:'K',      label:'K MMK — Myanmar Kyat'},
+    {code:'KHR', sym:'៛',      label:'៛ KHR — Cambodian Riel'},
+    {code:'MNT', sym:'₮',      label:'₮ MNT — Mongolian Tugrik'},
+    {code:'KZT', sym:'₸',      label:'₸ KZT — Kazakhstani Tenge'},
+    {code:'UZS', sym:"so'm",   label:"so'm UZS — Uzbekistani Som"},
+    {code:'AFN', sym:'؋',      label:'؋ AFN — Afghan Afghani'},
+    // Middle East
+    {code:'AED', sym:'د.إ',    label:'د.إ AED — UAE Dirham'},
+    {code:'SAR', sym:'﷼',      label:'﷼ SAR — Saudi Riyal'},
+    {code:'QAR', sym:'﷼',      label:'﷼ QAR — Qatari Riyal'},
+    {code:'KWD', sym:'د.ك',    label:'د.ك KWD — Kuwaiti Dinar'},
+    {code:'BHD', sym:'.د.ب',   label:'.د.ب BHD — Bahraini Dinar'},
+    {code:'OMR', sym:'﷼',      label:'﷼ OMR — Omani Rial'},
+    {code:'JOD', sym:'JD',     label:'JD JOD — Jordanian Dinar'},
+    {code:'ILS', sym:'₪',      label:'₪ ILS — Israeli Shekel'},
+    {code:'IRR', sym:'﷼',      label:'﷼ IRR — Iranian Rial'},
+    {code:'IQD', sym:'ع.د',    label:'ع.د IQD — Iraqi Dinar'},
+    {code:'LBP', sym:'ل.ل',    label:'ل.ل LBP — Lebanese Pound'},
+    // Africa
+    {code:'ZAR', sym:'R',      label:'R ZAR — South African Rand'},
+    {code:'NGN', sym:'₦',      label:'₦ NGN — Nigerian Naira'},
+    {code:'KES', sym:'KSh',    label:'KSh KES — Kenyan Shilling'},
+    {code:'GHS', sym:'₵',      label:'₵ GHS — Ghanaian Cedi'},
+    {code:'EGP', sym:'E£',     label:'E£ EGP — Egyptian Pound'},
+    {code:'MAD', sym:'د.م.',   label:'د.م. MAD — Moroccan Dirham'},
+    {code:'DZD', sym:'دج',     label:'دج DZD — Algerian Dinar'},
+    {code:'TND', sym:'د.ت',    label:'د.ت TND — Tunisian Dinar'},
+    {code:'ETB', sym:'Br',     label:'Br ETB — Ethiopian Birr'},
+    {code:'TZS', sym:'TSh',    label:'TSh TZS — Tanzanian Shilling'},
+    {code:'UGX', sym:'USh',    label:'USh UGX — Ugandan Shilling'},
+    {code:'XOF', sym:'CFA',    label:'CFA XOF — West African CFA'},
+    {code:'XAF', sym:'FCFA',   label:'FCFA XAF — Central African CFA'},
+    {code:'MUR', sym:'₨',      label:'₨ MUR — Mauritian Rupee'},
+    {code:'ZMW', sym:'ZK',     label:'ZK ZMW — Zambian Kwacha'},
+    {code:'BWP', sym:'P',      label:'P BWP — Botswana Pula'},
+    // Crypto
+    {code:'BTC',   sym:'₿',    label:'₿ BTC — Bitcoin'},
+    {code:'ETH',   sym:'Ξ',    label:'Ξ ETH — Ethereum'},
+    {code:'USDT',  sym:'₮',    label:'₮ USDT — Tether'},
+    {code:'BNB',   sym:'BNB',  label:'BNB — Binance Coin'},
+    {code:'SOL',   sym:'SOL',  label:'SOL — Solana'},
+    {code:'XRP',   sym:'XRP',  label:'XRP — Ripple'},
+    {code:'USDC',  sym:'USDC', label:'USDC — USD Coin'},
+    {code:'ADA',   sym:'ADA',  label:'ADA — Cardano'},
+    {code:'DOGE',  sym:'Ð',    label:'Ð DOGE — Dogecoin'},
+    {code:'MATIC', sym:'MATIC',label:'MATIC — Polygon'},
+];
+
+var selectedCurrency = {code:'USD', sym:'$', label:'$ USD — US Dollar'};
+
+function getCurrencySym() { return selectedCurrency.sym; }
+
+function renderCurrencyList(items) {
+    var list = document.getElementById('curr-list');
+    if (!items.length) {
+        list.innerHTML = '<p class="px-3 py-3 text-xs text-muted-foreground text-center">No currencies found</p>';
+        return;
+    }
+    list.innerHTML = items.map(function(c) {
+        var active = c.code === selectedCurrency.code ? 'bg-primary/10 text-primary font-bold' : 'text-foreground hover:bg-muted/60';
+        return '<button type="button" onclick="selectCurrency(\'' + c.code + '\')" ' +
+               'class="w-full text-left px-4 py-2.5 text-sm transition ' + active + '">' +
+               c.label + '</button>';
+    }).join('');
 }
-document.getElementById('id_currency').addEventListener('change', function() {
-    var sym = getCurrencySym();
+
+function filterCurrencies(q) {
+    var lq = q.toLowerCase();
+    var filtered = lq ? ALL_CURRENCIES.filter(function(c) {
+        return c.label.toLowerCase().includes(lq) || c.code.toLowerCase().includes(lq);
+    }) : ALL_CURRENCIES;
+    renderCurrencyList(filtered);
+}
+
+function selectCurrency(code) {
+    var cur = ALL_CURRENCIES.find(function(c){ return c.code === code; });
+    if (!cur) return;
+    selectedCurrency = cur;
+    document.getElementById('id_currency').value = code;
+    document.getElementById('curr-display').textContent = cur.label;
     var prefix = document.getElementById('entry-price-prefix');
-    if (prefix) prefix.textContent = sym;
+    if (prefix) prefix.textContent = cur.sym;
+    closeCurrencyDropdown();
     updatePreview();
+}
+
+function toggleCurrencyDropdown() {
+    var dd = document.getElementById('curr-dropdown');
+    var isHidden = dd.classList.contains('hidden');
+    if (isHidden) {
+        dd.classList.remove('hidden');
+        renderCurrencyList(ALL_CURRENCIES);
+        setTimeout(function(){ document.getElementById('curr-search').focus(); }, 50);
+    } else {
+        closeCurrencyDropdown();
+    }
+}
+
+function closeCurrencyDropdown() {
+    document.getElementById('curr-dropdown').classList.add('hidden');
+    document.getElementById('curr-search').value = '';
+}
+
+// Close when clicking outside
+document.addEventListener('click', function(e) {
+    var trigger = document.getElementById('curr-trigger');
+    var dd = document.getElementById('curr-dropdown');
+    if (!trigger.contains(e.target) && !dd.contains(e.target)) {
+        closeCurrencyDropdown();
+    }
+});
+
+// Position dropdown relative to trigger
+document.getElementById('curr-trigger').addEventListener('click', function() {
+    var dd = document.getElementById('curr-dropdown');
+    if (!dd.classList.contains('hidden')) return;
+    var rect = this.getBoundingClientRect();
+    dd.style.width = rect.width + 'px';
+    dd.style.left = rect.left + 'px';
+    dd.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+    dd.style.position = 'absolute';
 });
 
 // ── Live preview sentence ────────────────────────────────────
