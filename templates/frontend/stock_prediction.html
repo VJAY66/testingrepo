@@ -175,10 +175,11 @@
                     <strong class="text-primary font-black mx-0.5" style="font-family:'Playfair Display',serif;">{{ sp.stock_symbol }}</strong>
                     will go
                     {% if sp.direction == 'up' or sp.direction == 'above' %}
-                    <strong class="font-black" style="color:hsl(142 65% 38%);">▲ Up {{ sp.predicted_change_pct|floatformat:2 }}%</strong>
+                    <strong class="font-black" style="color:hsl(142 65% 38%);">▲ Up</strong>
                     {% else %}
-                    <strong class="font-black" style="color:hsl(346 65% 44%);">▼ Down {{ sp.predicted_change_pct|floatformat:2 }}%</strong>
+                    <strong class="font-black" style="color:hsl(346 65% 44%);">▼ Down</strong>
                     {% endif %}
+                    to <strong class="font-black text-foreground">{{ sp.target_price }} {{ sp.currency }}</strong>
                     by <strong class="text-foreground">{{ sp.target_date|date:"M j, Y" }}</strong>
                 </p>
                 {% if sp.days_remaining is not None and sp.status == 'active' %}

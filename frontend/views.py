@@ -10638,9 +10638,18 @@ def create_stock_prediction(request):
         except (ValueError, TypeError):
             pass
 
-    # Auto-fetch entry price if not provided
-    if not entry_price and stock_symbol:
-        entry_price = _fetch_live_price(stock_symbol)
+    # Auto-fetch entry price if not provided; also validates the symbol
+    fetched_price = None
+    if stock_symbol:
+        fetched_price = _fetch_live_price(stock_symbol)
+    if not entry_price:
+        if fetched_price:
+            entry_price = fetched_price
+        elif stock_symbol and not errors:
+            errors.append(
+                f"Could not find a live price for '{stock_symbol}'. "
+                "Please verify the ticker symbol is correct, or enter the current price manually."
+            )
 
     # Compute predicted_change_pct from entry price and target price
     predicted_change_pct = None
