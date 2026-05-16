@@ -45,6 +45,7 @@ urlpatterns = [
     path('stocks/<str:post_id>/', views.stock_prediction_detail, name='stock_prediction_detail'),
     path('stocks/<str:post_id>/resolve/', views.resolve_stock_prediction, name='resolve_stock_prediction'),
     path('stocks/<str:post_id>/comment/', views.create_stock_comment, name='create_stock_comment'),
+    path('stocks/<str:post_id>/live-price/', views.fetch_live_stock_price, name='fetch_live_stock_price'),
     path('profile/remove-follower/', views.remove_follower, name='remove_follower'),
     path('posts/<str:post_id>/action/', views.post_action, name='post_action'),
     path('posts/<str:post_id>/likes/', views.post_likes, name='post_likes'),

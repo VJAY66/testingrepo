@@ -1308,11 +1308,15 @@ class PostReminder(models.Model):
 
 
 class StockPrediction(models.Model):
+    DIRECTION_UP = 'up'
+    DIRECTION_DOWN = 'down'
     DIRECTION_ABOVE = 'above'
     DIRECTION_BELOW = 'below'
     DIRECTION_CHOICES = [
-        (DIRECTION_ABOVE, 'Above (will exceed target)'),
-        (DIRECTION_BELOW, 'Below (will fall under target)'),
+        ('up', 'Up (price will rise by predicted %)'),
+        ('down', 'Down (price will fall by predicted %)'),
+        ('above', 'Above (will exceed absolute target price)'),
+        ('below', 'Below (will fall under absolute target price)'),
     ]
     STATUS_ACTIVE = 'active'
     STATUS_RESOLVED = 'resolved'
@@ -1322,25 +1326,31 @@ class StockPrediction(models.Model):
         (STATUS_RESOLVED, 'Resolved'),
         (STATUS_EXPIRED, 'Expired'),
     ]
+    OUTCOME_CORRECT = 'bullish_correct'   # prediction was right
+    OUTCOME_WRONG = 'bearish_correct'     # prediction was wrong
     OUTCOME_BULLISH = 'bullish_correct'
     OUTCOME_BEARISH = 'bearish_correct'
     OUTCOME_CHOICES = [
         ('', 'Pending'),
-        (OUTCOME_BULLISH, 'Bullish Correct'),
-        (OUTCOME_BEARISH, 'Bearish Correct'),
+        (OUTCOME_BULLISH, 'Prediction Correct'),
+        (OUTCOME_BEARISH, 'Prediction Wrong'),
     ]
 
     post = models.OneToOneField(Post, on_delete=models.CASCADE, related_name='stock_prediction')
     stock_symbol = models.CharField(max_length=20, db_index=True)
     stock_name = models.CharField(max_length=100, blank=True, default='')
-    target_price = models.DecimalField(max_digits=12, decimal_places=2)
+    target_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     target_date = models.DateField(db_index=True)
     direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES)
-    entry_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text='Stock price when prediction was created')
+    predicted_change_pct = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text='Predicted % change from entry price')
+    entry_price = models.DecimalField(max_digits=14, decimal_places=6, null=True, blank=True, help_text='Price at time of prediction')
+    live_price = models.DecimalField(max_digits=14, decimal_places=6, null=True, blank=True, help_text='Most recently fetched live price')
+    price_updated_at = models.DateTimeField(null=True, blank=True)
+    points_earned = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
     outcome = models.CharField(max_length=20, choices=OUTCOME_CHOICES, blank=True, default='')
-    resolved_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    resolved_price = models.DecimalField(max_digits=14, decimal_places=6, null=True, blank=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
     resolved_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='resolved_predictions')
 
@@ -1355,7 +1365,9 @@ class StockPrediction(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.stock_symbol} → ₹{self.target_price} by {self.target_date}"
+        if self.direction in (self.DIRECTION_UP, self.DIRECTION_DOWN):
+            return f"{self.stock_symbol} → {self.direction.upper()} {self.predicted_change_pct}% by {self.target_date}"
+        return f"{self.stock_symbol} → {self.target_price} by {self.target_date}"
 
     @property
     def days_remaining(self):
@@ -1367,11 +1379,49 @@ class StockPrediction(models.Model):
     def is_active(self):
         return self.status == self.STATUS_ACTIVE
 
+    @property
+    def is_pct_prediction(self):
+        return self.direction in (self.DIRECTION_UP, self.DIRECTION_DOWN)
+
+    def get_live_pts(self, live_price=None):
+        """Compute live ± points based on current price vs prediction."""
+        lp = float(live_price or self.live_price or 0)
+        ep = float(self.entry_price or 0)
+        if not lp or not ep:
+            return None
+        move_pct = (lp - ep) / ep * 100
+        target_pct = float(self.predicted_change_pct or 0)
+        if self.direction == self.DIRECTION_UP:
+            if target_pct == 0:
+                return 1.0 if move_pct >= 0 else -1.0
+            ratio = move_pct / target_pct
+            return round(min(1.0, max(-1.0, ratio)), 2)
+        elif self.direction == self.DIRECTION_DOWN:
+            if target_pct == 0:
+                return 1.0 if move_pct <= 0 else -1.0
+            ratio = -move_pct / target_pct
+            return round(min(1.0, max(-1.0, ratio)), 2)
+        # For absolute price predictions
+        if self.target_price and float(self.target_price) > 0:
+            tp = float(self.target_price)
+            if self.direction == self.DIRECTION_ABOVE:
+                return round(min(1.0, max(-1.0, (lp - ep) / abs(tp - ep) if tp != ep else 0)), 2)
+            else:
+                return round(min(1.0, max(-1.0, (ep - lp) / abs(ep - tp) if tp != ep else 0)), 2)
+        return None
+
     def compute_outcome(self, resolved_price):
-        """Determine which side wins based on resolved price."""
+        """Determine if prediction was correct based on resolved price."""
         rp = float(resolved_price)
-        tp = float(self.target_price)
-        if self.direction == self.DIRECTION_ABOVE:
-            return self.OUTCOME_BULLISH if rp >= tp else self.OUTCOME_BEARISH
+        ep = float(self.entry_price) if self.entry_price else None
+        tp = float(self.target_price) if self.target_price else 0
+        if self.direction == self.DIRECTION_UP and ep and self.predicted_change_pct:
+            required = ep * (1 + float(self.predicted_change_pct) / 100)
+            return self.OUTCOME_CORRECT if rp >= required else self.OUTCOME_WRONG
+        elif self.direction == self.DIRECTION_DOWN and ep and self.predicted_change_pct:
+            required = ep * (1 - float(self.predicted_change_pct) / 100)
+            return self.OUTCOME_CORRECT if rp <= required else self.OUTCOME_WRONG
+        elif self.direction == self.DIRECTION_ABOVE:
+            return self.OUTCOME_CORRECT if tp and rp >= tp else self.OUTCOME_WRONG
         else:
-            return self.OUTCOME_BULLISH if rp <= tp else self.OUTCOME_BEARISH
+            return self.OUTCOME_CORRECT if tp and rp <= tp else self.OUTCOME_WRONG

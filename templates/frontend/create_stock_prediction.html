@@ -1,179 +1,13 @@
 {% extends 'frontend/base.html' %}
-{% block title %}Stock Prediction — PickASide{% endblock %}
+{% block title %}Make a Stock Prediction — PickASide{% endblock %}
 
 {% block content %}
 <style>
-.spf-card {
-    background: linear-gradient(152deg, hsl(var(--card) / 0.94), hsl(var(--card) / 0.76));
-    backdrop-filter: blur(18px);
-    box-shadow: 0 28px 72px -40px rgba(15,23,42,0.55), inset 0 1px 0 rgba(255,255,255,0.14);
-    border-radius: 1.5rem;
-    border: 1px solid hsl(var(--border) / 0.5);
+@keyframes livePulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: 0.55; }
 }
-.spf-section {
-    background: hsl(var(--background) / 0.55);
-    border: 1px solid hsl(var(--border) / 0.6);
-    border-radius: 1rem;
-    padding: 1.1rem 1.15rem;
-}
-.spf-label {
-    display: block;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: hsl(var(--muted-foreground));
-    margin-bottom: 0.45rem;
-}
-.spf-input {
-    width: 100%;
-    padding: 0.78rem 1rem;
-    border-radius: 0.9rem;
-    border: 1.5px solid hsl(var(--border));
-    background: hsl(var(--background) / 0.72);
-    color: hsl(var(--foreground));
-    font-size: 0.95rem;
-    font-family: inherit;
-    transition: border-color 180ms ease, box-shadow 180ms ease;
-    outline: none;
-}
-.spf-input:focus {
-    border-color: hsl(var(--primary));
-    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
-}
-.spf-input::placeholder { color: hsl(var(--muted-foreground) / 0.55); }
-.spf-input-prefix {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-.spf-input-prefix .prefix-icon {
-    position: absolute;
-    left: 0.85rem;
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: hsl(var(--muted-foreground));
-    pointer-events: none;
-}
-.spf-input-prefix .spf-input { padding-left: 2rem; }
-.spf-submit {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.9rem 1.5rem;
-    border-radius: 999px;
-    background-image: var(--float-gradient);
-    color: hsl(var(--primary-foreground));
-    font-size: 1rem;
-    font-weight: 700;
-    border: none;
-    cursor: pointer;
-    box-shadow: 0 12px 28px -14px hsl(var(--primary) / 0.7);
-    transition: transform 180ms ease, box-shadow 180ms ease;
-}
-.spf-submit:hover { transform: translateY(-2px); box-shadow: 0 18px 36px -12px hsl(var(--primary) / 0.85); }
-.spf-submit:active { transform: translateY(0); }
-
-/* Direction cards */
-.dir-card {
-    position: relative;
-    border: 2px solid hsl(var(--border));
-    border-radius: 1.1rem;
-    padding: 1.2rem 1rem;
-    cursor: pointer;
-    transition: border-color 200ms ease, background 200ms ease, transform 160ms ease, box-shadow 200ms ease;
-    background: hsl(var(--background) / 0.5);
-    text-align: center;
-    user-select: none;
-}
-.dir-card:hover { transform: translateY(-2px); }
-.dir-card.dir-above:hover { border-color: hsl(142 71% 45% / 0.6); background: hsl(142 71% 45% / 0.07); }
-.dir-card.dir-below:hover { border-color: hsl(346 77% 50% / 0.6); background: hsl(346 77% 50% / 0.07); }
-.dir-card.dir-above.selected {
-    border-color: hsl(142 71% 45%);
-    background: hsl(142 71% 45% / 0.12);
-    box-shadow: 0 0 0 3px hsl(142 71% 45% / 0.2);
-}
-.dir-card.dir-below.selected {
-    border-color: hsl(346 77% 50%);
-    background: hsl(346 77% 50% / 0.12);
-    box-shadow: 0 0 0 3px hsl(346 77% 50% / 0.2);
-}
-.dir-card input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
-.dir-arrow {
-    font-size: 2rem;
-    line-height: 1;
-    display: block;
-    margin-bottom: 0.4rem;
-}
-.dir-label {
-    font-size: 0.8rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
-.dir-sublabel {
-    font-size: 0.72rem;
-    color: hsl(var(--muted-foreground));
-    margin-top: 0.2rem;
-    line-height: 1.4;
-}
-.dir-check {
-    position: absolute;
-    top: 0.6rem;
-    right: 0.75rem;
-    width: 1.1rem;
-    height: 1.1rem;
-    border-radius: 50%;
-    border: 2px solid hsl(var(--border));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 180ms;
-}
-.dir-card.dir-above.selected .dir-check { background: hsl(142 71% 45%); border-color: hsl(142 71% 45%); }
-.dir-card.dir-below.selected .dir-check { background: hsl(346 77% 50%); border-color: hsl(346 77% 50%); }
-.dir-check-inner {
-    width: 0.45rem;
-    height: 0.45rem;
-    border-radius: 50%;
-    background: white;
-    transform: scale(0);
-    transition: transform 160ms;
-}
-.dir-card.selected .dir-check-inner { transform: scale(1); }
-
-/* Live preview box */
-.preview-box {
-    background: linear-gradient(135deg, hsl(var(--primary) / 0.06), hsl(var(--card) / 0.8));
-    border: 1.5px dashed hsl(var(--primary) / 0.35);
-    border-radius: 1rem;
-    padding: 1rem 1.2rem;
-    transition: border-color 300ms;
-}
-.preview-box.preview-active { border-color: hsl(var(--primary) / 0.6); border-style: solid; }
-.preview-symbol {
-    font-size: 1.5rem;
-    font-weight: 900;
-    letter-spacing: -0.02em;
-    color: hsl(var(--primary));
-    font-family: 'Playfair Display', serif;
-}
-.preview-dir-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-}
-.preview-dir-above { background: hsl(142 71% 45% / 0.15); color: hsl(142 71% 38%); }
-.preview-dir-below { background: hsl(346 77% 50% / 0.15); color: hsl(346 65% 44%); }
-.preview-empty { color: hsl(var(--muted-foreground) / 0.6); font-size: 0.85rem; font-style: italic; }
+.preview-live-dot { animation: livePulse 1.6s ease-in-out infinite; }
 </style>
 
 <div class="max-w-2xl mx-auto py-8 px-4">
@@ -184,280 +18,293 @@
         Back to Stock Predictions
     </a>
 
-    <!-- Header -->
+    <!-- Page header -->
     <div class="flex items-center gap-4 mb-8">
         <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-900/35 text-3xl shadow-inner flex-shrink-0">📈</div>
         <div>
             <h1 class="text-2xl font-bold text-foreground" style="font-family:'Playfair Display',serif;">Make a Stock Prediction</h1>
-            <p class="text-sm text-muted-foreground mt-0.5">Set a target, pick Bullish or Bearish, and let the community debate.</p>
+            <p class="text-sm text-muted-foreground mt-0.5">Name your symbol, pick a direction and set a target — let the community debate.</p>
         </div>
     </div>
 
     <!-- Form card -->
-    <div class="spf-card p-6 sm:p-8 space-y-6">
+    <div class="rounded-2xl shadow-sm border border-border bg-card p-6 sm:p-8 space-y-6">
         <form method="POST" action="{% url 'create_stock_prediction' %}" id="spf-form" novalidate>
             {% csrf_token %}
 
-            <!-- 1. Prediction Question -->
-            <div>
-                <label class="spf-label" for="id_title">Prediction Question</label>
-                <div class="relative">
-                    <textarea
-                        id="id_title"
-                        name="title"
-                        rows="2"
-                        maxlength="200"
-                        required
-                        placeholder="Will HDFC Bank go above ₹1800 by Dec 2026?"
-                        class="spf-input resize-none"
-                        oninput="updateCharCount(this)"
-                    ></textarea>
-                    <span id="title-count" class="absolute bottom-2.5 right-3 text-xs text-muted-foreground font-semibold tabular-nums">0/200</span>
+            <!-- ── Live preview sentence ─────────────────────────── -->
+            <div class="rounded-xl border-2 border-dashed border-border bg-muted/30 px-5 py-4 transition-all duration-300" id="preview-box">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="w-2 h-2 rounded-full bg-primary preview-live-dot flex-shrink-0"></span>
+                    <span class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Live Preview</span>
                 </div>
+                <p class="text-sm leading-relaxed text-foreground" id="preview-sentence">
+                    <span class="text-muted-foreground italic">Fill in the fields below to see your prediction…</span>
+                </p>
             </div>
 
-            <!-- 2. Stock Details -->
-            <div class="spf-section space-y-3">
-                <p class="text-xs font-700 uppercase tracking-widest text-muted-foreground mb-1" style="font-weight:700;letter-spacing:.06em;">Stock Details</p>
+            <!-- ── Stock symbol + name ──────────────────────────── -->
+            <div class="rounded-xl border border-border bg-background/50 p-4 space-y-3">
+                <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Stock Details</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="spf-label" for="id_stock_symbol">Stock Symbol <span class="text-destructive">*</span></label>
-                        <input
-                            type="text"
-                            id="id_stock_symbol"
-                            name="stock_symbol"
-                            required
-                            placeholder="HDFC, RELIANCE, TCS"
-                            class="spf-input"
-                            style="text-transform:uppercase;"
-                            oninput="this.value=this.value.toUpperCase();updatePreview()"
-                        >
+                        <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5" for="id_stock_symbol">
+                            Ticker Symbol <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <input
+                                type="text"
+                                id="id_stock_symbol"
+                                name="stock_symbol"
+                                required
+                                maxlength="10"
+                                autocomplete="off"
+                                placeholder="AAPL, TSLA, RELIANCE…"
+                                class="w-full rounded-xl border border-border bg-background/70 px-3.5 py-2.5 pr-12 text-sm font-bold text-foreground uppercase tracking-widest placeholder:normal-case placeholder:tracking-normal placeholder:font-normal placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
+                                style="text-transform:uppercase;"
+                                oninput="this.value=this.value.toUpperCase();updatePreview()"
+                            >
+                            <span id="symbol-count" class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground tabular-nums">0/10</span>
+                        </div>
                     </div>
                     <div>
-                        <label class="spf-label" for="id_stock_name">Stock Name <span class="text-muted-foreground font-normal normal-case tracking-normal">(optional)</span></label>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5" for="id_stock_name">
+                            Company Name <span class="text-muted-foreground font-normal normal-case tracking-normal">(optional)</span>
+                        </label>
                         <input
                             type="text"
                             id="id_stock_name"
                             name="stock_name"
-                            placeholder="HDFC Bank Ltd (optional)"
-                            class="spf-input"
+                            placeholder="Apple Inc. (optional)"
+                            class="w-full rounded-xl border border-border bg-background/70 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
                         >
                     </div>
                 </div>
             </div>
 
-            <!-- 3. Prediction Details -->
-            <div class="spf-section space-y-3">
-                <p class="text-xs uppercase tracking-widest text-muted-foreground mb-1" style="font-weight:700;letter-spacing:.06em;">Prediction Details</p>
+            <!-- ── Direction toggle cards ──────────────────────── -->
+            <div>
+                <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                    Direction <span class="text-red-500">*</span>
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+
+                    <!-- Up (bullish) -->
+                    <label class="dir-card relative border-2 border-border rounded-2xl p-4 cursor-pointer text-center transition-all duration-200 bg-background/50 hover:border-emerald-400/60 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 select-none" id="card-up" onclick="selectDirection('up')">
+                        <input type="radio" name="direction" value="up" id="dir-up" required class="absolute opacity-0 pointer-events-none">
+                        <!-- checkmark dot -->
+                        <div class="absolute top-2.5 right-2.5 w-4 h-4 rounded-full border-2 border-border flex items-center justify-center transition-all" id="check-up">
+                            <div class="w-2 h-2 rounded-full bg-white scale-0 transition-transform duration-150" id="check-inner-up"></div>
+                        </div>
+                        <span class="block text-3xl mb-1.5 leading-none">▲</span>
+                        <span class="block text-xs font-black uppercase tracking-wide" style="color:hsl(142 65% 38%);">Up (Bullish)</span>
+                        <p class="text-[11px] text-muted-foreground mt-1 leading-tight">Price will rise by X%</p>
+                    </label>
+
+                    <!-- Down (bearish) -->
+                    <label class="dir-card relative border-2 border-border rounded-2xl p-4 cursor-pointer text-center transition-all duration-200 bg-background/50 hover:border-rose-400/60 hover:bg-rose-50/40 dark:hover:bg-rose-950/20 select-none" id="card-down" onclick="selectDirection('down')">
+                        <input type="radio" name="direction" value="down" id="dir-down" required class="absolute opacity-0 pointer-events-none">
+                        <div class="absolute top-2.5 right-2.5 w-4 h-4 rounded-full border-2 border-border flex items-center justify-center transition-all" id="check-down">
+                            <div class="w-2 h-2 rounded-full bg-white scale-0 transition-transform duration-150" id="check-inner-down"></div>
+                        </div>
+                        <span class="block text-3xl mb-1.5 leading-none">▼</span>
+                        <span class="block text-xs font-black uppercase tracking-wide" style="color:hsl(346 65% 44%);">Down (Bearish)</span>
+                        <p class="text-[11px] text-muted-foreground mt-1 leading-tight">Price will fall by X%</p>
+                    </label>
+
+                </div>
+            </div>
+
+            <!-- ── % change + target date ──────────────────────── -->
+            <div class="rounded-xl border border-border bg-background/50 p-4 space-y-3">
+                <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Prediction Target</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="spf-label" for="id_target_price">Target Price in ₹ <span class="text-destructive">*</span></label>
-                        <div class="spf-input-prefix">
-                            <span class="prefix-icon">₹</span>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5" for="id_predicted_change_pct">
+                            % Change <span class="text-red-500">*</span>
+                        </label>
+                        <div class="relative">
                             <input
                                 type="number"
-                                id="id_target_price"
-                                name="target_price"
-                                step="0.01"
-                                min="0"
+                                id="id_predicted_change_pct"
+                                name="predicted_change_pct"
                                 required
-                                placeholder="1800.00"
-                                class="spf-input"
+                                min="0.01"
+                                step="0.01"
+                                placeholder="5.00"
+                                class="w-full rounded-xl border border-border bg-background/70 px-3.5 py-2.5 pr-8 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
                                 oninput="updatePreview()"
                             >
+                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground pointer-events-none">%</span>
                         </div>
                     </div>
                     <div>
-                        <label class="spf-label" for="id_target_date">Target Date <span class="text-destructive">*</span></label>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5" for="id_target_date">
+                            By Date <span class="text-red-500">*</span>
+                        </label>
                         <input
                             type="date"
                             id="id_target_date"
                             name="target_date"
                             required
-                            class="spf-input"
+                            class="w-full rounded-xl border border-border bg-background/70 px-3.5 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
                             oninput="validateFutureDate(this);updatePreview()"
                         >
-                        <p id="date-error" class="hidden text-destructive text-xs mt-1 font-semibold">Please select a future date.</p>
+                        <p id="date-error" class="hidden text-red-500 text-[11px] mt-1 font-semibold">Please select a future date.</p>
                     </div>
                 </div>
             </div>
 
-            <!-- 4. Direction toggle cards -->
+            <!-- ── Entry price (optional) ──────────────────────── -->
             <div>
-                <label class="spf-label">Prediction Direction <span class="text-destructive">*</span></label>
-                <div class="grid grid-cols-2 gap-3">
-                    <!-- Above -->
-                    <label class="dir-card dir-above" id="card-above" onclick="selectDirection('above')">
-                        <input type="radio" name="direction" value="above" id="dir-above" required>
-                        <div class="dir-check" id="check-above">
-                            <div class="dir-check-inner"></div>
-                        </div>
-                        <span class="dir-arrow">↑</span>
-                        <span class="dir-label" style="color:hsl(142 71% 38%);">Stock will go ABOVE</span>
-                        <p class="dir-sublabel">Price reaches or exceeds the target</p>
-                    </label>
-                    <!-- Below -->
-                    <label class="dir-card dir-below" id="card-below" onclick="selectDirection('below')">
-                        <input type="radio" name="direction" value="below" id="dir-below" required>
-                        <div class="dir-check" id="check-below">
-                            <div class="dir-check-inner"></div>
-                        </div>
-                        <span class="dir-arrow">↓</span>
-                        <span class="dir-label" style="color:hsl(346 65% 44%);">Stock will go BELOW</span>
-                        <p class="dir-sublabel">Price stays below the target</p>
-                    </label>
-                </div>
-            </div>
-
-            <!-- 5. Entry price -->
-            <div>
-                <label class="spf-label" for="id_entry_price">Current Stock Price (Optional)</label>
-                <div class="spf-input-prefix">
-                    <span class="prefix-icon">₹</span>
+                <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5" for="id_entry_price">
+                    Current Price <span class="text-muted-foreground font-normal normal-case tracking-normal">(optional, for live tracking)</span>
+                </label>
+                <div class="relative">
+                    <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground pointer-events-none">$</span>
                     <input
                         type="number"
                         id="id_entry_price"
                         name="entry_price"
-                        step="0.01"
+                        step="0.0001"
                         min="0"
-                        placeholder="Current market price for reference"
-                        class="spf-input"
+                        placeholder="150.0000"
+                        class="w-full rounded-xl border border-border bg-background/70 pl-7 pr-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
                     >
                 </div>
-                <p class="text-xs text-muted-foreground mt-1">Snapshot of the price when you made this prediction.</p>
+                <p class="text-[11px] text-muted-foreground mt-1">Snapshot used to track live movement and award points.</p>
             </div>
 
-            <!-- 6. Hashtags -->
+            <!-- ── Hashtags (optional) ─────────────────────────── -->
             <div>
-                <label class="spf-label" for="id_hashtags">Hashtags <span class="text-muted-foreground font-normal normal-case tracking-normal">(optional)</span></label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5" for="id_hashtags">
+                    Hashtags <span class="text-muted-foreground font-normal normal-case tracking-normal">(optional)</span>
+                </label>
                 <input
                     type="text"
                     id="id_hashtags"
                     name="hashtags"
-                    placeholder="#Nifty #Banking #LongTerm"
-                    class="spf-input"
+                    placeholder="#Tech #Earnings #LongTerm"
+                    class="w-full rounded-xl border border-border bg-background/70 px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
                 >
-                <p class="text-xs text-muted-foreground mt-1">Separate with spaces. E.g. #Nifty #HDFC</p>
+                <p class="text-[11px] text-muted-foreground mt-1">Separate with spaces. e.g. #FAANG #Semiconductors</p>
             </div>
 
-            <!-- Live preview -->
-            <div class="preview-box" id="preview-box">
-                <p class="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Live Preview</p>
-                <div id="preview-content">
-                    <p class="preview-empty">Start filling in the form to see your prediction summary…</p>
-                </div>
-            </div>
-
-            <!-- Submit -->
-            <button type="submit" class="spf-submit" id="submit-btn">
+            <!-- ── Submit ───────────────────────────────────────── -->
+            <button
+                type="submit"
+                id="submit-btn"
+                class="w-full inline-flex items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground font-bold text-sm py-3.5 hover:opacity-90 transition shadow-lg shadow-primary/25 active:scale-[0.98]"
+            >
                 🚀 Publish Prediction
             </button>
+
         </form>
     </div>
+
 </div>
 
 <script>
-// --- Char counter ---
-function updateCharCount(el) {
-    const count = el.value.length;
-    const max = parseInt(el.getAttribute('maxlength')) || 200;
-    const counter = document.getElementById('title-count');
-    if (counter) {
-        counter.textContent = count + '/' + max;
-        counter.style.color = count > max * 0.9 ? 'hsl(var(--destructive))' : '';
-    }
-    updatePreview();
-}
-
-// --- Direction selection ---
-let selectedDirection = null;
+// ── Direction state ──────────────────────────────────────────
+var selectedDirection = null;
 
 function selectDirection(dir) {
     selectedDirection = dir;
-    const cardAbove = document.getElementById('card-above');
-    const cardBelow = document.getElementById('card-below');
-    const radioAbove = document.getElementById('dir-above');
-    const radioBelow = document.getElementById('dir-below');
-
-    if (dir === 'above') {
-        cardAbove.classList.add('selected');
-        cardBelow.classList.remove('selected');
-        radioAbove.checked = true;
-        radioBelow.checked = false;
-    } else {
-        cardBelow.classList.add('selected');
-        cardAbove.classList.remove('selected');
-        radioBelow.checked = true;
-        radioAbove.checked = false;
-    }
+    var cards = ['up','down'];
+    cards.forEach(function(d) {
+        var card  = document.getElementById('card-' + d);
+        var check = document.getElementById('check-' + d);
+        var inner = document.getElementById('check-inner-' + d);
+        var radio = document.getElementById('dir-' + d);
+        if (d === dir) {
+            radio.checked = true;
+            card.classList.remove('border-border','bg-background/50');
+            if (d === 'up') {
+                card.classList.add('border-emerald-500','bg-emerald-50/50','dark:bg-emerald-950/25');
+                card.style.boxShadow = '0 0 0 3px hsl(142 71% 45% / 0.18)';
+                check.style.background = 'hsl(142 65% 44%)';
+                check.style.borderColor = 'hsl(142 65% 44%)';
+            } else {
+                card.classList.add('border-rose-500','bg-rose-50/50','dark:bg-rose-950/25');
+                card.style.boxShadow = '0 0 0 3px hsl(346 77% 50% / 0.18)';
+                check.style.background = 'hsl(346 65% 44%)';
+                check.style.borderColor = 'hsl(346 65% 44%)';
+            }
+            inner.style.transform = 'scale(1)';
+        } else {
+            radio.checked = false;
+            card.classList.add('border-border','bg-background/50');
+            card.classList.remove('border-emerald-500','bg-emerald-50/50','dark:bg-emerald-950/25','border-rose-500','bg-rose-50/50','dark:bg-rose-950/25');
+            card.style.boxShadow = '';
+            check.style.background = '';
+            check.style.borderColor = '';
+            inner.style.transform = 'scale(0)';
+        }
+    });
     updatePreview();
 }
 
-// --- Future date validation ---
+// ── Symbol char counter ──────────────────────────────────────
+document.getElementById('id_stock_symbol').addEventListener('input', function() {
+    var cnt = document.getElementById('symbol-count');
+    if (cnt) cnt.textContent = this.value.length + '/10';
+});
+
+// ── Future date guard ────────────────────────────────────────
 function validateFutureDate(input) {
-    const errEl = document.getElementById('date-error');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const chosen = new Date(input.value);
+    var errEl = document.getElementById('date-error');
+    var today = new Date(); today.setHours(0,0,0,0);
+    var chosen = new Date(input.value + 'T00:00:00');
     if (input.value && chosen <= today) {
         errEl.classList.remove('hidden');
-        input.style.borderColor = 'hsl(var(--destructive))';
+        input.style.borderColor = 'hsl(var(--destructive, 0 84% 60%))';
     } else {
         errEl.classList.add('hidden');
         input.style.borderColor = '';
     }
 }
 
-// --- Live preview ---
+// ── Live preview sentence ────────────────────────────────────
 function updatePreview() {
-    const symbol = (document.getElementById('id_stock_symbol').value || '').trim().toUpperCase();
-    const price = document.getElementById('id_target_price').value;
-    const dateRaw = document.getElementById('id_target_date').value;
-    const title = document.getElementById('id_title').value.trim();
+    var symbol = (document.getElementById('id_stock_symbol').value || '').trim().toUpperCase();
+    var pct    = document.getElementById('id_predicted_change_pct').value;
+    var dateRaw = document.getElementById('id_target_date').value;
+    var box    = document.getElementById('preview-box');
+    var sent   = document.getElementById('preview-sentence');
 
-    const box = document.getElementById('preview-box');
-    const content = document.getElementById('preview-content');
-
-    const isEmpty = !symbol && !price && !dateRaw && !selectedDirection;
-
+    var isEmpty = !symbol && !pct && !dateRaw && !selectedDirection;
     if (isEmpty) {
-        box.classList.remove('preview-active');
-        content.innerHTML = '<p class="preview-empty">Start filling in the form to see your prediction summary…</p>';
+        box.classList.remove('border-solid','border-primary/40');
+        box.classList.add('border-dashed','border-border');
+        sent.innerHTML = '<span class="text-muted-foreground italic">Fill in the fields below to see your prediction…</span>';
         return;
     }
 
-    box.classList.add('preview-active');
+    box.classList.remove('border-dashed','border-border');
+    box.classList.add('border-solid','border-primary/40');
 
-    let dirBadge = '';
-    if (selectedDirection === 'above') {
-        dirBadge = '<span class="preview-dir-badge preview-dir-above">↑ Must go ABOVE</span>';
-    } else if (selectedDirection === 'below') {
-        dirBadge = '<span class="preview-dir-badge preview-dir-below">↓ Must go BELOW</span>';
-    }
-
-    let dateStr = '';
+    var symHtml   = symbol ? '<strong class="text-primary font-black" style="font-family:\'Playfair Display\',serif;">' + symbol + '</strong>' : '<span class="text-muted-foreground italic">[SYMBOL]</span>';
+    var dirColor  = selectedDirection === 'up' ? 'color:hsl(142 65% 38%)' : selectedDirection === 'down' ? 'color:hsl(346 65% 44%)' : '';
+    var arrow     = selectedDirection === 'up' ? '▲' : selectedDirection === 'down' ? '▼' : '';
+    var dirWord   = selectedDirection === 'up' ? 'Up' : selectedDirection === 'down' ? 'Down' : '<span class="text-muted-foreground italic">[direction]</span>';
+    var dirHtml   = selectedDirection ? '<strong style="' + dirColor + '">' + arrow + ' ' + dirWord + '</strong>' : dirWord;
+    var pctHtml   = pct ? '<strong style="' + dirColor + '">' + parseFloat(pct).toFixed(2) + '%</strong>' : '<span class="text-muted-foreground italic">X%</span>';
+    var dateStr   = '';
     if (dateRaw) {
-        const d = new Date(dateRaw + 'T00:00:00');
-        dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        var d = new Date(dateRaw + 'T00:00:00');
+        dateStr = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
     }
+    var dateHtml = dateStr ? '<strong class="text-foreground">' + dateStr + '</strong>' : '<span class="text-muted-foreground italic">[date]</span>';
 
-    content.innerHTML = `
-        <div class="flex items-center gap-3 flex-wrap mb-2">
-            ${symbol ? `<span class="preview-symbol">${symbol}</span>` : ''}
-            ${dirBadge}
-            ${price ? `<span class="text-sm font-bold text-foreground">₹${parseFloat(price).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>` : ''}
-            ${dateStr ? `<span class="text-xs text-muted-foreground font-semibold">by ${dateStr}</span>` : ''}
-        </div>
-        ${title ? `<p class="text-sm text-foreground leading-relaxed">${title}</p>` : '<p class="text-xs text-muted-foreground italic">Add your prediction question above…</p>'}
-    `;
+    sent.innerHTML = 'I think ' + symHtml + ' will go ' + dirHtml + ' ' + pctHtml + ' by ' + dateHtml;
 }
 
-// --- Form submit guard ---
+// ── Form submit guard ────────────────────────────────────────
 document.getElementById('spf-form').addEventListener('submit', function(e) {
-    const dateInput = document.getElementById('id_target_date');
+    var dateInput = document.getElementById('id_target_date');
     if (dateInput.value) {
-        const today = new Date(); today.setHours(0,0,0,0);
-        const chosen = new Date(dateInput.value);
+        var today = new Date(); today.setHours(0,0,0,0);
+        var chosen = new Date(dateInput.value + 'T00:00:00');
         if (chosen <= today) {
             e.preventDefault();
             document.getElementById('date-error').classList.remove('hidden');
@@ -465,16 +312,16 @@ document.getElementById('spf-form').addEventListener('submit', function(e) {
             return;
         }
     }
-    const btn = document.getElementById('submit-btn');
+    var btn = document.getElementById('submit-btn');
     btn.disabled = true;
-    btn.textContent = '⏳ Publishing…';
+    btn.innerHTML = '⏳ Publishing…';
 });
 
-// Set min date to tomorrow
+// ── Set min date to tomorrow ─────────────────────────────────
 (function() {
-    const inp = document.getElementById('id_target_date');
+    var inp = document.getElementById('id_target_date');
     if (inp) {
-        const tomorrow = new Date();
+        var tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         inp.min = tomorrow.toISOString().split('T')[0];
     }
