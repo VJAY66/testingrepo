@@ -6940,9 +6940,16 @@ def activity_feed(request):
 
     events.sort(key=lambda e: e['ts'], reverse=True)
 
+    type_filter = request.GET.get('type', '')
+    filtered = [e for e in events if not type_filter or e['type'] == type_filter]
+
     return render(request, 'frontend/activity.html', {
-        'events': events[:60],
+        'events': filtered[:60],
+        'all_events': events[:60],
+        'active_type': type_filter,
         'has_following': True,
+        'follow_suggestions': _follow_suggestions(request.user),
+        'trending_sidebar': _get_trending_hashtags(),
     })
 
 

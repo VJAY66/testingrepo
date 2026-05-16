@@ -3,124 +3,223 @@
 
 {% block content %}
 <style>
-.act-page { max-width: 680px; margin: 0 auto; padding: 2rem 1rem 4rem; }
-.act-title { font-size: 1.6rem; font-weight: 900; color: hsl(var(--foreground)); letter-spacing: -0.01em; }
-.act-sub { font-size: 0.88rem; color: hsl(var(--muted-foreground)); margin-top: 0.3rem; }
-
-.act-list { display: flex; flex-direction: column; gap: 0; margin-top: 1.5rem; }
-
-.act-item {
-  display: flex; align-items: flex-start; gap: 0.85rem;
-  padding: 0.9rem 0;
-  border-bottom: 1px solid hsl(var(--border) / 0.6);
-  animation: actIn 0.3s ease both;
+.act-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 1.2rem;
+  padding: 1rem 1.15rem;
+  transition: border-color 180ms, box-shadow 180ms;
 }
-@keyframes actIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-
+.act-card:hover {
+  border-color: hsl(var(--primary)/0.35);
+  box-shadow: 0 6px 24px -10px hsl(var(--primary)/0.15);
+}
 .act-avatar {
-  width: 38px; height: 38px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
   border: 1.5px solid hsl(var(--border));
 }
 .act-avatar-fallback {
-  width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  background: hsl(var(--primary) / 0.12); color: hsl(var(--primary));
-  font-size: 14px; font-weight: 800; border: 1.5px solid hsl(var(--primary) / 0.25);
+  background: hsl(var(--primary)/0.12); color: hsl(var(--primary));
+  font-size: 15px; font-weight: 800; border: 1.5px solid hsl(var(--primary)/0.25);
 }
-.act-icon-badge {
+.act-badge {
   position: absolute; bottom: -3px; right: -3px;
-  width: 16px; height: 16px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; font-size: 9px;
+  width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 10px;
+  background: hsl(var(--card)); border: 1.5px solid hsl(var(--border));
+  line-height: 1;
+}
+/* Filter chips */
+.afc { display:inline-flex; align-items:center; gap:5px; padding:6px 14px; border-radius:999px;
+       font-size:12px; font-weight:600; border:1px solid hsl(var(--border));
+       background:hsl(var(--card)); color:hsl(var(--muted-foreground));
+       text-decoration:none; white-space:nowrap; transition:all 0.15s; }
+.afc:hover { border-color:hsl(var(--primary)/0.5); color:hsl(var(--foreground)); }
+.afc.afc-on { background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); border-color:transparent; }
+/* Sidebar */
+.act-sidebar-card {
   background: hsl(var(--card)); border: 1px solid hsl(var(--border));
+  border-radius: 1.2rem; padding: 1.1rem 1.2rem;
 }
-.act-avatar-wrap { position: relative; flex-shrink: 0; }
-
-.act-body { min-width: 0; flex: 1; }
-.act-actor {
-  font-size: 0.88rem; font-weight: 800; color: hsl(var(--foreground));
-  text-decoration: none;
-}
-.act-actor:hover { color: hsl(var(--primary)); }
-.act-verb { font-size: 0.88rem; color: hsl(var(--muted-foreground)); margin-left: 0.25rem; }
-.act-link {
-  display: block; margin-top: 0.3rem;
-  font-size: 0.82rem; font-weight: 600; color: hsl(var(--primary));
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  text-decoration: none;
-}
-.act-link:hover { text-decoration: underline; text-underline-offset: 3px; }
-.act-time { font-size: 0.72rem; color: hsl(var(--muted-foreground)); margin-top: 0.2rem; }
-
-.act-empty {
-  text-align: center; padding: 4rem 2rem;
-  color: hsl(var(--muted-foreground));
-}
-.act-empty-icon { font-size: 3rem; margin-bottom: 0.75rem; display: block; }
-
-.act-type-dot {
-  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-  margin-right: 4px; vertical-align: middle;
-}
-.dot-post    { background: hsl(var(--primary)); }
-.dot-debate  { background: #f59e0b; }
-.dot-like    { background: #ef4444; }
-.dot-follow  { background: #10b981; }
 </style>
 
-<div class="act-page">
-  <div class="flex items-center gap-3 mb-1">
-    <span style="font-size:1.5rem;">⚡</span>
-    <h1 class="act-title">Activity Feed</h1>
-  </div>
-  <p class="act-sub">Recent activity from people you follow</p>
+<div class="max-w-6xl mx-auto px-4 py-6">
 
-  {% if not has_following %}
-    <div class="act-empty mt-10">
-      <span class="act-empty-icon">🌱</span>
-      <p class="font-semibold text-base">You're not following anyone yet</p>
-      <p class="text-sm mt-2">Follow other users to see their activity here.</p>
-      <a href="{% url 'leaderboard' %}" class="inline-flex mt-4 items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground hover:border-primary hover:text-primary transition">
-        Discover users →
-      </a>
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+    <div class="flex items-center gap-3">
+      <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-xl">⚡</span>
+      <div>
+        <h1 class="text-xl font-black text-foreground">Activity Feed</h1>
+        <p class="text-xs text-muted-foreground">Recent activity from people you follow</p>
+      </div>
     </div>
-  {% elif not events %}
-    <div class="act-empty mt-10">
-      <span class="act-empty-icon">💤</span>
-      <p class="font-semibold text-base">Nothing new in the last 14 days</p>
-      <p class="text-sm mt-2">The people you follow haven't been active recently.</p>
+    <!-- Type filters -->
+    {% if has_following and all_events %}
+    <div class="flex items-center gap-2 flex-wrap">
+      <a href="?" class="afc {% if not active_type %}afc-on{% endif %}">⚡ All</a>
+      <a href="?type=post" class="afc {% if active_type == 'post' %}afc-on{% endif %}">📝 Posts</a>
+      <a href="?type=debate" class="afc {% if active_type == 'debate' %}afc-on{% endif %}">⚔️ Debates</a>
+      <a href="?type=like" class="afc {% if active_type == 'like' %}afc-on{% endif %}">❤️ Likes</a>
+      <a href="?type=follow" class="afc {% if active_type == 'follow' %}afc-on{% endif %}">✨ Follows</a>
     </div>
-  {% else %}
-    <div class="act-list">
+    {% endif %}
+  </div>
+
+  <!-- Two-column layout -->
+  <div class="flex flex-col lg:flex-row gap-6 items-start">
+
+    <!-- ── Left: Activity feed ── -->
+    <div class="flex-1 min-w-0 space-y-3">
+
+      {% if not has_following %}
+      <div class="act-sidebar-card text-center py-12">
+        <div class="text-4xl mb-3">🌱</div>
+        <p class="font-semibold text-foreground mb-1">You're not following anyone yet</p>
+        <p class="text-sm text-muted-foreground mb-4">Follow other users to see their activity here.</p>
+        <a href="{% url 'leaderboard' %}" class="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition">
+          Discover users →
+        </a>
+      </div>
+
+      {% elif not events %}
+      <div class="act-sidebar-card text-center py-12">
+        <div class="text-4xl mb-3">💤</div>
+        <p class="font-semibold text-foreground mb-1">
+          {% if active_type %}No {{ active_type }} activity recently{% else %}Nothing new in the last 14 days{% endif %}
+        </p>
+        <p class="text-sm text-muted-foreground">The people you follow haven't been active recently.</p>
+        {% if active_type %}
+        <a href="?" class="inline-flex mt-4 items-center gap-1 text-sm font-semibold text-primary hover:underline">← Show all activity</a>
+        {% endif %}
+      </div>
+
+      {% else %}
       {% for event in events %}
-        <div class="act-item" style="animation-delay: {{ forloop.counter0 }}0ms">
-          <div class="act-avatar-wrap">
-            {% if event.avatar %}
-              <img src="{{ event.avatar }}" alt="{{ event.actor.username }}" class="act-avatar">
-            {% else %}
-              <div class="act-avatar-fallback">{{ event.actor.username|first|upper }}</div>
-            {% endif %}
-            <span class="act-icon-badge">
-              {% if event.type == 'post' %}📝{% elif event.type == 'debate' %}⚔️{% elif event.type == 'like' %}❤️{% elif event.type == 'follow' %}✨{% endif %}
+      <a href="{{ event.url }}" class="act-card flex items-start gap-3 block no-underline"
+         style="animation: actIn 0.28s ease {{ forloop.counter0 }}0ms both;">
+        <!-- Avatar -->
+        <div class="relative flex-shrink-0">
+          {% if event.avatar %}
+            <img src="{{ event.avatar }}" alt="{{ event.actor.username }}" class="act-avatar">
+          {% else %}
+            <div class="act-avatar-fallback">{{ event.actor.username|first|upper }}</div>
+          {% endif %}
+          <span class="act-badge">
+            {% if event.type == 'post' %}📝{% elif event.type == 'debate' %}⚔️{% elif event.type == 'like' %}❤️{% elif event.type == 'follow' %}✨{% endif %}
+          </span>
+        </div>
+        <!-- Body -->
+        <div class="flex-1 min-w-0">
+          <div class="flex items-start justify-between gap-2">
+            <p class="text-sm">
+              <span class="font-bold text-foreground hover:text-primary">{{ event.actor.username }}</span>
+              <span class="text-muted-foreground ml-1">{{ event.text }}</span>
+            </p>
+            <span class="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">{{ event.ts|timesince }} ago</span>
+          </div>
+          {% if event.title %}
+          <p class="text-sm font-semibold text-primary mt-1 line-clamp-2 leading-snug">{{ event.title }}</p>
+          {% endif %}
+          <!-- Type tag -->
+          <div class="mt-1.5">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold
+              {% if event.type == 'post' %}bg-primary/10 text-primary{% elif event.type == 'debate' %}bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300{% elif event.type == 'like' %}bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400{% else %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300{% endif %}">
+              {% if event.type == 'post' %}📝 Post{% elif event.type == 'debate' %}⚔️ Debate{% elif event.type == 'like' %}❤️ Like{% else %}✨ Follow{% endif %}
             </span>
           </div>
-          <div class="act-body">
-            <div>
-              <a href="/user/{{ event.actor.username }}/" class="act-actor">{{ event.actor.username }}</a>
-              <span class="act-verb">{{ event.text }}</span>
-            </div>
-            {% if event.title %}
-              <a href="{{ event.url }}" class="act-link">{{ event.title|truncatechars:70 }}</a>
-            {% else %}
-              <a href="{{ event.url }}" class="act-link">View →</a>
-            {% endif %}
-            <div class="act-time">
-              <span class="act-type-dot dot-{{ event.type }}"></span>
-              {{ event.ts|timesince }} ago
-            </div>
-          </div>
         </div>
+      </a>
       {% endfor %}
-    </div>
-  {% endif %}
+      {% endif %}
+
+    </div><!-- /left -->
+
+    <!-- ── Right: Sidebar ── -->
+    <div class="w-full lg:w-72 flex-shrink-0 space-y-4">
+
+      <!-- Activity stats -->
+      {% if has_following and all_events %}
+      <div class="act-sidebar-card">
+        <p class="text-xs font-black uppercase tracking-widest text-muted-foreground mb-3">Activity Breakdown</p>
+        <div class="space-y-2">
+          {% with post_count=all_events|length %}
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-muted-foreground flex items-center gap-2">📝 Posts</span>
+            <span class="text-sm font-bold text-foreground">{% for e in all_events %}{% if e.type == 'post' %}+{% endif %}{% endfor %}</span>
+          </div>
+          {% endwith %}
+        </div>
+        <!-- simple visual stats via template counting -->
+        {% regroup all_events by type as grouped_events %}
+        <div class="space-y-1.5 mt-2">
+          {% for group in grouped_events %}
+          <div class="flex items-center gap-2">
+            <span class="text-xs w-16 text-muted-foreground capitalize">
+              {% if group.grouper == 'post' %}📝 Posts{% elif group.grouper == 'debate' %}⚔️ Debates{% elif group.grouper == 'like' %}❤️ Likes{% else %}✨ Follows{% endif %}
+            </span>
+            <div class="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+              <div class="h-full rounded-full
+                {% if group.grouper == 'post' %}bg-primary{% elif group.grouper == 'debate' %}bg-amber-400{% elif group.grouper == 'like' %}bg-red-400{% else %}bg-emerald-400{% endif %}"
+                style="width: {% widthratio group.list|length all_events|length 100 %}%"></div>
+            </div>
+            <span class="text-xs font-bold text-foreground w-5 text-right">{{ group.list|length }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Trending hashtags -->
+      {% if trending_sidebar %}
+      <div class="act-sidebar-card">
+        <p class="text-xs font-black uppercase tracking-widest text-muted-foreground mb-3">Trending Today</p>
+        <div class="space-y-1">
+          {% for tag in trending_sidebar|slice:":8" %}
+          <a href="{% url 'hashtag_feed' tag.name %}" class="flex items-center justify-between py-1.5 hover:text-primary transition-colors group">
+            <span class="text-sm font-semibold text-foreground group-hover:text-primary">#{{ tag.name }}</span>
+            <span class="text-xs text-muted-foreground">{{ tag.count }}</span>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- People you may know -->
+      {% if follow_suggestions %}
+      <div class="act-sidebar-card">
+        <p class="text-xs font-black uppercase tracking-widest text-muted-foreground mb-3">Who to Follow</p>
+        <div class="space-y-3">
+          {% for suggestion in follow_suggestions|slice:":5" %}
+          <div class="flex items-center justify-between gap-2">
+            <a href="/user/{{ suggestion.username }}/" class="flex items-center gap-2 min-w-0">
+              <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold flex-shrink-0">
+                {{ suggestion.username|first|upper }}
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm font-semibold text-foreground truncate">@{{ suggestion.username }}</p>
+              </div>
+            </a>
+            <button onclick="toggleFollowAuthor('{{ suggestion.username }}', this)"
+                    class="flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold border border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground transition"
+                    data-following="false">
+              Follow
+            </button>
+          </div>
+          {% endfor %}
+        </div>
+        <a href="{% url 'people_you_may_know' %}" class="block text-center text-xs font-semibold text-primary mt-3 hover:underline">See more →</a>
+      </div>
+      {% endif %}
+
+    </div><!-- /sidebar -->
+
+  </div>
 </div>
+
+<style>
+@keyframes actIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+</style>
 {% endblock %}
