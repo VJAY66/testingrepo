@@ -3050,7 +3050,7 @@ def onboarding_step2(request):
         popular = list(
             User.objects.exclude(id=request.user.id)
             .exclude(id__in=already_following_ids)
-            .annotate(_fc=Count('followers'))
+            .annotate(_fc=Count('follower_links'))
             .order_by('-_fc')[:8]
         )
         seen_ids = {u.id for u in suggested_users}
