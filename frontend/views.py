@@ -10680,10 +10680,12 @@ def create_stock_prediction(request):
                 "Please verify the ticker symbol is correct, or enter the current price manually."
             )
 
-    # Compute predicted_change_pct from entry price and target price
+    # Compute predicted_change_pct from entry price and target price.
+    # Clamped to DecimalField(max_digits=8, decimal_places=2) range.
     predicted_change_pct = None
     if entry_price and target_price:
-        predicted_change_pct = round((target_price - entry_price) / entry_price * 100, 2)
+        raw_pct = (target_price - entry_price) / entry_price * 100
+        predicted_change_pct = round(max(-999999.99, min(999999.99, raw_pct)), 2)
 
     # Build auto title if not submitted
     title = request.POST.get('title', '').strip()
