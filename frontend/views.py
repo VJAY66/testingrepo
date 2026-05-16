@@ -10594,7 +10594,7 @@ def create_stock_prediction(request):
     stock_name = request.POST.get('stock_name', '').strip()
     currency = request.POST.get('currency', 'USD').strip().upper() or 'USD'
     direction = request.POST.get('direction', '').strip()
-    pct_raw = request.POST.get('predicted_change_pct', '').strip()
+    target_price_raw = request.POST.get('target_price', '').strip()
     target_date_raw = request.POST.get('target_date', '').strip()
     entry_price_raw = request.POST.get('entry_price', '').strip()
     hashtags_raw = request.POST.get('hashtags', '').strip()
@@ -10608,19 +10608,19 @@ def create_stock_prediction(request):
         errors.append('Stock symbol is required.')
     if direction not in ('up', 'down', 'above', 'below'):
         errors.append('Prediction direction is required.')
-    if not pct_raw:
-        errors.append('Predicted change % is required.')
+    if not target_price_raw:
+        errors.append('Target price is required.')
     if not target_date_raw:
         errors.append('Target date is required.')
 
-    predicted_change_pct = None
+    target_price = None
     try:
-        predicted_change_pct = float(pct_raw)
-        if predicted_change_pct <= 0:
-            errors.append('Predicted % must be positive.')
+        target_price = float(target_price_raw)
+        if target_price <= 0:
+            errors.append('Target price must be positive.')
     except (ValueError, TypeError):
-        if pct_raw:
-            errors.append('Invalid predicted % value.')
+        if target_price_raw:
+            errors.append('Invalid target price value.')
 
     try:
         from datetime import date as _date
@@ -10642,19 +10642,16 @@ def create_stock_prediction(request):
     if not entry_price and stock_symbol:
         entry_price = _fetch_live_price(stock_symbol)
 
-    # Compute target_price from entry + predicted %
-    target_price = 0
-    if entry_price and predicted_change_pct:
-        if direction == 'up':
-            target_price = entry_price * (1 + predicted_change_pct / 100)
-        elif direction == 'down':
-            target_price = entry_price * (1 - predicted_change_pct / 100)
+    # Compute predicted_change_pct from entry price and target price
+    predicted_change_pct = None
+    if entry_price and target_price:
+        predicted_change_pct = round((target_price - entry_price) / entry_price * 100, 2)
 
     # Build auto title if not submitted
     title = request.POST.get('title', '').strip()
-    if not title and stock_symbol and direction and predicted_change_pct:
+    if not title and stock_symbol and direction and target_price:
         dir_word = 'Up' if direction in ('up', 'above') else 'Down'
-        title = f"I think {stock_symbol} will go {dir_word} {predicted_change_pct}% by {target_date}"
+        title = f"I think {stock_symbol} will go {dir_word} to {target_price:.2f} {currency} by {target_date}"
 
     if not title:
         errors.append('Could not generate a title — please fill in all fields.')

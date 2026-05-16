@@ -147,22 +147,22 @@
                 <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Prediction Target</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5" for="id_predicted_change_pct">
-                            % Change <span class="text-red-500">*</span>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5" for="id_target_price">
+                            Target Price <span class="text-red-500">*</span>
                         </label>
                         <div class="relative">
+                            <span id="target-price-prefix" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground pointer-events-none">$</span>
                             <input
                                 type="number"
-                                id="id_predicted_change_pct"
-                                name="predicted_change_pct"
+                                id="id_target_price"
+                                name="target_price"
                                 required
-                                min="0.01"
-                                step="0.01"
-                                placeholder="5.00"
-                                class="w-full rounded-xl border border-border bg-background/70 px-3.5 py-2.5 pr-8 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
+                                min="0.0001"
+                                step="0.0001"
+                                placeholder="200.00"
+                                class="w-full rounded-xl border border-border bg-background/70 pl-7 pr-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
                                 oninput="updatePreview()"
                             >
-                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground pointer-events-none">%</span>
                         </div>
                     </div>
                     <div>
@@ -432,6 +432,8 @@ function selectCurrency(code) {
     document.getElementById('curr-display').textContent = cur.label;
     var prefix = document.getElementById('entry-price-prefix');
     if (prefix) prefix.textContent = cur.sym;
+    var tpPrefix = document.getElementById('target-price-prefix');
+    if (tpPrefix) tpPrefix.textContent = cur.sym;
     closeCurrencyDropdown();
     updatePreview();
 }
@@ -475,13 +477,13 @@ document.getElementById('curr-trigger').addEventListener('click', function() {
 
 // ── Live preview sentence ────────────────────────────────────
 function updatePreview() {
-    var symbol = (document.getElementById('id_stock_symbol').value || '').trim().toUpperCase();
-    var pct    = document.getElementById('id_predicted_change_pct').value;
+    var symbol  = (document.getElementById('id_stock_symbol').value || '').trim().toUpperCase();
+    var price   = document.getElementById('id_target_price').value;
     var dateRaw = document.getElementById('id_target_date').value;
-    var box    = document.getElementById('preview-box');
-    var sent   = document.getElementById('preview-sentence');
+    var box     = document.getElementById('preview-box');
+    var sent    = document.getElementById('preview-sentence');
 
-    var isEmpty = !symbol && !pct && !dateRaw && !selectedDirection;
+    var isEmpty = !symbol && !price && !dateRaw && !selectedDirection;
     if (isEmpty) {
         box.classList.remove('border-solid','border-primary/40');
         box.classList.add('border-dashed','border-border');
@@ -492,20 +494,21 @@ function updatePreview() {
     box.classList.remove('border-dashed','border-border');
     box.classList.add('border-solid','border-primary/40');
 
-    var symHtml   = symbol ? '<strong class="text-primary font-black" style="font-family:\'Playfair Display\',serif;">' + symbol + '</strong>' : '<span class="text-muted-foreground italic">[SYMBOL]</span>';
-    var dirColor  = selectedDirection === 'up' ? 'color:hsl(142 65% 38%)' : selectedDirection === 'down' ? 'color:hsl(346 65% 44%)' : '';
-    var arrow     = selectedDirection === 'up' ? '▲' : selectedDirection === 'down' ? '▼' : '';
-    var dirWord   = selectedDirection === 'up' ? 'Up' : selectedDirection === 'down' ? 'Down' : '<span class="text-muted-foreground italic">[direction]</span>';
-    var dirHtml   = selectedDirection ? '<strong style="' + dirColor + '">' + arrow + ' ' + dirWord + '</strong>' : dirWord;
-    var pctHtml   = pct ? '<strong style="' + dirColor + '">' + parseFloat(pct).toFixed(2) + '%</strong>' : '<span class="text-muted-foreground italic">X%</span>';
-    var dateStr   = '';
+    var sym      = selectedCurrency.sym;
+    var symHtml  = symbol ? '<strong class="text-primary font-black" style="font-family:\'Playfair Display\',serif;">' + symbol + '</strong>' : '<span class="text-muted-foreground italic">[SYMBOL]</span>';
+    var dirColor = selectedDirection === 'up' ? 'color:hsl(142 65% 38%)' : selectedDirection === 'down' ? 'color:hsl(346 65% 44%)' : '';
+    var arrow    = selectedDirection === 'up' ? '▲' : selectedDirection === 'down' ? '▼' : '';
+    var dirWord  = selectedDirection === 'up' ? 'Up' : selectedDirection === 'down' ? 'Down' : '<span class="text-muted-foreground italic">[direction]</span>';
+    var dirHtml  = selectedDirection ? '<strong style="' + dirColor + '">' + arrow + ' ' + dirWord + '</strong>' : dirWord;
+    var priceHtml = price ? '<strong style="' + dirColor + '">' + sym + parseFloat(price).toFixed(2) + '</strong>' : '<span class="text-muted-foreground italic">[target price]</span>';
+    var dateStr  = '';
     if (dateRaw) {
         var d = new Date(dateRaw + 'T00:00:00');
         dateStr = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
     }
     var dateHtml = dateStr ? '<strong class="text-foreground">' + dateStr + '</strong>' : '<span class="text-muted-foreground italic">[date]</span>';
 
-    sent.innerHTML = 'I think ' + symHtml + ' will go ' + dirHtml + ' ' + pctHtml + ' by ' + dateHtml;
+    sent.innerHTML = 'I think ' + symHtml + ' will go ' + dirHtml + ' to ' + priceHtml + ' by ' + dateHtml;
 }
 
 // ── Form submit guard ────────────────────────────────────────
