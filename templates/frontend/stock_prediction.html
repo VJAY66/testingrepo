@@ -247,7 +247,7 @@
             <!-- When guessed -->
             <div class="rounded-xl bg-muted/40 border border-border px-2 py-3">
                 <p class="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">When Guessed</p>
-                <p class="text-sm font-black text-foreground tabular-nums">${{ sp.entry_price|floatformat:4 }}</p>
+                <p class="text-sm font-black text-foreground tabular-nums">{{ sp.currency_symbol }}{{ sp.entry_price|floatformat:4 }}</p>
                 <p class="text-[10px] text-muted-foreground mt-0.5">{{ post.created_at|date:"M j, Y" }}</p>
             </div>
             <!-- Movement -->
@@ -269,7 +269,7 @@
             <div class="rounded-xl bg-muted/40 border border-border px-2 py-3">
                 <p class="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">Last Updated</p>
                 <p class="text-sm font-black text-foreground tabular-nums" id="live-price-value">
-                    {% if sp.live_price %}${{ sp.live_price|floatformat:4 }}{% else %}—{% endif %}
+                    {% if sp.live_price %}{{ sp.currency_symbol }}{{ sp.live_price|floatformat:4 }}{% else %}—{% endif %}
                 </p>
                 <p class="text-[10px] text-muted-foreground mt-0.5" id="price-updated-at">
                     {% if sp.price_updated_at %}{{ sp.price_updated_at|date:"M j" }}{% else %}—{% endif %}
@@ -303,7 +303,7 @@
                 {% if sp.outcome == 'bullish_wins' or sp.outcome == 'bullish_correct' %}🎉 Prediction Correct!{% else %}❌ Prediction Missed{% endif %}
             </p>
             {% if sp.resolved_price %}
-            <p class="text-xs text-muted-foreground mt-0.5">Resolved at ${{ sp.resolved_price|floatformat:4 }}</p>
+            <p class="text-xs text-muted-foreground mt-0.5">Resolved at {{ sp.currency_symbol }}{{ sp.resolved_price|floatformat:4 }}</p>
             {% endif %}
             {% if sp.points_earned is not None %}
             <p class="text-xs font-bold mt-1
@@ -593,7 +593,7 @@
         </div>
         <div class="flex flex-col sm:flex-row gap-3">
             <div class="relative flex-1">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground pointer-events-none">$</span>
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground pointer-events-none">{{ sp.currency_symbol }}</span>
                 <input type="number" id="resolve-price-input" step="0.0001" min="0" placeholder="Actual closing price" class="resolve-input w-full">
             </div>
             <button id="resolve-btn" type="button" onclick="resolveStock()"
@@ -777,7 +777,7 @@ function resolveStock() {
         msg.classList.remove('hidden');
         return;
     }
-    if (!confirm('Resolve this prediction at $' + parseFloat(price).toFixed(4) + '?\n\nThis is permanent.')) return;
+    if (!confirm('Resolve this prediction at {{ sp.currency_symbol|escapejs }}' + parseFloat(price).toFixed(4) + '?\n\nThis is permanent.')) return;
     btn.disabled = true; btn.textContent = 'Resolving…';
     msg.textContent = 'Processing…'; msg.className = 'text-xs font-semibold text-muted-foreground'; msg.classList.remove('hidden');
 
@@ -819,7 +819,7 @@ function refreshLivePrice() {
             var lp = document.getElementById('live-price-value');
             var mv = document.getElementById('movement-value');
             var pu = document.getElementById('price-updated-at');
-            if (lp) lp.textContent = '$' + parseFloat(data.live_price).toFixed(4);
+            if (lp) lp.textContent = '{{ sp.currency_symbol|escapejs }}' + parseFloat(data.live_price).toFixed(4);
             if (pu) pu.textContent = data.updated_at || 'just now';
             if (mv && data.movement_pct !== undefined && data.movement_pct !== null) {
                 var pct = parseFloat(data.movement_pct);

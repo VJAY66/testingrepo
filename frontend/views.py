@@ -10587,11 +10587,16 @@ def create_stock_prediction(request):
     # POST
     stock_symbol = request.POST.get('stock_symbol', '').strip().upper()
     stock_name = request.POST.get('stock_name', '').strip()
+    currency = request.POST.get('currency', 'USD').strip().upper() or 'USD'
     direction = request.POST.get('direction', '').strip()
     pct_raw = request.POST.get('predicted_change_pct', '').strip()
     target_date_raw = request.POST.get('target_date', '').strip()
     entry_price_raw = request.POST.get('entry_price', '').strip()
     hashtags_raw = request.POST.get('hashtags', '').strip()
+
+    valid_currencies = [c[0] for c in StockPrediction.CURRENCY_CHOICES]
+    if currency not in valid_currencies:
+        currency = 'USD'
 
     errors = []
     if not stock_symbol:
@@ -10676,6 +10681,7 @@ def create_stock_prediction(request):
         post=post,
         stock_symbol=stock_symbol,
         stock_name=stock_name,
+        currency=currency,
         target_price=round(target_price, 6) if target_price else 0,
         target_date=target_date,
         direction=direction,

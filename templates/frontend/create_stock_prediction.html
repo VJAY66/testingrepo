@@ -43,9 +43,34 @@
                 </p>
             </div>
 
-            <!-- ── Stock symbol + name ──────────────────────────── -->
+            <!-- ── Stock symbol + name + currency ─────────────── -->
             <div class="rounded-xl border border-border bg-background/50 p-4 space-y-3">
                 <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Stock Details</p>
+                <!-- Currency selector (full width) -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5" for="id_currency">
+                        Currency <span class="text-red-500">*</span>
+                    </label>
+                    <select id="id_currency" name="currency" required onchange="updatePreview()"
+                            class="w-full rounded-xl border border-border bg-background/70 px-3.5 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition">
+                        <option value="USD">$ USD — US Dollar</option>
+                        <option value="INR">₹ INR — Indian Rupee</option>
+                        <option value="EUR">€ EUR — Euro</option>
+                        <option value="GBP">£ GBP — British Pound</option>
+                        <option value="JPY">¥ JPY — Japanese Yen</option>
+                        <option value="CNY">¥ CNY — Chinese Yuan</option>
+                        <option value="AUD">A$ AUD — Australian Dollar</option>
+                        <option value="CAD">C$ CAD — Canadian Dollar</option>
+                        <option value="SGD">S$ SGD — Singapore Dollar</option>
+                        <option value="HKD">HK$ HKD — Hong Kong Dollar</option>
+                        <option value="BRL">R$ BRL — Brazilian Real</option>
+                        <option value="KRW">₩ KRW — South Korean Won</option>
+                        <option value="TRY">₺ TRY — Turkish Lira</option>
+                        <option value="MXN">MX$ MXN — Mexican Peso</option>
+                        <option value="BTC">₿ BTC — Bitcoin</option>
+                        <option value="ETH">Ξ ETH — Ethereum</option>
+                    </select>
+                </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5" for="id_stock_symbol">
@@ -161,7 +186,7 @@
                     Current Price <span class="text-muted-foreground font-normal normal-case tracking-normal">(optional, for live tracking)</span>
                 </label>
                 <div class="relative">
-                    <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground pointer-events-none">$</span>
+                    <span id="entry-price-prefix" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground pointer-events-none">$</span>
                     <input
                         type="number"
                         id="id_entry_price"
@@ -263,6 +288,23 @@ function validateFutureDate(input) {
         input.style.borderColor = '';
     }
 }
+
+// ── Currency symbol map ──────────────────────────────────────
+var CURRENCY_SYMBOLS = {
+    USD:'$', INR:'₹', EUR:'€', GBP:'£', JPY:'¥', CNY:'¥',
+    AUD:'A$', CAD:'C$', SGD:'S$', HKD:'HK$', BRL:'R$',
+    KRW:'₩', TRY:'₺', MXN:'MX$', BTC:'₿', ETH:'Ξ'
+};
+function getCurrencySym() {
+    var sel = document.getElementById('id_currency');
+    return sel ? (CURRENCY_SYMBOLS[sel.value] || sel.value) : '$';
+}
+document.getElementById('id_currency').addEventListener('change', function() {
+    var sym = getCurrencySym();
+    var prefix = document.getElementById('entry-price-prefix');
+    if (prefix) prefix.textContent = sym;
+    updatePreview();
+});
 
 // ── Live preview sentence ────────────────────────────────────
 function updatePreview() {

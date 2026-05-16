@@ -1318,6 +1318,31 @@ class StockPrediction(models.Model):
         ('above', 'Above (will exceed absolute target price)'),
         ('below', 'Below (will fall under absolute target price)'),
     ]
+
+    CURRENCY_CHOICES = [
+        ('USD', '$ USD — US Dollar'),
+        ('INR', '₹ INR — Indian Rupee'),
+        ('EUR', '€ EUR — Euro'),
+        ('GBP', '£ GBP — British Pound'),
+        ('JPY', '¥ JPY — Japanese Yen'),
+        ('CNY', '¥ CNY — Chinese Yuan'),
+        ('AUD', 'A$ AUD — Australian Dollar'),
+        ('CAD', 'C$ CAD — Canadian Dollar'),
+        ('SGD', 'S$ SGD — Singapore Dollar'),
+        ('HKD', 'HK$ HKD — Hong Kong Dollar'),
+        ('BRL', 'R$ BRL — Brazilian Real'),
+        ('KRW', '₩ KRW — South Korean Won'),
+        ('TRY', '₺ TRY — Turkish Lira'),
+        ('MXN', 'MX$ MXN — Mexican Peso'),
+        ('BTC', '₿ BTC — Bitcoin'),
+        ('ETH', 'Ξ ETH — Ethereum'),
+    ]
+    CURRENCY_SYMBOLS = {
+        'USD': '$', 'INR': '₹', 'EUR': '€', 'GBP': '£',
+        'JPY': '¥', 'CNY': '¥', 'AUD': 'A$', 'CAD': 'C$',
+        'SGD': 'S$', 'HKD': 'HK$', 'BRL': 'R$', 'KRW': '₩',
+        'TRY': '₺', 'MXN': 'MX$', 'BTC': '₿', 'ETH': 'Ξ',
+    }
     STATUS_ACTIVE = 'active'
     STATUS_RESOLVED = 'resolved'
     STATUS_EXPIRED = 'expired'
@@ -1339,6 +1364,7 @@ class StockPrediction(models.Model):
     post = models.OneToOneField(Post, on_delete=models.CASCADE, related_name='stock_prediction')
     stock_symbol = models.CharField(max_length=20, db_index=True)
     stock_name = models.CharField(max_length=100, blank=True, default='')
+    currency = models.CharField(max_length=6, choices=CURRENCY_CHOICES, default='USD')
     target_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     target_date = models.DateField(db_index=True)
     direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES)
@@ -1378,6 +1404,10 @@ class StockPrediction(models.Model):
     @property
     def is_active(self):
         return self.status == self.STATUS_ACTIVE
+
+    @property
+    def currency_symbol(self):
+        return self.CURRENCY_SYMBOLS.get(self.currency, self.currency)
 
     @property
     def is_pct_prediction(self):
