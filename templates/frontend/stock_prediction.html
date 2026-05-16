@@ -1,411 +1,803 @@
 {% extends 'frontend/base.html' %}
 {% block title %}{{ sp.stock_symbol }} Prediction — PickASide{% endblock %}
 
+{% block og_meta %}
+<meta property="og:title" content="{{ sp.stock_symbol }}: {{ post.title|truncatechars:70 }}">
+<meta property="og:description" content="{% if sp.direction == 'above' %}↑ Must go ABOVE{% else %}↓ Must go BELOW{% endif %} ₹{{ sp.target_price }} by {{ sp.target_date|date:'M j, Y' }} — Join the debate on PickASide.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="{{ request.build_absolute_uri }}">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ sp.stock_symbol }} Prediction — PickASide">
+<meta name="twitter:description" content="{{ post.title|truncatechars:140 }}">
+{% endblock %}
+
 {% block content %}
+<style>
+/* ── Glassmorphism card ── */
+.sp-hero {
+    background: linear-gradient(152deg, hsl(var(--card) / 0.96), hsl(var(--card) / 0.80));
+    backdrop-filter: blur(20px);
+    box-shadow: 0 24px 64px -36px rgba(15,23,42,0.55), inset 0 1px 0 rgba(255,255,255,0.13);
+    border-radius: 1.75rem;
+    border: 1px solid hsl(var(--border) / 0.5);
+}
+.sp-inner-card {
+    background: hsl(var(--background) / 0.5);
+    border: 1px solid hsl(var(--border) / 0.55);
+    border-radius: 1.1rem;
+}
+
+/* ── Progress bar ── */
+.sp-bar-track { height: 10px; border-radius: 999px; background: hsl(var(--muted)); overflow: hidden; }
+.sp-bar-bull  { height: 100%; background: linear-gradient(90deg, hsl(142 71% 38%), hsl(142 71% 50%)); border-radius: 999px 0 0 999px; transition: width 700ms cubic-bezier(.4,0,.2,1); }
+.sp-bar-bear  { height: 100%; background: linear-gradient(90deg, hsl(346 77% 44%), hsl(346 77% 55%)); border-radius: 0 999px 999px 0; transition: width 700ms cubic-bezier(.4,0,.2,1); }
+
+/* ── Side vote cards ── */
+.side-card {
+    border-radius: 1.35rem;
+    border: 2.5px solid hsl(var(--border));
+    padding: 1.5rem 1.25rem;
+    background: hsl(var(--card) / 0.65);
+    transition: border-color 220ms, box-shadow 220ms, transform 180ms;
+}
+.side-card:hover { transform: translateY(-3px); }
+.side-card.bull-card:hover  { border-color: hsl(142 71% 42% / 0.75); box-shadow: 0 14px 36px -18px hsl(142 71% 42% / 0.4); }
+.side-card.bear-card:hover  { border-color: hsl(346 77% 50% / 0.75); box-shadow: 0 14px 36px -18px hsl(346 77% 50% / 0.4); }
+
+/* ── Confidence slider ── */
+.conf-track {
+    -webkit-appearance: none;
+    width: 100%; height: 7px; border-radius: 999px;
+    outline: none; cursor: pointer;
+    transition: background 250ms;
+}
+.conf-track::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: white;
+    border: 3px solid currentColor;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    cursor: pointer;
+    transition: transform 140ms;
+}
+.conf-track::-webkit-slider-thumb:hover { transform: scale(1.18); }
+.conf-track::-moz-range-thumb {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: white; border: 3px solid hsl(var(--primary)); cursor: pointer;
+}
+.conf-track.lvl-danger  { background: linear-gradient(90deg, hsl(346 77% 50%), hsl(var(--muted) / 0.5)); color: hsl(346 77% 50%); }
+.conf-track.lvl-caution { background: linear-gradient(90deg, hsl(38 86% 52%),  hsl(var(--muted) / 0.5)); color: hsl(38 86% 52%); }
+.conf-track.lvl-good    { background: linear-gradient(90deg, hsl(142 71% 44%), hsl(var(--muted) / 0.5)); color: hsl(142 71% 44%); }
+.conf-track.lvl-max     { background: linear-gradient(90deg, hsl(160 80% 44%), hsl(var(--muted) / 0.5)); color: hsl(160 80% 44%); }
+
+/* ── Emerald glow for 10/10 ── */
+@keyframes emeraldPulse {
+    0%,100% { box-shadow: 0 0 0 0 hsl(160 80% 44% / 0); }
+    50%      { box-shadow: 0 0 22px 6px hsl(160 80% 44% / 0.45); }
+}
+.emerald-glow { animation: emeraldPulse 1.8s ease-in-out infinite; }
+
+/* ── Comment area ── */
+.sp-textarea {
+    width: 100%; padding: 0.72rem 0.95rem;
+    border-radius: 0.9rem;
+    border: 1.5px solid hsl(var(--border));
+    background: hsl(var(--background) / 0.7);
+    color: hsl(var(--foreground));
+    font-size: 0.875rem; font-family: inherit;
+    resize: none; outline: none;
+    transition: border-color 180ms, box-shadow 180ms;
+}
+.sp-textarea:focus {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.13);
+}
+.sp-textarea::placeholder { color: hsl(var(--muted-foreground) / 0.5); }
+
+/* ── Comment cards ── */
+.cmt-card {
+    border-radius: 1rem;
+    border: 1px solid hsl(var(--border) / 0.65);
+    background: hsl(var(--background) / 0.45);
+    padding: 0.9rem 1rem;
+    transition: border-color 150ms, background 150ms;
+}
+.cmt-card:hover { border-color: hsl(var(--border)); background: hsl(var(--background) / 0.6); }
+
+/* ── Confidence badge ── */
+.conf-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 1px 7px; border-radius: 999px;
+    font-size: 0.68rem; font-weight: 800; white-space: nowrap;
+}
+.cbadge-low    { background: hsl(346 77% 50% / 0.13); color: hsl(346 70% 44%); border: 1px solid hsl(346 77% 50% / 0.25); }
+.cbadge-mid    { background: hsl(38 86% 54% / 0.13);  color: hsl(38 76% 38%);  border: 1px solid hsl(38 86% 54% / 0.25); }
+.cbadge-high   { background: hsl(142 71% 44% / 0.13); color: hsl(142 58% 34%); border: 1px solid hsl(142 71% 44% / 0.25); }
+.cbadge-max    { background: hsl(160 80% 44% / 0.13); color: hsl(160 68% 32%); border: 1px solid hsl(160 80% 44% / 0.25); }
+
+/* ── React buttons ── */
+.react-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px; border-radius: 999px;
+    border: 1px solid hsl(var(--border) / 0.7);
+    background: hsl(var(--background) / 0.7);
+    font-size: 0.7rem; font-weight: 600;
+    color: hsl(var(--muted-foreground));
+    cursor: pointer; transition: all 140ms; line-height: 1.4;
+}
+.react-btn:hover { border-color: hsl(var(--border)); color: hsl(var(--foreground)); }
+.react-btn.liked    { color: hsl(142 60% 40%); border-color: hsl(142 60% 40% / 0.4); background: hsl(142 60% 40% / 0.08); }
+.react-btn.disliked { color: hsl(346 70% 50%); border-color: hsl(346 70% 50% / 0.4); background: hsl(346 70% 50% / 0.08); }
+
+/* ── Status badges ── */
+.sbadge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 12px; border-radius: 999px;
+    font-size: 0.7rem; font-weight: 800;
+    letter-spacing: 0.05em; text-transform: uppercase;
+}
+.sbadge-active   { background: hsl(38 86% 54% / 0.13); color: hsl(38 75% 38%); border: 1px solid hsl(38 86% 54% / 0.35); }
+.sbadge-resolved { background: hsl(142 71% 44% / 0.13); color: hsl(142 56% 34%); border: 1px solid hsl(142 71% 44% / 0.35); }
+.sbadge-expired  { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border)); }
+
+/* ── Resolution panel ── */
+.resolve-panel {
+    background: linear-gradient(135deg, hsl(38 86% 54% / 0.07), hsl(var(--card) / 0.8));
+    border: 1.5px solid hsl(38 86% 54% / 0.3);
+    border-radius: 1.35rem; padding: 1.4rem 1.5rem;
+}
+.resolve-input {
+    width: 100%; padding: 0.78rem 1rem 0.78rem 2.2rem;
+    border-radius: 0.9rem;
+    border: 1.5px solid hsl(var(--border));
+    background: hsl(var(--background) / 0.72);
+    color: hsl(var(--foreground)); font-size: 0.95rem; font-family: inherit;
+    outline: none; transition: border-color 180ms, box-shadow 180ms;
+}
+.resolve-input:focus { border-color: hsl(38 86% 54%); box-shadow: 0 0 0 3px hsl(38 86% 54% / 0.15); }
+</style>
+
 <div class="max-w-5xl mx-auto py-6 px-4 space-y-6">
 
-  <!-- ── Stock Header Card ──────────────────────────────────────────────── -->
-  <div class="rounded-3xl border border-border bg-card shadow-lg overflow-hidden">
-    <!-- Top band -->
-    <div class="{% if sp.status == 'resolved' %}{% if sp.outcome == 'bullish_correct' %}bg-gradient-to-r from-emerald-600 to-teal-600{% else %}bg-gradient-to-r from-rose-600 to-red-600{% endif %}{% else %}bg-gradient-to-r from-slate-700 to-slate-800{% endif %} px-6 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <span class="text-3xl font-black text-white tracking-tight">{{ sp.stock_symbol }}</span>
-        {% if sp.stock_name %}<span class="text-sm text-white/70 font-medium">{{ sp.stock_name }}</span>{% endif %}
-      </div>
-      <div class="flex items-center gap-2">
-        {% if sp.status == 'active' %}
-          <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 border border-amber-400/40 px-3 py-1 text-xs font-bold text-amber-200">⏳ Active</span>
-        {% elif sp.status == 'resolved' %}
-          {% if sp.outcome == 'bullish_correct' %}
-            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/20 border border-emerald-400/40 px-3 py-1 text-xs font-bold text-emerald-200">🐂 Bullish Won!</span>
-          {% else %}
-            <span class="inline-flex items-center gap-1.5 rounded-full bg-rose-400/20 border border-rose-400/40 px-3 py-1 text-xs font-bold text-rose-200">🐻 Bearish Won!</span>
-          {% endif %}
-        {% else %}
-          <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-400/20 border border-gray-400/40 px-3 py-1 text-xs font-bold text-gray-200">⌛ Expired</span>
+    <!-- Back -->
+    <a href="{% url 'stocks_list' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        All Stock Predictions
+    </a>
+
+    <!-- ════════════════════════════════════════════════════════
+         STOCK HEADER CARD
+    ════════════════════════════════════════════════════════ -->
+    <div class="sp-hero p-6 sm:p-8">
+
+        <!-- Symbol row -->
+        <div class="flex flex-wrap items-start justify-between gap-4 mb-5">
+            <div class="flex items-center gap-4 min-w-0">
+                <div class="flex-shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center
+                    {% if sp.direction == 'above' %}bg-emerald-100 dark:bg-emerald-900/35{% else %}bg-rose-100 dark:bg-rose-900/35{% endif %}
+                    shadow-inner border {% if sp.direction == 'above' %}border-emerald-200/60 dark:border-emerald-700/40{% else %}border-rose-200/60 dark:border-rose-700/40{% endif %}">
+                    <span class="font-black text-base leading-none text-center break-all
+                        {% if sp.direction == 'above' %}text-emerald-700 dark:text-emerald-400{% else %}text-rose-700 dark:text-rose-400{% endif %}"
+                        style="font-family:'Playfair Display',serif; font-size:clamp(0.65rem,2vw,0.9rem); letter-spacing:-0.01em;">
+                        {{ sp.stock_symbol|truncatechars:5 }}
+                    </span>
+                </div>
+                <div class="min-w-0">
+                    <div class="flex flex-wrap items-baseline gap-2">
+                        <h1 class="text-2xl sm:text-3xl font-black text-foreground"
+                            style="font-family:'Playfair Display',serif; letter-spacing:-0.02em;">{{ sp.stock_symbol }}</h1>
+                        {% if sp.stock_name %}
+                        <span class="text-muted-foreground font-medium text-sm">{{ sp.stock_name }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 mt-1.5">
+                        <span class="text-sm font-bold text-muted-foreground">vs ₹{{ sp.target_price|floatformat:2 }}</span>
+                        {% if sp.direction == 'above' %}
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wide bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700/40">↑ Must go ABOVE</span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wide bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 border border-rose-200 dark:border-rose-700/40">↓ Must go BELOW</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status + Date -->
+            <div class="flex flex-col items-end gap-2 flex-shrink-0">
+                {% if sp.status == 'active' %}
+                <span class="sbadge sbadge-active"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Active</span>
+                {% elif sp.status == 'resolved' %}
+                <span class="sbadge sbadge-resolved"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Resolved</span>
+                {% else %}
+                <span class="sbadge sbadge-expired">Expired</span>
+                {% endif %}
+                <div class="text-right">
+                    <p class="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Target Date</p>
+                    <p class="text-sm font-bold text-foreground">{{ sp.target_date|date:"d M Y" }}</p>
+                    {% if sp.status == 'active' and sp.days_remaining is not None %}
+                    <p class="text-xs {% if sp.days_remaining <= 7 %}text-rose-500 font-bold{% else %}text-muted-foreground{% endif %}">
+                        {% if sp.days_remaining > 0 %}{{ sp.days_remaining }} day{{ sp.days_remaining|pluralize }} left{% else %}Deadline today{% endif %}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Prediction question -->
+        <h2 class="text-base sm:text-lg font-bold text-foreground mb-5 leading-snug">{{ post.title }}</h2>
+
+        <!-- Meta chips row -->
+        <div class="flex flex-wrap gap-2 mb-5">
+            {% if sp.entry_price %}
+            <span class="inline-flex items-center gap-1 rounded-xl border border-border bg-muted/40 px-3 py-1.5 text-xs font-semibold text-foreground">
+                📌 Entry ₹{{ sp.entry_price|floatformat:2 }}
+            </span>
+            {% endif %}
+            {% if sp.status == 'resolved' and sp.resolved_price is not None %}
+            <span class="inline-flex items-center gap-1 rounded-xl border border-border bg-muted/40 px-3 py-1.5 text-xs font-semibold text-foreground">
+                ✅ Resolved ₹{{ sp.resolved_price|floatformat:2 }}
+            </span>
+            {% endif %}
+            {% if post.category %}
+            <span class="inline-flex items-center gap-1 rounded-xl border border-border bg-muted/40 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+                {{ post.category }}
+            </span>
+            {% endif %}
+        </div>
+
+        <!-- Resolved outcome banner -->
+        {% if sp.status == 'resolved' and sp.resolved_price is not None %}
+        <div class="flex flex-wrap items-center gap-4 p-4 rounded-2xl mb-5
+            {% if sp.outcome == 'bullish_wins' or sp.outcome == 'bullish_correct' %}bg-emerald-50 dark:bg-emerald-950/25 border border-emerald-200 dark:border-emerald-800/40{% else %}bg-rose-50 dark:bg-rose-950/25 border border-rose-200 dark:border-rose-800/40{% endif %}">
+            <div class="text-3xl">{% if sp.outcome == 'bullish_wins' or sp.outcome == 'bullish_correct' %}🐂{% else %}🐻{% endif %}</div>
+            <div>
+                <p class="text-base font-black {% if sp.outcome == 'bullish_wins' or sp.outcome == 'bullish_correct' %}text-emerald-700 dark:text-emerald-300{% else %}text-rose-700 dark:text-rose-300{% endif %}">
+                    {% if sp.outcome == 'bullish_wins' or sp.outcome == 'bullish_correct' %}Bullish Won!{% else %}Bearish Won!{% endif %}
+                </p>
+                <p class="text-xs text-muted-foreground">Resolved at ₹{{ sp.resolved_price|floatformat:2 }}{% if sp.resolved_at %} on {{ sp.resolved_at|date:"d M Y" }}{% endif %}</p>
+            </div>
+        </div>
         {% endif %}
-      </div>
+
+        <!-- Bull/Bear progress bar -->
+        <div class="space-y-2">
+            <div class="flex items-center justify-between text-xs font-bold">
+                <span class="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">🐂 Bullish <span class="tabular-nums">{{ bull_pct|floatformat:0 }}%</span></span>
+                <span class="text-rose-600 dark:text-rose-400 flex items-center gap-1"><span class="tabular-nums">{{ bear_pct|floatformat:0 }}%</span> Bearish 🐻</span>
+            </div>
+            <div class="sp-bar-track flex">
+                <div class="sp-bar-bull" style="width:{{ bull_pct|floatformat:1 }}%"></div>
+                <div class="sp-bar-bear flex-1"></div>
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>{{ bull_count }} vote{{ bull_count|pluralize }}</span>
+                <span class="font-semibold">{{ total_votes }} total</span>
+                <span>{{ bear_count }} vote{{ bear_count|pluralize }}</span>
+            </div>
+        </div>
+
+        <!-- Confidence distribution -->
+        {% if total_votes > 0 %}
+        <div class="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-border/40 text-xs">
+            <span class="text-muted-foreground font-medium">Avg confidence:</span>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/35 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-200/60 dark:border-emerald-700/40">
+                🐂 {{ bull_conf_avg|floatformat:1 }}/10
+            </span>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-100 dark:bg-rose-900/35 text-rose-700 dark:text-rose-400 font-bold border border-rose-200/60 dark:border-rose-700/40">
+                🐻 {{ bear_conf_avg|floatformat:1 }}/10
+            </span>
+        </div>
+        {% endif %}
+
+        <!-- Hashtags -->
+        {% if post.hashtags %}
+        <div class="mt-4 flex flex-wrap gap-1.5">
+            {% for tag in post.get_hashtags_list %}
+            <a href="{% url 'hashtag_search' %}?tag={{ tag }}" class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-gradient-to-r from-cyan-500/15 via-teal-500/15 to-amber-500/15 border border-cyan-500/30 hover:border-cyan-500/60 text-cyan-600 dark:text-cyan-400 text-xs font-medium transition">#{{ tag }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 
-    <div class="p-5 sm:p-6">
-      <!-- Question -->
-      <h1 class="text-xl font-bold text-foreground mb-4 leading-snug">{{ post.title }}</h1>
+    <!-- ════════════════════════════════════════════════════════
+         VOTING SECTION
+    ════════════════════════════════════════════════════════ -->
 
-      <!-- Prediction meta -->
-      <div class="flex flex-wrap gap-3 mb-5">
-        <!-- Direction -->
-        {% if sp.direction == 'above' %}
-        <div class="inline-flex items-center gap-2 rounded-xl border border-emerald-300/50 bg-emerald-50/70 dark:bg-emerald-950/40 dark:border-emerald-700/40 px-3 py-2">
-          <span class="text-emerald-600 text-lg font-black">↑</span>
-          <div>
-            <p class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wide">Direction</p>
-            <p class="text-sm font-bold text-foreground">Must go ABOVE ₹{{ sp.target_price|floatformat:2 }}</p>
-          </div>
-        </div>
-        {% else %}
-        <div class="inline-flex items-center gap-2 rounded-xl border border-rose-300/50 bg-rose-50/70 dark:bg-rose-950/40 dark:border-rose-700/40 px-3 py-2">
-          <span class="text-rose-600 text-lg font-black">↓</span>
-          <div>
-            <p class="text-[10px] text-rose-600 dark:text-rose-400 font-bold uppercase tracking-wide">Direction</p>
-            <p class="text-sm font-bold text-foreground">Must go BELOW ₹{{ sp.target_price|floatformat:2 }}</p>
-          </div>
-        </div>
-        {% endif %}
-
-        <!-- Target date -->
-        <div class="inline-flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2">
-          <span class="text-lg">📅</span>
-          <div>
-            <p class="text-[10px] text-muted-foreground font-bold uppercase tracking-wide">Target Date</p>
-            <p class="text-sm font-bold text-foreground">{{ sp.target_date|date:"d M Y" }}
-              {% if sp.is_active %}
-                <span class="text-xs font-normal text-muted-foreground">({{ sp.days_remaining }} days)</span>
-              {% endif %}
-            </p>
-          </div>
-        </div>
-
-        <!-- Entry price if available -->
-        {% if sp.entry_price %}
-        <div class="inline-flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2">
-          <span class="text-lg">📌</span>
-          <div>
-            <p class="text-[10px] text-muted-foreground font-bold uppercase tracking-wide">Entry Price</p>
-            <p class="text-sm font-bold text-foreground">₹{{ sp.entry_price|floatformat:2 }}</p>
-          </div>
-        </div>
-        {% endif %}
-
-        <!-- Resolved price -->
-        {% if sp.status == 'resolved' %}
-        <div class="inline-flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2">
-          <span class="text-lg">✅</span>
-          <div>
-            <p class="text-[10px] text-muted-foreground font-bold uppercase tracking-wide">Resolved At</p>
-            <p class="text-sm font-bold text-foreground">₹{{ sp.resolved_price|floatformat:2 }}</p>
-          </div>
-        </div>
-        {% endif %}
-      </div>
-
-      <!-- Progress bar -->
-      <div class="mb-2 flex items-center justify-between text-xs font-semibold">
-        <span class="text-emerald-600 dark:text-emerald-400">🐂 Bullish {{ bull_pct }}%</span>
-        <span class="text-rose-600 dark:text-rose-400">{{ bear_pct }}% Bearish 🐻</span>
-      </div>
-      <div class="w-full h-3 rounded-full overflow-hidden bg-muted flex mb-1">
-        <div class="bg-gradient-to-r from-emerald-500 to-green-500 h-full transition-all duration-700" style="width:{{ bull_pct }}%"></div>
-        <div class="bg-gradient-to-r from-rose-500 to-red-500 h-full transition-all duration-700" style="width:{{ bear_pct }}%"></div>
-      </div>
-      <div class="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>{{ bull_count }} votes</span>
-        <span>{{ total_votes }} total</span>
-        <span>{{ bear_count }} votes</span>
-      </div>
-
-      <!-- Confidence averages -->
-      {% if bull_conf_avg or bear_conf_avg %}
-      <div class="mt-4 flex items-center gap-3 flex-wrap">
-        <span class="text-xs text-muted-foreground font-medium">Avg confidence:</span>
-        {% if bull_conf_avg %}
-        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200/60 dark:border-emerald-700/40 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-400">
-          🐂 {{ bull_conf_avg }}/10
-        </span>
-        {% endif %}
-        {% if bear_conf_avg %}
-        <span class="inline-flex items-center gap-1.5 rounded-full bg-rose-100 dark:bg-rose-900/30 border border-rose-200/60 dark:border-rose-700/40 px-2.5 py-1 text-xs font-bold text-rose-700 dark:text-rose-400">
-          🐻 {{ bear_conf_avg }}/10
-        </span>
-        {% endif %}
-      </div>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- ── Vote Section ───────────────────────────────────────────────────── -->
-  {% if not user.is_authenticated %}
-  <div class="rounded-2xl border border-border bg-card p-6 text-center">
-    <p class="text-base font-semibold text-foreground mb-1">Join the debate</p>
-    <p class="text-sm text-muted-foreground mb-4">Sign in to pick Bullish or Bearish and add your prediction.</p>
-    <a href="{% url 'login' %}" class="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition">Sign In</a>
-  </div>
-
-  {% elif not is_post_creator and sp.status == 'active' %}
-    {% if not user_has_voted %}
-    <!-- Pick side form -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-      <!-- Bullish -->
-      <form method="post" action="{% url 'create_stock_comment' post.id %}" class="group rounded-2xl border-2 border-emerald-200/80 dark:border-emerald-700/40 bg-gradient-to-br from-white via-emerald-50/70 to-teal-50/60 dark:from-slate-900/90 dark:via-slate-900/85 dark:to-emerald-950/55 p-5 shadow-lg hover:shadow-emerald-500/20 hover:border-emerald-300 dark:hover:border-emerald-500/60 transition-all duration-200">
-        {% csrf_token %}
-        <input type="hidden" name="vote_type" value="yes">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-green-500 shadow-lg shadow-emerald-500/30 text-3xl">🐂</div>
-          <div>
-            <p class="text-lg font-black text-emerald-700 dark:text-emerald-400">Bullish</p>
-            <p class="text-xs text-muted-foreground">Stock will reach/exceed target</p>
-          </div>
-        </div>
-
-        <!-- Confidence slider -->
-        <div class="mb-4">
-          <div class="flex items-center justify-between mb-2">
-            <label class="text-xs font-bold text-foreground">Confidence Level</label>
-            <span id="bull-conf-display" class="text-sm font-black text-emerald-600 dark:text-emerald-400">5/10</span>
-          </div>
-          <input type="range" name="confidence_score" id="bull-conf-slider" min="1" max="10" value="5"
-                 class="w-full h-2 rounded-full appearance-none cursor-pointer bg-emerald-200 dark:bg-emerald-900/50 accent-emerald-500">
-          <div class="flex justify-between text-[10px] text-muted-foreground mt-1">
-            <span>Low</span><span>Medium</span><span>High</span><span>🔥 Max</span>
-          </div>
-          <div id="bull-conf-emoji" class="text-center text-2xl mt-2">🤔</div>
-        </div>
-
-        <textarea name="content" rows="2" placeholder="Why are you Bullish? (optional)" class="w-full rounded-xl border border-emerald-200/70 dark:border-emerald-700/40 bg-white/85 dark:bg-slate-900/70 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 mb-3 resize-none"></textarea>
-        <label class="flex items-center gap-2 text-xs text-muted-foreground mb-3 cursor-pointer">
-          <input type="checkbox" name="is_anonymous" value="1" class="rounded border-border"> Post anonymously
-        </label>
-        <button type="submit" class="w-full rounded-full bg-gradient-to-r from-emerald-500 to-green-500 px-4 py-3 text-sm font-bold text-white shadow-md shadow-emerald-500/30 hover:from-emerald-400 hover:to-green-400 transition">
-          🐂 I'm Bullish
-        </button>
-      </form>
-
-      <!-- Bearish -->
-      <form method="post" action="{% url 'create_stock_comment' post.id %}" class="group rounded-2xl border-2 border-rose-200/80 dark:border-rose-700/40 bg-gradient-to-br from-white via-rose-50/70 to-red-50/60 dark:from-slate-900/90 dark:via-slate-900/85 dark:to-rose-950/55 p-5 shadow-lg hover:shadow-rose-500/20 hover:border-rose-300 dark:hover:border-rose-500/60 transition-all duration-200">
-        {% csrf_token %}
-        <input type="hidden" name="vote_type" value="no">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-red-500 shadow-lg shadow-rose-500/30 text-3xl">🐻</div>
-          <div>
-            <p class="text-lg font-black text-rose-700 dark:text-rose-400">Bearish</p>
-            <p class="text-xs text-muted-foreground">Stock won't reach target</p>
-          </div>
-        </div>
-
-        <!-- Confidence slider -->
-        <div class="mb-4">
-          <div class="flex items-center justify-between mb-2">
-            <label class="text-xs font-bold text-foreground">Confidence Level</label>
-            <span id="bear-conf-display" class="text-sm font-black text-rose-600 dark:text-rose-400">5/10</span>
-          </div>
-          <input type="range" name="confidence_score" id="bear-conf-slider" min="1" max="10" value="5"
-                 class="w-full h-2 rounded-full appearance-none cursor-pointer bg-rose-200 dark:bg-rose-900/50 accent-rose-500">
-          <div class="flex justify-between text-[10px] text-muted-foreground mt-1">
-            <span>Low</span><span>Medium</span><span>High</span><span>🔥 Max</span>
-          </div>
-          <div id="bear-conf-emoji" class="text-center text-2xl mt-2">🤔</div>
-        </div>
-
-        <textarea name="content" rows="2" placeholder="Why are you Bearish? (optional)" class="w-full rounded-xl border border-rose-200/70 dark:border-rose-700/40 bg-white/85 dark:bg-slate-900/70 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20 mb-3 resize-none"></textarea>
-        <label class="flex items-center gap-2 text-xs text-muted-foreground mb-3 cursor-pointer">
-          <input type="checkbox" name="is_anonymous" value="1" class="rounded border-border"> Post anonymously
-        </label>
-        <button type="submit" class="w-full rounded-full bg-gradient-to-r from-rose-500 to-red-500 px-4 py-3 text-sm font-bold text-white shadow-md shadow-rose-500/30 hover:from-rose-400 hover:to-red-400 transition">
-          🐻 I'm Bearish
-        </button>
-      </form>
+    {% if not user.is_authenticated %}
+    <!-- Not authenticated -->
+    <div class="rounded-2xl border border-border bg-card p-8 text-center">
+        <div class="text-4xl mb-3">📊</div>
+        <h3 class="text-lg font-bold text-foreground mb-1">Join the Debate</h3>
+        <p class="text-sm text-muted-foreground mb-5">Sign in to vote Bullish 🐂 or Bearish 🐻 and share your analysis.</p>
+        <a href="{% url 'login' %}?next={{ request.path }}" class="inline-flex items-center gap-2 px-7 py-2.5 rounded-full bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition shadow-lg shadow-primary/25">
+            Sign In to Vote
+        </a>
     </div>
 
-    {% else %}
+    {% elif is_post_creator %}
+    <!-- Creator: no voting -->
+    <div class="sp-inner-card p-4 text-center">
+        <p class="text-sm text-muted-foreground">You created this prediction — results update as the community votes.</p>
+    </div>
+
+    {% elif user_has_voted %}
     <!-- Already voted -->
-    <div class="rounded-2xl border {% if user_vote_type == 'yes' %}border-emerald-300/50 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-700/40{% else %}border-rose-300/50 bg-rose-50/50 dark:bg-rose-950/20 dark:border-rose-700/40{% endif %} p-4 flex items-center gap-4">
-      <span class="text-3xl">{% if user_vote_type == 'yes' %}🐂{% else %}🐻{% endif %}</span>
-      <div class="flex-1">
-        <p class="text-sm font-bold text-foreground">You voted <span class="{% if user_vote_type == 'yes' %}text-emerald-600 dark:text-emerald-400{% else %}text-rose-600 dark:text-rose-400{% endif %}">{% if user_vote_type == 'yes' %}Bullish{% else %}Bearish{% endif %}</span></p>
-        {% if user_confidence %}<p class="text-xs text-muted-foreground">Confidence: {{ user_confidence }}/10</p>{% endif %}
-      </div>
+    <div class="rounded-2xl border {% if user_vote_type == 'yes' or user_vote_type == 'bullish' %}border-emerald-200/70 dark:border-emerald-700/40 bg-emerald-50/60 dark:bg-emerald-950/20{% else %}border-rose-200/70 dark:border-rose-700/40 bg-rose-50/60 dark:bg-rose-950/20{% endif %} p-5">
+        <div class="flex items-center gap-4 mb-4">
+            <span class="text-3xl">{% if user_vote_type == 'yes' or user_vote_type == 'bullish' %}🐂{% else %}🐻{% endif %}</span>
+            <div class="flex-1">
+                <p class="font-bold text-foreground">
+                    You voted <span class="{% if user_vote_type == 'yes' or user_vote_type == 'bullish' %}text-emerald-700 dark:text-emerald-400{% else %}text-rose-700 dark:text-rose-400{% endif %}">
+                        {% if user_vote_type == 'yes' or user_vote_type == 'bullish' %}Bullish{% else %}Bearish{% endif %}
+                    </span>
+                </p>
+                {% if user_confidence %}<p class="text-xs text-muted-foreground mt-0.5">Confidence: {{ user_confidence }}/10</p>{% endif %}
+            </div>
+        </div>
+        {% if sp.status == 'active' %}
+        <p class="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Add Your Analysis</p>
+        <textarea id="extra-comment-text" class="sp-textarea" rows="3" maxlength="1000"
+                  placeholder="Share your analysis, charts or reasoning…"></textarea>
+        <div class="flex items-center justify-between mt-2.5">
+            <label class="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                <input type="checkbox" id="extra-anon" class="rounded border-border accent-primary"> Post anonymously
+            </label>
+            <button type="button"
+                    onclick="submitExtraComment()"
+                    class="inline-flex items-center gap-1.5 px-5 py-1.5 rounded-full
+                        {% if user_vote_type == 'yes' or user_vote_type == 'bullish' %}bg-emerald-500 hover:bg-emerald-600{% else %}bg-rose-500 hover:bg-rose-600{% endif %}
+                        text-white text-xs font-bold transition shadow-sm">
+                Post Comment
+            </button>
+        </div>
+        <p id="extra-comment-status" class="text-xs mt-1.5 hidden"></p>
+        {% endif %}
     </div>
-    {% endif %}
 
-  {% elif sp.status == 'resolved' %}
-  <div class="rounded-2xl border border-border bg-card p-5 text-center">
-    <p class="text-sm font-semibold text-foreground">This prediction has been resolved.</p>
-    {% if sp.outcome == 'bullish_correct' %}
-    <p class="text-2xl mt-1">🐂 <span class="text-emerald-600 font-black">Bullish Won!</span></p>
     {% else %}
-    <p class="text-2xl mt-1">🐻 <span class="text-rose-600 font-black">Bearish Won!</span></p>
+    <!-- Active + not voted: two big vote cards -->
+    {% if sp.status == 'active' %}
+    <div id="vote-status-msg" class="hidden rounded-xl px-4 py-3 text-sm font-semibold text-center border"></div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+        <!-- BULLISH -->
+        <div class="side-card bull-card">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-green-500 shadow-lg shadow-emerald-500/30 text-3xl flex-shrink-0">🐂</div>
+                <div>
+                    <p class="text-lg font-black text-emerald-700 dark:text-emerald-400">Bullish</p>
+                    <p class="text-xs text-muted-foreground">Stock will reach or exceed target</p>
+                </div>
+            </div>
+            <!-- Confidence slider -->
+            <div class="mb-4">
+                <div class="flex items-center justify-between mb-2">
+                    <label class="text-xs font-bold uppercase tracking-wide text-muted-foreground">Confidence</label>
+                    <div class="flex items-center gap-1.5">
+                        <span id="bull-emoji" class="text-base">🤔</span>
+                        <span id="bull-val" class="text-sm font-black text-foreground tabular-nums">5/10</span>
+                    </div>
+                </div>
+                <input type="range" id="bull-slider" min="1" max="10" value="5"
+                       class="conf-track lvl-good w-full"
+                       oninput="updateSlider(this,'bull')">
+                <div class="flex justify-between text-[10px] text-muted-foreground mt-1 px-0.5">
+                    <span>Skeptical</span><span>Moderate</span><span>Max Bullish</span>
+                </div>
+            </div>
+            <textarea id="bull-comment" class="sp-textarea mb-3" rows="3" maxlength="1000"
+                      placeholder="Why are you bullish? (optional)"></textarea>
+            <label class="flex items-center gap-2 mb-4 text-xs text-muted-foreground cursor-pointer select-none">
+                <input type="checkbox" id="bull-anon" class="rounded border-border accent-emerald-500"> Post anonymously
+            </label>
+            <button type="button" id="bull-btn" onclick="castVote('bullish')"
+                    class="w-full py-3 rounded-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white font-black text-sm transition shadow-lg shadow-emerald-500/25">
+                🐂 I'm Bullish
+            </button>
+        </div>
+
+        <!-- BEARISH -->
+        <div class="side-card bear-card">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-red-500 shadow-lg shadow-rose-500/30 text-3xl flex-shrink-0">🐻</div>
+                <div>
+                    <p class="text-lg font-black text-rose-700 dark:text-rose-400">Bearish</p>
+                    <p class="text-xs text-muted-foreground">Stock won't reach the target</p>
+                </div>
+            </div>
+            <!-- Confidence slider -->
+            <div class="mb-4">
+                <div class="flex items-center justify-between mb-2">
+                    <label class="text-xs font-bold uppercase tracking-wide text-muted-foreground">Confidence</label>
+                    <div class="flex items-center gap-1.5">
+                        <span id="bear-emoji" class="text-base">🤔</span>
+                        <span id="bear-val" class="text-sm font-black text-foreground tabular-nums">5/10</span>
+                    </div>
+                </div>
+                <input type="range" id="bear-slider" min="1" max="10" value="5"
+                       class="conf-track lvl-caution w-full"
+                       oninput="updateSlider(this,'bear')">
+                <div class="flex justify-between text-[10px] text-muted-foreground mt-1 px-0.5">
+                    <span>Skeptical</span><span>Moderate</span><span>Max Bearish</span>
+                </div>
+            </div>
+            <textarea id="bear-comment" class="sp-textarea mb-3" rows="3" maxlength="1000"
+                      placeholder="Why are you bearish? (optional)"></textarea>
+            <label class="flex items-center gap-2 mb-4 text-xs text-muted-foreground cursor-pointer select-none">
+                <input type="checkbox" id="bear-anon" class="rounded border-border accent-rose-500"> Post anonymously
+            </label>
+            <button type="button" id="bear-btn" onclick="castVote('bearish')"
+                    class="w-full py-3 rounded-full bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-400 hover:to-red-400 text-white font-black text-sm transition shadow-lg shadow-rose-500/25">
+                🐻 I'm Bearish
+            </button>
+        </div>
+
+    </div>
+    {% else %}
+    <div class="sp-inner-card p-4 text-center">
+        <p class="text-sm text-muted-foreground">This prediction is {{ sp.get_status_display|default:sp.status }} — voting is closed.</p>
+    </div>
     {% endif %}
-    <p class="text-xs text-muted-foreground mt-1">Resolved price: ₹{{ sp.resolved_price|floatformat:2 }} on {{ sp.resolved_at|date:"d M Y" }}</p>
-  </div>
-  {% endif %}
+    {% endif %}
 
-  <!-- ── Resolution Panel ───────────────────────────────────────────────── -->
-  {% if sp.status == 'active' and is_post_creator or sp.status == 'active' and is_moderator %}
-  <div class="rounded-2xl border border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-700/40 p-5">
-    <div class="flex items-center gap-2 mb-3">
-      <span class="text-lg">⚡</span>
-      <p class="text-sm font-bold text-foreground">Resolve This Prediction</p>
-      <span class="text-xs text-muted-foreground">(Creator / Moderator only)</span>
-    </div>
-    <p class="text-xs text-muted-foreground mb-3">Enter the actual stock price at the target date. This is irreversible.</p>
-    <div class="flex gap-2">
-      <div class="relative flex-1">
-        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">₹</span>
-        <input type="number" id="resolve-price-input" step="0.01" min="0" placeholder="Actual price"
-               class="w-full rounded-xl border border-border bg-background pl-7 pr-3 py-2.5 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20">
-      </div>
-      <button id="resolve-btn" onclick="resolveStock()" class="rounded-full bg-primary text-primary-foreground px-5 py-2.5 text-sm font-bold hover:bg-primary/90 transition whitespace-nowrap">
-        Resolve Now
-      </button>
-    </div>
-    <div id="resolve-msg" class="hidden mt-2 text-xs font-medium"></div>
-  </div>
-  {% endif %}
+    <!-- ════════════════════════════════════════════════════════
+         COMMENTS GRID
+    ════════════════════════════════════════════════════════ -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-  <!-- ── Comments Grid ──────────────────────────────────────────────────── -->
-  <div class="grid grid-cols-2 gap-4">
-    <!-- Bullish -->
-    <div class="space-y-3">
-      <div class="flex items-center justify-between rounded-xl border border-emerald-200/60 dark:border-emerald-700/40 bg-emerald-50/60 dark:bg-emerald-950/30 px-3 py-2">
-        <span class="text-sm font-bold text-emerald-700 dark:text-emerald-400">🐂 Bullish</span>
-        <div class="flex items-center gap-2">
-          <span class="text-xs text-muted-foreground">{{ bull_count }}</span>
-          <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">{{ bull_pct }}%</span>
+        <!-- 🐂 BULLISH COLUMN -->
+        <div class="space-y-3">
+            <div class="flex items-center justify-between rounded-xl border border-emerald-200/60 dark:border-emerald-800/50 bg-emerald-50/60 dark:bg-emerald-950/25 px-3.5 py-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-sm">🐂</span>
+                    <span class="text-sm font-bold text-emerald-700 dark:text-emerald-400">Bullish ({{ bull_count }})</span>
+                </div>
+                <span class="text-xs font-black text-emerald-600 dark:text-emerald-500 tabular-nums">{{ bull_pct|floatformat:0 }}%</span>
+            </div>
+            <div class="space-y-2.5" id="bullish-list">
+                {% for cmt in bullish_comments %}
+                <div class="cmt-card {% if cmt.id == top_bull_id %}ring-1 ring-emerald-400/40{% endif %}" id="spcmt-{{ cmt.id }}">
+                    {% if cmt.content %}
+                    <p class="text-sm leading-relaxed text-foreground break-words mb-2.5">{{ cmt.content }}</p>
+                    {% endif %}
+                    <div class="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                        {% if cmt.is_anonymous %}
+                        <span class="italic text-[11px]">Anonymous</span>
+                        {% else %}
+                        {% with pic=cmt.user.profile.get_picture_url %}{% if pic %}
+                        <img src="{{ pic }}" alt="{{ cmt.user.username }}" class="w-5 h-5 rounded-full object-cover border border-border">
+                        {% else %}
+                        <div class="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 flex items-center justify-center text-[9px] font-black flex-shrink-0">{{ cmt.user.username|first|upper }}</div>
+                        {% endif %}{% endwith %}
+                        <a href="{% url 'user_profile' cmt.user.username %}" class="font-semibold text-foreground hover:text-primary transition text-[11px]">{{ cmt.user.username }}</a>
+                        {% endif %}
+                        {% if cmt.confidence_score %}
+                        <span class="conf-badge {% if cmt.confidence_score <= 3 %}cbadge-low{% elif cmt.confidence_score <= 6 %}cbadge-mid{% elif cmt.confidence_score <= 9 %}cbadge-high{% else %}cbadge-max{% endif %}">{{ cmt.confidence_score }}/10</span>
+                        {% endif %}
+                        {% if cmt.id == top_bull_id %}
+                        <span class="px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[9px] font-bold">🔥 Top</span>
+                        {% endif %}
+                        <span class="ml-auto text-[10px]">{{ cmt.created_at|date:"M j" }}</span>
+                    </div>
+                    {% if user.is_authenticated %}
+                    <div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/50">
+                        <button type="button" onclick="reactCmt('{{ cmt.id }}','like')"
+                                class="react-btn {% if cmt.user_reaction == 'like' %}liked{% endif %}" id="like-btn-{{ cmt.id }}">
+                            👍 <span id="like-cnt-{{ cmt.id }}">{{ cmt.likes|default:0 }}</span>
+                        </button>
+                        <button type="button" onclick="reactCmt('{{ cmt.id }}','dislike')"
+                                class="react-btn {% if cmt.user_reaction == 'dislike' %}disliked{% endif %}" id="dislike-btn-{{ cmt.id }}">
+                            👎 <span id="dislike-cnt-{{ cmt.id }}">{{ cmt.dislikes|default:0 }}</span>
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="text-center py-10 text-sm text-muted-foreground" id="bull-empty">
+                    <div class="text-3xl mb-2 opacity-60">🐂</div>
+                    No bullish arguments yet. Be the first!
+                </div>
+                {% endfor %}
+            </div>
         </div>
-      </div>
-      {% if bullish_comments %}
-      {% for comment in bullish_comments %}
-      <div class="rounded-xl border border-border bg-card p-3 shadow-sm {% if top_bull_id and comment.id == top_bull_id %}ring-1 ring-emerald-400/40{% endif %}">
-        <p class="text-xs leading-relaxed font-medium text-foreground break-words {% if not comment.content %}hidden{% endif %}">{{ comment.content }}</p>
-        <div class="mt-2 flex flex-wrap items-center gap-1.5">
-          {% if comment.is_anonymous and comment.user != user %}
-          <div class="flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-border bg-muted text-[9px]">?</div>
-          <p class="text-[11px] text-muted-foreground italic">Anonymous</p>
-          {% else %}
-          {% with pic=comment.user.profile.get_picture_url %}{% if pic %}
-          <img src="{{ pic }}" alt="{{ comment.user.username }}" class="h-5 w-5 rounded-full object-cover border border-border">
-          {% else %}
-          <div class="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-[9px] font-bold">{{ comment.user.username|first|upper }}</div>
-          {% endif %}{% endwith %}
-          <p class="text-[11px] font-medium text-foreground truncate">{{ comment.user.username }}</p>
-          {% endif %}
-          {% if comment.confidence_score %}
-          <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold {% if comment.confidence_score >= 8 %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400{% elif comment.confidence_score >= 5 %}bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400{% else %}bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400{% endif %}">
-            {{ comment.confidence_score }}/10
-          </span>
-          {% endif %}
-          {% if top_bull_id and comment.id == top_bull_id %}
-          <span class="inline-flex items-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 text-[9px] font-bold">⭐ Top</span>
-          {% endif %}
+
+        <!-- 🐻 BEARISH COLUMN -->
+        <div class="space-y-3">
+            <div class="flex items-center justify-between rounded-xl border border-rose-200/60 dark:border-rose-800/50 bg-rose-50/60 dark:bg-rose-950/25 px-3.5 py-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-900/60 text-sm">🐻</span>
+                    <span class="text-sm font-bold text-rose-700 dark:text-rose-400">Bearish ({{ bear_count }})</span>
+                </div>
+                <span class="text-xs font-black text-rose-600 dark:text-rose-500 tabular-nums">{{ bear_pct|floatformat:0 }}%</span>
+            </div>
+            <div class="space-y-2.5" id="bearish-list">
+                {% for cmt in bearish_comments %}
+                <div class="cmt-card {% if cmt.id == top_bear_id %}ring-1 ring-rose-400/40{% endif %}" id="spcmt-{{ cmt.id }}">
+                    {% if cmt.content %}
+                    <p class="text-sm leading-relaxed text-foreground break-words mb-2.5">{{ cmt.content }}</p>
+                    {% endif %}
+                    <div class="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                        {% if cmt.is_anonymous %}
+                        <span class="italic text-[11px]">Anonymous</span>
+                        {% else %}
+                        {% with pic=cmt.user.profile.get_picture_url %}{% if pic %}
+                        <img src="{{ pic }}" alt="{{ cmt.user.username }}" class="w-5 h-5 rounded-full object-cover border border-border">
+                        {% else %}
+                        <div class="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-400 flex items-center justify-center text-[9px] font-black flex-shrink-0">{{ cmt.user.username|first|upper }}</div>
+                        {% endif %}{% endwith %}
+                        <a href="{% url 'user_profile' cmt.user.username %}" class="font-semibold text-foreground hover:text-primary transition text-[11px]">{{ cmt.user.username }}</a>
+                        {% endif %}
+                        {% if cmt.confidence_score %}
+                        <span class="conf-badge {% if cmt.confidence_score <= 3 %}cbadge-low{% elif cmt.confidence_score <= 6 %}cbadge-mid{% elif cmt.confidence_score <= 9 %}cbadge-high{% else %}cbadge-max{% endif %}">{{ cmt.confidence_score }}/10</span>
+                        {% endif %}
+                        {% if cmt.id == top_bear_id %}
+                        <span class="px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[9px] font-bold">🔥 Top</span>
+                        {% endif %}
+                        <span class="ml-auto text-[10px]">{{ cmt.created_at|date:"M j" }}</span>
+                    </div>
+                    {% if user.is_authenticated %}
+                    <div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/50">
+                        <button type="button" onclick="reactCmt('{{ cmt.id }}','like')"
+                                class="react-btn {% if cmt.user_reaction == 'like' %}liked{% endif %}" id="like-btn-{{ cmt.id }}">
+                            👍 <span id="like-cnt-{{ cmt.id }}">{{ cmt.likes|default:0 }}</span>
+                        </button>
+                        <button type="button" onclick="reactCmt('{{ cmt.id }}','dislike')"
+                                class="react-btn {% if cmt.user_reaction == 'dislike' %}disliked{% endif %}" id="dislike-btn-{{ cmt.id }}">
+                            👎 <span id="dislike-cnt-{{ cmt.id }}">{{ cmt.dislikes|default:0 }}</span>
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="text-center py-10 text-sm text-muted-foreground" id="bear-empty">
+                    <div class="text-3xl mb-2 opacity-60">🐻</div>
+                    No bearish arguments yet. Be the first!
+                </div>
+                {% endfor %}
+            </div>
         </div>
-      </div>
-      {% endfor %}
-      {% else %}
-      <div class="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">No Bullish arguments yet.</div>
-      {% endif %}
+
+    </div><!-- /comments grid -->
+
+    <!-- ════════════════════════════════════════════════════════
+         RESOLUTION PANEL (creator or moderator, active only)
+    ════════════════════════════════════════════════════════ -->
+    {% if sp.status == 'active' %}
+    {% if is_post_creator or is_moderator %}
+    <div class="resolve-panel">
+        <div class="flex items-start gap-3 mb-4">
+            <div class="flex-shrink-0 w-11 h-11 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-xl">⚖️</div>
+            <div>
+                <h3 class="font-bold text-foreground">Resolve this Prediction</h3>
+                <p class="text-xs text-muted-foreground mt-0.5">
+                    Enter the actual stock price at the target date to determine the winner.
+                    <span class="font-semibold text-amber-600 dark:text-amber-400">This cannot be undone.</span>
+                </p>
+            </div>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3">
+            <div class="relative flex-1">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground pointer-events-none">₹</span>
+                <input type="number" id="resolve-price-input" step="0.01" min="0"
+                       placeholder="Actual closing price" class="resolve-input w-full">
+            </div>
+            <button id="resolve-btn" type="button" onclick="resolveStock()"
+                    class="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-amber-500 hover:bg-amber-400 text-white font-bold text-sm transition shadow-md shadow-amber-500/25 flex-shrink-0">
+                ⚖️ Resolve Prediction
+            </button>
+        </div>
+        <div id="resolve-msg" class="hidden mt-2.5 text-xs font-semibold"></div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <!-- Bottom nav -->
+    <div class="text-center pb-2">
+        <a href="{% url 'stocks_list' %}" class="text-xs text-muted-foreground hover:text-primary transition-colors">← All Stock Predictions</a>
     </div>
 
-    <!-- Bearish -->
-    <div class="space-y-3">
-      <div class="flex items-center justify-between rounded-xl border border-rose-200/60 dark:border-rose-700/40 bg-rose-50/60 dark:bg-rose-950/30 px-3 py-2">
-        <span class="text-sm font-bold text-rose-700 dark:text-rose-400">🐻 Bearish</span>
-        <div class="flex items-center gap-2">
-          <span class="text-xs text-muted-foreground">{{ bear_count }}</span>
-          <span class="text-xs font-bold text-rose-600 dark:text-rose-400">{{ bear_pct }}%</span>
-        </div>
-      </div>
-      {% if bearish_comments %}
-      {% for comment in bearish_comments %}
-      <div class="rounded-xl border border-border bg-card p-3 shadow-sm {% if top_bear_id and comment.id == top_bear_id %}ring-1 ring-rose-400/40{% endif %}">
-        <p class="text-xs leading-relaxed font-medium text-foreground break-words {% if not comment.content %}hidden{% endif %}">{{ comment.content }}</p>
-        <div class="mt-2 flex flex-wrap items-center gap-1.5">
-          {% if comment.is_anonymous and comment.user != user %}
-          <div class="flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-border bg-muted text-[9px]">?</div>
-          <p class="text-[11px] text-muted-foreground italic">Anonymous</p>
-          {% else %}
-          {% with pic=comment.user.profile.get_picture_url %}{% if pic %}
-          <img src="{{ pic }}" alt="{{ comment.user.username }}" class="h-5 w-5 rounded-full object-cover border border-border">
-          {% else %}
-          <div class="flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-[9px] font-bold">{{ comment.user.username|first|upper }}</div>
-          {% endif %}{% endwith %}
-          <p class="text-[11px] font-medium text-foreground truncate">{{ comment.user.username }}</p>
-          {% endif %}
-          {% if comment.confidence_score %}
-          <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold {% if comment.confidence_score >= 8 %}bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400{% elif comment.confidence_score >= 5 %}bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400{% else %}bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400{% endif %}">
-            {{ comment.confidence_score }}/10
-          </span>
-          {% endif %}
-          {% if top_bear_id and comment.id == top_bear_id %}
-          <span class="inline-flex items-center rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-300 px-1.5 py-0.5 text-[9px] font-bold">⭐ Top</span>
-          {% endif %}
-        </div>
-      </div>
-      {% endfor %}
-      {% else %}
-      <div class="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">No Bearish arguments yet.</div>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- Back link -->
-  <div class="text-center">
-    <a href="{% url 'stocks_list' %}" class="text-xs text-muted-foreground hover:text-primary transition">← All Stock Predictions</a>
-  </div>
-
-</div>
+</div><!-- /container -->
 
 <script>
-function confEmoji(v) {
-  if (v <= 2) return '😐';
-  if (v <= 4) return '🤔';
-  if (v <= 6) return '💪';
-  if (v <= 8) return '🚀';
-  return '🔥';
-}
+const CSRF_TOKEN = '{{ csrf_token }}';
+const POST_ID = '{{ post.id }}';
+const USER_VOTE_TYPE = '{{ user_vote_type|default:"" }}';
 
-const bullSlider = document.getElementById('bull-conf-slider');
-const bullDisplay = document.getElementById('bull-conf-display');
-const bullEmoji = document.getElementById('bull-conf-emoji');
-if (bullSlider) {
-  bullSlider.addEventListener('input', function() {
-    bullDisplay.textContent = this.value + '/10';
-    bullEmoji.textContent = confEmoji(parseInt(this.value));
-  });
-}
+// ── Confidence slider ──────────────────────────────────────
+function updateSlider(slider, side) {
+    var val = parseInt(slider.value);
+    var valEl  = document.getElementById(side + '-val');
+    var emoji  = document.getElementById(side + '-emoji');
+    var card   = slider.closest('.side-card');
 
-const bearSlider = document.getElementById('bear-conf-slider');
-const bearDisplay = document.getElementById('bear-conf-display');
-const bearEmoji = document.getElementById('bear-conf-emoji');
-if (bearSlider) {
-  bearSlider.addEventListener('input', function() {
-    bearDisplay.textContent = this.value + '/10';
-    bearEmoji.textContent = confEmoji(parseInt(this.value));
-  });
-}
+    if (valEl)  valEl.textContent  = val + '/10';
 
-function getCSRF() {
-  const m = document.cookie.match(/csrftoken=([^;]+)/);
-  return m ? m[1] : '';
-}
+    var em = '😐', cls = 'lvl-danger';
+    if (val <= 3)      { em = '😐'; cls = side === 'bull' ? 'lvl-caution' : 'lvl-danger'; }
+    else if (val <= 6) { em = '🤔'; cls = side === 'bull' ? 'lvl-good'    : 'lvl-caution'; }
+    else if (val <= 8) { em = '💪'; cls = 'lvl-good'; }
+    else if (val === 9){ em = '🔥'; cls = 'lvl-good'; }
+    else               { em = '🔥'; cls = 'lvl-max'; }
 
-function resolveStock() {
-  const price = document.getElementById('resolve-price-input').value;
-  const btn = document.getElementById('resolve-btn');
-  const msg = document.getElementById('resolve-msg');
-  if (!price || parseFloat(price) <= 0) { msg.textContent = 'Enter a valid price.'; msg.className = 'mt-2 text-xs font-medium text-red-600'; msg.classList.remove('hidden'); return; }
-  if (!confirm('Resolve this prediction at ₹' + parseFloat(price).toFixed(2) + '? This cannot be undone.')) return;
-  btn.disabled = true;
-  btn.textContent = 'Resolving…';
-  fetch('{% url "resolve_stock_prediction" post.id %}', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': getCSRF()},
-    body: 'resolved_price=' + encodeURIComponent(price),
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data.success) {
-      msg.textContent = 'Resolved! Reloading…';
-      msg.className = 'mt-2 text-xs font-medium text-emerald-600';
-      msg.classList.remove('hidden');
-      setTimeout(() => window.location.reload(), 1200);
-    } else {
-      msg.textContent = data.error || 'Failed to resolve.';
-      msg.className = 'mt-2 text-xs font-medium text-red-600';
-      msg.classList.remove('hidden');
-      btn.disabled = false;
-      btn.textContent = 'Resolve Now';
+    if (emoji) emoji.textContent = em;
+    slider.className = 'conf-track ' + cls + ' w-full';
+
+    if (card) {
+        if (val === 10) card.classList.add('emerald-glow');
+        else            card.classList.remove('emerald-glow');
     }
-  })
-  .catch(() => { btn.disabled = false; btn.textContent = 'Resolve Now'; });
+}
+
+// Init sliders
+['bull','bear'].forEach(function(s) {
+    var sl = document.getElementById(s + '-slider');
+    if (sl) updateSlider(sl, s);
+});
+
+// ── Cast vote (fetch) ──────────────────────────────────────
+function castVote(side) {
+    var conf    = parseInt(document.getElementById(side + '-slider')?.value || 5);
+    var comment = (document.getElementById(side + '-comment')?.value || '').trim();
+    var anon    = document.getElementById(side + '-anon')?.checked || false;
+    var btn     = document.getElementById(side + '-btn');
+    var statusEl = document.getElementById('vote-status-msg');
+
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Submitting…'; }
+    if (statusEl) {
+        statusEl.className = 'rounded-xl px-4 py-3 text-sm font-semibold text-center border bg-muted text-muted-foreground border-border';
+        statusEl.textContent = 'Casting your vote…';
+        statusEl.classList.remove('hidden');
+    }
+
+    fetch('{% url "create_stock_comment" post.id %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ vote_type: side, confidence: conf, content: comment, is_anonymous: anon }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            if (statusEl) {
+                statusEl.className = 'rounded-xl px-4 py-3 text-sm font-semibold text-center border bg-emerald-50 dark:bg-emerald-950/25 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40';
+                statusEl.textContent = '✓ Vote recorded! Refreshing…';
+            }
+            setTimeout(function() { location.reload(); }, 900);
+        } else {
+            if (statusEl) {
+                statusEl.className = 'rounded-xl px-4 py-3 text-sm font-semibold text-center border bg-rose-50 dark:bg-rose-950/25 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/40';
+                statusEl.textContent = data.error || 'Could not cast vote. Please try again.';
+            }
+            if (btn) { btn.disabled = false; btn.textContent = side === 'bullish' ? '🐂 I\'m Bullish' : '🐻 I\'m Bearish'; }
+        }
+    })
+    .catch(function() {
+        if (statusEl) {
+            statusEl.className = 'rounded-xl px-4 py-3 text-sm font-semibold text-center border bg-rose-50 dark:bg-rose-950/25 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/40';
+            statusEl.textContent = 'Network error. Please try again.';
+        }
+        if (btn) { btn.disabled = false; btn.textContent = side === 'bullish' ? '🐂 I\'m Bullish' : '🐻 I\'m Bearish'; }
+    });
+}
+
+// ── Submit extra comment (already voted) ──────────────────
+function submitExtraComment() {
+    var content  = (document.getElementById('extra-comment-text')?.value || '').trim();
+    var anon     = document.getElementById('extra-anon')?.checked || false;
+    var statusEl = document.getElementById('extra-comment-status');
+    var voteType = USER_VOTE_TYPE || 'bullish';
+
+    if (!content) {
+        statusEl.textContent = 'Please write something first.';
+        statusEl.className = 'text-xs mt-1.5 text-destructive';
+        statusEl.classList.remove('hidden');
+        return;
+    }
+    statusEl.textContent = 'Posting…';
+    statusEl.className = 'text-xs mt-1.5 text-muted-foreground';
+    statusEl.classList.remove('hidden');
+
+    fetch('{% url "create_stock_comment" post.id %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ vote_type: voteType, content: content, is_anonymous: anon }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            statusEl.textContent = '✓ Comment posted!';
+            statusEl.className = 'text-xs mt-1.5 text-emerald-600 dark:text-emerald-400';
+            var textarea = document.getElementById('extra-comment-text');
+            if (textarea) textarea.value = '';
+
+            // Append comment card to correct column
+            var isBull = (voteType === 'yes' || voteType === 'bullish');
+            var listId  = isBull ? 'bullish-list' : 'bearish-list';
+            var emptyId = isBull ? 'bull-empty'   : 'bear-empty';
+            var list    = document.getElementById(listId);
+            var empty   = document.getElementById(emptyId);
+            if (empty) empty.remove();
+            var c = data.comment || {};
+            var el = document.createElement('div');
+            el.className = 'cmt-card';
+            el.innerHTML = '<p class="text-sm leading-relaxed text-foreground break-words mb-2">' + escHtml(c.content || content) + '</p>'
+                + '<div class="text-[11px] text-muted-foreground">' + (anon ? '<span class="italic">Anonymous</span>' : escHtml(c.username || '')) + '</div>';
+            if (list) list.prepend(el);
+        } else {
+            statusEl.textContent = data.error || 'Failed to post comment.';
+            statusEl.className = 'text-xs mt-1.5 text-destructive';
+        }
+    })
+    .catch(function() {
+        statusEl.textContent = 'Network error. Please try again.';
+        statusEl.className = 'text-xs mt-1.5 text-destructive';
+    });
+}
+
+// ── React to comment ──────────────────────────────────────
+function reactCmt(commentId, reaction) {
+    fetch('/stocks/comment/' + commentId + '/react/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ reaction: reaction }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) return;
+        var lc = document.getElementById('like-cnt-'    + commentId);
+        var dc = document.getElementById('dislike-cnt-' + commentId);
+        if (lc) lc.textContent = data.likes;
+        if (dc) dc.textContent = data.dislikes;
+        var lb = document.getElementById('like-btn-'    + commentId);
+        var db = document.getElementById('dislike-btn-' + commentId);
+        if (lb && db) {
+            lb.classList.remove('liked'); db.classList.remove('disliked');
+            if (reaction === 'like'    && data.reacted) lb.classList.add('liked');
+            if (reaction === 'dislike' && data.reacted) db.classList.add('disliked');
+        }
+    })
+    .catch(function() {});
+}
+
+// ── Resolve prediction ────────────────────────────────────
+function resolveStock() {
+    var price = document.getElementById('resolve-price-input').value;
+    var btn   = document.getElementById('resolve-btn');
+    var msg   = document.getElementById('resolve-msg');
+    if (!price || isNaN(parseFloat(price)) || parseFloat(price) < 0) {
+        msg.textContent = '⚠ Enter a valid price.';
+        msg.className = 'text-xs font-semibold text-destructive';
+        msg.classList.remove('hidden');
+        return;
+    }
+    if (!confirm('Resolve this prediction at ₹' + parseFloat(price).toFixed(2) + '?\n\nThis is permanent and determines the winner.')) return;
+    btn.disabled = true; btn.textContent = 'Resolving…';
+    msg.textContent = 'Processing…'; msg.className = 'text-xs font-semibold text-muted-foreground'; msg.classList.remove('hidden');
+
+    fetch('{% url "resolve_stock_prediction" post.id %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': CSRF_TOKEN },
+        body: 'resolved_price=' + encodeURIComponent(price),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success || data.redirect_url) {
+            msg.textContent = '✓ Resolved! Redirecting…';
+            msg.className = 'text-xs font-semibold text-emerald-600 dark:text-emerald-400';
+            setTimeout(function() { window.location.href = data.redirect_url || window.location.href; }, 1000);
+        } else {
+            msg.textContent = data.error || 'Failed to resolve.';
+            msg.className = 'text-xs font-semibold text-destructive';
+            btn.disabled = false; btn.textContent = '⚖️ Resolve Prediction';
+        }
+    })
+    .catch(function() {
+        msg.textContent = 'Network error. Please try again.';
+        msg.className = 'text-xs font-semibold text-destructive';
+        btn.disabled = false; btn.textContent = '⚖️ Resolve Prediction';
+    });
+}
+
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
 {% endblock %}

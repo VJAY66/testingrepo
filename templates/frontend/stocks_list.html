@@ -2,125 +2,203 @@
 {% block title %}Stock Predictions — PickASide{% endblock %}
 
 {% block content %}
+<style>
+/* ── Prediction card ── */
+.pred-card {
+    display: block;
+    border-radius: 1.35rem;
+    border: 1.5px solid hsl(var(--border));
+    background: hsl(var(--card));
+    overflow: hidden;
+    transition: border-color 200ms, box-shadow 200ms, transform 160ms;
+    text-decoration: none;
+}
+.pred-card:hover {
+    border-color: hsl(var(--primary) / 0.45);
+    box-shadow: 0 14px 40px -20px hsl(var(--primary) / 0.2);
+    transform: translateY(-2px);
+}
+
+/* ── Card band ── */
+.pred-band {
+    padding: 0.7rem 1.1rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+}
+.pred-band-active   { background: linear-gradient(90deg, hsl(215 28% 18%), hsl(215 26% 22%)); }
+.pred-band-resolved-bull { background: linear-gradient(90deg, hsl(142 55% 26%), hsl(142 55% 32%)); }
+.pred-band-resolved-bear { background: linear-gradient(90deg, hsl(346 60% 28%), hsl(346 60% 34%)); }
+.pred-band-expired  { background: linear-gradient(90deg, hsl(215 15% 20%), hsl(215 15% 24%)); }
+
+/* ── Progress bar ── */
+.pb-track { height: 6px; border-radius: 999px; background: hsl(var(--muted)); overflow: hidden; }
+.pb-bull  { height: 100%; background: linear-gradient(90deg, hsl(142 68% 38%), hsl(142 68% 48%)); border-radius: 999px 0 0 999px; }
+.pb-bear  { height: 100%; background: linear-gradient(90deg, hsl(346 70% 42%), hsl(346 70% 52%)); border-radius: 0 999px 999px 0; }
+
+/* ── Search / filter row ── */
+.filter-tab {
+    padding: 0.45rem 1.1rem; font-size: 0.78rem; font-weight: 700;
+    transition: background 150ms, color 150ms;
+}
+.filter-tab.active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.filter-tab:not(.active) { background: hsl(var(--card)); color: hsl(var(--muted-foreground)); }
+.filter-tab:not(.active):hover { color: hsl(var(--foreground)); }
+</style>
+
 <div class="max-w-5xl mx-auto py-6 px-4">
 
-  <!-- Header -->
-  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
-    <div>
-      <h1 class="text-2xl font-black text-foreground flex items-center gap-2">📈 Stock Predictions</h1>
-      <p class="text-sm text-muted-foreground mt-0.5">Bullish or Bearish — pick a side and debate the markets</p>
-    </div>
-    <div class="flex items-center gap-2">
-      <a href="{% url 'stock_leaderboard' %}" class="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground hover:border-primary/40 hover:text-primary transition">🏆 Leaderboard</a>
-      {% if user.is_authenticated %}
-      <a href="{% url 'create_stock_prediction' %}" class="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition shadow-sm shadow-primary/30">+ New Prediction</a>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- Filters -->
-  <div class="mb-5 flex flex-wrap items-center gap-3">
-    <div class="flex rounded-xl border border-border overflow-hidden text-xs font-semibold">
-      <a href="?status=active{% if symbol_filter %}&symbol={{ symbol_filter }}{% endif %}" class="px-4 py-2 {% if status_filter == 'active' %}bg-primary text-primary-foreground{% else %}bg-card text-muted-foreground hover:text-foreground{% endif %} transition">Active</a>
-      <a href="?status=resolved{% if symbol_filter %}&symbol={{ symbol_filter }}{% endif %}" class="px-4 py-2 {% if status_filter == 'resolved' %}bg-primary text-primary-foreground{% else %}bg-card text-muted-foreground hover:text-foreground{% endif %} transition border-l border-border">Resolved</a>
-      <a href="?{% if symbol_filter %}symbol={{ symbol_filter }}{% endif %}" class="px-4 py-2 {% if not status_filter or status_filter not in 'active resolved' %}bg-primary text-primary-foreground{% else %}bg-card text-muted-foreground hover:text-foreground{% endif %} transition border-l border-border">All</a>
-    </div>
-    <form method="get" class="flex items-center gap-2 flex-1 min-w-[160px]">
-      {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
-      <input type="text" name="symbol" value="{{ symbol_filter }}" placeholder="Filter by symbol…" class="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20">
-      <button type="submit" class="rounded-xl bg-primary text-primary-foreground px-3 py-2 text-xs font-semibold hover:bg-primary/90 transition">Search</button>
-    </form>
-  </div>
-
-  <!-- Grid -->
-  {% if page_obj.object_list %}
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-    {% for sp in page_obj.object_list %}
-    <a href="{% url 'stock_prediction_detail' sp.post.id %}" class="block group rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-md hover:shadow-primary/10 transition-all duration-200 overflow-hidden">
-      <!-- Card top band -->
-      <div class="{% if sp.status == 'resolved' %}{% if sp.outcome == 'bullish_correct' %}bg-gradient-to-r from-emerald-600/90 to-teal-600/90{% else %}bg-gradient-to-r from-rose-600/90 to-red-600/90{% endif %}{% else %}bg-gradient-to-r from-slate-700 to-slate-800{% endif %} px-4 py-2.5 flex items-center justify-between">
+    <!-- ── Header ─────────────────────────────────────── -->
+    <div class="flex items-start justify-between flex-wrap gap-4 mb-7">
+        <div>
+            <h1 class="text-2xl font-black text-foreground flex items-center gap-2.5" style="font-family:'Playfair Display',serif;">
+                <span class="text-3xl">📈</span> Stock Predictions
+            </h1>
+            <p class="text-sm text-muted-foreground mt-0.5">Bullish 🐂 or Bearish 🐻 — pick a side and debate the markets</p>
+        </div>
         <div class="flex items-center gap-2">
-          <span class="text-xl font-black text-white">{{ sp.stock_symbol }}</span>
-          {% if sp.stock_name %}<span class="text-xs text-white/60 truncate max-w-[100px]">{{ sp.stock_name }}</span>{% endif %}
+            <a href="{% url 'stock_leaderboard' %}"
+               class="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-xs font-bold text-foreground hover:border-primary/40 hover:text-primary transition">
+                🏆 Leaderboard
+            </a>
+            {% if user.is_authenticated %}
+            <a href="{% url 'create_stock_prediction' %}"
+               class="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-sm shadow-primary/25">
+                + New Prediction
+            </a>
+            {% endif %}
         </div>
-        {% if sp.status == 'active' %}
-        <span class="text-xs font-bold text-amber-300 bg-amber-400/20 border border-amber-400/30 rounded-full px-2 py-0.5">Active</span>
-        {% elif sp.status == 'resolved' %}
-          {% if sp.outcome == 'bullish_correct' %}
-          <span class="text-xs font-bold text-emerald-200 bg-emerald-400/20 border border-emerald-400/30 rounded-full px-2 py-0.5">🐂 Bullish Won</span>
-          {% else %}
-          <span class="text-xs font-bold text-rose-200 bg-rose-400/20 border border-rose-400/30 rounded-full px-2 py-0.5">🐻 Bearish Won</span>
-          {% endif %}
-        {% else %}
-        <span class="text-xs font-bold text-gray-300 bg-gray-400/20 border border-gray-400/30 rounded-full px-2 py-0.5">Expired</span>
-        {% endif %}
-      </div>
+    </div>
 
-      <div class="p-4">
-        <p class="text-sm font-semibold text-foreground mb-3 line-clamp-2 leading-snug group-hover:text-primary transition-colors">{{ sp.post.title }}</p>
-
-        <!-- Meta row -->
-        <div class="flex items-center flex-wrap gap-2 mb-3">
-          {% if sp.direction == 'above' %}
-          <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 text-[10px] font-bold border border-emerald-200/60 dark:border-emerald-700/40">↑ ABOVE ₹{{ sp.target_price|floatformat:0 }}</span>
-          {% else %}
-          <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 px-2 py-0.5 text-[10px] font-bold border border-rose-200/60 dark:border-rose-700/40">↓ BELOW ₹{{ sp.target_price|floatformat:0 }}</span>
-          {% endif %}
-          <span class="inline-flex items-center gap-1 rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-[10px] font-medium">📅 {{ sp.target_date|date:"M Y" }}</span>
-          {% if sp.status == 'resolved' and sp.resolved_price %}
-          <span class="inline-flex items-center gap-1 rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-[10px] font-medium">✅ ₹{{ sp.resolved_price|floatformat:2 }}</span>
-          {% endif %}
+    <!-- ── Filters ─────────────────────────────────────── -->
+    <div class="mb-6 flex flex-wrap items-center gap-3">
+        <!-- Status tabs -->
+        <div class="flex rounded-xl border border-border overflow-hidden">
+            <a href="?status=active{% if symbol_filter %}&symbol={{ symbol_filter }}{% endif %}"
+               class="filter-tab {% if status_filter == 'active' %}active{% endif %}">Active</a>
+            <a href="?status=resolved{% if symbol_filter %}&symbol={{ symbol_filter }}{% endif %}"
+               class="filter-tab border-l border-border {% if status_filter == 'resolved' %}active{% endif %}">Resolved</a>
+            <a href="?{% if symbol_filter %}symbol={{ symbol_filter }}{% endif %}"
+               class="filter-tab border-l border-border {% if not status_filter or status_filter not in 'active,resolved' %}active{% endif %}">All</a>
         </div>
+        <!-- Symbol search -->
+        <form method="get" class="flex items-center gap-2 flex-1 min-w-[180px]">
+            {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+            <input type="text" name="symbol" value="{{ symbol_filter }}"
+                   placeholder="Search by symbol e.g. HDFC…"
+                   class="flex-1 rounded-xl border border-border bg-background px-3.5 py-2 text-xs text-foreground focus:border-primary focus:ring-2 focus:ring-primary/15 outline-none transition">
+            <button type="submit"
+                    class="rounded-xl bg-primary text-primary-foreground px-3.5 py-2 text-xs font-bold hover:opacity-90 transition">
+                Search
+            </button>
+        </form>
+    </div>
 
-        <!-- Progress bar -->
+    <!-- ── Grid ────────────────────────────────────────── -->
+    {% if page_obj.object_list %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-7">
+        {% for sp in page_obj.object_list %}
         {% with total=sp.bull_count|add:sp.bear_count %}
-        {% if total > 0 %}
-        {% with bull_pct=sp.bull_count|floatformat:0 %}
-        <div class="mb-1 flex items-center justify-between text-[10px] font-semibold">
-          <span class="text-emerald-600 dark:text-emerald-400">🐂 {{ sp.bull_count }}</span>
-          <span class="text-muted-foreground">{{ total }} votes</span>
-          <span class="text-rose-600 dark:text-rose-400">{{ sp.bear_count }} 🐻</span>
-        </div>
-        <div class="w-full h-2 rounded-full overflow-hidden bg-muted flex">
-          <div class="bg-gradient-to-r from-emerald-500 to-green-500 h-full" style="width: {% widthratio sp.bull_count total 100 %}%"></div>
-          <div class="bg-gradient-to-r from-rose-500 to-red-500 h-full" style="width: {% widthratio sp.bear_count total 100 %}%"></div>
-        </div>
+        <a href="{% url 'stock_prediction_detail' sp.post.id %}" class="pred-card group">
+
+            <!-- Band -->
+            <div class="pred-band {% if sp.status == 'resolved' %}{% if sp.outcome == 'bullish_correct' or sp.outcome == 'bullish_wins' %}pred-band-resolved-bull{% else %}pred-band-resolved-bear{% endif %}{% elif sp.status == 'expired' %}pred-band-expired{% else %}pred-band-active{% endif %}">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <span class="text-xl font-black text-white tracking-tight flex-shrink-0">{{ sp.stock_symbol }}</span>
+                    {% if sp.stock_name %}
+                    <span class="text-xs text-white/60 font-medium truncate max-w-[120px]">{{ sp.stock_name }}</span>
+                    {% endif %}
+                </div>
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                    {% if sp.status == 'active' %}
+                    <span class="inline-flex items-center gap-1 rounded-full bg-amber-400/25 border border-amber-400/40 px-2.5 py-0.5 text-[10px] font-black text-amber-200 uppercase tracking-wide">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>Active
+                    </span>
+                    {% elif sp.status == 'resolved' %}
+                        {% if sp.outcome == 'bullish_correct' or sp.outcome == 'bullish_wins' %}
+                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-400/25 border border-emerald-400/40 px-2.5 py-0.5 text-[10px] font-black text-emerald-200">🐂 Bullish Won</span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1 rounded-full bg-rose-400/25 border border-rose-400/40 px-2.5 py-0.5 text-[10px] font-black text-rose-200">🐻 Bearish Won</span>
+                        {% endif %}
+                    {% else %}
+                    <span class="inline-flex items-center gap-1 rounded-full bg-gray-400/20 border border-gray-400/30 px-2.5 py-0.5 text-[10px] font-bold text-gray-300">Expired</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Body -->
+            <div class="p-4">
+                <!-- Title -->
+                <p class="text-sm font-semibold text-foreground mb-3 line-clamp-2 leading-snug group-hover:text-primary transition-colors">{{ sp.post.title }}</p>
+
+                <!-- Meta chips -->
+                <div class="flex flex-wrap gap-1.5 mb-3">
+                    {% if sp.direction == 'above' %}
+                    <span class="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 text-[10px] font-black border border-emerald-200/60 dark:border-emerald-700/40">↑ ABOVE ₹{{ sp.target_price|floatformat:0 }}</span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-0.5 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 px-2 py-0.5 text-[10px] font-black border border-rose-200/60 dark:border-rose-700/40">↓ BELOW ₹{{ sp.target_price|floatformat:0 }}</span>
+                    {% endif %}
+                    <span class="inline-flex items-center gap-1 rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-[10px] font-semibold">📅 {{ sp.target_date|date:"M Y" }}</span>
+                    {% if sp.status == 'resolved' and sp.resolved_price %}
+                    <span class="inline-flex items-center gap-1 rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-[10px] font-semibold">✅ ₹{{ sp.resolved_price|floatformat:2 }}</span>
+                    {% endif %}
+                </div>
+
+                <!-- Progress bar -->
+                {% if total > 0 %}
+                <div class="mb-1.5 flex items-center justify-between text-[10px] font-bold">
+                    <span class="text-emerald-600 dark:text-emerald-400">🐂 {{ sp.bull_count }}</span>
+                    <span class="text-muted-foreground font-semibold">{{ total }} vote{{ total|pluralize }}</span>
+                    <span class="text-rose-600 dark:text-rose-400">{{ sp.bear_count }} 🐻</span>
+                </div>
+                <div class="pb-track flex">
+                    <div class="pb-bull" style="width:{% widthratio sp.bull_count total 100 %}%"></div>
+                    <div class="pb-bear flex-1"></div>
+                </div>
+                {% else %}
+                <div class="pb-track"></div>
+                <p class="text-[10px] text-muted-foreground mt-1 text-center">No votes yet — be the first!</p>
+                {% endif %}
+            </div>
+        </a>
         {% endwith %}
-        {% else %}
-        <div class="w-full h-2 rounded-full bg-muted"></div>
-        <p class="text-[10px] text-muted-foreground mt-1 text-center">No votes yet</p>
+        {% endfor %}
+    </div>
+
+    <!-- ── Pagination ───────────────────────────────────── -->
+    {% if page_obj.has_other_pages %}
+    <div class="flex items-center justify-center gap-2">
+        {% if page_obj.has_previous %}
+        <a href="?{% if status_filter %}status={{ status_filter }}&{% endif %}{% if symbol_filter %}symbol={{ symbol_filter }}&{% endif %}page={{ page_obj.previous_page_number }}"
+           class="rounded-full border border-border bg-card px-4 py-2 text-xs font-bold text-foreground hover:border-primary/40 hover:text-primary transition">← Prev</a>
         {% endif %}
-        {% endwith %}
-      </div>
-    </a>
-    {% endfor %}
-  </div>
-
-  <!-- Pagination -->
-  {% if page_obj.has_other_pages %}
-  <div class="flex items-center justify-center gap-2">
-    {% if page_obj.has_previous %}
-    <a href="?{% if status_filter %}status={{ status_filter }}&{% endif %}{% if symbol_filter %}symbol={{ symbol_filter }}&{% endif %}page={{ page_obj.previous_page_number }}" class="rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground hover:border-primary/40 hover:text-primary transition">← Prev</a>
+        <span class="text-xs text-muted-foreground px-3">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?{% if status_filter %}status={{ status_filter }}&{% endif %}{% if symbol_filter %}symbol={{ symbol_filter }}&{% endif %}page={{ page_obj.next_page_number }}"
+           class="rounded-full border border-border bg-card px-4 py-2 text-xs font-bold text-foreground hover:border-primary/40 hover:text-primary transition">Next →</a>
+        {% endif %}
+    </div>
     {% endif %}
-    <span class="text-xs text-muted-foreground">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-    {% if page_obj.has_next %}
-    <a href="?{% if status_filter %}status={{ status_filter }}&{% endif %}{% if symbol_filter %}symbol={{ symbol_filter }}&{% endif %}page={{ page_obj.next_page_number }}" class="rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold text-foreground hover:border-primary/40 hover:text-primary transition">Next →</a>
-    {% endif %}
-  </div>
-  {% endif %}
 
-  {% else %}
-  <div class="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
-    <p class="text-5xl mb-4">📈</p>
-    <p class="text-lg font-bold text-foreground mb-2">No predictions yet{% if symbol_filter %} for "{{ symbol_filter }}"{% endif %}</p>
-    <p class="text-sm text-muted-foreground mb-5">Be the first to make a stock prediction!</p>
-    {% if user.is_authenticated %}
-    <a href="{% url 'create_stock_prediction' %}" class="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition">🚀 Make a Prediction</a>
     {% else %}
-    <a href="{% url 'login' %}" class="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition">Sign In to Predict</a>
+    <!-- Empty state -->
+    <div class="rounded-2xl border border-dashed border-border bg-card p-14 text-center">
+        <p class="text-5xl mb-4">📈</p>
+        <p class="text-lg font-bold text-foreground mb-2">
+            No predictions yet{% if symbol_filter %} for "{{ symbol_filter }}"{% endif %}
+        </p>
+        <p class="text-sm text-muted-foreground mb-6">Be the first to make a stock prediction and spark the debate!</p>
+        {% if user.is_authenticated %}
+        <a href="{% url 'create_stock_prediction' %}"
+           class="inline-flex items-center gap-2 rounded-full bg-primary px-7 py-3 text-sm font-bold text-primary-foreground hover:opacity-90 transition shadow-lg shadow-primary/25">
+            🚀 Make a Prediction
+        </a>
+        {% else %}
+        <a href="{% url 'login' %}"
+           class="inline-flex items-center gap-2 rounded-full bg-primary px-7 py-3 text-sm font-bold text-primary-foreground hover:opacity-90 transition shadow-lg shadow-primary/25">
+            Sign In to Predict
+        </a>
+        {% endif %}
+    </div>
     {% endif %}
-  </div>
-  {% endif %}
 
 </div>
 {% endblock %}
