@@ -142,6 +142,29 @@
                                     <p id="hashtags-error" class="hidden text-xs text-red-500 mt-1"></p>
             </div>
 
+            <!-- Pick-a-Side custom option labels -->
+            <div class="rounded-2xl border border-border bg-background/60 px-4 py-4">
+                <p class="text-sm font-medium text-foreground mb-1">Pick a Side Options</p>
+                <p class="text-xs text-muted-foreground mb-3">Customize the two sides readers can pick. Left side is the first option, right side is the second.</p>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="yes-label" class="block text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">Left Side (Option 1)</label>
+                        <input type="text" id="yes-label" name="yes_label" maxlength="50"
+                               value="Yes"
+                               placeholder="e.g. Agree, Pro, For…"
+                               class="w-full rounded-xl border border-emerald-300/60 bg-background px-3 py-2 text-sm text-foreground shadow-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20">
+                    </div>
+                    <div>
+                        <label for="no-label" class="block text-xs font-semibold text-rose-700 dark:text-rose-400 mb-1">Right Side (Option 2)</label>
+                        <input type="text" id="no-label" name="no_label" maxlength="50"
+                               value="No"
+                               placeholder="e.g. Disagree, Con, Against…"
+                               class="w-full rounded-xl border border-rose-300/60 bg-background px-3 py-2 text-sm text-foreground shadow-sm focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20">
+                    </div>
+                </div>
+                <p class="text-xs text-muted-foreground mt-2">Max 50 characters each. Defaults to "Yes" / "No" if left blank.</p>
+            </div>
+
             <!-- Anonymous toggle -->
             <label class="flex items-center gap-3 rounded-2xl border border-border bg-background/60 px-4 py-3 cursor-pointer hover:border-primary/40 transition-colors">
                 <div class="relative flex-shrink-0">

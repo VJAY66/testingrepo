@@ -288,8 +288,8 @@
         <div class="mb-4 flex items-center gap-4 text-sm text-muted-foreground">
             <div class="flex-1">
                 <div class="flex justify-between mb-1">
-                    <span id="discussion-yes-percentage-label">Yes: {{ yes_percentage|floatformat:1 }}%</span>
-                    <span id="discussion-no-percentage-label">No: {{ no_percentage|floatformat:1 }}%</span>
+                    <span id="discussion-yes-percentage-label">{{ post.yes_label }}: {{ yes_percentage|floatformat:1 }}%</span>
+                    <span id="discussion-no-percentage-label">{{ post.no_label }}: {{ no_percentage|floatformat:1 }}%</span>
                 </div>
                 <div class="w-full rounded-full h-2 overflow-hidden bg-secondary flex">
                     <div id="discussion-yes-bar" class="bg-green-500 h-2" style="width: {{ yes_percentage }}%"></div>
@@ -333,7 +333,7 @@
               {% if analytics.velocity_delta > 0 %}<span class="text-emerald-500 font-semibold">↑{{ analytics.velocity_delta }}</span>
               {% elif analytics.velocity_delta < 0 %}<span class="text-rose-500 font-semibold">↓{{ analytics.velocity_delta|slice:"1:" }}</span>{% endif %}
             </span>
-            <span>✅ <strong class="text-emerald-600">{{ analytics.yes_pct }}%</strong> Yes · ❌ <strong class="text-rose-600">{{ analytics.no_pct }}%</strong> No</span>
+            <span>✅ <strong class="text-emerald-600">{{ analytics.yes_pct }}%</strong> {{ post.yes_label }} · ❌ <strong class="text-rose-600">{{ analytics.no_pct }}%</strong> {{ post.no_label }}</span>
           </div>
           {% if analytics.daily_views %}
           <div>
@@ -549,13 +549,13 @@
                     <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                     </svg>
-                    Yes {{ yes_vote_count }}
+                    {{ post.yes_label }} {{ yes_vote_count }}
                 </span>
                 <span id="discussion-no-count-chip" class="inline-flex items-center rounded-full border border-red-500/20 bg-slate-900/90 px-3 py-1 text-sm font-semibold text-red-300 shadow-sm">
                     <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
                     </svg>
-                    No {{ no_vote_count }}
+                    {{ post.no_label }} {{ no_vote_count }}
                 </span>
             </div>
         </div>
@@ -568,7 +568,7 @@
             <div class="flex items-center gap-2 mb-0.5">
               <span class="text-xs font-semibold text-yellow-700 dark:text-yellow-400">Pinned comment</span>
               <span class="text-xs text-muted-foreground">@{{ pinned_comment.user.username }}</span>
-              <span class="text-[10px] px-1.5 py-0.5 rounded-full {% if pinned_comment.vote_type == 'yes' %}bg-green-500/10 text-green-700 dark:text-green-300{% else %}bg-red-500/10 text-red-700 dark:text-red-300{% endif %}">{{ pinned_comment.vote_type|capfirst }}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded-full {% if pinned_comment.vote_type == 'yes' %}bg-green-500/10 text-green-700 dark:text-green-300{% else %}bg-red-500/10 text-red-700 dark:text-red-300{% endif %}">{% if pinned_comment.vote_type == 'yes' %}{{ post.yes_label }}{% else %}{{ post.no_label }}{% endif %}</span>
             </div>
             <p class="text-xs text-foreground leading-relaxed">{{ pinned_comment.content }}</p>
             {% if is_post_creator %}
@@ -610,6 +610,8 @@
         </div>
         {% endif %}
 
+        {% include "frontend/_ad_unit.html" %}
+
         {% if user.is_authenticated and not is_post_creator %}
             {% if not user_has_voted or not user_has_commented %}
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -623,20 +625,20 @@
                             </svg>
                         </div>
                         <div>
-                            <p class="text-sm font-medium text-emerald-700 dark:text-emerald-300">Yes</p>
-                            <p class="text-2xl font-semibold text-emerald-950 dark:text-emerald-50">Agree</p>
+                            <p class="text-sm font-medium text-emerald-700 dark:text-emerald-300">{{ post.yes_label }}</p>
+                            <p class="text-2xl font-semibold text-emerald-950 dark:text-emerald-50">{{ post.yes_label }}</p>
                         </div>
                     </div>
                     <p class="text-sm text-muted-foreground mb-4">
                         {% if user_has_voted and not user_has_commented and user_vote_type == 'yes' %}
-                        You voted Yes. Add your comment here if you want your opinion to appear.
+                        You picked "{{ post.yes_label }}". Add your comment here if you want your opinion to appear.
                         {% elif user_has_voted and not user_has_commented and user_vote_type == 'no' %}
-                        Switch to Yes, or add text here to switch and comment at the same time.
+                        Switch to "{{ post.yes_label }}", or add text here to switch and comment at the same time.
                         {% else %}
-                        Vote yes if you believe the statement is true or should happen.
+                        Pick "{{ post.yes_label }}" if you are on this side.
                         {% endif %}
                     </p>
-                    <textarea name="content" rows="2" placeholder="{% if user_has_voted and not user_has_commented and user_vote_type == 'yes' %}Add your Yes comment...{% elif user_has_voted and not user_has_commented and user_vote_type == 'no' %}Optional: add comment while switching to Yes...{% else %}Optional: explain your view...{% endif %}" class="w-full rounded-2xl border border-emerald-200/70 bg-white/85 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-500/30 dark:bg-slate-900/70"></textarea>
+                    <textarea name="content" rows="2" placeholder="Optional: explain your view…" class="w-full rounded-2xl border border-emerald-200/70 bg-white/85 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-500/30 dark:bg-slate-900/70"></textarea>
                     <div class="mt-3 flex items-center gap-2">
                         <label class="flex items-center gap-1.5 cursor-pointer select-none text-xs text-muted-foreground">
                             <input type="checkbox" name="is_anonymous" value="1" class="sr-only peer">
@@ -648,11 +650,11 @@
                     </div>
                     <button type="submit" class="mt-3 inline-flex w-full justify-center rounded-full bg-gradient-to-r from-emerald-500 to-green-500 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:from-emerald-400 hover:to-green-400">
                         {% if user_has_voted and not user_has_commented and user_vote_type == 'yes' %}
-                        Add Yes Comment
+                        Add {{ post.yes_label }} Comment
                         {% elif user_has_voted and not user_has_commented and user_vote_type == 'no' %}
-                        Switch to Yes
+                        Switch to {{ post.yes_label }}
                         {% else %}
-                        Yes ({{ yes_vote_count }})
+                        {{ post.yes_label }} ({{ yes_vote_count }})
                         {% endif %}
                     </button>
                 </form>
@@ -667,20 +669,20 @@
                             </svg>
                         </div>
                         <div>
-                            <p class="text-sm font-medium text-rose-700 dark:text-rose-300">No</p>
-                            <p class="text-2xl font-semibold text-rose-950 dark:text-rose-50">Disagree</p>
+                            <p class="text-sm font-medium text-rose-700 dark:text-rose-300">{{ post.no_label }}</p>
+                            <p class="text-2xl font-semibold text-rose-950 dark:text-rose-50">{{ post.no_label }}</p>
                         </div>
                     </div>
                     <p class="text-sm text-muted-foreground mb-4">
                         {% if user_has_voted and not user_has_commented and user_vote_type == 'no' %}
-                        You voted No. Add your comment here if you want your opinion to appear.
+                        You picked "{{ post.no_label }}". Add your comment here if you want your opinion to appear.
                         {% elif user_has_voted and not user_has_commented and user_vote_type == 'yes' %}
-                        Switch to No, or add text here to switch and comment at the same time.
+                        Switch to "{{ post.no_label }}", or add text here to switch and comment at the same time.
                         {% else %}
-                        Vote no if you think the statement is wrong or should not happen.
+                        Pick "{{ post.no_label }}" if you are on this side.
                         {% endif %}
                     </p>
-                    <textarea name="content" rows="2" placeholder="{% if user_has_voted and not user_has_commented and user_vote_type == 'no' %}Add your No comment...{% elif user_has_voted and not user_has_commented and user_vote_type == 'yes' %}Optional: add comment while switching to No...{% else %}Optional: explain your view...{% endif %}" class="w-full rounded-2xl border border-rose-200/70 bg-white/85 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20 dark:border-rose-500/30 dark:bg-slate-900/70"></textarea>
+                    <textarea name="content" rows="2" placeholder="Optional: explain your view…" class="w-full rounded-2xl border border-rose-200/70 bg-white/85 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20 dark:border-rose-500/30 dark:bg-slate-900/70"></textarea>
                     <div class="mt-3 flex items-center gap-2">
                         <label class="flex items-center gap-1.5 cursor-pointer select-none text-xs text-muted-foreground">
                             <input type="checkbox" name="is_anonymous" value="1" class="sr-only peer">
@@ -692,11 +694,11 @@
                     </div>
                     <button type="submit" class="mt-3 inline-flex w-full justify-center rounded-full bg-gradient-to-r from-rose-500 to-red-500 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:from-rose-400 hover:to-red-400">
                         {% if user_has_voted and not user_has_commented and user_vote_type == 'no' %}
-                        Add No Comment
+                        Add {{ post.no_label }} Comment
                         {% elif user_has_voted and not user_has_commented and user_vote_type == 'yes' %}
-                        Switch to No
+                        Switch to {{ post.no_label }}
                         {% else %}
-                        No ({{ no_vote_count }})
+                        {{ post.no_label }} ({{ no_vote_count }})
                         {% endif %}
                     </button>
                 </form>
@@ -713,7 +715,7 @@
         <div class="grid grid-cols-2 gap-2">
             <div class="space-y-2 min-w-0">
                 <div class="mb-2 flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900/40 px-2.5 py-1.5">
-                    <p class="text-sm font-semibold text-green-700 dark:text-green-300">Yes</p>
+                    <p class="text-sm font-semibold text-green-700 dark:text-green-300">{{ post.yes_label }}</p>
                     <div class="flex items-center gap-1.5">
                         <span class="text-[11px] text-gray-500 dark:text-gray-400">{{ yes_vote_count }}</span>
                         <span class="text-xs font-semibold text-green-600 dark:text-green-400">{{ yes_percentage|floatformat:0 }}%</span>
@@ -805,7 +807,7 @@
 
             <div class="space-y-2 min-w-0">
                 <div class="mb-2 flex items-center justify-between rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-900/40 px-2.5 py-1.5">
-                    <p class="text-sm font-semibold text-red-700 dark:text-red-300">No</p>
+                    <p class="text-sm font-semibold text-red-700 dark:text-red-300">{{ post.no_label }}</p>
                     <div class="flex items-center gap-1.5">
                         <span class="text-[11px] text-gray-500 dark:text-gray-400">{{ no_vote_count }}</span>
                         <span class="text-xs font-semibold text-red-600 dark:text-red-400">{{ no_percentage|floatformat:0 }}%</span>
@@ -1497,11 +1499,14 @@ function updateDiscussionVoteSummary(data) {
     const yesChip = document.getElementById('discussion-yes-count-chip');
     const noChip = document.getElementById('discussion-no-count-chip');
 
+    const sideYesLabel = '{{ post.yes_label|escapejs }}';
+    const sideNoLabel = '{{ post.no_label|escapejs }}';
+
     if (yesLabel) {
-        yesLabel.textContent = `Yes: ${yesPercentage.toFixed(1)}%`;
+        yesLabel.textContent = `${sideYesLabel}: ${yesPercentage.toFixed(1)}%`;
     }
     if (noLabel) {
-        noLabel.textContent = `No: ${noPercentage.toFixed(1)}%`;
+        noLabel.textContent = `${sideNoLabel}: ${noPercentage.toFixed(1)}%`;
     }
     if (yesBar) {
         yesBar.style.width = `${Math.max(0, Math.min(100, yesPercentage))}%`;
@@ -1514,7 +1519,7 @@ function updateDiscussionVoteSummary(data) {
                     <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
                     </svg>
-                    Yes ${yesCount}
+                    ${sideYesLabel} ${yesCount}
                 `;
     }
     if (noChip) {
@@ -1522,7 +1527,7 @@ function updateDiscussionVoteSummary(data) {
                     <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                     </svg>
-                    No ${noCount}
+                    ${sideNoLabel} ${noCount}
                 `;
     }
 }

@@ -81,6 +81,8 @@ class Post(models.Model):
     ]
     reply_restriction = models.CharField(max_length=20, choices=REPLY_CHOICES, default=REPLY_EVERYONE)
     quoted_post = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='quotes')
+    yes_label = models.CharField(max_length=50, default='Yes', help_text='Custom label for the left/yes side option')
+    no_label = models.CharField(max_length=50, default='No', help_text='Custom label for the right/no side option')
     reading_time_minutes = models.PositiveSmallIntegerField(default=1)
     word_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)

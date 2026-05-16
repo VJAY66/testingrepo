@@ -101,6 +101,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'frontend.context_processors.notification_counts',
+                'frontend.context_processors.adsense',
             ],
         },
     },
@@ -310,6 +311,10 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'PickASide <noreply@pickside.app>')
 SITE_URL = os.getenv('SITE_URL', 'https://pickside.app')
+
+# ── Google AdSense ─────────────────────────────────────────────────────────────
+GOOGLE_ADSENSE_CLIENT = os.getenv('GOOGLE_ADSENSE_CLIENT', '')
+GOOGLE_ADSENSE_ENABLED = _env_bool('GOOGLE_ADSENSE_ENABLED', default=False)
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 LOGGING = {

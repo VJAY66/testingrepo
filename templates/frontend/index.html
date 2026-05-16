@@ -241,6 +241,7 @@
 
         <div class="space-y-4" id="posts-list">
             {% for post in posts %}
+                {% if forloop.counter == 4 %}{% include "frontend/_ad_unit.html" %}{% endif %}
                 {% if post.id %}
                 <div class="glass-panel trend-card transition hover:shadow-lg hover:shadow-primary/10" data-post-id="{{ post.id }}" data-share-url="{% url 'discussion' post.id %}">
                     <div class="trend-side"></div>

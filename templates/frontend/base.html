@@ -2366,6 +2366,9 @@
     <!-- Cropper.js for image cropping -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+    {% if GOOGLE_ADSENSE_ENABLED and GOOGLE_ADSENSE_CLIENT %}
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ GOOGLE_ADSENSE_CLIENT }}" crossorigin="anonymous"></script>
+    {% endif %}
 </head>
 <body class="bg-background text-foreground min-h-screen {% if request.resolver_match.url_name == 'index' %}home-bg{% endif %}">
 <!-- Cookie Consent Banner -->

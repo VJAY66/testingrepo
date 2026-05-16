@@ -3234,6 +3234,9 @@ def create_post(request):
 
         is_anonymous = request.POST.get('is_anonymous') == '1'
 
+        yes_label = request.POST.get('yes_label', '').strip()[:50] or 'Yes'
+        no_label = request.POST.get('no_label', '').strip()[:50] or 'No'
+
         try:
             post = Post.objects.create(
                 id=str(uuid.uuid4()),
@@ -3248,6 +3251,8 @@ def create_post(request):
                 mood=mood,
                 reply_restriction=reply_restriction,
                 is_anonymous=is_anonymous,
+                yes_label=yes_label,
+                no_label=no_label,
             )
 
             if not post or not post.id:

@@ -3,6 +3,13 @@ from django.conf import settings
 from discussions.models import Debate, DebateParticipant, Notification
 
 
+def adsense(request):
+    return {
+        'GOOGLE_ADSENSE_CLIENT': getattr(settings, 'GOOGLE_ADSENSE_CLIENT', ''),
+        'GOOGLE_ADSENSE_ENABLED': getattr(settings, 'GOOGLE_ADSENSE_ENABLED', False),
+    }
+
+
 def _safe_profile_avatar(user):
     try:
         return user.profile.get_picture_url or ''
