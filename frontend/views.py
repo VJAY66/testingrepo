@@ -8383,6 +8383,8 @@ def explore(request):
     section = request.GET.get('section', 'all').strip()
     if section not in ('all', 'pick_a_side', 'reviews', 'questions', 'stocks'):
         section = 'all'
+    # When searching for a hashtag (e.g. #bitcoin), also match tags stored without the # prefix
+    _bare_tag = search_q.lstrip('#') if search_q.startswith('#') else None
 
     # Base exclusion filters for logged-in users
     exclude_user_ids = set()
@@ -8446,7 +8448,8 @@ def explore(request):
         if category_filter:
             base_qs = base_qs.filter(category=category_filter)
         if search_q:
-            base_qs = base_qs.filter(Q(title__icontains=search_q) | Q(content__icontains=search_q) | Q(hashtags__icontains=search_q))
+            _hq = Q(hashtags__icontains=search_q) | Q(hashtags__icontains=_bare_tag) if _bare_tag else Q(hashtags__icontains=search_q)
+            base_qs = base_qs.filter(Q(title__icontains=search_q) | Q(content__icontains=search_q) | _hq)
         explore_posts = base_qs.order_by('-is_hot', '-like_count', '-comment_count', '-created_at')
         paginator = Paginator(explore_posts, 12)
         page_obj = paginator.get_page(request.GET.get('page'))
@@ -8459,7 +8462,8 @@ def explore(request):
         if category_filter:
             base_qs = base_qs.filter(category=category_filter)
         if search_q:
-            base_qs = base_qs.filter(Q(title__icontains=search_q) | Q(hashtags__icontains=search_q))
+            _hq = Q(hashtags__icontains=search_q) | Q(hashtags__icontains=_bare_tag) if _bare_tag else Q(hashtags__icontains=search_q)
+            base_qs = base_qs.filter(Q(title__icontains=search_q) | _hq)
         paginator = Paginator(base_qs.order_by('-like_count', '-comment_count', '-created_at'), 12)
         page_obj = paginator.get_page(request.GET.get('page'))
         posts = list(page_obj.object_list)
@@ -8470,7 +8474,8 @@ def explore(request):
         if request.user.is_authenticated:
             qs = qs.exclude(user_id__in=exclude_user_ids).exclude(user=request.user)
         if search_q:
-            qs = qs.filter(Q(subject__icontains=search_q) | Q(content__icontains=search_q))
+            _hq = Q(hashtags__icontains=search_q) | Q(hashtags__icontains=_bare_tag) if _bare_tag else Q(hashtags__icontains=search_q)
+            qs = qs.filter(Q(subject__icontains=search_q) | Q(content__icontains=search_q) | _hq)
         paginator = Paginator(qs, 12)
         page_obj = paginator.get_page(request.GET.get('page'))
         reviews_data = list(page_obj.object_list)
@@ -8480,7 +8485,8 @@ def explore(request):
         if request.user.is_authenticated:
             qs = qs.exclude(user_id__in=exclude_user_ids).exclude(user=request.user)
         if search_q:
-            qs = qs.filter(Q(title__icontains=search_q) | Q(content__icontains=search_q))
+            _hq = Q(hashtags__icontains=search_q) | Q(hashtags__icontains=_bare_tag) if _bare_tag else Q(hashtags__icontains=search_q)
+            qs = qs.filter(Q(title__icontains=search_q) | Q(content__icontains=search_q) | _hq)
         paginator = Paginator(qs, 12)
         page_obj = paginator.get_page(request.GET.get('page'))
         questions_data = list(page_obj.object_list)
