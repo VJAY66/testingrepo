@@ -4,6 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}PickASide{% endblock %}</title>
+    <!-- ── Page load progress bar ── -->
+    <style>
+    #npbar {
+        position: fixed; top: 0; left: 0; height: 2.5px; z-index: 99999;
+        background: linear-gradient(90deg, hsl(var(--primary, 221 83% 53%)), hsl(160 72% 44%));
+        width: 0%; transition: width 0.22s ease, opacity 0.3s ease;
+        pointer-events: none; box-shadow: 0 0 8px hsl(var(--primary, 221 83% 53%)/0.6);
+    }
+    #npbar.done { width: 100% !important; opacity: 0; }
+    </style>
+    <script>
+    (function(){
+        var bar = document.createElement('div'); bar.id = 'npbar';
+        document.addEventListener('DOMContentLoaded', function(){ document.body.prepend(bar); });
+        var timer, progress = 0, active = false;
+        function start() {
+            if (active) return; active = true; progress = 0;
+            bar.style.opacity = '1'; bar.style.width = '0%';
+            timer = setInterval(function(){
+                progress = Math.min(progress + (90 - progress) * 0.06, 90);
+                bar.style.width = progress + '%';
+            }, 80);
+        }
+        function done() {
+            clearInterval(timer); active = false;
+            bar.style.width = '100%';
+            setTimeout(function(){ bar.style.opacity = '0'; setTimeout(function(){ bar.style.width = '0'; }, 300); }, 200);
+        }
+        document.addEventListener('click', function(e){
+            var a = e.target.closest('a[href]');
+            if (!a) return;
+            var href = a.getAttribute('href');
+            if (!href || href.startsWith('#') || href.startsWith('javascript') || a.target === '_blank') return;
+            try { var u = new URL(href, location.href); if (u.origin !== location.origin) return; } catch(e){ return; }
+            start();
+        });
+        window.addEventListener('popstate', start);
+        document.addEventListener('DOMContentLoaded', done);
+        window.addEventListener('pageshow', done);
+    })();
+    </script>
     <!-- Default Open Graph / Twitter Card -->
     <meta property="og:site_name" content="PickASide">
     <meta property="og:type" content="website">
