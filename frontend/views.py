@@ -11426,6 +11426,55 @@ def _build_leaderboard_data(limit=10):
     return board[:limit], len(resolved_map)
 
 
+def discussions_list(request):
+    """Dedicated Pick a Side page — browse all discussion posts."""
+    from discussions.models import CATEGORY_CHOICES as _CAT_CHOICES
+    sort = request.GET.get('sort', 'trending')
+    category_filter = request.GET.get('category', '').strip()
+    search_query = request.GET.get('q', '').strip()
+
+    qs = Post.objects.filter(
+        post_type=Post.POST_TYPE_DISCUSSION,
+        is_draft=False,
+        is_deleted_by_moderation=False,
+    ).select_related('user', 'user__profile').annotate(
+        comment_count=Count('comments', distinct=True),
+        like_count=Count('actions', filter=Q(actions__action='like'), distinct=True),
+        debate_count=Count('debates', distinct=True),
+        hot_count=Count('actions', filter=Q(actions__action='hot'), distinct=True),
+    )
+
+    if category_filter:
+        qs = qs.filter(category=category_filter)
+    if search_query:
+        qs = qs.filter(
+            Q(title__icontains=search_query) |
+            Q(content__icontains=search_query) |
+            Q(hashtags__icontains=search_query)
+        )
+
+    if sort == 'latest':
+        qs = qs.order_by('-created_at')
+    elif sort == 'debated':
+        qs = qs.order_by('-debate_count', '-comment_count', '-created_at')
+    else:
+        cutoff = timezone.now() - timedelta(days=7)
+        qs = qs.filter(created_at__gte=cutoff).order_by(
+            '-hot_count', '-like_count', '-debate_count', '-comment_count', '-created_at'
+        )
+
+    paginator = Paginator(qs, 15)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    return render(request, 'frontend/discussions_list.html', {
+        'page_obj': page_obj,
+        'sort': sort,
+        'category_filter': category_filter,
+        'search_query': search_query,
+        'categories': _CAT_CHOICES,
+    })
+
+
 def stocks_list(request):
     """Browse all stock predictions with leaderboard sidebar."""
     status_filter = request.GET.get('status', 'active')

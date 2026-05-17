@@ -38,6 +38,8 @@ urlpatterns = [
     path('onboarding/profile/', views.onboarding_step3, name='onboarding_step3'),
     path('presence/offline/', views.mark_offline, name='mark_offline'),
     path('create-post/', views.create_post, name='create_post'),
+    # Pick a Side discussions
+    path('discussions/', views.discussions_list, name='discussions_list'),
     # Stock predictions
     path('stocks/', views.stocks_list, name='stocks_list'),
     path('stocks/create/', views.create_stock_prediction, name='create_stock_prediction'),
