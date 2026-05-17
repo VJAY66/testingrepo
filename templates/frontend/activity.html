@@ -178,7 +178,7 @@
         <p class="text-xs font-black uppercase tracking-widest text-muted-foreground mb-3">Trending Today</p>
         <div class="space-y-1">
           {% for tag in trending_sidebar|slice:":8" %}
-          <a href="{% url 'hashtag_feed' tag.name %}" class="flex items-center justify-between py-1.5 hover:text-primary transition-colors group">
+          <a href="{% url 'hashtag_search' %}?tag={{ tag.name|urlencode }}" class="flex items-center justify-between py-1.5 hover:text-primary transition-colors group">
             <span class="text-sm font-semibold text-foreground group-hover:text-primary">#{{ tag.name }}</span>
             <span class="text-xs text-muted-foreground">{{ tag.count }}</span>
           </a>
