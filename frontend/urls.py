@@ -108,8 +108,8 @@ urlpatterns = [
     path('reviews/<str:review_id>/react/', views.react_to_review, name='react_to_review'),
     path('reviews/<str:review_id>/comment/', views.create_review_comment, name='create_review_comment'),
     path('reviews/<str:review_id>/pin-comment/', views.pin_review_comment, name='pin_review_comment'),
-    # Trending hashtags
-    path('trending/', views.trending_hashtags, name='trending_hashtags'),
+    # Trending hashtags (moved off /trending/ so the main trending page shows posts)
+    path('trending/hashtags/', views.trending_hashtags, name='trending_hashtags'),
     # Activity feed
     path('activity/', views.activity_feed, name='activity_feed'),
     # Debate transcript (public)
