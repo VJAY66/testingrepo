@@ -389,25 +389,29 @@
     .ch-mobile { display: block; }
     .ch-empty-wrap { padding: 0.85rem; }
 }
-/* Strip all main/wrapper constraints so ch-page fills the viewport */
-main:has(.ch-page) {
+/* Applied via JS below — body class is the reliable cross-browser hook */
+body.ch-fullscreen {
+    overflow: hidden !important;
+}
+body.ch-fullscreen main {
     max-width: 100% !important;
+    width: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
 }
-main:has(.ch-page) > div {
+body.ch-fullscreen main > div {
+    display: block !important;
     gap: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
+    width: 100% !important;
 }
-main:has(.ch-page) > div > div {
+body.ch-fullscreen main > div > div {
     padding: 0 !important;
     margin: 0 !important;
     min-width: 0;
+    width: 100% !important;
     overflow: hidden;
-}
-body:has(.ch-page) {
-    overflow: hidden !important;
 }
 </style>
 
@@ -604,8 +608,11 @@ function markActiveChatRead() {
         .catch(function() {});
 }
 
+// Apply immediately (before first paint) so there's no layout flash
+document.body.classList.add('ch-fullscreen');
+
 document.addEventListener('DOMContentLoaded', function() {
-    // Set exact navbar height as CSS variable so ch-shell fills remaining viewport precisely
+    // Measure real nav height for precise full-viewport shell
     var nav = document.querySelector('.nav-shell');
     if (nav) document.documentElement.style.setProperty('--nav-height', nav.getBoundingClientRect().height + 'px');
 
