@@ -1383,7 +1383,7 @@ document.addEventListener('keydown', function(event) {
 
     document.body.appendChild(wrapper);
     refreshVisibility();
-    const pollTimer = window.setInterval(refreshVisibility, 4000);
+    const pollTimer = window.setInterval(refreshVisibility, 30000);
     document.addEventListener('visibilitychange', function() {
         if (!document.hidden) {
             refreshVisibility();

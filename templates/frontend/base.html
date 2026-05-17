@@ -3777,7 +3777,7 @@ function acceptCookies() {
                 };
                 src.onerror = function() { src.close(); setTimeout(startNotificationStream, 10000); };
             }
-            startNotificationStream();
+            if (window.self === window.top) startNotificationStream();
             {% endif %}
 
             function bindUserMenu(toggleEl, panelEl) {
@@ -5602,9 +5602,15 @@ function acceptCookies() {
 
                 if (!uiPairs.length) {
                     fetchChats();
-                    pollTimer = setInterval(fetchChats, 15000);
+                    pollTimer = setInterval(fetchChats, 30000);
                     document.addEventListener('visibilitychange', () => {
-                        if (!document.hidden) fetchChats();
+                        if (document.hidden) {
+                            clearInterval(pollTimer);
+                            pollTimer = null;
+                        } else {
+                            fetchChats();
+                            pollTimer = setInterval(fetchChats, 30000);
+                        }
                     });
                     return;
                 }
@@ -5650,9 +5656,15 @@ function acceptCookies() {
                 });
 
                 fetchChats();
-                pollTimer = setInterval(fetchChats, 15000);
+                pollTimer = setInterval(fetchChats, 30000);
                 document.addEventListener('visibilitychange', () => {
-                    if (!document.hidden) fetchChats();
+                    if (document.hidden) {
+                        clearInterval(pollTimer);
+                        pollTimer = null;
+                    } else {
+                        fetchChats();
+                        pollTimer = setInterval(fetchChats, 30000);
+                    }
                 });
             },
 
@@ -5933,7 +5945,7 @@ function acceptCookies() {
 
     document.addEventListener('DOMContentLoaded', () => {
         {% if user.is_authenticated %}
-        ChatListManager.init();
+        if (window.self === window.top) ChatListManager.init();
         {% endif %}
     });
     </script>
