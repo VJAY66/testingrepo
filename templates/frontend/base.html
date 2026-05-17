@@ -2427,6 +2427,89 @@
         }
 
         /* ─────────────────────────────────────────────────────── */
+
+        /* ══ Global button elegance layer ══════════════════════ */
+
+        /* Universal smooth motion for all interactive controls */
+        button, [role="button"], input[type="submit"], input[type="button"],
+        a.rounded-full, a[class*="rounded-full"] {
+            will-change: transform;
+        }
+
+        /* Primary filled buttons — lift + glow */
+        button[class*="bg-primary"], a[class*="bg-primary"],
+        button[class*="bg-gradient"], a[class*="bg-gradient"],
+        button[class*="bg-emerald"], a[class*="bg-emerald"],
+        button[class*="bg-blue-5"], a[class*="bg-blue-5"],
+        button[class*="bg-violet"], a[class*="bg-violet"] {
+            transition: transform 0.18s cubic-bezier(.22,1,.36,1),
+                        box-shadow 0.18s ease,
+                        opacity 0.18s ease !important;
+            box-shadow: 0 2px 10px -3px hsl(var(--primary)/0.3);
+        }
+        button[class*="bg-primary"]:hover:not(:disabled):not([class*="cursor-not"]),
+        a[class*="bg-primary"]:hover,
+        button[class*="bg-gradient"]:hover:not(:disabled),
+        a[class*="bg-gradient"]:hover,
+        button[class*="bg-emerald"]:hover:not(:disabled),
+        a[class*="bg-emerald"]:hover,
+        button[class*="bg-blue-5"]:hover:not(:disabled),
+        a[class*="bg-blue-5"]:hover,
+        button[class*="bg-violet"]:hover:not(:disabled),
+        a[class*="bg-violet"]:hover {
+            transform: translateY(-1.5px) scale(1.015);
+            box-shadow: 0 8px 22px -6px hsl(var(--primary)/0.48);
+            opacity: 0.95;
+        }
+
+        /* Outline / ghost rounded-full buttons — subtle lift */
+        button[class*="rounded-full"][class*="border"]:not([class*="bg-primary"]):not([class*="bg-gradient"]):not([class*="bg-slate"]):not([class*="bg-gray"]):not(:disabled),
+        a[class*="rounded-full"][class*="border"]:not([class*="bg-primary"]):not([class*="bg-gradient"]) {
+            transition: transform 0.16s ease,
+                        box-shadow 0.16s ease,
+                        border-color 0.16s ease,
+                        color 0.16s ease,
+                        background 0.16s ease !important;
+        }
+        button[class*="rounded-full"][class*="border"]:not([class*="bg-primary"]):not([class*="bg-gradient"]):not([class*="bg-slate"]):not([class*="bg-gray"]):not(:disabled):hover,
+        a[class*="rounded-full"][class*="border"]:not([class*="bg-primary"]):not([class*="bg-gradient"]):hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px -6px hsl(var(--primary)/0.18);
+            border-color: hsl(var(--primary)/0.45) !important;
+        }
+
+        /* Active / press-down feedback */
+        button[class*="bg-primary"]:active,
+        a[class*="bg-primary"]:active,
+        button[class*="rounded-full"]:active,
+        a[class*="rounded-full"]:active {
+            transform: translateY(0.5px) scale(0.985) !important;
+            box-shadow: 0 1px 4px -2px hsl(var(--primary)/0.2) !important;
+            transition-duration: 0.06s !important;
+        }
+
+        /* Disabled — no lift ever */
+        button:disabled, button[class*="cursor-not"], [disabled],
+        .opacity-50, .opacity-40 {
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        /* Rounded-lg buttons (non-pill) — gentle lift */
+        button[class*="rounded-lg"]:not([class*="bg-primary"]):not(:disabled):hover,
+        button[class*="rounded-xl"]:not([class*="bg-primary"]):not(:disabled):hover,
+        button[class*="rounded-2xl"]:not([class*="bg-primary"]):not(:disabled):hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px -6px hsl(var(--primary)/0.15);
+        }
+
+        /* Filter/tab pill chips — consistent active style */
+        [class*="afc-on"], [class*="active-nav"],
+        [class*="hf-tab"][class*="active"] {
+            box-shadow: 0 2px 8px -3px hsl(var(--primary)/0.3);
+        }
+
+        /* ══════════════════════════════════════════════════════ */
     </style>
     <!-- Cropper.js for image cropping -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
