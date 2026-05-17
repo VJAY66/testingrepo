@@ -700,6 +700,16 @@
     @media (max-height: 760px) {
       #mc-shell { top: calc(env(safe-area-inset-top, 0px) + 60px); bottom: 6px; }
     }
+    @media (min-width: 768px) {
+      #mc-shell {
+        left: 50%; right: auto;
+        transform: translateX(-50%);
+        width: min(700px, calc(100vw - 32px));
+        top: calc(env(safe-area-inset-top, 0px) + 72px);
+        bottom: 24px;
+      }
+      #mc-shell.mc-hidden { transform: translateX(-50%) translateY(40px) scale(0.96); }
+    }
     @media (prefers-reduced-motion: reduce) {
       #mc-shell, .mc-msg { animation: none !important; }
       .mc-msg-hover-bar { transition: none !important; }
@@ -969,6 +979,51 @@
   {% if user == debate.initiator %}{{ debate.target.username|slice:":1"|upper }}{% else %}{{ debate.initiator.username|slice:":1"|upper }}{% endif %}
   <span class="mc-unread-dot" id="mc-unread-dot"></span>
 </div>
+
+{# ── Universal UI handlers (collapse + caution) — run at all viewport widths ── #}
+<script>
+(function() {
+  var LS_PANELS = 'mc_panels_collapsed';
+  var LS_CAUTION = 'dhChatCautionAccepted:{{ debate.id }}';
+
+  function applyPanelState(collapsed) {
+    var panels = document.getElementById('mc-collapsible-panels');
+    var btn = document.getElementById('mc-collapse-btn');
+    if (!panels || !btn) return;
+    panels.classList.toggle('collapsed', collapsed);
+    btn.classList.toggle('collapsed', collapsed);
+    btn.title = collapsed ? 'Expand panels' : 'Collapse panels';
+  }
+  try { applyPanelState(localStorage.getItem(LS_PANELS) === '1'); } catch(e) {}
+  window.mcTogglePanels = function() {
+    var panels = document.getElementById('mc-collapsible-panels');
+    if (!panels) return;
+    var nowCollapsed = !panels.classList.contains('collapsed');
+    applyPanelState(nowCollapsed);
+    try { localStorage.setItem(LS_PANELS, nowCollapsed ? '1' : '0'); } catch(e) {}
+  };
+
+  function syncCautionBanner() {
+    var bar = document.getElementById('mc-caution');
+    if (!bar) return;
+    var accepted = false;
+    try { accepted = localStorage.getItem(LS_CAUTION) === '1'; } catch(e) {}
+    bar.style.display = accepted ? 'none' : 'flex';
+  }
+  syncCautionBanner();
+  var cautionBtn = document.getElementById('mc-caution-accept');
+  if (cautionBtn) {
+    cautionBtn.addEventListener('click', function() {
+      try { localStorage.setItem(LS_CAUTION, '1'); } catch(e) {}
+      syncCautionBanner();
+      var panels = document.getElementById('mc-collapsible-panels');
+      if (panels && !panels.classList.contains('collapsed')) {
+        window.mcTogglePanels();
+      }
+    });
+  }
+})();
+</script>
 
 {# ── Mobile chat JS ── #}
 <script>

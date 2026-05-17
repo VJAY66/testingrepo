@@ -116,7 +116,7 @@ html[data-theme="dark"] .hot-badge { color: hsl(24 90% 65%); }
     </div>
 
     <!-- ── Sort tabs ─────────────────────────────────────────── -->
-    <div class="flex items-center gap-3 mb-6">
+    <div class="flex items-center gap-3 mb-6 overflow-x-auto pb-1" style="scrollbar-width:none;">
         <div class="flex rounded-xl border border-border overflow-hidden flex-shrink-0">
             <a href="?sort=trending{% if category_filter %}&category={{ category_filter|urlencode }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}"
                class="sort-tab {% if sort == 'trending' %}active{% endif %}">🔥 Trending</a>
