@@ -700,6 +700,14 @@
     @media (max-height: 760px) {
       #mc-shell { top: calc(env(safe-area-inset-top, 0px) + 60px); bottom: 6px; }
     }
+    @media (min-width: 768px) {
+      body.mc-open #mc-shell {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        width: min(700px, calc(100vw - 32px));
+      }
+    }
     @media (prefers-reduced-motion: reduce) {
       #mc-shell, .mc-msg { animation: none !important; }
       .mc-msg-hover-bar { transition: none !important; }
@@ -969,6 +977,65 @@
   {% if user == debate.initiator %}{{ debate.target.username|slice:":1"|upper }}{% else %}{{ debate.initiator.username|slice:":1"|upper }}{% endif %}
   <span class="mc-unread-dot" id="mc-unread-dot"></span>
 </div>
+
+{# ── Universal UI handlers (collapse + caution) — run at all viewport widths ── #}
+<script>
+(function() {
+  // Collapse/expand the info panels above the chat
+  var LS_KEY = 'mc_panels_collapsed';
+  function applyPanelState(collapsed) {
+    var panels = document.getElementById('mc-collapsible-panels');
+    var btn = document.getElementById('mc-collapse-btn');
+    if (!panels || !btn) return;
+    if (collapsed) {
+      panels.classList.add('collapsed');
+      btn.classList.add('collapsed');
+      btn.title = 'Expand panels';
+    } else {
+      panels.classList.remove('collapsed');
+      btn.classList.remove('collapsed');
+      btn.title = 'Collapse panels';
+    }
+  }
+  try { applyPanelState(localStorage.getItem(LS_KEY) === '1'); } catch(e) {}
+  window.mcTogglePanels = function() {
+    var panels = document.getElementById('mc-collapsible-panels');
+    if (!panels) return;
+    var nowCollapsed = !panels.classList.contains('collapsed');
+    applyPanelState(nowCollapsed);
+    try { localStorage.setItem(LS_KEY, nowCollapsed ? '1' : '0'); } catch(e) {}
+  };
+
+  // Caution banner
+  var cautionStorageKey = 'dhChatCautionAccepted:{{ debate.id }}';
+  function hasAcceptedCaution() {
+    try { return localStorage.getItem(cautionStorageKey) === '1'; } catch { return false; }
+  }
+  function syncCautionBanner() {
+    var bar = document.getElementById('mc-caution');
+    if (bar) bar.style.display = hasAcceptedCaution() ? 'none' : 'flex';
+  }
+  function initCaution() {
+    syncCautionBanner();
+    var btn = document.getElementById('mc-caution-accept');
+    if (btn) {
+      btn.addEventListener('click', function() {
+        try { localStorage.setItem(cautionStorageKey, '1'); } catch {}
+        syncCautionBanner();
+        // Auto-collapse panels so user lands directly in the chat
+        if (!document.getElementById('mc-collapsible-panels').classList.contains('collapsed')) {
+          window.mcTogglePanels();
+        }
+      });
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCaution);
+  } else {
+    initCaution();
+  }
+})();
+</script>
 
 {# ── Mobile chat JS ── #}
 <script>
