@@ -3,7 +3,7 @@
 {% block title %}Chats - Discussion Hub{% endblock %}
 
 {% block page_layout %}
-<main style="padding:0;margin:0;max-width:100%;width:100%;overflow:hidden;">
+<main id="ch-main" style="position:fixed;top:var(--nav-height,64px);left:0;right:0;bottom:0;padding:0;margin:0;overflow:hidden;z-index:10;">
 <style>
 @keyframes chGradientDrift {
     0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.72; }
@@ -27,7 +27,7 @@
 .ch-shell {
     position: relative;
     width: 100%;
-    height: calc(100dvh - var(--nav-height, 64px));
+    height: 100%;
     border: none;
     border-radius: 0;
     background:
@@ -603,9 +603,13 @@ function markActiveChatRead() {
 document.body.classList.add('ch-fullscreen');
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Measure real nav height for precise full-viewport shell
     var nav = document.querySelector('.nav-shell');
-    if (nav) document.documentElement.style.setProperty('--nav-height', nav.getBoundingClientRect().height + 'px');
+    var main = document.getElementById('ch-main');
+    if (nav && main) {
+        var h = nav.getBoundingClientRect().height + 'px';
+        document.documentElement.style.setProperty('--nav-height', h);
+        main.style.top = h;
+    }
 
     bindChatSearch('ch-desktop-search', '#ch-desktop-list');
     bindChatSearch('ch-mobile-search', '#ch-mobile-list');
