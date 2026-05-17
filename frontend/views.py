@@ -1311,12 +1311,16 @@ def discussion(request, post_id):
     else:
         _comment_order = ('-reaction_score', '-likes', 'created_at')
     _COMMENT_PAGE_SIZE = 75
-    yes_comments = visible_comments.filter(vote_type='yes').order_by(*_comment_order)[:_COMMENT_PAGE_SIZE]
-    no_comments = visible_comments.filter(vote_type='no').order_by(*_comment_order)[:_COMMENT_PAGE_SIZE]
+    yes_qs = visible_comments.filter(vote_type='yes').order_by(*_comment_order)
+    no_qs  = visible_comments.filter(vote_type='no').order_by(*_comment_order)
 
     # Only award top badges when a comment has a positive net reaction.
-    top_yes_comment = yes_comments.filter(reaction_score__gt=0).first()
-    top_no_comment = no_comments.filter(reaction_score__gt=0).first()
+    # Must query before slicing — Django forbids .filter() on a sliced queryset.
+    top_yes_comment = yes_qs.filter(reaction_score__gt=0).first()
+    top_no_comment  = no_qs.filter(reaction_score__gt=0).first()
+
+    yes_comments = yes_qs[:_COMMENT_PAGE_SIZE]
+    no_comments  = no_qs[:_COMMENT_PAGE_SIZE]
 
     # Pinned comment for this post (only one can be pinned at a time)
     pinned_comment = Comment.objects.filter(post=post, is_pinned=True).select_related('user', 'user__profile').first()
