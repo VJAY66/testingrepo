@@ -4,11 +4,6 @@
 
 {% block page_layout %}
 <main style="padding:0;margin:0;max-width:100%;width:100%;overflow:hidden;">
-    {% block content %}{% endblock %}
-</main>
-{% endblock page_layout %}
-
-{% block content %}
 <style>
 @keyframes chGradientDrift {
     0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.72; }
@@ -638,4 +633,5 @@ function openDesktopChat(chatId, btn) {
 }
 </script>
 
-{% endblock %}
+</main>
+{% endblock page_layout %}
