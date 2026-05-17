@@ -3777,7 +3777,7 @@ function acceptCookies() {
                 };
                 src.onerror = function() { src.close(); setTimeout(startNotificationStream, 10000); };
             }
-            if (window.self === window.top) startNotificationStream();
+            if (window.self === window.top) setTimeout(startNotificationStream, 2000);
             {% endif %}
 
             function bindUserMenu(toggleEl, panelEl) {
@@ -5658,8 +5658,13 @@ function acceptCookies() {
                     closeAllPanels();
                 });
 
-                fetchChats();
-                pollTimer = setInterval(fetchChats, 30000);
+                // Delay initial fetch so it doesn't compete with page render on navigation
+                setTimeout(() => {
+                    if (!document.hidden) {
+                        fetchChats();
+                        pollTimer = setInterval(fetchChats, 30000);
+                    }
+                }, 4000);
                 document.addEventListener('visibilitychange', () => {
                     if (document.hidden) {
                         clearInterval(pollTimer);
