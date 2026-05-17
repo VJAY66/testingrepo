@@ -737,6 +737,7 @@
             </div>
             <div class="nf-stream">
                 {% for notif in post_notifications %}
+                {% if notif.post %}
                 {% if notif.notification_type == 'author_comment' or notif.notification_type == 'post_comment' or notif.notification_type == 'author_debate' or notif.notification_type == 'post_activity' %}
                     <article class="nf-post-card nf-reveal" id="post-notif-{{ notif.id }}" data-post-id="{{ notif.post.id }}"
                         style="cursor:pointer;"
@@ -794,6 +795,7 @@
                     <button type="button" class="nf-button-ghost" onclick="unfollowPostFromNotif('{{ notif.post.id }}', '{{ notif.post.title|escapejs }}', this)">Unfollow</button>
                     {% endif %}
                 </article>
+                {% endif %}
                 {% endfor %}
             </div>
         </section>
@@ -812,7 +814,7 @@
                             <span class="nf-chip">Accused: {{ report.reported_user.username }}</span>
                             <span class="nf-chip">Reports: {{ report.total_reports }}</span>
                         </div>
-                        <p class="text-xs text-muted-foreground">Debate: <a href="{% url 'discussion' report.debate.post.id %}" class="nf-link">{{ report.debate.post.title|truncatechars:70 }}</a></p>
+                        <p class="text-xs text-muted-foreground">Debate: {% if report.debate.post %}<a href="{% url 'discussion' report.debate.post.id %}" class="nf-link">{{ report.debate.post.title|truncatechars:70 }}</a>{% else %}<span class="nf-link">(deleted post)</span>{% endif %}</p>
                         <div class="rounded-lg border border-border bg-background/70 px-3 py-2 text-xs text-foreground">"{{ report.message_preview|truncatechars:180 }}"</div>
                         <div class="flex flex-wrap items-center gap-1.5">
                             <button type="button" class="nf-button-danger" onclick="moderateDebateMessageReport('{{ report.id }}', 'delete_warn', this)">Delete + Warn</button>
@@ -869,7 +871,7 @@
                                     <p class="text-xs text-muted-foreground leading-snug">
                                         {% if debate.initiator == user %}You challenged <strong class="text-foreground">{{ debate.target.username }}</strong>{% else %}<strong class="text-foreground">{{ debate.initiator.username }}</strong> challenged you{% endif %}
                                     </p>
-                                    <a href="{% url 'discussion' debate.post.id %}" class="block text-sm font-bold text-foreground mt-0.5 leading-snug hover:text-primary transition-colors">{{ debate.post.title|truncatechars:70 }}</a>
+                                    {% if debate.post %}<a href="{% url 'discussion' debate.post.id %}" class="block text-sm font-bold text-foreground mt-0.5 leading-snug hover:text-primary transition-colors">{{ debate.post.title|truncatechars:70 }}</a>{% else %}<span class="block text-sm font-bold text-muted-foreground mt-0.5 leading-snug">(deleted post)</span>{% endif %}
                                 </div>
                                 <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
                                     <span id="debate-status-{{ debate.id }}" class="nf-status {% if debate.status == 'pending' %}pending{% elif debate.status == 'accepted' %}accepted{% else %}rejected{% endif %}">{{ debate.status|title }}</span>
