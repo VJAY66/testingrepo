@@ -1281,6 +1281,22 @@ def discussion(request, post_id):
         messages.error(request, 'This discussion is no longer available.')
         return redirect('index')
 
+    # Audience access control — enforce followers/close_friends restrictions
+    if post.audience != 'public' and request.user != post.user:
+        if not request.user.is_authenticated:
+            messages.error(request, 'You must be logged in to view this post.')
+            return redirect('login')
+        if post.audience == 'followers':
+            is_following = post.user.follower_links.filter(follower=request.user).exists()
+            if not is_following:
+                messages.error(request, 'This post is only visible to followers.')
+                return redirect('index')
+        elif post.audience == 'close_friends':
+            is_close_friend = post.user.close_friends_list.filter(friend=request.user).exists()
+            if not is_close_friend:
+                messages.error(request, 'This post is only visible to close friends.')
+                return redirect('index')
+
     # Stock predictions have their own dedicated detail page.
     if post.post_type == Post.POST_TYPE_STOCK:
         return redirect('stock_prediction_detail', post_id=post_id)
@@ -2030,8 +2046,6 @@ def user_profile(request, username):
         from django.http import Http404
         raise Http404("User not found")
 
-    user_posts = Post.objects.filter(user=profile_user).exclude(id='').order_by('-created_at')
-
     profile_obj = Profile.objects.filter(user=profile_user).first()
     avatar_url = profile_obj.get_picture_url if profile_obj else ''
     profile_last_seen = profile_obj.last_seen if profile_obj else None
@@ -2044,6 +2058,7 @@ def user_profile(request, username):
     is_blocked = False
     is_muted = False
     request_pending = False
+    is_close_friend = False
     is_private = bool(profile_obj and profile_obj.is_private)
     if request.user.is_authenticated:
         is_following = Follow.objects.filter(follower=request.user, following=profile_user).exists()
@@ -2053,10 +2068,23 @@ def user_profile(request, username):
             request_pending = FollowRequest.objects.filter(
                 from_user=request.user, to_user=profile_user, status='pending'
             ).exists()
+        is_close_friend = profile_user.close_friends_list.filter(friend=request.user).exists()
 
     # Gate content for private profiles
     is_own_profile = request.user == profile_user
     can_see_content = is_own_profile or is_following or not is_private
+
+    # Filter posts by audience: owners see all; followers see public+followers;
+    # close friends see all; everyone else sees only public.
+    _base_posts = Post.objects.filter(user=profile_user).exclude(id='').order_by('-created_at')
+    if is_own_profile:
+        user_posts = _base_posts
+    elif is_close_friend:
+        user_posts = _base_posts
+    elif is_following:
+        user_posts = _base_posts.filter(audience__in=('public', 'followers'))
+    else:
+        user_posts = _base_posts.filter(audience='public')
 
     follows_you_back = False
     user_endorsements = []
@@ -11040,6 +11068,21 @@ def create_stock_prediction(request):
 def stock_prediction_detail(request, post_id):
     """Detail page for a stock prediction."""
     post = get_object_or_404(Post, id=post_id, post_type=Post.POST_TYPE_STOCK)
+
+    # Audience access control
+    if post.audience != 'public' and request.user != post.user:
+        if not request.user.is_authenticated:
+            messages.error(request, 'You must be logged in to view this post.')
+            return redirect('login')
+        if post.audience == 'followers':
+            if not post.user.follower_links.filter(follower=request.user).exists():
+                messages.error(request, 'This post is only visible to followers.')
+                return redirect('index')
+        elif post.audience == 'close_friends':
+            if not post.user.close_friends_list.filter(friend=request.user).exists():
+                messages.error(request, 'This post is only visible to close friends.')
+                return redirect('index')
+
     try:
         sp = post.stock_prediction
     except StockPrediction.DoesNotExist:
