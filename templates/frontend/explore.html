@@ -102,11 +102,11 @@
             <a href="{% url 'stock_prediction_detail' post.id %}" class="ecard no-underline block">
               <div class="ecard-body">
                 <div class="flex items-center gap-2 mb-2">
-                  <a href="{% url 'user_profile' post.user.username %}" class="h-7 w-7 rounded-full border border-border bg-background/70 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <span class="h-7 w-7 rounded-full border border-border bg-background/70 flex items-center justify-center overflow-hidden flex-shrink-0">
                     <span class="text-xs font-bold text-muted-foreground">{{ post.user.username|slice:":1"|upper }}</span>
-                  </a>
+                  </span>
                   <div class="min-w-0">
-                    <a href="{% url 'user_profile' post.user.username %}" class="text-xs font-semibold text-foreground truncate block hover:text-primary">@{{ post.user.username }}</a>
+                    <span class="text-xs font-semibold text-foreground truncate block">@{{ post.user.username }}</span>
                     <span class="text-xs text-emerald-600 font-semibold">📈 {{ post.category }}</span>
                   </div>
                 </div>
@@ -193,11 +193,11 @@
           <a href="{% url 'stock_prediction_detail' post.id %}" class="ecard no-underline block">
             <div class="ecard-body">
               <div class="flex items-center gap-2 mb-2">
-                <a href="{% url 'user_profile' post.user.username %}" class="h-7 w-7 rounded-full border border-border bg-background/70 flex items-center justify-center overflow-hidden flex-shrink-0">
+                <span class="h-7 w-7 rounded-full border border-border bg-background/70 flex items-center justify-center overflow-hidden flex-shrink-0">
                   <span class="text-xs font-bold text-muted-foreground">{{ post.user.username|slice:":1"|upper }}</span>
-                </a>
+                </span>
                 <div class="min-w-0">
-                  <a href="{% url 'user_profile' post.user.username %}" class="text-xs font-semibold text-foreground truncate block hover:text-primary">@{{ post.user.username }}</a>
+                  <span class="text-xs font-semibold text-foreground truncate block">@{{ post.user.username }}</span>
                   <span class="text-xs text-emerald-600 font-semibold">{{ post.category }}</span>
                 </div>
               </div>
