@@ -9842,15 +9842,14 @@ def notification_stream_v2(request):
         last_notifs = -1
         last_dms = -1
         last_notif_id = None
-        for _ in range(60):
-            try:
+        try:
+            for _ in range(60):
                 notifs = Notification.objects.filter(user=user, is_read=False).count()
                 dms = DMRequest.objects.filter(recipient=user, status=DMRequest.STATUS_PENDING).count()
                 payload = {}
                 if notifs != last_notifs or dms != last_dms:
                     payload['notifications'] = notifs
                     payload['dms'] = dms
-                # Detect a new notification and emit its message for rich toasts
                 latest = Notification.objects.filter(user=user, is_read=False).order_by('-created_at').first()
                 if latest and latest.id != last_notif_id and last_notif_id is not None:
                     payload['latest_message'] = latest.message[:120]
@@ -9863,10 +9862,15 @@ def notification_stream_v2(request):
                     last_notifs = notifs
                     last_dms = dms
                     yield f'data: {_json.dumps(payload)}\n\n'
-                _time.sleep(5)
-            except Exception:
-                break
-        yield 'data: {"reconnect":true}\n\n'
+                # Sleep in 1-second chunks so GeneratorExit (client disconnect)
+                # is handled within 1 second instead of blocking for the full 5s
+                for _ in range(5):
+                    _time.sleep(1)
+            yield 'data: {"reconnect":true}\n\n'
+        except (GeneratorExit, BrokenPipeError):
+            return
+        except Exception:
+            return
 
     from django.http import StreamingHttpResponse
     response = StreamingHttpResponse(_event_gen(request.user), content_type='text/event-stream')

@@ -3753,6 +3753,7 @@ function acceptCookies() {
                 setTimeout(function(){ t.style.opacity='0'; t.style.transition='opacity .4s'; setTimeout(function(){ t.remove(); }, 400); }, 4000);
             }
             var _lastNotifCount = -1, _lastDmCount = -1;
+            var _notifSrc = null;  // held in outer scope so beforeunload can close it
             function startNotificationStream() {
                 if (!window.EventSource) {
                     window.setInterval(function() {
@@ -3762,15 +3763,15 @@ function acceptCookies() {
                     }, 15000);
                     return;
                 }
-                var src = new EventSource('{% url "notification_stream_v2" %}');
-                src.onmessage = function(e) {
+                if (_notifSrc) { try { _notifSrc.close(); } catch(_) {} _notifSrc = null; }
+                _notifSrc = new EventSource('{% url "notification_stream_v2" %}');
+                _notifSrc.onmessage = function(e) {
                     try {
                         var d = JSON.parse(e.data);
-                        if (d.reconnect) { src.close(); setTimeout(startNotificationStream, 1000); return; }
+                        if (d.reconnect) { _notifSrc.close(); _notifSrc = null; setTimeout(startNotificationStream, 1000); return; }
                         if (typeof d.notifications === 'number') {
                             updateNotificationBadge(d.notifications);
                             if (_lastNotifCount >= 0 && d.notifications > _lastNotifCount) {
-                                // Use rich message if available, otherwise fall back to generic
                                 var msg = d.latest_message ? d.latest_message : ('You have ' + d.notifications + ' new notification' + (d.notifications !== 1 ? 's' : ''));
                                 _showToast(msg, 'notif');
                             }
@@ -3789,8 +3790,12 @@ function acceptCookies() {
                         }
                     } catch(_) {}
                 };
-                src.onerror = function() { src.close(); setTimeout(startNotificationStream, 10000); };
+                _notifSrc.onerror = function() { _notifSrc.close(); _notifSrc = null; setTimeout(startNotificationStream, 10000); };
             }
+            // Close SSE before navigating away so the server thread is freed immediately
+            window.addEventListener('beforeunload', function() {
+                if (_notifSrc) { try { _notifSrc.close(); } catch(_) {} _notifSrc = null; }
+            });
             if (window.self === window.top) setTimeout(startNotificationStream, 2000);
             {% endif %}
 
