@@ -16,7 +16,7 @@ class Command(BaseCommand):
         self.stdout.write(f"Updating prices for {total} active prediction(s)…")
 
         for sp in active:
-            price = _fetch_live_price(sp.stock_symbol)
+            price = _fetch_live_price(sp.stock_symbol, sp.currency)
             if price:
                 sp.live_price = price
                 sp.price_updated_at = timezone.now()

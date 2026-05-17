@@ -10889,13 +10889,74 @@ def toggle_profile_privacy(request):
 
 _PRICE_CACHE_SECONDS = 600  # 10 minutes
 
-def _fetch_live_price(symbol):
+_CRYPTO_CURRENCIES = {'BTC', 'ETH', 'USDT', 'BNB', 'SOL', 'XRP', 'USDC', 'ADA', 'DOGE', 'MATIC', 'DOT', 'AVAX', 'SHIB', 'LTC', 'LINK', 'UNI', 'ATOM', 'XLM', 'ALGO', 'TRX'}
+
+# Maps currency code → ordered list of Yahoo Finance symbol suffixes to try.
+# '' means use the symbol as-is (works for US tickers like AAPL).
+_CURRENCY_YF_SUFFIXES = {
+    'USD':  ['', '-USD'],
+    'CAD':  ['.TO', '.V', ''],
+    'MXN':  ['.MX', ''],
+    'BRL':  ['.SA', ''],
+    'EUR':  ['.PA', '.DE', '.AS', '.MI', '.MC', '.BR', '.LS', '.HE', ''],
+    'GBP':  ['.L', ''],
+    'CHF':  ['.SW', '.VX', ''],
+    'NOK':  ['.OL', ''],
+    'SEK':  ['.ST', ''],
+    'DKK':  ['.CO', ''],
+    'PLN':  ['.WA', ''],
+    'TRY':  ['.IS', ''],
+    'RUB':  ['.ME', ''],
+    'UAH':  [''],
+    'INR':  ['.NS', '.BO', ''],
+    'JPY':  ['.T', ''],
+    'CNY':  ['.SS', '.SZ', ''],
+    'HKD':  ['.HK', ''],
+    'SGD':  ['.SI', ''],
+    'AUD':  ['.AX', ''],
+    'NZD':  ['.NZ', ''],
+    'KRW':  ['.KS', '.KQ', ''],
+    'TWD':  ['.TW', '.TWO', ''],
+    'THB':  ['.BK', ''],
+    'MYR':  ['.KL', ''],
+    'IDR':  ['.JK', ''],
+    'PHP':  ['.PS', ''],
+    'PKR':  [''],
+    'BDT':  [''],
+    'VND':  [''],
+    'ILS':  ['.TA', ''],
+    'AED':  [''],
+    'SAR':  [''],
+    'QAR':  [''],
+    'KWD':  [''],
+    'ZAR':  ['.JO', ''],
+    'NGN':  [''],
+    'KES':  [''],
+    'EGP':  [''],
+    'MAD':  ['.CS', ''],
+}
+
+def _fetch_live_price(symbol, currency='USD'):
     """Fetch live price for a stock or crypto symbol. Returns float or None."""
     sym = symbol.strip().upper()
-    # Build candidate list: plain → NSE India (.NS) → BSE India (.BO) → crypto (-USD)
-    # Skip exchange-suffix variants if the symbol already has one (e.g. HDFCBANK.NS entered directly)
-    has_suffix = '.' in sym or sym.endswith('-USD') or sym.endswith('-USDT')
-    candidates = [sym] if has_suffix else [sym, f"{sym}.NS", f"{sym}.BO", f"{sym}-USD"]
+    cur = (currency or 'USD').strip().upper()
+
+    # If symbol already carries an exchange suffix (.NS, .L, -USD etc.) use it directly
+    has_suffix = ('.' in sym) or ('-' in sym)
+    if has_suffix:
+        candidates = [sym]
+    elif cur in _CRYPTO_CURRENCIES:
+        # Crypto currencies: try symbol-USD and symbol-USDT on Yahoo, then CoinGecko
+        candidates = [f"{sym}-USD", f"{sym}-USDT", sym]
+    else:
+        suffixes = _CURRENCY_YF_SUFFIXES.get(cur, ['', '-USD'])
+        seen, candidates = set(), []
+        for s in suffixes:
+            c = f"{sym}{s}" if s else sym
+            if c not in seen:
+                seen.add(c)
+                candidates.append(c)
+
     for yf_sym in candidates:
         try:
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}"
@@ -10907,17 +10968,19 @@ def _fetch_live_price(symbol):
                     return float(price)
         except Exception:
             pass
+
     # CoinGecko fallback for crypto
-    try:
-        coin_id = sym.lower().replace('-usd', '').replace('-usdt', '')
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd"
-        r = _http_requests.get(url, timeout=6)
-        if r.status_code == 200:
-            data = r.json()
-            if coin_id in data:
-                return float(data[coin_id]['usd'])
-    except Exception:
-        pass
+    if cur in _CRYPTO_CURRENCIES or any(c.endswith('-USD') for c in candidates):
+        try:
+            coin_id = sym.lower().replace('-usd', '').replace('-usdt', '')
+            url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd"
+            r = _http_requests.get(url, timeout=6)
+            if r.status_code == 200:
+                data = r.json()
+                if coin_id in data:
+                    return float(data[coin_id]['usd'])
+        except Exception:
+            pass
     return None
 
 
@@ -10927,7 +10990,7 @@ def _refresh_live_price(sp):
     now = tz.now()
     stale = sp.price_updated_at is None or (now - sp.price_updated_at).total_seconds() > _PRICE_CACHE_SECONDS
     if stale and sp.status == StockPrediction.STATUS_ACTIVE:
-        price = _fetch_live_price(sp.stock_symbol)
+        price = _fetch_live_price(sp.stock_symbol, sp.currency)
         if price:
             sp.live_price = price
             sp.price_updated_at = now
@@ -10999,7 +11062,7 @@ def create_stock_prediction(request):
     # Auto-fetch entry price if not provided; also validates the symbol
     fetched_price = None
     if stock_symbol:
-        fetched_price = _fetch_live_price(stock_symbol)
+        fetched_price = _fetch_live_price(stock_symbol, currency)
     if not entry_price:
         if fetched_price:
             entry_price = fetched_price
@@ -11438,7 +11501,7 @@ def fetch_live_stock_price(request, post_id):
     except StockPrediction.DoesNotExist:
         return JsonResponse({'success': False}, status=404)
 
-    price = _fetch_live_price(sp.stock_symbol)
+    price = _fetch_live_price(sp.stock_symbol, sp.currency)
     if price:
         sp.live_price = price
         sp.price_updated_at = timezone.now()
