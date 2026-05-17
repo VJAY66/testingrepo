@@ -1723,10 +1723,14 @@ bindDiscussionVoteForms();
             });
     }
 
-    window.setInterval(refreshCommentsIfNeeded, 5000);
+    let _commentPollTimer = setInterval(refreshCommentsIfNeeded, 15000);
     document.addEventListener('visibilitychange', function() {
-        if (!document.hidden) {
+        if (document.hidden) {
+            clearInterval(_commentPollTimer);
+            _commentPollTimer = null;
+        } else {
             refreshCommentsIfNeeded();
+            _commentPollTimer = setInterval(refreshCommentsIfNeeded, 15000);
         }
     });
 })();
@@ -1923,35 +1927,45 @@ bindDiscussionVoteForms();
                     .catch(() => {});
             }
 
-        const closeBtn = wrapper.querySelector('.dh-mobile-chat-resume-close');
-        if (closeBtn) {
-                closeBtn.addEventListener('click', function(event) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                    const state = readState();
-                    writeState({ mode: 'closed', lastSeenMessageId: Number(state.lastSeenMessageId || 0) });
-                        wrapper.remove();
-                });
+        let pollTimer = null;
+
+        function stopWidget() {
+            clearInterval(pollTimer);
+            pollTimer = null;
         }
 
-            wrapper.addEventListener('click', function(event) {
-                if (event.target && event.target.closest('.dh-mobile-chat-resume-close')) {
-                    return;
-                }
-                clearState();
+        const closeBtn = wrapper.querySelector('.dh-mobile-chat-resume-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                const state = readState();
+                writeState({ mode: 'closed', lastSeenMessageId: Number(state.lastSeenMessageId || 0) });
+                stopWidget();
+                wrapper.remove();
             });
+        }
+
+        wrapper.addEventListener('click', function(event) {
+            if (event.target && event.target.closest('.dh-mobile-chat-resume-close')) {
+                return;
+            }
+            clearState();
+        });
 
         document.body.appendChild(wrapper);
-            refreshVisibility();
-            const pollTimer = window.setInterval(refreshVisibility, 30000);
-            document.addEventListener('visibilitychange', function() {
-                if (!document.hidden) {
-                    refreshVisibility();
-                }
-            });
-            window.addEventListener('beforeunload', function() {
+        refreshVisibility();
+        pollTimer = setInterval(refreshVisibility, 30000);
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
                 clearInterval(pollTimer);
-            });
+                pollTimer = null;
+            } else {
+                refreshVisibility();
+                pollTimer = setInterval(refreshVisibility, 30000);
+            }
+        });
+        window.addEventListener('beforeunload', stopWidget);
 })();
 
 (function() {

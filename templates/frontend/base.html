@@ -5579,8 +5579,11 @@ function acceptCookies() {
             } catch {}
         }
 
+        let _initialized = false;
         return {
             init() {
+                if (_initialized) return;
+                _initialized = true;
                 const desktopChatsToggle = document.getElementById('nav-chat-toggle');
                 if (desktopChatsToggle) {
                     desktopChatsToggle.addEventListener('click', (e) => {

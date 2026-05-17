@@ -1363,6 +1363,13 @@ document.addEventListener('keydown', function(event) {
             .catch(() => {});
     }
 
+    let pollTimer = null;
+
+    function stopWidget() {
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
+
     const closeBtn = wrapper.querySelector('.dh-mobile-chat-resume-close');
     if (closeBtn) {
         closeBtn.addEventListener('click', function(event) {
@@ -1370,6 +1377,7 @@ document.addEventListener('keydown', function(event) {
             event.stopPropagation();
             const state = readState();
             writeState({ mode: 'closed', lastSeenMessageId: Number(state.lastSeenMessageId || 0) });
+            stopWidget();
             wrapper.remove();
         });
     }
@@ -1383,15 +1391,17 @@ document.addEventListener('keydown', function(event) {
 
     document.body.appendChild(wrapper);
     refreshVisibility();
-    const pollTimer = window.setInterval(refreshVisibility, 30000);
+    pollTimer = setInterval(refreshVisibility, 30000);
     document.addEventListener('visibilitychange', function() {
-        if (!document.hidden) {
+        if (document.hidden) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+        } else {
             refreshVisibility();
+            pollTimer = setInterval(refreshVisibility, 30000);
         }
     });
-    window.addEventListener('beforeunload', function() {
-        clearInterval(pollTimer);
-    });
+    window.addEventListener('beforeunload', stopWidget);
 })();
 
 /* ── Infinite Scroll ─────────────────────────────────── */
