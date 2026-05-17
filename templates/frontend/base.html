@@ -3103,6 +3103,7 @@ function acceptCookies() {
     </aside>
 
     <!-- Main Content -->
+    {% block page_layout %}
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {% if messages %}
             <div id="flash-messages" class="dh-flash-stack" aria-live="polite" aria-atomic="true">
@@ -3117,7 +3118,6 @@ function acceptCookies() {
             </div>
         {% endif %}
 
-
         <div class="flex gap-6 items-start">
             <!-- Left sidebar removed as per request -->
 
@@ -3127,6 +3127,7 @@ function acceptCookies() {
             </div>
         </div>
     </main>
+    {% endblock page_layout %}
 
     <!-- Footer -->
     <footer class="bg-card border-t border-border mt-16">
