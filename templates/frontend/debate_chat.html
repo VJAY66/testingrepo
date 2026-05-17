@@ -1029,7 +1029,7 @@
 <script>
 (function() {
   const isEmbedded = window.self !== window.top;
-  if (window.innerWidth >= 768 && !isEmbedded) return;   // desktop uses ChatManager (unless inside iframe)
+  // Run at all viewport widths — mc-shell is the primary chat UI on this page
 
   const mobileDebateId = '{{ debate.id }}';
   const mobilePostId = '{{ debate.post.id|default:"" }}';

@@ -5226,8 +5226,9 @@ function acceptCookies() {
     window.ChatManager = ChatManager;
 
     document.addEventListener('DOMContentLoaded', () => {
-        // The dedicated /chats/ workspace manages conversation rendering itself.
+        // The dedicated /chats/ workspace and debate_chat page manage rendering themselves.
         if (window.location.pathname.startsWith('/chats/')) return;
+        if (/\/debates\/[^/]+\/chat\//.test(window.location.pathname)) return;
         ChatManager.restore();
     });
 
