@@ -3694,6 +3694,20 @@ function acceptCookies() {
             const resultsBox = document.getElementById('nav-search-results');
             const notificationsLink = document.getElementById('nav-notifications-link');
             const mobileNotificationsLink = document.getElementById('mobile-nav-notifications-link');
+
+            // Clear badge immediately when bell is clicked and mark all read in background
+            [notificationsLink, mobileNotificationsLink].forEach(function(link) {
+                if (!link) return;
+                link.addEventListener('click', function() {
+                    updateNotificationBadge(0);
+                    fetch('{% url "mark_all_notifications_read" %}', {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': (document.cookie.match('(^|;) ?csrftoken=([^;]*)(;|$)') || [])[2] || '' },
+                        credentials: 'same-origin',
+                    }).catch(function() {});
+                });
+            });
+
             const userMenuToggle = document.getElementById('user-menu-toggle');
             const userMenuPanel = document.getElementById('user-menu-panel');
             const mobileUserMenuToggle = document.getElementById('mobile-user-menu-toggle');
