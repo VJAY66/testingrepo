@@ -10892,8 +10892,11 @@ _PRICE_CACHE_SECONDS = 600  # 10 minutes
 def _fetch_live_price(symbol):
     """Fetch live price for a stock or crypto symbol. Returns float or None."""
     sym = symbol.strip().upper()
-    # Yahoo Finance works for stocks (HDFC.NS, AAPL) and crypto (BTC-USD, DOGE-USD)
-    for yf_sym in [sym, f"{sym}-USD"]:
+    # Build candidate list: plain → NSE India (.NS) → BSE India (.BO) → crypto (-USD)
+    # Skip exchange-suffix variants if the symbol already has one (e.g. HDFCBANK.NS entered directly)
+    has_suffix = '.' in sym or sym.endswith('-USD') or sym.endswith('-USDT')
+    candidates = [sym] if has_suffix else [sym, f"{sym}.NS", f"{sym}.BO", f"{sym}-USD"]
+    for yf_sym in candidates:
         try:
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}"
             r = _http_requests.get(url, timeout=6, headers={'User-Agent': 'Mozilla/5.0'})
