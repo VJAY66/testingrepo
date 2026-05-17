@@ -6,29 +6,72 @@
 /* ── Feed card ── */
 .feed-card {
     display: block; text-decoration: none;
-    border-radius: 1.25rem;
-    border: 1.5px solid hsl(var(--border));
+    border-radius: 1.4rem;
+    border: 1px solid hsl(var(--border)/0.7);
     background: hsl(var(--card));
     overflow: hidden;
-    transition: border-color 180ms, box-shadow 180ms, transform 140ms;
+    transition: border-color 200ms, box-shadow 200ms, transform 160ms;
+    position: relative;
+    box-shadow: 0 1px 4px -1px hsl(0 0% 0%/0.06), 0 4px 12px -6px hsl(0 0% 0%/0.04);
 }
+/* Accent top line — direction-colored */
+.feed-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2.5px;
+    background: linear-gradient(90deg, hsl(var(--primary)/0.5), hsl(var(--primary)/0.15));
+    pointer-events: none;
+}
+.feed-card.card-up::before   { background: linear-gradient(90deg, hsl(142 65% 42%), hsl(142 65% 42%/0.0)); }
+.feed-card.card-down::before { background: linear-gradient(90deg, hsl(346 65% 46%), hsl(346 65% 46%/0.0)); }
 .feed-card:hover {
-    border-color: hsl(var(--primary)/0.4);
-    box-shadow: 0 12px 36px -18px hsl(var(--primary)/0.18);
+    border-color: hsl(var(--primary)/0.35);
+    box-shadow: 0 8px 28px -10px hsl(var(--primary)/0.16), 0 2px 8px -3px hsl(0 0% 0%/0.06);
     transform: translateY(-2px);
 }
 
 /* ── Progress bar ── */
-.pb-track { height: 5px; border-radius: 999px; background: hsl(var(--muted)); overflow: hidden; }
-.pb-bull  { height: 100%; background: linear-gradient(90deg, hsl(142 65% 40%), hsl(142 65% 52%)); border-radius: 999px 0 0 999px; }
+.pb-track { height: 6px; border-radius: 999px; background: hsl(var(--muted)); overflow: hidden; }
+.pb-bull  { height: 100%; background: linear-gradient(90deg, hsl(142 65% 40%), hsl(142 65% 52%)); border-radius: 999px 0 0 999px; transition: width 0.4s ease; }
 .pb-bear  { height: 100%; background: linear-gradient(90deg, hsl(346 68% 44%), hsl(346 68% 56%)); border-radius: 0 999px 999px 0; }
 
 /* ── Status badges ── */
-.sbadge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
-.sbadge-active   { background: hsl(38 86% 54%/0.12); color: hsl(38 72% 36%); border: 1px solid hsl(38 86% 54%/0.3); }
-.sbadge-correct  { background: hsl(142 65% 44%/0.12); color: hsl(142 52% 32%); border: 1px solid hsl(142 65% 44%/0.3); }
-.sbadge-wrong    { background: hsl(346 68% 50%/0.12); color: hsl(346 60% 38%); border: 1px solid hsl(346 68% 50%/0.3); }
-.sbadge-expired  { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border)); }
+.sbadge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 999px;
+    font-size: 0.6rem; font-weight: 800; letter-spacing: 0.06em;
+    text-transform: uppercase; white-space: nowrap;
+}
+.sbadge-active  { background: hsl(38 90% 54%/0.1); color: hsl(35 80% 34%); border: 1px solid hsl(38 90% 54%/0.28); }
+.sbadge-correct { background: hsl(142 65% 44%/0.1); color: hsl(142 52% 30%); border: 1px solid hsl(142 65% 44%/0.3); }
+.sbadge-wrong   { background: hsl(346 68% 50%/0.1); color: hsl(346 60% 36%); border: 1px solid hsl(346 68% 50%/0.3); }
+.sbadge-expired { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border)); }
+html.dark .sbadge-active  { color: hsl(38 90% 68%); }
+html.dark .sbadge-correct { color: hsl(142 60% 58%); }
+html.dark .sbadge-wrong   { color: hsl(346 70% 62%); }
+
+/* ── Stock symbol pill ── */
+.stock-sym-pill {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; border-radius: 6px;
+    font-size: 0.72rem; font-weight: 900; letter-spacing: 0.04em;
+    background: hsl(var(--primary)/0.1); color: hsl(var(--primary));
+    border: 1px solid hsl(var(--primary)/0.2);
+    font-family: 'Manrope', monospace;
+    vertical-align: middle;
+}
+
+/* ── Direction badge inline ── */
+.dir-up   { color: hsl(142 62% 36%); font-weight: 800; }
+.dir-down { color: hsl(346 65% 42%); font-weight: 800; }
+html.dark .dir-up   { color: hsl(142 60% 56%); }
+html.dark .dir-down { color: hsl(346 70% 62%); }
+
+/* ── Vote area ── */
+.vote-area {
+    border-top: 1px solid hsl(var(--border)/0.5);
+    padding: 0.75rem 1rem;
+    background: hsl(var(--muted)/0.25);
+}
 
 /* ── Filter tabs ── */
 .filter-tab {
@@ -59,12 +102,15 @@
 
 /* ── Movement chip ── */
 .move-chip {
-    display: inline-flex; align-items: center; gap: 2px;
-    padding: 1px 6px; border-radius: 999px;
-    font-size: 0.65rem; font-weight: 800; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: 999px;
+    font-size: 0.62rem; font-weight: 800; white-space: nowrap;
+    letter-spacing: 0.02em;
 }
-.chip-up   { background: hsl(142 65% 44%/0.12); color: hsl(142 52% 32%); border: 1px solid hsl(142 65% 44%/0.2); }
-.chip-down { background: hsl(346 68% 50%/0.12); color: hsl(346 60% 38%); border: 1px solid hsl(346 68% 50%/0.2); }
+.chip-up   { background: hsl(142 65% 44%/0.1); color: hsl(142 52% 30%); border: 1px solid hsl(142 65% 44%/0.22); }
+.chip-down { background: hsl(346 68% 50%/0.1); color: hsl(346 60% 36%); border: 1px solid hsl(346 68% 50%/0.22); }
+html.dark .chip-up   { color: hsl(142 60% 58%); }
+html.dark .chip-down { color: hsl(346 70% 62%); }
 </style>
 
 <div class="max-w-6xl mx-auto py-6 px-4">
@@ -146,26 +192,28 @@
             {% if page_obj.object_list %}
             {% for sp in page_obj.object_list %}
             {% with total=sp.bull_count|add:sp.bear_count %}
-            <a href="{% url 'stock_prediction_detail' sp.post.id %}" class="feed-card group">
+            <a href="{% url 'stock_prediction_detail' sp.post.id %}"
+               class="feed-card group {% if sp.direction == 'up' or sp.direction == 'above' %}card-up{% else %}card-down{% endif %}">
 
                 <!-- Author row -->
                 <div class="flex items-center gap-3 px-4 pt-4 pb-0">
                     {% with pic=sp.post.user.profile.get_picture_url %}
                     {% if pic %}
-                    <img src="{{ pic }}" alt="{{ sp.post.user.username }}" class="w-9 h-9 rounded-full object-cover border border-border flex-shrink-0">
+                    <img src="{{ pic }}" alt="{{ sp.post.user.username }}" class="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0">
                     {% else %}
-                    <div class="flex w-9 h-9 items-center justify-center rounded-full bg-primary/12 text-primary font-black text-sm flex-shrink-0">{{ sp.post.user.username|first|upper }}</div>
+                    <div class="flex w-8 h-8 items-center justify-center rounded-full bg-primary/10 text-primary font-black text-sm flex-shrink-0">{{ sp.post.user.username|first|upper }}</div>
                     {% endif %}
                     {% endwith %}
-                    <div class="flex-1 min-w-0 flex items-baseline gap-1.5 flex-wrap">
-                        <span class="text-sm font-bold text-foreground truncate">{{ sp.post.user.get_full_name|default:sp.post.user.username }}</span>
-                        <span class="text-xs text-muted-foreground">@{{ sp.post.user.username }}</span>
-                        <span class="text-muted-foreground/40 text-xs">·</span>
-                        <span class="text-xs text-muted-foreground">{{ sp.post.created_at|timesince }} ago</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="text-sm font-bold text-foreground truncate">{{ sp.post.user.get_full_name|default:sp.post.user.username }}</span>
+                            <span class="text-xs text-muted-foreground">@{{ sp.post.user.username }}</span>
+                        </div>
+                        <span class="text-[11px] text-muted-foreground/70">{{ sp.post.created_at|timesince }} ago</span>
                     </div>
                     <!-- Status badge -->
                     {% if sp.status == 'active' %}
-                    <span class="sbadge sbadge-active flex-shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 pulse-dot"></span>Active</span>
+                    <span class="sbadge sbadge-active flex-shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 pulse-dot inline-block"></span> Active</span>
                     {% elif sp.status == 'resolved' %}
                         {% if sp.outcome == 'bullish_correct' or sp.outcome == 'bullish_wins' %}
                         <span class="sbadge sbadge-correct flex-shrink-0">✓ Correct</span>
@@ -177,53 +225,55 @@
                     {% endif %}
                 </div>
 
-                <!-- Prediction sentence -->
+                <!-- Prediction body -->
                 <div class="px-4 pt-3 pb-0">
-                    <p class="text-sm leading-relaxed text-foreground group-hover:text-primary transition-colors">
-                        I think <strong class="font-black" style="font-family:'Playfair Display',serif;">{{ sp.stock_symbol }}</strong>
-                        will go
+                    <!-- Symbol + direction pill row -->
+                    <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span class="stock-sym-pill">{{ sp.stock_symbol }}</span>
                         {% if sp.direction == 'up' or sp.direction == 'above' %}
-                        <strong class="font-black" style="color:hsl(142 65% 38%);">▲ Up</strong>
+                        <span class="inline-flex items-center gap-1 text-xs font-bold dir-up">▲ Bullish</span>
                         {% else %}
-                        <strong class="font-black" style="color:hsl(346 65% 44%);">▼ Down</strong>
+                        <span class="inline-flex items-center gap-1 text-xs font-bold dir-down">▼ Bearish</span>
                         {% endif %}
-                        to <strong class="font-black text-foreground">{{ sp.target_price }} {{ sp.currency }}</strong>
-                        by <strong class="text-foreground">{{ sp.target_date|date:"M j, Y" }}</strong>
+                        {% if sp.stock_name %}
+                        <span class="text-[11px] text-muted-foreground truncate">{{ sp.stock_name }}</span>
+                        {% endif %}
+                    </div>
+                    <!-- Human sentence -->
+                    <p class="text-sm leading-snug text-foreground/90 group-hover:text-primary transition-colors">
+                        Predicts target of
+                        <strong class="font-black text-foreground">{{ sp.target_price }} {{ sp.currency }}</strong>
+                        <span class="text-muted-foreground">by</span>
+                        <strong class="text-foreground">{{ sp.target_date|date:"M j, Y" }}</strong>
                     </p>
-                    {% if sp.stock_name %}
-                    <p class="text-[11px] text-muted-foreground mt-0.5">{{ sp.stock_name }}</p>
-                    {% endif %}
                 </div>
 
-                <!-- Movement chip (if live tracking available) -->
+                <!-- Movement chip -->
                 {% if sp.live_price and sp.entry_price %}
                 <div class="px-4 pt-2">
-                    {% with move=sp.live_price|add:"-0" %}
-                    {# calculate direction from live vs entry #}
                     {% if sp.live_price > sp.entry_price %}
                     <span class="move-chip chip-up">▲ Live tracking</span>
                     {% else %}
                     <span class="move-chip chip-down">▼ Live tracking</span>
                     {% endif %}
-                    {% endwith %}
                 </div>
                 {% endif %}
 
-                <!-- Bottom bar: votes progress + vote counts -->
-                <div class="px-4 pb-4 pt-3">
+                <!-- Vote bar -->
+                <div class="vote-area mt-3">
                     {% if total > 0 %}
                     <div class="flex items-center gap-2 mb-1.5">
-                        <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0">👍 {{ sp.bull_count }}</span>
+                        <span class="text-[11px] font-bold dir-up flex-shrink-0">👍 {{ sp.bull_count }}</span>
                         <div class="pb-track flex flex-1">
                             <div class="pb-bull" style="width:{% widthratio sp.bull_count total 100 %}%"></div>
                             <div class="pb-bear flex-1"></div>
                         </div>
-                        <span class="text-[10px] font-bold text-rose-600 dark:text-rose-400 flex-shrink-0">{{ sp.bear_count }} 👎</span>
+                        <span class="text-[11px] font-bold dir-down flex-shrink-0">{{ sp.bear_count }} 👎</span>
                     </div>
-                    <p class="text-[10px] text-muted-foreground text-center">{{ total }} vote{{ total|pluralize }}</p>
+                    <p class="text-[10px] text-muted-foreground text-center font-medium">{{ total }} vote{{ total|pluralize }}</p>
                     {% else %}
-                    <div class="pb-track mb-1"></div>
-                    <p class="text-[10px] text-muted-foreground text-center">No votes yet — be the first!</p>
+                    <div class="pb-track mb-2"></div>
+                    <p class="text-[11px] text-muted-foreground/70 text-center font-semibold">No votes yet — be the first!</p>
                     {% endif %}
                 </div>
 
