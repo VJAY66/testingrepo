@@ -234,11 +234,11 @@
         <a href="{% url 'debate_transcript' debate.id %}" class="share-btn">
           📄 Full Transcript
         </a>
-        {% if debate.post_id %}
-        <a href="{% url 'discussion' debate.post.id %}" class="share-btn">
+        {% with durl=debate.get_discussion_url %}{% if durl %}
+        <a href="{{ durl }}" class="share-btn">
           💬 View Post
         </a>
-        {% endif %}
+        {% endif %}{% endwith %}
       </div>
     </div>
   </div>

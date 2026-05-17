@@ -88,9 +88,9 @@
         {% else %}
         <p class="nc-msg">{{ notif.message }}</p>
         {% endif %}
-        {% if notif.post %}
-        <a href="{% url 'discussion' notif.post.id %}" class="nc-post-link">{{ notif.post.title|truncatechars:70 }}</a>
-        {% endif %}
+        {% with nurl=notif.get_discussion_url %}{% if nurl %}
+        <a href="{{ nurl }}" class="nc-post-link">{{ notif.post.title|truncatechars:70 }}</a>
+        {% endif %}{% endwith %}
         <p class="nc-meta">
           {{ notif.created_at|timesince }} ago
           {% if notif.count > 1 %}&middot; {{ notif.count }} people{% endif %}

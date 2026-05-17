@@ -258,6 +258,13 @@ class Debate(models.Model):
             return self.poll.title
         return ''
 
+    def get_discussion_url(self):
+        """Return the URL of the linked post, or '' if post has been deleted."""
+        if self.post_id:
+            from django.urls import reverse
+            return reverse('discussion', args=[self.post_id])
+        return ''
+
     def __str__(self):
         return f"Debate between {self.initiator.username} and {self.target.username}"
 
@@ -387,6 +394,13 @@ class Notification(models.Model):
     count = models.PositiveIntegerField(default=1)
     actors = models.JSONField(default=list, blank=True, help_text='Usernames of users involved, for batched display')
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def get_discussion_url(self):
+        """Return the URL of the linked post, or '' if post has been deleted."""
+        if self.post_id:
+            from django.urls import reverse
+            return reverse('discussion', args=[self.post_id])
+        return ''
 
     def __str__(self):
         return f"Notification for {self.user.username}: {self.message}"
