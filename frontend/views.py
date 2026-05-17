@@ -2351,8 +2351,12 @@ def search(request):
         else:
             post_order = '-created_at'
 
+        # When query is a hashtag (e.g. #ai), also match tags stored without the # prefix
+        _bare = query.lstrip('#') if query.startswith('#') else None
+        _htag_q = Q(hashtags__icontains=query) | Q(hashtags__icontains=_bare) if _bare else Q(hashtags__icontains=query)
+
         post_qs = Post.objects.filter(
-            Q(title__icontains=query) | Q(content__icontains=query), is_draft=False
+            Q(title__icontains=query) | Q(content__icontains=query) | _htag_q, is_draft=False
         ).filter(**date_filter).annotate(like_count=Count('actions', filter=Q(actions__action='like')))
 
         if sort == 'most_liked':
@@ -2367,19 +2371,19 @@ def search(request):
         review_qs = Review.objects.filter(
             is_deleted_by_moderation=False
         ).filter(
-            Q(subject__icontains=query) | Q(content__icontains=query)
+            Q(subject__icontains=query) | Q(content__icontains=query) | _htag_q
         ).filter(**date_filter)
         review_results = list(review_qs.order_by(post_order.replace('like_count', 'created_at').replace('-like_count', '-created_at'))[:50])
 
         question_qs = Question.objects.filter(
             is_deleted_by_moderation=False
         ).filter(
-            Q(title__icontains=query) | Q(content__icontains=query)
+            Q(title__icontains=query) | Q(content__icontains=query) | _htag_q
         ).filter(**date_filter)
         question_results = list(question_qs.order_by(post_order.replace('like_count', 'created_at').replace('-like_count', '-created_at'))[:50])
 
         poll_qs = Poll.objects.filter(
-            Q(title__icontains=query) | Q(description__icontains=query)
+            Q(title__icontains=query) | Q(description__icontains=query) | _htag_q
         ).filter(**date_filter)
         poll_results = list(poll_qs.order_by(post_order.replace('like_count', 'created_at').replace('-like_count', '-created_at'))[:50])
 
@@ -2417,8 +2421,10 @@ def quick_search(request):
     if not query:
         return JsonResponse({'success': True, 'results': []})
 
+    _bare = query.lstrip('#') if query.startswith('#') else None
+    _htag_q = Q(hashtags__icontains=query) | Q(hashtags__icontains=_bare) if _bare else Q(hashtags__icontains=query)
     posts = Post.objects.filter(
-        Q(title__icontains=query) | Q(content__icontains=query)
+        Q(title__icontains=query) | Q(content__icontains=query) | _htag_q
     ).select_related('user').order_by('-created_at')[:8]
 
     results = [
