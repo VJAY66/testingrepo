@@ -977,7 +977,7 @@ function markAllRead() {
 var _COMMENT_TYPES = ['author_comment','post_comment','author_debate','post_activity'];
 function gotoNotif(type, postId) {
   if (!postId) return;
-  window.location.href = '/discussions/' + postId + '/' + (_COMMENT_TYPES.indexOf(type) !== -1 ? '#discussion-comments-section' : '');
+  window.location.href = '/discussion/' + postId + '/' + (_COMMENT_TYPES.indexOf(type) !== -1 ? '#discussion-comments-section' : '');
 }
 function getCSRFToken() {
     const name = 'csrftoken=';
