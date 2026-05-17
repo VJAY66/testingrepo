@@ -106,6 +106,7 @@
     50%      { opacity: 0.4; transform: scale(0.75); }
 }
 .live-dot { animation: liveDot 1.4s ease-in-out infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Resolution panel ── */
 .resolve-panel {
@@ -246,11 +247,16 @@
     {% if sp.entry_price %}
     <div class="rounded-2xl border border-border bg-card shadow-sm p-5" id="price-tracking-card">
         <div class="flex items-center justify-between mb-4">
-            <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Price Tracking</p>
+            <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Price Tracking</p>
+                {% if sp.status == 'active' %}
+                <p class="text-[10px] text-muted-foreground mt-0.5" id="next-refresh-label">Auto-refreshes every hour</p>
+                {% endif %}
+            </div>
             <button type="button" id="refresh-price-btn" onclick="refreshLivePrice()"
                     class="inline-flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground hover:text-foreground transition-colors rounded-full border border-border px-2.5 py-1">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                Refresh
+                <svg class="w-3 h-3" id="refresh-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span id="refresh-btn-label">Refresh</span>
             </button>
         </div>
 
@@ -866,9 +872,15 @@ function resolveStock() {
 }
 
 // ── Live price refresh ───────────────────────────────────────
+var _lastRefreshAt = Date.now();
+
 function refreshLivePrice() {
     var btn = document.getElementById('refresh-price-btn');
-    if (btn) { btn.disabled = true; btn.textContent = '⟳ Loading…'; }
+    var label = document.getElementById('refresh-btn-label');
+    var icon = document.getElementById('refresh-icon');
+    if (btn) btn.disabled = true;
+    if (label) label.textContent = 'Loading…';
+    if (icon) icon.style.animation = 'spin 1s linear infinite';
 
     fetch('/stocks/{{ post.id }}/live-price/', {
         headers: { 'X-CSRFToken': CSRF_TOKEN },
@@ -878,6 +890,7 @@ function refreshLivePrice() {
         if (data.live_price !== undefined && data.live_price !== null) {
             var lp = document.getElementById('live-price-value');
             var mv = document.getElementById('movement-value');
+            var mvCol = document.getElementById('movement-col');
             var pu = document.getElementById('price-updated-at');
             if (lp) lp.textContent = '{{ sp.currency_symbol|escapejs }}' + parseFloat(data.live_price).toFixed(4);
             if (pu) pu.textContent = data.updated_at || 'just now';
@@ -885,28 +898,66 @@ function refreshLivePrice() {
                 var pct = parseFloat(data.movement_pct);
                 mv.textContent = (pct >= 0 ? '▲ +' : '▼ ') + pct.toFixed(2) + '%';
                 mv.className = 'text-sm font-black tabular-nums ' + (pct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400');
+                if (mvCol) {
+                    mvCol.className = mvCol.className.replace(/border-\S+|bg-\S+/g, '');
+                    mvCol.className += pct >= 0
+                        ? ' border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/40 dark:bg-emerald-950/20'
+                        : ' border-rose-200/60 dark:border-rose-800/40 bg-rose-50/40 dark:bg-rose-950/20';
+                }
             }
+            _lastRefreshAt = Date.now();
         }
     })
     .catch(function() {})
     .finally(function() {
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Refresh';
-        }
+        if (btn) btn.disabled = false;
+        if (label) label.textContent = 'Refresh';
+        if (icon) icon.style.animation = '';
     });
 }
 
-// ── Auto-refresh live price every 60s (active predictions) ───
+// ── Auto-refresh live price every 1 hour (active predictions) ─
 {% if sp.status == 'active' %}
 (function() {
-    var interval = setInterval(function() {
-        if (document.hidden) return;
-        refreshLivePrice();
-    }, 60000);
+    var AUTO_REFRESH_MS = 3600000; // 1 hour
+    var nextRefreshTimer = null;
+    var nextRefreshLabel = document.getElementById('next-refresh-label');
+
+    function scheduleRefresh() {
+        if (nextRefreshTimer) clearTimeout(nextRefreshTimer);
+        nextRefreshTimer = setTimeout(function() {
+            if (!document.hidden) {
+                refreshLivePrice();
+            }
+            scheduleRefresh();
+        }, AUTO_REFRESH_MS);
+
+        // Update the countdown label every minute
+        updateNextRefreshLabel();
+        var countdownInterval = setInterval(function() {
+            if (!nextRefreshLabel) { clearInterval(countdownInterval); return; }
+            updateNextRefreshLabel();
+        }, 60000);
+    }
+
+    function updateNextRefreshLabel() {
+        if (!nextRefreshLabel) return;
+        var elapsed = Date.now() - _lastRefreshAt;
+        var remaining = Math.max(0, AUTO_REFRESH_MS - elapsed);
+        var mins = Math.round(remaining / 60000);
+        nextRefreshLabel.textContent = mins > 1
+            ? 'Next auto-refresh in ~' + mins + ' min'
+            : 'Auto-refreshing soon…';
+    }
+
     document.addEventListener('visibilitychange', function() {
-        if (!document.hidden) refreshLivePrice();
+        // Refresh immediately if tab becomes visible after a long absence
+        if (!document.hidden && (Date.now() - _lastRefreshAt) > AUTO_REFRESH_MS) {
+            refreshLivePrice();
+        }
     });
+
+    scheduleRefresh();
 })();
 {% endif %}
 

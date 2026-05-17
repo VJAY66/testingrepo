@@ -10826,11 +10826,19 @@ def toggle_profile_privacy(request):
 
 _PRICE_CACHE_SECONDS = 600  # 10 minutes
 
+# Common exchange suffixes to try when a bare symbol doesn't resolve
+_EXCHANGE_SUFFIXES = ['.NS', '.BO', '.L', '.AX', '.TO', '.HK', '.SI', '.DE', '.PA', '.MI']
+
+
 def _fetch_live_price(symbol):
     """Fetch live price for a stock or crypto symbol. Returns float or None."""
     sym = symbol.strip().upper()
     # Yahoo Finance works for stocks (HDFC.NS, AAPL) and crypto (BTC-USD, DOGE-USD)
-    for yf_sym in [sym, f"{sym}-USD"]:
+    candidates = [sym, f"{sym}-USD"]
+    # If no suffix already, also try common exchange suffixes
+    if '.' not in sym and '-' not in sym:
+        candidates += [sym + sfx for sfx in _EXCHANGE_SUFFIXES]
+    for yf_sym in candidates:
         try:
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}"
             r = _http_requests.get(url, timeout=6, headers={'User-Agent': 'Mozilla/5.0'})
@@ -10853,6 +10861,75 @@ def _fetch_live_price(symbol):
     except Exception:
         pass
     return None
+
+
+def _resolve_symbol(symbol):
+    """
+    Try to resolve a symbol to a live price + metadata. Also searches Yahoo Finance
+    for suggestions when the symbol is wrong or ambiguous.
+    Returns dict: {price, symbol, name, exchange, suggestions: [{symbol, name, exchange}]}
+    """
+    sym = symbol.strip().upper()
+    result = {'price': None, 'symbol': sym, 'name': '', 'exchange': '', 'suggestions': []}
+
+    # Try to get a price from the canonical symbol first
+    candidates = [sym]
+    if '.' not in sym and '-' not in sym:
+        candidates += [sym + sfx for sfx in _EXCHANGE_SUFFIXES] + [f"{sym}-USD"]
+
+    for yf_sym in candidates:
+        try:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}"
+            r = _http_requests.get(url, timeout=6, headers={'User-Agent': 'Mozilla/5.0'})
+            if r.status_code == 200:
+                data = r.json()
+                meta = data['chart']['result'][0]['meta']
+                price = meta.get('regularMarketPrice')
+                if price and float(price) > 0:
+                    result['price'] = float(price)
+                    result['symbol'] = meta.get('symbol', yf_sym)
+                    result['name'] = meta.get('longName') or meta.get('shortName', '')
+                    result['exchange'] = meta.get('exchangeName', '')
+                    break
+        except Exception:
+            pass
+
+    # CoinGecko fallback
+    if result['price'] is None:
+        try:
+            coin_id = sym.lower().replace('-usd', '').replace('-usdt', '')
+            url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd"
+            r = _http_requests.get(url, timeout=6)
+            if r.status_code == 200:
+                data = r.json()
+                if coin_id in data:
+                    result['price'] = float(data[coin_id]['usd'])
+                    result['symbol'] = sym
+        except Exception:
+            pass
+
+    # If still not found, search Yahoo Finance for suggestions
+    if result['price'] is None:
+        try:
+            url = (
+                f"https://query1.finance.yahoo.com/v1/finance/search"
+                f"?q={sym}&quotesCount=5&newsCount=0&enableFuzzyQuery=true"
+            )
+            r = _http_requests.get(url, timeout=6, headers={'User-Agent': 'Mozilla/5.0'})
+            if r.status_code == 200:
+                data = r.json()
+                for q in data.get('quotes', []):
+                    ticker = q.get('symbol', '')
+                    if ticker:
+                        result['suggestions'].append({
+                            'symbol': ticker,
+                            'name': q.get('longname') or q.get('shortname', ''),
+                            'exchange': q.get('exchDisp', q.get('exchange', '')),
+                        })
+        except Exception:
+            pass
+
+    return result
 
 
 def _refresh_live_price(sp):
@@ -11374,6 +11451,31 @@ def fetch_live_stock_price(request, post_id):
             'updated_at': sp.price_updated_at.strftime('%b %d, %I:%M %p'),
         })
     return JsonResponse({'success': False, 'error': 'Could not fetch price'})
+
+
+def validate_stock_symbol(request):
+    """
+    AJAX GET endpoint: resolve a symbol to price + metadata.
+    Used by the create-prediction form to validate/autocorrect symbols in real time.
+    ?symbol=AAPL  →  {valid, price, symbol, name, exchange, suggestions}
+    """
+    symbol = request.GET.get('symbol', '').strip()
+    if not symbol:
+        return JsonResponse({'valid': False, 'error': 'No symbol provided.'})
+    resolved = _resolve_symbol(symbol)
+    if resolved['price']:
+        return JsonResponse({
+            'valid': True,
+            'price': resolved['price'],
+            'symbol': resolved['symbol'],
+            'name': resolved['name'],
+            'exchange': resolved['exchange'],
+        })
+    return JsonResponse({
+        'valid': False,
+        'suggestions': resolved['suggestions'],
+        'error': f"Could not find a price for '{symbol.upper()}'.",
+    })
 
 
 def _build_leaderboard_data(limit=10):

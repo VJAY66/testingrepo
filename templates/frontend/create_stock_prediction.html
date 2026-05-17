@@ -90,7 +90,7 @@
                                 value="{{ form_data.stock_symbol }}"
                                 class="w-full rounded-xl border border-border bg-background/70 px-3.5 py-2.5 pr-12 text-sm font-bold text-foreground uppercase tracking-widest placeholder:normal-case placeholder:tracking-normal placeholder:font-normal placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
                                 style="text-transform:uppercase;"
-                                oninput="this.value=this.value.toUpperCase();updatePreview()"
+                                oninput="this.value=this.value.toUpperCase();updatePreview();scheduleSymbolLookup()"
                             >
                             <span id="symbol-count" class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground tabular-nums">0/10</span>
                         </div>
@@ -109,6 +109,10 @@
                         >
                     </div>
                 </div>
+                <!-- ── Symbol validation status ──────────────────── -->
+                <div id="symbol-status" class="hidden mt-2 rounded-xl px-3 py-2.5 text-xs font-semibold border transition-all" style="line-height:1.5"></div>
+                <!-- ── Symbol suggestions ────────────────────────── -->
+                <div id="symbol-suggestions" class="hidden mt-1.5 flex flex-wrap gap-1.5"></div>
             </div>
 
             <!-- ── Direction toggle cards ──────────────────────── -->
@@ -189,7 +193,7 @@
             <!-- ── Entry price (optional) ──────────────────────── -->
             <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5" for="id_entry_price">
-                    Current Price <span class="text-muted-foreground font-normal normal-case tracking-normal">(optional, for live tracking)</span>
+                    Current Price <span class="text-muted-foreground font-normal normal-case tracking-normal">(auto-filled from live data)</span>
                 </label>
                 <div class="relative">
                     <span id="entry-price-prefix" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground pointer-events-none">$</span>
@@ -199,12 +203,13 @@
                         name="entry_price"
                         step="0.0001"
                         min="0"
-                        placeholder="150.0000"
+                        placeholder="Auto-filled when symbol is found"
                         value="{{ form_data.entry_price }}"
-                        class="w-full rounded-xl border border-border bg-background/70 pl-7 pr-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
+                        class="w-full rounded-xl border border-border bg-background/70 pl-7 pr-10 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
                     >
+                    <span id="entry-price-live-badge" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-emerald-600 bg-emerald-100 dark:bg-emerald-900/40 rounded-full px-1.5 py-0.5">LIVE</span>
                 </div>
-                <p class="text-[11px] text-muted-foreground mt-1">Snapshot used to track live movement and award points.</p>
+                <p class="text-[11px] text-muted-foreground mt-1">Fetched automatically from Yahoo Finance. You can edit if needed.</p>
             </div>
 
             <!-- ── Category ───────────────────────────────────── -->
@@ -298,6 +303,109 @@ function selectDirection(dir) {
     });
     updatePreview();
 }
+
+// ── Symbol live lookup ───────────────────────────────────────
+var _symLookupTimer = null;
+var _lastLookedUpSym = '';
+
+function scheduleSymbolLookup() {
+    if (_symLookupTimer) clearTimeout(_symLookupTimer);
+    _symLookupTimer = setTimeout(doSymbolLookup, 800);
+}
+
+function doSymbolLookup() {
+    var sym = (document.getElementById('id_stock_symbol').value || '').trim().toUpperCase();
+    if (!sym || sym === _lastLookedUpSym) return;
+    _lastLookedUpSym = sym;
+
+    var statusEl = document.getElementById('symbol-status');
+    var sugEl    = document.getElementById('symbol-suggestions');
+    var entryEl  = document.getElementById('id_entry_price');
+    var badge    = document.getElementById('entry-price-live-badge');
+    var nameEl   = document.getElementById('id_stock_name');
+
+    // Show loading state
+    statusEl.className = 'mt-2 rounded-xl px-3 py-2.5 text-xs font-semibold border transition-all border-border bg-muted/40 text-muted-foreground';
+    statusEl.innerHTML = '⟳ Looking up <strong>' + sym + '</strong>…';
+    statusEl.classList.remove('hidden');
+    sugEl.innerHTML = '';
+    sugEl.classList.add('hidden');
+
+    fetch('/stocks/validate-symbol/?symbol=' + encodeURIComponent(sym))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.valid) {
+                // Symbol found — show green status
+                var corrected = data.symbol || sym;
+                var name = data.name || '';
+                var exch = data.exchange ? ' · ' + data.exchange : '';
+                var price = parseFloat(data.price);
+                statusEl.className = 'mt-2 rounded-xl px-3 py-2.5 text-xs font-semibold border transition-all border-emerald-300/60 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-950/25 text-emerald-800 dark:text-emerald-300';
+                statusEl.innerHTML = '✓ <strong>' + corrected + '</strong>' +
+                    (name ? ' — ' + name : '') + exch +
+                    ' — Current price: <strong>' + price.toFixed(4) + '</strong>';
+
+                // If server returned a corrected symbol, update the input
+                if (corrected !== sym) {
+                    document.getElementById('id_stock_symbol').value = corrected;
+                    _lastLookedUpSym = corrected;
+                    updatePreview();
+                }
+                // Auto-fill company name if blank
+                if (name && nameEl && !nameEl.value.trim()) {
+                    nameEl.value = name;
+                }
+                // Auto-fill/correct current price
+                if (entryEl && (!entryEl.value || parseFloat(entryEl.value) <= 0 || entryEl.dataset.liveAutofilled === '1')) {
+                    entryEl.value = price.toFixed(4);
+                    entryEl.dataset.liveAutofilled = '1';
+                    if (badge) badge.classList.remove('hidden');
+                }
+                updatePreview();
+            } else {
+                // Symbol not found — show red status + suggestions
+                statusEl.className = 'mt-2 rounded-xl px-3 py-2.5 text-xs font-semibold border transition-all border-rose-300/60 dark:border-rose-700/50 bg-rose-50/60 dark:bg-rose-950/25 text-rose-800 dark:text-rose-300';
+                statusEl.innerHTML = '✗ <strong>' + sym + '</strong> not found.' +
+                    (data.suggestions && data.suggestions.length ? ' Did you mean:' : ' Please check the ticker symbol.');
+
+                if (data.suggestions && data.suggestions.length) {
+                    sugEl.innerHTML = '';
+                    sugEl.className = 'mt-1.5 flex flex-wrap gap-1.5';
+                    data.suggestions.slice(0, 5).forEach(function(s) {
+                        var btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/8 text-primary px-2.5 py-1 text-[11px] font-bold hover:bg-primary/15 transition';
+                        btn.innerHTML = s.symbol + (s.name ? '<span class="font-normal text-muted-foreground"> — ' + s.name + '</span>' : '');
+                        btn.onclick = function() {
+                            document.getElementById('id_stock_symbol').value = s.symbol;
+                            _lastLookedUpSym = '';
+                            updatePreview();
+                            doSymbolLookup();
+                        };
+                        sugEl.appendChild(btn);
+                    });
+                    sugEl.classList.remove('hidden');
+                }
+                // Clear autofilled price if it was auto-filled
+                if (badge) badge.classList.add('hidden');
+                if (entryEl && entryEl.dataset.liveAutofilled === '1') {
+                    entryEl.value = '';
+                    delete entryEl.dataset.liveAutofilled;
+                }
+            }
+        })
+        .catch(function() {
+            statusEl.className = 'mt-2 rounded-xl px-3 py-2.5 text-xs font-semibold border transition-all border-border bg-muted/40 text-muted-foreground';
+            statusEl.textContent = 'Could not reach price server. You can still enter the current price manually.';
+        });
+}
+
+// Also clear live badge if user manually edits the entry price
+document.getElementById('id_entry_price').addEventListener('input', function() {
+    var badge = document.getElementById('entry-price-live-badge');
+    if (badge) badge.classList.add('hidden');
+    delete this.dataset.liveAutofilled;
+});
 
 // ── Symbol char counter ──────────────────────────────────────
 document.getElementById('id_stock_symbol').addEventListener('input', function() {
@@ -576,6 +684,9 @@ document.getElementById('spf-form').addEventListener('submit', function(e) {
     selectCurrency('{{ form_data.currency }}');
     {% endif %}
     updatePreview();
+    // If symbol already filled (e.g. after server-side error), run lookup
+    var sym = document.getElementById('id_stock_symbol').value.trim();
+    if (sym) { scheduleSymbolLookup(); }
 })();
 </script>
 {% endblock %}
