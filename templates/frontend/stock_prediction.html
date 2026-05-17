@@ -22,7 +22,7 @@
 .vote-side-card {
     border: 2.5px solid hsl(var(--border));
     border-radius: 1.35rem;
-    padding: 1.5rem 1.25rem;
+    padding: 1.1rem 1rem;
     background: hsl(var(--card) / 0.65);
     transition: border-color 200ms, box-shadow 200ms, transform 160ms;
 }
@@ -110,7 +110,7 @@
 /* ── Resolution panel ── */
 .resolve-panel {
     background: linear-gradient(135deg, hsl(38 86% 54%/0.06), hsl(var(--card)/0.8));
-    border: 1.5px solid hsl(38 86% 54%/0.28); border-radius: 1.35rem; padding: 1.4rem 1.5rem;
+    border: 1.5px solid hsl(38 86% 54%/0.28); border-radius: 1.35rem; padding: 1rem 1.2rem;
 }
 .resolve-input {
     width: 100%; padding: 0.75rem 1rem 0.75rem 2rem;
@@ -127,12 +127,12 @@
 /* ── Mobile layout ── */
 @media (max-width: 540px) {
     #price-cols { grid-template-columns: 1fr !important; gap: 0.5rem !important; }
-    .vote-side-card { padding: 1rem 0.9rem; }
+    .vote-side-card { padding: 0.85rem 0.75rem; }
     .sp-textarea { font-size: 0.875rem; }
 }
 </style>
 
-<div class="max-w-3xl mx-auto py-6 px-4 space-y-5">
+<div class="max-w-3xl mx-auto py-4 px-4 space-y-3">
 
     <!-- Back -->
     <a href="{% url 'stocks_list' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
@@ -144,15 +144,15 @@
          POST CARD  (feed-style)
     ═══════════════════════════════════════════════════════ -->
     <div class="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-        <div class="p-5">
+        <div class="p-4">
 
             <!-- Author row -->
-            <div class="flex items-center gap-3 mb-4">
+            <div class="flex items-center gap-3 mb-3">
                 {% with pic=post.user.profile.get_picture_url %}
                 {% if pic %}
-                <img src="{{ pic }}" alt="{{ post.user.username }}" class="w-10 h-10 rounded-full object-cover border border-border flex-shrink-0">
+                <img src="{{ pic }}" alt="{{ post.user.username }}" class="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0">
                 {% else %}
-                <div class="flex w-10 h-10 items-center justify-center rounded-full bg-primary/12 text-primary font-black text-sm flex-shrink-0">{{ post.user.username|first|upper }}</div>
+                <div class="flex w-8 h-8 items-center justify-center rounded-full bg-primary/12 text-primary font-black text-xs flex-shrink-0">{{ post.user.username|first|upper }}</div>
                 {% endif %}
                 {% endwith %}
                 <div class="flex-1 min-w-0">
@@ -174,8 +174,8 @@
             </div>
 
             <!-- Prediction sentence -->
-            <div class="rounded-xl border border-border bg-muted/30 px-4 py-3 mb-4">
-                <p class="text-sm leading-relaxed text-foreground">
+            <div class="rounded-xl border border-border/60 bg-muted/25 px-3 py-2.5 mb-3">
+                <p class="text-sm leading-snug text-foreground">
                     I think
                     <strong class="text-primary font-black mx-0.5" style="font-family:'Playfair Display',serif;">{{ sp.stock_symbol }}</strong>
                     will go
@@ -188,7 +188,7 @@
                     by <strong class="text-foreground">{{ sp.target_date|date:"M j, Y" }}</strong>
                 </p>
                 {% if sp.days_remaining is not None and sp.status == 'active' %}
-                <p class="text-[11px] text-muted-foreground mt-1">
+                <p class="text-[11px] text-muted-foreground mt-0.5">
                     {% if sp.days_remaining > 0 %}
                     <span class="{% if sp.days_remaining <= 7 %}text-rose-500 font-bold{% endif %}">{{ sp.days_remaining }} day{{ sp.days_remaining|pluralize }} remaining</span>
                     {% else %}
@@ -200,7 +200,7 @@
 
             <!-- Hashtags -->
             {% if post.hashtags %}
-            <div class="flex flex-wrap gap-1.5 mb-4">
+            <div class="flex flex-wrap gap-1 mb-3">
                 {% for tag in post.get_hashtags_list %}
                 <a href="{% url 'hashtag_search' %}?tag={{ tag }}" class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-gradient-to-r from-cyan-500/12 via-teal-500/12 to-primary/12 border border-cyan-500/25 hover:border-cyan-500/50 text-cyan-600 dark:text-cyan-400 text-[11px] font-medium transition">#{{ tag }}</a>
                 {% endfor %}
@@ -208,7 +208,7 @@
             {% endif %}
 
             <!-- Bottom bar -->
-            <div class="flex items-center gap-3 pt-3 border-t border-border/50 flex-wrap">
+            <div class="flex items-center gap-3 pt-2.5 border-t border-border/50 flex-wrap">
                 <!-- Comments count -->
                 <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
@@ -254,8 +254,8 @@
          PRICE TRACKING CARD  (only if entry_price exists)
     ═══════════════════════════════════════════════════════ -->
     {% if sp.entry_price %}
-    <div class="rounded-2xl border border-border bg-card shadow-sm p-5" id="price-tracking-card">
-        <div class="flex items-center justify-between mb-4">
+    <div class="rounded-2xl border border-border bg-card shadow-sm p-4" id="price-tracking-card">
+        <div class="flex items-center justify-between mb-3">
             <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Price Tracking</p>
             <button type="button" id="refresh-price-btn" onclick="refreshLivePrice()"
                     class="inline-flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground hover:text-foreground transition-colors rounded-full border border-border px-2.5 py-1">
@@ -267,13 +267,13 @@
         <!-- 3-column tracking row -->
         <div class="grid grid-cols-3 gap-2 text-center mb-4" id="price-cols">
             <!-- When guessed -->
-            <div class="rounded-xl bg-muted/40 border border-border px-2 py-3">
+            <div class="rounded-xl bg-muted/40 border border-border px-2 py-2">
                 <p class="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">When Guessed</p>
                 <p class="text-sm font-black text-foreground tabular-nums">{{ sp.currency_symbol }}{{ sp.entry_price|floatformat:4 }}</p>
                 <p class="text-[10px] text-muted-foreground mt-0.5">{{ post.created_at|date:"M j, Y" }}</p>
             </div>
             <!-- Movement -->
-            <div class="rounded-xl border px-2 py-3
+            <div class="rounded-xl border px-2 py-2
                 {% if movement_pct is not None %}
                     {% if movement_pct >= 0 %}border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/40 dark:bg-emerald-950/20{% else %}border-rose-200/60 dark:border-rose-800/40 bg-rose-50/40 dark:bg-rose-950/20{% endif %}
                 {% else %}bg-muted/40 border-border{% endif %}"
@@ -288,7 +288,7 @@
                 </p>
             </div>
             <!-- Last updated -->
-            <div class="rounded-xl bg-muted/40 border border-border px-2 py-3">
+            <div class="rounded-xl bg-muted/40 border border-border px-2 py-2">
                 <p class="text-[9px] font-black uppercase tracking-widest text-muted-foreground mb-1">Last Updated</p>
                 <p class="text-sm font-black text-foreground tabular-nums" id="live-price-value">
                     {% if sp.live_price %}{{ sp.currency_symbol }}{{ sp.live_price|floatformat:4 }}{% else %}—{% endif %}
@@ -301,7 +301,7 @@
 
         <!-- Status bar -->
         {% if sp.status == 'active' and sp.days_remaining is not None and sp.days_remaining > 0 %}
-        <div class="flex flex-wrap items-center gap-3 pt-3 border-t border-border/50">
+        <div class="flex flex-wrap items-center gap-3 pt-2.5 border-t border-border/50">
             <!-- Points -->
             {% if live_pts is not None %}
             <span class="inline-flex items-center gap-1 text-xs font-black
@@ -353,7 +353,7 @@
     </div>
 
     {% elif is_post_creator %}
-    <div class="rounded-2xl border border-border bg-card p-4 text-center">
+    <div class="rounded-2xl border border-border bg-card px-4 py-3 text-center">
         <p class="text-sm text-muted-foreground">You created this prediction — watch as the community weighs in.</p>
     </div>
 
@@ -363,23 +363,22 @@
     <div id="vote-status-msg" class="hidden rounded-xl px-4 py-3 text-sm font-semibold text-center border"></div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <!-- AGREE card (show full form if voted yes, minimal switch otherwise) -->
-        <div class="group rounded-2xl border {% if user_vote_type == 'yes' %}border-emerald-200/80 bg-gradient-to-br from-white via-emerald-50/70 to-teal-50/60 dark:border-emerald-500/20 dark:bg-gradient-to-br dark:from-slate-900/90 dark:via-slate-900/85 dark:to-emerald-950/55{% else %}border-border bg-card opacity-70 hover:opacity-90{% endif %} p-5 shadow-[0_18px_42px_-30px_rgba(16,185,129,0.5)] transition">
+        <div class="group rounded-2xl border {% if user_vote_type == 'yes' %}border-emerald-200/80 bg-gradient-to-br from-white via-emerald-50/70 to-teal-50/60 dark:border-emerald-500/20 dark:bg-gradient-to-br dark:from-slate-900/90 dark:via-slate-900/85 dark:to-emerald-950/55{% else %}border-border bg-card opacity-70 hover:opacity-90{% endif %} p-4 shadow-[0_18px_42px_-30px_rgba(16,185,129,0.5)] transition">
             <div class="flex items-center gap-3 mb-3">
-                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-sm shadow-emerald-500/35 flex-shrink-0">
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-sm shadow-emerald-500/35 flex-shrink-0">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                 </div>
                 <div>
-                    <p class="text-sm font-medium text-emerald-700 dark:text-emerald-300">Agree (Bullish)</p>
-                    <p class="text-2xl font-semibold text-emerald-950 dark:text-emerald-50">Agree</p>
+                    <p class="text-sm font-bold text-emerald-700 dark:text-emerald-300">Agree · Bullish</p>
                 </div>
             </div>
-            <p class="text-sm text-muted-foreground mb-3">
+            <p class="text-xs text-muted-foreground mb-2">
                 {% if user_vote_type == 'yes' %}You picked Agree. Add your analysis below.
                 {% else %}Switch to Agree, or add text to switch and comment.{% endif %}
             </p>
             <!-- Confidence slider (only for current vote side) -->
             {% if user_vote_type == 'yes' %}
-            <div class="mb-3">
+            <div class="mb-2">
                 <div class="flex items-center justify-between mb-1.5">
                     <label class="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Confidence</label>
                     <div class="flex items-center gap-1"><span id="agree-emoji" class="text-sm">🤔</span><span id="agree-val" class="text-sm font-black tabular-nums">5/10</span></div>
@@ -388,8 +387,8 @@
                 <div class="flex justify-between text-[10px] text-muted-foreground mt-1"><span>Unsure</span><span>Moderate</span><span>Certain</span></div>
             </div>
             {% endif %}
-            <textarea id="agree-comment" class="w-full rounded-2xl border border-emerald-200/70 bg-white/85 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-500/30 dark:bg-slate-900/70 resize-none outline-none font-[inherit] mb-3" rows="2" maxlength="1000" placeholder="Optional: explain your view…"></textarea>
-            <div class="flex items-center gap-2 mb-3">
+            <textarea id="agree-comment" class="w-full rounded-2xl border border-emerald-200/70 bg-white/85 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-500/30 dark:bg-slate-900/70 resize-none outline-none font-[inherit] mb-2" rows="2" maxlength="1000" placeholder="Optional: explain your view…"></textarea>
+            <div class="flex items-center gap-2 mb-2">
                 <label class="flex items-center gap-1.5 cursor-pointer select-none text-xs text-muted-foreground">
                     <input type="checkbox" id="agree-anon" class="sr-only peer">
                     <span class="relative inline-flex h-4 w-7 rounded-full border border-border bg-muted transition-colors peer-checked:bg-primary/80 peer-checked:border-primary/80">
@@ -399,27 +398,26 @@
                 </label>
             </div>
             <button type="button" id="agree-btn" onclick="castVote('yes')"
-                    class="w-full py-3 rounded-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white font-semibold text-sm transition shadow-lg">
+                    class="w-full py-2 rounded-full bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white font-semibold text-sm transition shadow-lg">
                 {% if user_vote_type == 'yes' %}Add Agree Comment{% else %}Switch to Agree{% endif %}
             </button>
         </div>
         <!-- DISAGREE card -->
-        <div class="group rounded-2xl border {% if user_vote_type == 'no' %}border-rose-200/80 bg-gradient-to-br from-white via-rose-50/70 to-red-50/60 dark:border-rose-500/20 dark:bg-gradient-to-br dark:from-slate-900/90 dark:via-slate-900/85 dark:to-rose-950/55{% else %}border-border bg-card opacity-70 hover:opacity-90{% endif %} p-5 shadow-[0_18px_42px_-30px_rgba(239,68,68,0.5)] transition">
+        <div class="group rounded-2xl border {% if user_vote_type == 'no' %}border-rose-200/80 bg-gradient-to-br from-white via-rose-50/70 to-red-50/60 dark:border-rose-500/20 dark:bg-gradient-to-br dark:from-slate-900/90 dark:via-slate-900/85 dark:to-rose-950/55{% else %}border-border bg-card opacity-70 hover:opacity-90{% endif %} p-4 shadow-[0_18px_42px_-30px_rgba(239,68,68,0.5)] transition">
             <div class="flex items-center gap-3 mb-3">
-                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-red-500 text-white shadow-sm shadow-rose-500/35 flex-shrink-0">
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-red-500 text-white shadow-sm shadow-rose-500/35 flex-shrink-0">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
                 </div>
                 <div>
-                    <p class="text-sm font-medium text-rose-700 dark:text-rose-300">Disagree (Bearish)</p>
-                    <p class="text-2xl font-semibold text-rose-950 dark:text-rose-50">Disagree</p>
+                    <p class="text-sm font-bold text-rose-700 dark:text-rose-300">Disagree · Bearish</p>
                 </div>
             </div>
-            <p class="text-sm text-muted-foreground mb-3">
+            <p class="text-xs text-muted-foreground mb-2">
                 {% if user_vote_type == 'no' %}You picked Disagree. Add your analysis below.
                 {% else %}Switch to Disagree, or add text to switch and comment.{% endif %}
             </p>
             {% if user_vote_type == 'no' %}
-            <div class="mb-3">
+            <div class="mb-2">
                 <div class="flex items-center justify-between mb-1.5">
                     <label class="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Confidence</label>
                     <div class="flex items-center gap-1"><span id="disagree-emoji" class="text-sm">🤔</span><span id="disagree-val" class="text-sm font-black tabular-nums">5/10</span></div>
@@ -428,8 +426,8 @@
                 <div class="flex justify-between text-[10px] text-muted-foreground mt-1"><span>Unsure</span><span>Moderate</span><span>Certain</span></div>
             </div>
             {% endif %}
-            <textarea id="disagree-comment" class="w-full rounded-2xl border border-rose-200/70 bg-white/85 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20 dark:border-rose-500/30 dark:bg-slate-900/70 resize-none outline-none font-[inherit] mb-3" rows="2" maxlength="1000" placeholder="Optional: explain your view…"></textarea>
-            <div class="flex items-center gap-2 mb-3">
+            <textarea id="disagree-comment" class="w-full rounded-2xl border border-rose-200/70 bg-white/85 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20 dark:border-rose-500/30 dark:bg-slate-900/70 resize-none outline-none font-[inherit] mb-2" rows="2" maxlength="1000" placeholder="Optional: explain your view…"></textarea>
+            <div class="flex items-center gap-2 mb-2">
                 <label class="flex items-center gap-1.5 cursor-pointer select-none text-xs text-muted-foreground">
                     <input type="checkbox" id="disagree-anon" class="sr-only peer">
                     <span class="relative inline-flex h-4 w-7 rounded-full border border-border bg-muted transition-colors peer-checked:bg-primary/80 peer-checked:border-primary/80">
@@ -439,7 +437,7 @@
                 </label>
             </div>
             <button type="button" id="disagree-btn" onclick="castVote('no')"
-                    class="w-full py-3 rounded-full bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-400 hover:to-red-400 text-white font-semibold text-sm transition shadow-lg">
+                    class="w-full py-2 rounded-full bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-400 hover:to-red-400 text-white font-semibold text-sm transition shadow-lg">
                 {% if user_vote_type == 'no' %}Add Disagree Comment{% else %}Switch to Disagree{% endif %}
             </button>
         </div>
@@ -462,19 +460,18 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
         <!-- AGREE (Bullish) -->
-        <div class="group rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white via-emerald-50/70 to-teal-50/60 p-5 shadow-[0_18px_42px_-30px_rgba(16,185,129,0.5)] transition hover:border-emerald-300/90 dark:border-emerald-500/20 dark:bg-gradient-to-br dark:from-slate-900/90 dark:via-slate-900/85 dark:to-emerald-950/55 dark:hover:border-emerald-400/45">
+        <div class="group rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white via-emerald-50/70 to-teal-50/60 p-4 shadow-[0_18px_42px_-30px_rgba(16,185,129,0.5)] transition hover:border-emerald-300/90 dark:border-emerald-500/20 dark:bg-gradient-to-br dark:from-slate-900/90 dark:via-slate-900/85 dark:to-emerald-950/55 dark:hover:border-emerald-400/45">
             <div class="flex items-center gap-3 mb-3">
-                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-sm shadow-emerald-500/35 flex-shrink-0">
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-sm shadow-emerald-500/35 flex-shrink-0">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                 </div>
                 <div>
-                    <p class="text-sm font-medium text-emerald-700 dark:text-emerald-300">Agree (Bullish)</p>
-                    <p class="text-2xl font-semibold text-emerald-950 dark:text-emerald-50">Agree</p>
+                    <p class="text-sm font-bold text-emerald-700 dark:text-emerald-300">Agree · Bullish</p>
                 </div>
             </div>
-            <p class="text-sm text-muted-foreground mb-3">Pick Agree if you think this prediction is correct.</p>
+            <p class="text-xs text-muted-foreground mb-2">Pick Agree if you think this prediction is correct.</p>
             <!-- Confidence slider -->
-            <div class="mb-3">
+            <div class="mb-2">
                 <div class="flex items-center justify-between mb-1.5">
                     <label class="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Confidence</label>
                     <div class="flex items-center gap-1"><span id="agree-emoji" class="text-sm">🤔</span><span id="agree-val" class="text-sm font-black tabular-nums">5/10</span></div>
@@ -482,8 +479,8 @@
                 <input type="range" id="agree-slider" min="1" max="10" value="5" class="conf-slider sl-green w-full" oninput="updateSlider(this,'agree')">
                 <div class="flex justify-between text-[10px] text-muted-foreground mt-1"><span>Unsure</span><span>Moderate</span><span>Certain</span></div>
             </div>
-            <textarea id="agree-comment" class="w-full rounded-2xl border border-emerald-200/70 bg-white/85 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-500/30 dark:bg-slate-900/70 resize-none outline-none font-[inherit] mb-3" rows="2" maxlength="1000" placeholder="Optional: explain your view…"></textarea>
-            <div class="flex items-center gap-2 mb-3">
+            <textarea id="agree-comment" class="w-full rounded-2xl border border-emerald-200/70 bg-white/85 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-500/30 dark:bg-slate-900/70 resize-none outline-none font-[inherit] mb-2" rows="2" maxlength="1000" placeholder="Optional: explain your view…"></textarea>
+            <div class="flex items-center gap-2 mb-2">
                 <label class="flex items-center gap-1.5 cursor-pointer select-none text-xs text-muted-foreground">
                     <input type="checkbox" id="agree-anon" class="sr-only peer">
                     <span class="relative inline-flex h-4 w-7 rounded-full border border-border bg-muted transition-colors peer-checked:bg-primary/80 peer-checked:border-primary/80">
@@ -493,25 +490,24 @@
                 </label>
             </div>
             <button type="button" id="agree-btn" onclick="castVote('yes')"
-                    class="mt-1 inline-flex w-full justify-center rounded-full bg-gradient-to-r from-emerald-500 to-green-500 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:from-emerald-400 hover:to-green-400">
+                    class="mt-1 inline-flex w-full justify-center rounded-full bg-gradient-to-r from-emerald-500 to-green-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:from-emerald-400 hover:to-green-400">
                 Agree ({{ bull_count }})
             </button>
         </div>
 
         <!-- DISAGREE (Bearish) -->
-        <div class="group rounded-2xl border border-rose-200/80 bg-gradient-to-br from-white via-rose-50/70 to-red-50/60 p-5 shadow-[0_18px_42px_-30px_rgba(239,68,68,0.5)] transition hover:border-rose-300/90 dark:border-rose-500/20 dark:bg-gradient-to-br dark:from-slate-900/90 dark:via-slate-900/85 dark:to-rose-950/55 dark:hover:border-rose-400/45">
+        <div class="group rounded-2xl border border-rose-200/80 bg-gradient-to-br from-white via-rose-50/70 to-red-50/60 p-4 shadow-[0_18px_42px_-30px_rgba(239,68,68,0.5)] transition hover:border-rose-300/90 dark:border-rose-500/20 dark:bg-gradient-to-br dark:from-slate-900/90 dark:via-slate-900/85 dark:to-rose-950/55 dark:hover:border-rose-400/45">
             <div class="flex items-center gap-3 mb-3">
-                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-red-500 text-white shadow-sm shadow-rose-500/35 flex-shrink-0">
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-red-500 text-white shadow-sm shadow-rose-500/35 flex-shrink-0">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
                 </div>
                 <div>
-                    <p class="text-sm font-medium text-rose-700 dark:text-rose-300">Disagree (Bearish)</p>
-                    <p class="text-2xl font-semibold text-rose-950 dark:text-rose-50">Disagree</p>
+                    <p class="text-sm font-bold text-rose-700 dark:text-rose-300">Disagree · Bearish</p>
                 </div>
             </div>
-            <p class="text-sm text-muted-foreground mb-3">Pick Disagree if you think this prediction is wrong.</p>
+            <p class="text-xs text-muted-foreground mb-2">Pick Disagree if you think this prediction is wrong.</p>
             <!-- Confidence slider -->
-            <div class="mb-3">
+            <div class="mb-2">
                 <div class="flex items-center justify-between mb-1.5">
                     <label class="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Confidence</label>
                     <div class="flex items-center gap-1"><span id="disagree-emoji" class="text-sm">🤔</span><span id="disagree-val" class="text-sm font-black tabular-nums">5/10</span></div>
@@ -519,8 +515,8 @@
                 <input type="range" id="disagree-slider" min="1" max="10" value="5" class="conf-slider sl-red w-full" oninput="updateSlider(this,'disagree')">
                 <div class="flex justify-between text-[10px] text-muted-foreground mt-1"><span>Unsure</span><span>Moderate</span><span>Certain</span></div>
             </div>
-            <textarea id="disagree-comment" class="w-full rounded-2xl border border-rose-200/70 bg-white/85 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20 dark:border-rose-500/30 dark:bg-slate-900/70 resize-none outline-none font-[inherit] mb-3" rows="2" maxlength="1000" placeholder="Optional: explain your view…"></textarea>
-            <div class="flex items-center gap-2 mb-3">
+            <textarea id="disagree-comment" class="w-full rounded-2xl border border-rose-200/70 bg-white/85 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20 dark:border-rose-500/30 dark:bg-slate-900/70 resize-none outline-none font-[inherit] mb-2" rows="2" maxlength="1000" placeholder="Optional: explain your view…"></textarea>
+            <div class="flex items-center gap-2 mb-2">
                 <label class="flex items-center gap-1.5 cursor-pointer select-none text-xs text-muted-foreground">
                     <input type="checkbox" id="disagree-anon" class="sr-only peer">
                     <span class="relative inline-flex h-4 w-7 rounded-full border border-border bg-muted transition-colors peer-checked:bg-primary/80 peer-checked:border-primary/80">
@@ -530,7 +526,7 @@
                 </label>
             </div>
             <button type="button" id="disagree-btn" onclick="castVote('no')"
-                    class="mt-1 inline-flex w-full justify-center rounded-full bg-gradient-to-r from-rose-500 to-red-500 px-4 py-3 text-sm font-semibold text-white shadow-lg transition hover:from-rose-400 hover:to-red-400">
+                    class="mt-1 inline-flex w-full justify-center rounded-full bg-gradient-to-r from-rose-500 to-red-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:from-rose-400 hover:to-red-400">
                 Disagree ({{ bear_count }})
             </button>
         </div>
