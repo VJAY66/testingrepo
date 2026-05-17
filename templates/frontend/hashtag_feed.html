@@ -3,111 +3,216 @@
 
 {% block content %}
 <style>
-.hf-page { max-width: 680px; margin: 0 auto; padding: 2rem 1rem 4rem; }
-.hf-title { font-size: 1.55rem; font-weight: 900; color: hsl(var(--foreground)); letter-spacing: -0.01em; }
-.hf-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0 1.5rem; }
+.hf-page { max-width: 680px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+
 .hf-tag {
   display: inline-flex; align-items: center; gap: 0.3rem;
-  padding: 0.3rem 0.75rem; border-radius: 999px;
+  padding: 0.25rem 0.65rem; border-radius: 999px;
   background: hsl(var(--primary) / 0.1); color: hsl(var(--primary));
-  font-size: 0.8rem; font-weight: 700; border: 1px solid hsl(var(--primary) / 0.25);
+  font-size: 0.75rem; font-weight: 700; border: 1px solid hsl(var(--primary) / 0.25);
 }
-.hf-section-label {
-  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em;
-  text-transform: uppercase; color: hsl(var(--muted-foreground));
-  margin: 1.75rem 0 0.65rem;
-}
-.hf-card {
-  border: 1px solid hsl(var(--border) / 0.7);
-  border-radius: 1rem; background: hsl(var(--card));
-  padding: 0.9rem 1rem; margin-bottom: 0.6rem;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.hf-card:hover { transform: translateY(-1px); box-shadow: 0 6px 20px -8px hsl(var(--primary) / 0.15); }
-.hf-card-title { font-size: 0.95rem; font-weight: 700; color: hsl(var(--foreground)); text-decoration: none; }
-.hf-card-title:hover { color: hsl(var(--primary)); }
-.hf-card-meta { font-size: 0.75rem; color: hsl(var(--muted-foreground)); margin-top: 0.3rem; }
 
-.hf-empty {
-  text-align: center; padding: 4rem 2rem;
-  color: hsl(var(--muted-foreground));
+/* ── Tab bar ── */
+.hf-tabs {
+  display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 2px;
+  scrollbar-width: none; margin-bottom: 1.25rem;
 }
-.hf-empty-icon { font-size: 3rem; margin-bottom: 0.75rem; display: block; }
+.hf-tabs::-webkit-scrollbar { display: none; }
+.hf-tab {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.4rem 0.9rem; border-radius: 999px; white-space: nowrap;
+  font-size: 0.75rem; font-weight: 700; border: 1.5px solid hsl(var(--border));
+  background: hsl(var(--card)); color: hsl(var(--muted-foreground));
+  text-decoration: none; transition: all 140ms;
+}
+.hf-tab:hover { color: hsl(var(--foreground)); border-color: hsl(var(--primary)/0.4); }
+.hf-tab.active {
+  background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+  border-color: transparent; box-shadow: 0 4px 12px -4px hsl(var(--primary)/0.4);
+}
+
+/* ── Cards ── */
+.hf-card {
+  display: block; text-decoration: none;
+  border: 1.5px solid hsl(var(--border)/0.7);
+  border-radius: 1rem; background: hsl(var(--card));
+  padding: 0.85rem 1rem; margin-bottom: 0.5rem;
+  transition: border-color 150ms, box-shadow 150ms, transform 140ms;
+}
+.hf-card:hover {
+  border-color: hsl(var(--primary)/0.4);
+  box-shadow: 0 8px 24px -12px hsl(var(--primary)/0.2);
+  transform: translateY(-1px);
+}
+.hf-card-title { font-size: 0.9rem; font-weight: 700; color: hsl(var(--foreground)); line-height: 1.4; }
+.hf-card:hover .hf-card-title { color: hsl(var(--primary)); }
+.hf-card-meta { font-size: 0.72rem; color: hsl(var(--muted-foreground)); margin-top: 0.3rem; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.hf-type-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 7px; border-radius: 999px; font-size: 0.65rem; font-weight: 800;
+}
+.badge-discussion { background: hsl(var(--primary)/0.1); color: hsl(var(--primary)); border: 1px solid hsl(var(--primary)/0.2); }
+.badge-question   { background: hsl(217 80% 54%/0.1); color: hsl(217 70% 44%); border: 1px solid hsl(217 80% 54%/0.2); }
+.badge-review     { background: hsl(38 86% 54%/0.1); color: hsl(38 72% 36%); border: 1px solid hsl(38 86% 54%/0.2); }
+.badge-stock      { background: hsl(142 65% 44%/0.1); color: hsl(142 52% 32%); border: 1px solid hsl(142 65% 44%/0.2); }
+.badge-poll       { background: hsl(272 70% 54%/0.1); color: hsl(272 60% 40%); border: 1px solid hsl(272 70% 54%/0.2); }
+html[data-theme="dark"] .badge-question { color: hsl(217 80% 70%); }
+html[data-theme="dark"] .badge-review   { color: hsl(38 86% 65%); }
+html[data-theme="dark"] .badge-stock    { color: hsl(142 65% 55%); }
+html[data-theme="dark"] .badge-poll     { color: hsl(272 70% 70%); }
+
+/* ── Section header ── */
+.hf-section {
+  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: hsl(var(--muted-foreground));
+  margin: 1.25rem 0 0.6rem; display: flex; align-items: center; gap: 0.5rem;
+}
+.hf-section::after { content: ''; flex: 1; height: 1px; background: hsl(var(--border)/0.6); }
+
+.hf-empty { text-align: center; padding: 3.5rem 1.5rem; color: hsl(var(--muted-foreground)); }
+.hf-empty-icon { font-size: 2.5rem; margin-bottom: 0.6rem; display: block; }
+
+/* Stock direction chips */
+.sp-up   { color: hsl(142 60% 38%); font-weight: 800; }
+.sp-down { color: hsl(346 65% 44%); font-weight: 800; }
 </style>
 
 <div class="hf-page">
-  <div class="flex items-center gap-3 mb-1">
-    <span style="font-size:1.5rem;">#</span>
-    <h1 class="hf-title">My Hashtag Feed</h1>
+
+  <!-- Header -->
+  <div class="flex items-center gap-2.5 mb-3">
+    <span class="text-2xl font-black text-primary">#</span>
+    <h1 class="text-xl font-black text-foreground tracking-tight">My Hashtag Feed</h1>
   </div>
 
+  <!-- Followed tags -->
   {% if followed_tags %}
-    <div class="hf-tags">
-      {% for tag in followed_tags %}
-      <span class="hf-tag">
-        <span>#</span>{{ tag }}
-        <button type="button" onclick="unfollowTag('{{ tag }}')" title="Unfollow" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;margin-left:2px;font-size:0.9em;">×</button>
-      </span>
-      {% endfor %}
-    </div>
+  <div class="flex flex-wrap gap-1.5 mb-4">
+    {% for tag in followed_tags %}
+    <span class="hf-tag">
+      #{{ tag }}
+      <button type="button" onclick="unfollowTag('{{ tag }}')" title="Unfollow"
+              style="background:none;border:none;cursor:pointer;color:inherit;padding:0;margin-left:1px;font-size:1em;line-height:1;">×</button>
+    </span>
+    {% endfor %}
+  </div>
   {% endif %}
 
   {% if not followed_tags %}
-    <div class="hf-empty mt-10">
-      <span class="hf-empty-icon">🏷️</span>
-      <p class="font-semibold text-base">You're not following any hashtags yet</p>
-      <p class="text-sm mt-2">Go to <a href="{% url 'trending_hashtags' %}" class="text-primary hover:underline">Trending Tags</a> and click the ♡ button to follow tags you care about.</p>
-    </div>
-  {% elif not posts and not polls and not questions and not reviews %}
-    <div class="hf-empty mt-6">
-      <span class="hf-empty-icon">💤</span>
-      <p class="font-semibold">No recent content found for your hashtags.</p>
-      <p class="text-sm mt-2">Content using these hashtags will appear here.</p>
-    </div>
+  <div class="hf-empty mt-8">
+    <span class="hf-empty-icon">🏷️</span>
+    <p class="font-semibold text-base">You're not following any hashtags yet</p>
+    <p class="text-sm mt-2">Go to <a href="{% url 'trending_hashtags' %}" class="text-primary hover:underline">Trending Tags</a> and follow tags you care about.</p>
+  </div>
+
   {% else %}
-    {% if posts %}
-    <p class="hf-section-label">📝 Discussions ({{ posts|length }})</p>
-    {% for post in posts %}
-    <div class="hf-card">
-      <a href="{% url 'discussion' post.id %}" class="hf-card-title">{{ post.title }}</a>
-      <div class="hf-card-meta">
-        by @{{ post.user.username }} &middot; {{ post.category }} &middot; {{ post.created_at|date:"M j, Y" }}
-        {% if post.view_count %}&middot; {{ post.view_count }} views{% endif %}
-      </div>
-    </div>
-    {% endfor %}
-    {% endif %}
 
-    {% if polls %}
-    <p class="hf-section-label">📊 Polls ({{ polls|length }})</p>
-    {% for poll in polls %}
-    <div class="hf-card">
-      <a href="{% url 'poll_detail' poll.id %}" class="hf-card-title">{{ poll.title }}</a>
-      <div class="hf-card-meta">by @{{ poll.user.username }} &middot; {{ poll.category }} &middot; {{ poll.created_at|date:"M j, Y" }}</div>
-    </div>
-    {% endfor %}
-    {% endif %}
+  <!-- ── Tab navigation ── -->
+  <nav class="hf-tabs">
+    <a href="?tab=all"          class="hf-tab {% if active_tab == 'all' %}active{% endif %}">🌐 All</a>
+    <a href="?tab=discussions"  class="hf-tab {% if active_tab == 'discussions' %}active{% endif %}">⚔️ Pick a Side</a>
+    <a href="?tab=stocks"       class="hf-tab {% if active_tab == 'stocks' %}active{% endif %}">📈 Stock Predictions</a>
+    <a href="?tab=questions"    class="hf-tab {% if active_tab == 'questions' %}active{% endif %}">❓ Questions</a>
+    <a href="?tab=reviews"      class="hf-tab {% if active_tab == 'reviews' %}active{% endif %}">⭐ Reviews</a>
+    <a href="?tab=polls"        class="hf-tab {% if active_tab == 'polls' %}active{% endif %}">📊 Polls</a>
+  </nav>
 
-    {% if questions %}
-    <p class="hf-section-label">💬 Questions ({{ questions|length }})</p>
-    {% for q in questions %}
-    <div class="hf-card">
-      <a href="{% url 'question_detail' q.id %}" class="hf-card-title">{{ q.title }}</a>
-      <div class="hf-card-meta">by @{{ q.user.username }} &middot; {{ q.answer_count }} answer{{ q.answer_count|pluralize }} &middot; {{ q.created_at|date:"M j, Y" }}</div>
-    </div>
-    {% endfor %}
-    {% endif %}
+  {% with has_content=posts|length|add:questions|length|add:reviews|length|add:stock_predictions|length|add:polls|length %}
+  {% if not has_content %}
+  <div class="hf-empty">
+    <span class="hf-empty-icon">💤</span>
+    <p class="font-semibold">Nothing here yet for your hashtags.</p>
+    <p class="text-sm mt-1.5">Content using these tags will appear here.</p>
+  </div>
 
-    {% if reviews %}
-    <p class="hf-section-label">⭐ Reviews ({{ reviews|length }})</p>
-    {% for review in reviews %}
-    <div class="hf-card">
-      <a href="{% url 'review_detail' review.id %}" class="hf-card-title">{{ review.subject }}</a>
-      <div class="hf-card-meta">by @{{ review.user.username }} &middot; {{ review.subject_type }} &middot; {{ review.created_at|date:"M j, Y" }}</div>
+  {% else %}
+
+  <!-- ── Pick a Side / Discussions ── -->
+  {% if posts %}
+  <p class="hf-section">⚔️ Pick a Side <span class="text-[10px] font-bold bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{{ posts|length }}</span></p>
+  {% for post in posts %}
+  <a href="{% url 'discussion' post.id %}" class="hf-card">
+    <div class="hf-card-title">{{ post.title }}</div>
+    <div class="hf-card-meta">
+      <span class="hf-type-badge badge-discussion">⚔️ Pick a Side</span>
+      @{{ post.user.username }} · {{ post.category }} · {{ post.created_at|date:"M j, Y" }}
+      {% if post.view_count %}<span>· {{ post.view_count }} views</span>{% endif %}
     </div>
-    {% endfor %}
-    {% endif %}
+  </a>
+  {% endfor %}
   {% endif %}
+
+  <!-- ── Stock Predictions ── -->
+  {% if stock_predictions %}
+  <p class="hf-section">📈 Stock Predictions <span class="text-[10px] font-bold bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{{ stock_predictions|length }}</span></p>
+  {% for sp in stock_predictions %}
+  <a href="{% url 'stock_prediction_detail' sp.post.id %}" class="hf-card">
+    <div class="hf-card-title flex items-center gap-2 flex-wrap">
+      <span class="font-black text-primary">{{ sp.stock_symbol }}</span>
+      {% if sp.direction == 'up' or sp.direction == 'above' %}
+      <span class="sp-up text-xs">▲ Up</span>
+      {% else %}
+      <span class="sp-down text-xs">▼ Down</span>
+      {% endif %}
+      <span class="text-foreground font-semibold">→ {{ sp.currency_symbol }}{{ sp.target_price }} by {{ sp.target_date|date:"M j, Y" }}</span>
+    </div>
+    <div class="hf-card-meta">
+      <span class="hf-type-badge badge-stock">📈 Stock</span>
+      @{{ sp.post.user.username }} · {{ sp.post.created_at|date:"M j, Y" }}
+      {% if sp.status == 'active' %}<span class="text-emerald-600 dark:text-emerald-400 font-bold">· Active</span>
+      {% elif sp.status == 'resolved' %}<span class="text-muted-foreground font-bold">· Resolved</span>{% endif %}
+    </div>
+  </a>
+  {% endfor %}
+  {% endif %}
+
+  <!-- ── Questions ── -->
+  {% if questions %}
+  <p class="hf-section">❓ Questions <span class="text-[10px] font-bold bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{{ questions|length }}</span></p>
+  {% for q in questions %}
+  <a href="{% url 'question_detail' q.id %}" class="hf-card">
+    <div class="hf-card-title">{{ q.title }}</div>
+    <div class="hf-card-meta">
+      <span class="hf-type-badge badge-question">❓ Question</span>
+      @{{ q.user.username }} · {{ q.answer_count }} answer{{ q.answer_count|pluralize }} · {{ q.created_at|date:"M j, Y" }}
+    </div>
+  </a>
+  {% endfor %}
+  {% endif %}
+
+  <!-- ── Reviews ── -->
+  {% if reviews %}
+  <p class="hf-section">⭐ Reviews <span class="text-[10px] font-bold bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{{ reviews|length }}</span></p>
+  {% for review in reviews %}
+  <a href="{% url 'review_detail' review.id %}" class="hf-card">
+    <div class="hf-card-title">{{ review.subject }}</div>
+    <div class="hf-card-meta">
+      <span class="hf-type-badge badge-review">⭐ Review</span>
+      @{{ review.user.username }} · {{ review.subject_type }} · {{ review.created_at|date:"M j, Y" }}
+      <span>{% for i in "12345" %}{% if forloop.counter <= review.rating %}★{% else %}☆{% endif %}{% endfor %}</span>
+    </div>
+  </a>
+  {% endfor %}
+  {% endif %}
+
+  <!-- ── Polls ── -->
+  {% if polls %}
+  <p class="hf-section">📊 Polls <span class="text-[10px] font-bold bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{{ polls|length }}</span></p>
+  {% for poll in polls %}
+  <a href="{% url 'poll_detail' poll.id %}" class="hf-card">
+    <div class="hf-card-title">{{ poll.title }}</div>
+    <div class="hf-card-meta">
+      <span class="hf-type-badge badge-poll">📊 Poll</span>
+      @{{ poll.user.username }} · {{ poll.category }} · {{ poll.created_at|date:"M j, Y" }}
+    </div>
+  </a>
+  {% endfor %}
+  {% endif %}
+
+  {% endif %}{# end has_content #}
+  {% endwith %}
+
+  {% endif %}{# end followed_tags #}
 </div>
 
 <script>

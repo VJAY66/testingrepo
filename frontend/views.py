@@ -7334,32 +7334,44 @@ def hashtag_followed_feed(request):
         HashtagFollow.objects.filter(user=request.user).values_list('tag', flat=True)
     )
 
-    posts, polls, questions, reviews = [], [], [], []
+    active_tab = request.GET.get('tab', 'all')
+    valid_tabs = ('all', 'discussions', 'questions', 'reviews', 'stocks', 'polls')
+    if active_tab not in valid_tabs:
+        active_tab = 'all'
+
+    posts, polls, questions, reviews, stock_predictions = [], [], [], [], []
     if followed_tags:
         tag_filter = _re.compile(r'\b(?:' + '|'.join(_re.escape(t) for t in followed_tags) + r')\b', _re.I)
 
         def _matches(obj):
             return bool(tag_filter.search(getattr(obj, 'hashtags', '') or ''))
 
-        raw_posts = _annotated_feed_posts_queryset().order_by('-created_at')[:200]
-        posts = [p for p in raw_posts if _matches(p)][:30]
+        def _sp_matches(sp):
+            sym = (sp.stock_symbol or '').lower()
+            return any(sym == t.lower() or t.lower() in sym for t in followed_tags)
 
-        polls = list(Poll.objects.filter(
-            is_active=True
-        ).order_by('-created_at')[:200])
-        polls = [p for p in polls if _matches(p)][:20]
+        if active_tab in ('all', 'discussions'):
+            raw_posts = _annotated_feed_posts_queryset().order_by('-created_at')[:200]
+            posts = [p for p in raw_posts if _matches(p)][:30]
+            _enrich_posts_for_feed(posts, request.user)
 
-        questions = list(Question.objects.filter(
-            is_deleted_by_moderation=False
-        ).order_by('-created_at')[:200])
-        questions = [q for q in questions if _matches(q)][:20]
+        if active_tab in ('all', 'polls'):
+            raw_polls = list(Poll.objects.filter(is_active=True).order_by('-created_at')[:200])
+            polls = [p for p in raw_polls if _matches(p)][:20]
 
-        reviews = list(Review.objects.filter(
-            is_deleted_by_moderation=False
-        ).order_by('-created_at')[:200])
-        reviews = [r for r in reviews if _matches(r)][:20]
+        if active_tab in ('all', 'questions'):
+            raw_qs = list(Question.objects.filter(is_deleted_by_moderation=False).order_by('-created_at')[:200])
+            questions = [q for q in raw_qs if _matches(q)][:20]
 
-        _enrich_posts_for_feed(posts, request.user)
+        if active_tab in ('all', 'reviews'):
+            raw_reviews = list(Review.objects.filter(is_deleted_by_moderation=False).order_by('-created_at')[:200])
+            reviews = [r for r in raw_reviews if _matches(r)][:20]
+
+        if active_tab in ('all', 'stocks'):
+            raw_sp = list(StockPrediction.objects.filter(
+                status__in=['active', 'resolved']
+            ).select_related('post', 'post__user').order_by('-post__created_at')[:200])
+            stock_predictions = [sp for sp in raw_sp if _sp_matches(sp)][:20]
 
     return render(request, 'frontend/hashtag_feed.html', {
         'followed_tags': followed_tags,
@@ -7367,6 +7379,8 @@ def hashtag_followed_feed(request):
         'polls': polls,
         'questions': questions,
         'reviews': reviews,
+        'stock_predictions': stock_predictions,
+        'active_tab': active_tab,
     })
 
 
