@@ -8473,6 +8473,9 @@ def explore(request):
 
 
 def _get_explore_trending_tags():
+    cached = cache.get('explore_trending_tags')
+    if cached is not None:
+        return cached
     _tag_counts: dict = {}
     _tag_cutoff = timezone.now() - timedelta(days=7)
     for _model in [Post, Poll, Question, Review]:
@@ -8480,19 +8483,26 @@ def _get_explore_trending_tags():
             for _t in Post.parse_hashtags(_raw, max_tags=20):
                 _tag_counts[_t] = _tag_counts.get(_t, 0) + 1
     _max_count = max(_tag_counts.values(), default=1)
-    return sorted(
+    result = sorted(
         [{'tag': t, 'count': c, 'weight': round(c / _max_count * 100)} for t, c in _tag_counts.items()],
         key=lambda x: x['count'], reverse=True,
     )[:15]
+    cache.set('explore_trending_tags', result, 600)  # 10 minutes
+    return result
 
 
 def _get_explore_hot_today():
+    cached = cache.get('explore_hot_today')
+    if cached is not None:
+        return cached
     _hot_cutoff = timezone.now() - timedelta(hours=24)
-    return list(
+    result = list(
         _annotated_feed_posts_queryset()
         .filter(is_hot=True, created_at__gte=_hot_cutoff, is_draft=False, is_deleted_by_moderation=False)
         .order_by('-like_count')[:5]
     )
+    cache.set('explore_hot_today', result, 300)  # 5 minutes
+    return result
 
 
 # ─── Stories ──────────────────────────────────────────────────────────────────
@@ -11516,7 +11526,13 @@ def stocks_list(request):
     paginator = Paginator(qs, 15)
     page_obj = paginator.get_page(request.GET.get('page', 1))
 
-    leaderboard, total_resolved = _build_leaderboard_data(limit=10)
+    # Cache the leaderboard sidebar — it changes rarely
+    leaderboard_cache_key = 'stocks_leaderboard_10'
+    leaderboard_data = cache.get(leaderboard_cache_key)
+    if leaderboard_data is None:
+        leaderboard_data = _build_leaderboard_data(limit=10)
+        cache.set(leaderboard_cache_key, leaderboard_data, 300)
+    leaderboard, total_resolved = leaderboard_data
 
     return render(request, 'frontend/stocks_list.html', {
         'page_obj': page_obj,

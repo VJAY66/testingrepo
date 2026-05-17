@@ -40,6 +40,21 @@
             try { var u = new URL(href, location.href); if (u.origin !== location.origin) return; } catch(e){ return; }
             start();
         });
+        // Prefetch page on hover — gives 200-400ms head start before click
+        var _pf = {};
+        document.addEventListener('mouseover', function(e){
+            var a = e.target.closest('a[href]');
+            if (!a) return;
+            var href = a.getAttribute('href');
+            if (!href || href.startsWith('#') || href.startsWith('javascript') || a.target === '_blank') return;
+            try { var u = new URL(href, location.href); if (u.origin !== location.origin) return; } catch(x){ return; }
+            var key = u.pathname + u.search;
+            if (_pf[key]) return;
+            _pf[key] = true;
+            var lnk = document.createElement('link');
+            lnk.rel = 'prefetch'; lnk.href = href; lnk.as = 'document';
+            document.head.appendChild(lnk);
+        });
         window.addEventListener('popstate', start);
         document.addEventListener('DOMContentLoaded', done);
         window.addEventListener('pageshow', done);
