@@ -4849,7 +4849,14 @@ def debate_messages(request, debate_id):
 
     opponent = debate.target if request.user == debate.initiator else debate.initiator
 
-    raw_messages = list(debate.messages.select_related('sender', 'reply_to__sender').all())
+    try:
+        after_id = int(request.GET.get('after', 0) or 0)
+    except (ValueError, TypeError):
+        after_id = 0
+    qs = debate.messages.select_related('sender', 'reply_to__sender')
+    if after_id:
+        qs = qs.filter(id__gt=after_id)
+    raw_messages = list(qs)
     message_ids = [message.id for message in raw_messages]
     likes_map, dislikes_map, viewer_reaction_map = _debate_message_reaction_maps(message_ids, request.user.id)
     side_map = _sender_side_map(debate)

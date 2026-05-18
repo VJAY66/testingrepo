@@ -1872,7 +1872,7 @@ min-width: 0;
 
   function poll() {
     if (minimized || document.hidden) return;
-    fetch('{% url "debate_messages" debate.id %}')
+    fetch('{% url "debate_messages" debate.id %}?after=' + lastMsgId)
       .then(r => {
         if (r.status === 403) {
           if (pollTimer) {
@@ -1945,6 +1945,7 @@ min-width: 0;
             return;
           }
 
+          const prevLastMsgId = lastMsgId;
           d.messages.forEach(addMsg);
           d.messages.forEach(updateReactionSummaryUI);
           if (typeof d.opponent_last_read_msg_id === 'number') {
@@ -1958,7 +1959,7 @@ min-width: 0;
             });
           }
           updateStickyDate();
-          if (isEmbedded && d.messages.length) markCurrentChatRead();
+          if (isEmbedded && lastMsgId > prevLastMsgId) markCurrentChatRead();
           return;
         }
         if (d.error === 'Access denied') {
