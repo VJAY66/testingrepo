@@ -319,18 +319,18 @@
     #mc-msgs::-webkit-scrollbar-thumb { background: hsl(var(--primary) / 0.2); border-radius: 3px; }
     #mc-msgs::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.35); }
 
-    .mc-date-divider { display: flex; align-items: center; gap: 12px; margin: 10px 0 8px; }
+    .mc-date-divider {
+      display: flex; align-items: center; gap: 8px;
+      margin: 3px 0 2px; opacity: 0.4; pointer-events: none;
+    }
     .mc-date-divider::before,
     .mc-date-divider::after {
       content: ''; flex: 1; height: 1px;
-      background: linear-gradient(90deg, transparent, hsl(var(--border) / 0.5), transparent);
+      background: hsl(var(--border) / 0.4);
     }
     .mc-date-divider span {
-      font-size: 10px; color: hsl(var(--muted-foreground));
-      background: linear-gradient(135deg, hsl(var(--card) / 0.95), hsl(var(--secondary) / 0.8));
-      border: 1px solid hsl(var(--border) / 0.6);
-      border-radius: 999px; padding: 4px 14px; letter-spacing: 0.07em; font-weight: 700;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+      font-size: 9px; color: hsl(var(--muted-foreground));
+      border-radius: 999px; padding: 1px 8px; letter-spacing: 0.05em; font-weight: 600;
       white-space: nowrap;
     }
     .mc-sticky-date {
