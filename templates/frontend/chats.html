@@ -213,8 +213,6 @@
     z-index: 2;
     flex: 1 1 0%;
     min-width: 0;
-    display: flex;
-    flex-direction: column;
     overflow: hidden;
     background:
         radial-gradient(640px 270px at 12% -4%, hsl(var(--primary) / 0.12), transparent 65%),
@@ -222,9 +220,10 @@
         linear-gradient(180deg, hsl(var(--background) / 0.92), hsl(var(--card) / 0.98));
 }
 .ch-conv-frame {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
-    min-height: 0;
     border: none;
     background: hsl(var(--background));
     color-scheme: dark light;
@@ -233,8 +232,8 @@
     display: none !important;
 }
 .ch-placeholder {
-    height: 100%;
-    min-height: 0;
+    position: absolute;
+    inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -244,7 +243,13 @@
     font-size: 0.92rem;
     text-align: center;
     padding: 1.2rem;
+    background:
+        radial-gradient(640px 270px at 12% -4%, hsl(var(--primary) / 0.12), transparent 65%),
+        radial-gradient(520px 240px at 95% 110%, hsl(var(--accent) / 0.12), transparent 70%),
+        linear-gradient(180deg, hsl(var(--background) / 0.92), hsl(var(--card) / 0.98));
 }
+/* Ensure our display:flex above never beats the Tailwind hidden utility */
+.ch-placeholder.hidden { display: none !important; }
 .ch-placeholder-card {
     width: min(520px, 100%);
     border: 1px solid hsl(var(--border) / 0.9);
