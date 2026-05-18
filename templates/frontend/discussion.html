@@ -334,6 +334,7 @@
               {% elif analytics.velocity_delta < 0 %}<span class="text-rose-500 font-semibold">↓{{ analytics.velocity_delta|slice:"1:" }}</span>{% endif %}
             </span>
             <span>✅ <strong class="text-emerald-600">{{ analytics.yes_pct }}%</strong> {{ post.yes_label }} · ❌ <strong class="text-rose-600">{{ analytics.no_pct }}%</strong> {{ post.no_label }}</span>
+            <span title="(likes + comments) / views">📈 <strong class="text-foreground">{{ analytics.engagement_rate }}%</strong> engagement rate</span>
           </div>
           {% if analytics.daily_views %}
           <div>

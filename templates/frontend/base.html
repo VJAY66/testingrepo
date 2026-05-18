@@ -6386,5 +6386,112 @@ function acceptCookies() {
   });
 })();
 </script>
+
+<!-- Keyboard Shortcuts -->
+<script>
+(function() {
+  var POST_SELECTOR = '.post-card, [data-post-id], article.post, .discussion-card';
+
+  function isTyping() {
+    var tag = document.activeElement && document.activeElement.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' ||
+           (document.activeElement && document.activeElement.isContentEditable);
+  }
+
+  function getPostCards() {
+    return Array.from(document.querySelectorAll(POST_SELECTOR));
+  }
+
+  function currentIndex(cards) {
+    var mid = window.innerHeight / 2;
+    var best = -1, bestDist = Infinity;
+    cards.forEach(function(card, i) {
+      var rect = card.getBoundingClientRect();
+      var center = rect.top + rect.height / 2;
+      var dist = Math.abs(center - mid);
+      if (dist < bestDist) { bestDist = dist; best = i; }
+    });
+    return best;
+  }
+
+  function scrollToCard(card) {
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.focus && card.focus({ preventScroll: true });
+  }
+
+  var helpModal = null;
+  function showHelp() {
+    if (helpModal) { helpModal.remove(); helpModal = null; return; }
+    helpModal = document.createElement('div');
+    helpModal.id = 'kb-help-modal';
+    helpModal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    helpModal.innerHTML = '<div style="background:var(--card,#fff);border:1px solid var(--border,#e2e8f0);border-radius:16px;padding:28px 32px;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3);">' +
+      '<h3 style="margin:0 0 16px;font-size:1rem;font-weight:700;">Keyboard Shortcuts</h3>' +
+      '<table style="border-collapse:collapse;width:100%;font-size:.875rem;">' +
+      '<tr><td style="padding:4px 12px 4px 0;"><kbd style="background:var(--muted,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:4px;padding:1px 6px;font-size:.8rem;">j</kbd></td><td style="padding:4px 0;color:var(--muted-foreground,#64748b);">Next post</td></tr>' +
+      '<tr><td style="padding:4px 12px 4px 0;"><kbd style="background:var(--muted,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:4px;padding:1px 6px;font-size:.8rem;">k</kbd></td><td style="padding:4px 0;color:var(--muted-foreground,#64748b);">Previous post</td></tr>' +
+      '<tr><td style="padding:4px 12px 4px 0;"><kbd style="background:var(--muted,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:4px;padding:1px 6px;font-size:.8rem;">n</kbd></td><td style="padding:4px 0;color:var(--muted-foreground,#64748b);">New post</td></tr>' +
+      '<tr><td style="padding:4px 12px 4px 0;"><kbd style="background:var(--muted,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:4px;padding:1px 6px;font-size:.8rem;">/</kbd></td><td style="padding:4px 0;color:var(--muted-foreground,#64748b);">Focus search</td></tr>' +
+      '<tr><td style="padding:4px 12px 4px 0;"><kbd style="background:var(--muted,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:4px;padding:1px 6px;font-size:.8rem;">g h</kbd></td><td style="padding:4px 0;color:var(--muted-foreground,#64748b);">Go home</td></tr>' +
+      '<tr><td style="padding:4px 12px 4px 0;"><kbd style="background:var(--muted,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:4px;padding:1px 6px;font-size:.8rem;">g p</kbd></td><td style="padding:4px 0;color:var(--muted-foreground,#64748b);">Go to profile</td></tr>' +
+      '<tr><td style="padding:4px 12px 4px 0;"><kbd style="background:var(--muted,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:4px;padding:1px 6px;font-size:.8rem;">?</kbd></td><td style="padding:4px 0;color:var(--muted-foreground,#64748b);">Show / hide this</td></tr>' +
+      '</table>' +
+      '<button onclick="document.getElementById(\'kb-help-modal\').remove();" style="margin-top:16px;width:100%;padding:8px;border:1px solid var(--border,#e2e8f0);border-radius:8px;background:transparent;cursor:pointer;font-size:.875rem;">Close</button>' +
+      '</div>';
+    helpModal.addEventListener('click', function(e) { if (e.target === helpModal) { helpModal.remove(); helpModal = null; } });
+    document.body.appendChild(helpModal);
+  }
+
+  var gPressed = false, gTimer = null;
+
+  document.addEventListener('keydown', function(e) {
+    if (isTyping()) return;
+    var key = e.key;
+
+    if (key === 'g') {
+      gPressed = true;
+      clearTimeout(gTimer);
+      gTimer = setTimeout(function() { gPressed = false; }, 1000);
+      return;
+    }
+    if (gPressed) {
+      gPressed = false;
+      clearTimeout(gTimer);
+      if (key === 'h') { window.location.href = '/'; return; }
+      if (key === 'p') { window.location.href = '/profile/'; return; }
+      if (key === 'n') { window.location.href = '/notifications/'; return; }
+      return;
+    }
+
+    if (key === '?') { e.preventDefault(); showHelp(); return; }
+
+    if (key === '/') {
+      e.preventDefault();
+      var search = document.querySelector('input[type="search"], input[name="q"], #search-input, .search-input');
+      if (search) { search.focus(); search.select(); }
+      return;
+    }
+
+    if (key === 'n') {
+      var modal = document.getElementById('create-post-modal');
+      if (modal) { e.preventDefault(); modal.classList.remove('hidden'); modal.classList.add('flex'); }
+      return;
+    }
+
+    if (key === 'j' || key === 'k') {
+      var cards = getPostCards();
+      if (!cards.length) return;
+      e.preventDefault();
+      var idx = currentIndex(cards);
+      var next = key === 'j' ? Math.min(idx + 1, cards.length - 1) : Math.max(idx - 1, 0);
+      scrollToCard(cards[next]);
+      return;
+    }
+
+    if (key === 'Escape' && helpModal) { helpModal.remove(); helpModal = null; }
+  });
+})();
+</script>
 </body>
 </html>

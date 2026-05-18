@@ -1600,6 +1600,8 @@ def discussion(request, post_id):
         ).count()
         velocity_delta = recent_comments - prev_comments
 
+        total_comments = Comment.objects.filter(post=post).count()
+        engagement_rate = round((like_count + total_comments) / max(views_count, 1) * 100, 1)
         analytics = {
             'total_views': views_count,
             'unique_viewers': unique_viewers,
@@ -1612,6 +1614,8 @@ def discussion(request, post_id):
             'recent_comments': recent_comments,
             'velocity_delta': velocity_delta,
             'max_daily_views': max((d['count'] for d in daily_views), default=1),
+            'engagement_rate': engagement_rate,
+            'total_comments': total_comments,
         }
     else:
         analytics = None
@@ -11678,3 +11682,73 @@ def stock_leaderboard(request):
         'leaderboard': leaderboard,
         'total_resolved': total_resolved,
     })
+
+
+# ─── GDPR Data Export ─────────────────────────────────────────────────────────
+
+@login_required
+def export_user_data(request):
+    """Return a JSON file containing all of the user's data."""
+    import json as _json
+    from django.http import HttpResponse as _HR
+
+    u = request.user
+    posts = list(
+        Post.objects.filter(user=u).values('id', 'title', 'content', 'category', 'created_at', 'is_draft')
+    )
+    for p in posts:
+        p['created_at'] = str(p['created_at'])
+
+    comments = list(
+        Comment.objects.filter(user=u).values('id', 'content', 'vote_type', 'created_at', 'post__title')
+    )
+    for c in comments:
+        c['created_at'] = str(c['created_at'])
+
+    votes = list(
+        PostAction.objects.filter(user=u).values('action', 'post__title', 'created_at')
+    )
+    for v in votes:
+        v['created_at'] = str(v['created_at'])
+
+    poll_votes = list(
+        PollVote.objects.filter(user=u).values('poll__title', 'option__text', 'created_at')
+    )
+    for pv in poll_votes:
+        pv['created_at'] = str(pv['created_at'])
+
+    debates = list(
+        DebateParticipant.objects.filter(user=u).values(
+            'debate__id', 'side', 'is_active', 'joined_at', 'debate__status'
+        )
+    )
+    for d in debates:
+        d['joined_at'] = str(d['joined_at'])
+
+    achievements = list(
+        Achievement.objects.filter(user=u).values('code', 'awarded_at')
+    )
+    for a in achievements:
+        a['awarded_at'] = str(a['awarded_at'])
+
+    data = {
+        'exported_at': str(timezone.now()),
+        'user': {
+            'username': u.username,
+            'email': u.email,
+            'date_joined': str(u.date_joined),
+            'first_name': u.first_name,
+            'last_name': u.last_name,
+        },
+        'posts': posts,
+        'comments': comments,
+        'reactions': votes,
+        'poll_votes': poll_votes,
+        'debate_participations': debates,
+        'achievements': achievements,
+    }
+
+    payload = _json.dumps(data, indent=2, ensure_ascii=False)
+    response = _HR(payload, content_type='application/json')
+    response['Content-Disposition'] = f'attachment; filename="pickside-data-{u.username}.json"'
+    return response

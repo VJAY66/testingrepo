@@ -134,6 +134,7 @@ urlpatterns = [
     # Profile bio/website update
     path('profile/update-bio/', views.update_profile_bio, name='update_profile_bio'),
     path('profile/theme/', views.save_theme_preference, name='save_theme_preference'),
+    path('profile/export-data/', views.export_user_data, name='export_user_data'),
     # Notification preferences
     path('profile/notification-prefs/', views.update_notification_prefs, name='update_notification_prefs'),
     path('profile/quiet-hours/', views.update_quiet_hours, name='update_quiet_hours'),
