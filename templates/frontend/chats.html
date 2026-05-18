@@ -3,7 +3,7 @@
 {% block title %}Chats - Discussion Hub{% endblock %}
 
 {% block page_layout %}
-<main id="ch-main" style="position:fixed;top:var(--nav-height,64px);left:0;right:0;bottom:0;padding:0;margin:0;overflow:hidden;z-index:10;display:grid;grid-template-columns:336px 1fr;grid-template-rows:1fr;">
+<main id="ch-main" style="position:fixed;top:64px;left:0;right:0;bottom:0;padding:0;margin:0;overflow:hidden;z-index:10;">
 <style>
 @keyframes chGradientDrift {
     0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.72; }
@@ -16,14 +16,18 @@
 }
 
 .ch-list-col {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 336px;
     border-right: 1px solid hsl(var(--border) / 0.9);
     background: linear-gradient(180deg, hsl(var(--card) / 0.92), hsl(var(--card) / 0.72));
     backdrop-filter: blur(3px);
     display: flex;
     flex-direction: column;
-    min-height: 0;
-    min-width: 0;
     overflow: hidden;
+    z-index: 1;
 }
 .ch-list-head {
     padding: 1rem 0.95rem 0.88rem;
@@ -203,10 +207,11 @@
 }
 .ch-preview { margin-top: 0.08rem; }
 .ch-conv-col {
-    position: relative;
-    min-height: 0;
-    min-width: 0;
-    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 336px;
+    right: 0;
+    bottom: 0;
     overflow: hidden;
     background:
         radial-gradient(640px 270px at 12% -4%, hsl(var(--primary) / 0.12), transparent 65%),
@@ -325,14 +330,10 @@
     color: hsl(var(--muted-foreground));
 }
 @media (max-width: 900px) {
-    #ch-main {
-        display: block !important;
-        overflow-y: auto;
-    }
     .ch-list-col {
-        height: auto;
-        border-right: none;
-        border-bottom: 1px solid hsl(var(--border) / 0.9);
+        position: relative;
+        width: 100%;
+        bottom: auto;
     }
     .ch-conv-col { display: none; }
     .ch-empty-wrap { padding: 0.85rem; }
@@ -401,7 +402,7 @@ body.ch-fullscreen {
     </div>
 </section>
 {% else %}
-<div style="grid-column:1/-1;overflow-y:auto;" class="ch-empty-wrap">
+<div style="position:absolute;inset:0;overflow-y:auto;" class="ch-empty-wrap">
     <div class="ch-empty">
         <span class="ch-empty-icon" aria-hidden="true">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 10h10M7 14h6"/></svg>
@@ -504,10 +505,14 @@ document.addEventListener('DOMContentLoaded', function() {
     var nav = document.querySelector('.nav-shell');
     var main = document.getElementById('ch-main');
     if (nav && main) {
-        var h = nav.getBoundingClientRect().height + 'px';
-        document.documentElement.style.setProperty('--nav-height', h);
-        main.style.top = h;
+        main.style.top = nav.getBoundingClientRect().height + 'px';
     }
+    // Force layout recalculation after all resources (including async Tailwind CDN) load
+    window.addEventListener('load', function() {
+        if (nav && main) {
+            main.style.top = nav.getBoundingClientRect().height + 'px';
+        }
+    });
 
     bindChatSearch('ch-desktop-search', '#ch-desktop-list');
     if (activeChatId) {
