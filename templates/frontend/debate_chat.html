@@ -359,6 +359,29 @@
     }
     .mc-msg.own   { align-self: flex-end;   align-items: flex-end; }
     .mc-msg.other { align-self: flex-start; align-items: flex-start; }
+
+    /* System messages — compact centered pill */
+    .mc-msg.system {
+      align-self: center; width: auto; max-width: 90%; padding: 2px 0;
+    }
+    .mc-msg.system .mc-msg-hover-bar,
+    .mc-msg.system .mc-msg-avatar,
+    .mc-msg.system .mc-msg-avatar-fallback,
+    .mc-msg.system .mc-meta,
+    .mc-msg.system .mc-reactions-summary,
+    .mc-msg.system .mc-read-receipt { display: none !important; }
+    .mc-msg.system .mc-row { justify-content: center; }
+    .mc-msg.system .mc-msg-main { max-width: 100%; }
+    .mc-msg.system .mc-bubble {
+      background: hsl(var(--muted) / 0.45);
+      border: 1px solid hsl(var(--border) / 0.55);
+      border-radius: 999px;
+      padding: 3px 14px;
+      font-size: 11px; line-height: 1.5;
+      color: hsl(var(--muted-foreground));
+      text-align: center;
+      box-shadow: none;
+    }
     .mc-row { display: flex; align-items: flex-start; gap: 8px; width: 100%; }
     .mc-msg.own .mc-row { flex-direction: row-reverse; }
     .mc-msg-avatar {
@@ -964,7 +987,7 @@ min-width: 0;
       {% ifchanged message.created_date_label %}
       <div class="mc-date-divider"><span>{{ message.created_date_label }}</span></div>
       {% endifchanged %}
-      <div class="mc-msg {% if message.is_own %}own{% else %}other{% endif %} {% if not message.is_own %}{{ message.sender|lower|slugify }}{% endif %}" id="mc-m-{{ message.id }}">
+      <div class="mc-msg {% if message.is_own %}own{% else %}other{% endif %}{% if message.is_system %} system{% endif %} {% if not message.is_own %}{{ message.sender|lower|slugify }}{% endif %}" id="mc-m-{{ message.id }}">
         {# Floating hover toolbar #}
         <div class="mc-msg-hover-bar">
           {% if not message.is_own and not message.is_system %}<button type="button" class="mc-hbar-btn" onclick="window.mcReactMessageFromMenu({{ message.id }}, 'like', event)" title="Like">👍</button>{% endif %}
@@ -1823,6 +1846,7 @@ min-width: 0;
 
     const div = document.createElement('div');
     div.className = 'mc-msg ' + (m.is_own ? 'own' : 'other');
+    if (m.is_system) div.classList.add('system');
     if (!m.is_own) {
       div.classList.add(senderVariant(m.sender));
     }
