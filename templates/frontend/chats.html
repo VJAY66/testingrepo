@@ -3,33 +3,34 @@
 {% block title %}Chats - Discussion Hub{% endblock %}
 
 {% block page_layout %}
-<main id="ch-main" style="position:fixed;top:64px;left:0;right:0;bottom:0;padding:0;margin:0;overflow:hidden;z-index:10;">
+<main id="ch-main" style="position:fixed;top:64px;left:0;right:0;bottom:0;padding:0;margin:0;overflow:hidden;z-index:10;display:flex;">
 <style>
-@keyframes chGradientDrift {
-    0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.72; }
-    50% { transform: translate3d(-2%, 1.5%, 0) scale(1.035); opacity: 0.95; }
-    100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.72; }
-}
 @keyframes chRowIn {
     from { opacity: 0; transform: translateY(10px) scale(0.995); }
     to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .ch-list-col {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
+    position: relative;
+    z-index: 1;
     width: 336px;
+    flex-shrink: 0;
     border-right: 1px solid hsl(var(--border) / 0.9);
-    background: linear-gradient(180deg, hsl(var(--card) / 0.92), hsl(var(--card) / 0.72));
-    backdrop-filter: blur(3px);
     display: flex;
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
-    position: relative;
-    z-index: 1;
+}
+/* backdrop-filter moved off the outer flex item to avoid unintended compositing overlap */
+.ch-list-col::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, hsl(var(--card) / 0.92), hsl(var(--card) / 0.72));
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: -1;
+    pointer-events: none;
 }
 .ch-list-head {
     padding: 1rem 0.95rem 0.88rem;
@@ -209,11 +210,10 @@
 }
 .ch-preview { margin-top: 0.08rem; }
 .ch-conv-col {
-    position: absolute;
-    top: 0;
-    left: 336px;
-    right: 0;
-    bottom: 0;
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     background:
         radial-gradient(640px 270px at 12% -4%, hsl(var(--primary) / 0.12), transparent 65%),
@@ -332,11 +332,7 @@
     color: hsl(var(--muted-foreground));
 }
 @media (max-width: 900px) {
-    .ch-list-col {
-        position: relative;
-        width: 100%;
-        bottom: auto;
-    }
+    .ch-list-col { width: 100%; }
     .ch-conv-col { display: none; }
     .ch-empty-wrap { padding: 0.85rem; }
 }
