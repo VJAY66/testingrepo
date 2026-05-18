@@ -3,6 +3,7 @@
 {% block title %}Chats - Discussion Hub{% endblock %}
 
 {% block page_layout %}
+<script>document.documentElement.style.overflow='hidden';</script>
 <style>
 @keyframes chRowIn {
     from { opacity: 0; transform: translateY(10px) scale(0.995); }
@@ -507,8 +508,9 @@ function markActiveChatRead() {
         .catch(function() {});
 }
 
-// Apply immediately (before first paint) so there's no layout flash
+// Applied via early inline script; also set class for CSS targeting
 document.body.classList.add('ch-fullscreen');
+window.addEventListener('pagehide', function() { document.documentElement.style.overflow = ''; });
 
 document.addEventListener('DOMContentLoaded', function() {
     var nav = document.querySelector('.nav-shell');

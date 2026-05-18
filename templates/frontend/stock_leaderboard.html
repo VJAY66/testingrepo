@@ -48,39 +48,34 @@
 .gold-glow { animation: goldenPulse 2.2s ease-in-out infinite; }
 </style>
 
-<div class="max-w-4xl mx-auto py-6 px-4">
+<div class="max-w-4xl mx-auto py-3 px-4">
 
     <!-- ── Header ──────────────────────────────────────── -->
-    <div class="text-center mb-8">
-        <div class="inline-flex h-18 w-18 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 text-4xl shadow-xl shadow-amber-400/35 mb-4 gold-glow" style="width:4.5rem;height:4.5rem;">🏆</div>
-        <h1 class="text-3xl font-black text-foreground" style="font-family:'Playfair Display',serif; letter-spacing:-0.02em;">Prediction Leaderboard</h1>
-        <p class="text-sm text-muted-foreground mt-2 max-w-md mx-auto">Ranked by confidence-weighted accuracy across all resolved predictions</p>
-        {% if total_resolved %}
-        <div class="inline-flex items-center gap-2 mt-3 rounded-full bg-muted px-4 py-1.5 text-xs font-bold text-muted-foreground border border-border">
-            📊 {{ total_resolved }} resolved prediction{{ total_resolved|pluralize }} tracked
+    <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
+        <div class="flex items-center gap-3">
+            <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 text-xl shadow-lg shadow-amber-400/35 gold-glow flex-shrink-0">🏆</div>
+            <div>
+                <h1 class="text-lg font-black text-foreground" style="font-family:'Playfair Display',serif;">Prediction Leaderboard</h1>
+                <p class="text-xs text-muted-foreground">Ranked by confidence-weighted accuracy{% if total_resolved %} · <span class="font-semibold">{{ total_resolved }} resolved</span>{% endif %}</p>
+            </div>
         </div>
-        {% endif %}
-    </div>
-
-    <!-- ── Nav row ──────────────────────────────────────── -->
-    <div class="flex items-center justify-between mb-7 flex-wrap gap-3">
-        <a href="{% url 'stocks_list' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-primary transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-            All Predictions
-        </a>
-        {% if user.is_authenticated %}
-        <a href="{% url 'create_stock_prediction' %}"
-           class="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-sm shadow-primary/25">
-            + New Prediction
-        </a>
-        {% endif %}
+        <div class="flex items-center gap-2">
+            <a href="{% url 'stocks_list' %}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-primary transition-colors border border-border rounded-full px-3 py-1.5 bg-card">
+                ← All Predictions
+            </a>
+            {% if user.is_authenticated %}
+            <a href="{% url 'create_stock_prediction' %}" class="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-sm shadow-primary/25">
+                + New Prediction
+            </a>
+            {% endif %}
+        </div>
     </div>
 
     {% if leaderboard %}
 
     <!-- ── Podium (top 3) ──────────────────────────────── -->
     {% if leaderboard|length >= 3 %}
-    <div class="flex items-end justify-center gap-3 mb-8 px-4">
+    <div class="flex items-end justify-center gap-3 mb-5 px-4">
 
         <!-- 2nd place -->
         <div class="flex flex-col items-center flex-1 max-w-[140px]">

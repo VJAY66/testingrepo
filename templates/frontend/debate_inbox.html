@@ -1,109 +1,221 @@
 {% extends 'frontend/base.html' %}
 {% block title %}Debate Inbox — Discussion Hub{% endblock %}
 {% block content %}
-<div class="max-w-2xl mx-auto px-4 py-6 sm:py-10">
-  <div class="flex items-center gap-3 mb-6">
-    <span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-2xl dark:bg-amber-900/40">⚔️</span>
-    <div>
-      <h1 class="text-xl font-bold text-foreground">Debate Inbox</h1>
-      <p class="text-sm text-muted-foreground">All your debates in one place{% if pending_count %} · <span class="text-amber-500 font-semibold">{{ pending_count }} pending</span>{% endif %}</p>
+<style>
+/* ── Premium card ── */
+.di-card {
+    border-radius: 16px;
+    border: 1px solid hsl(var(--border)/0.7);
+    background: hsl(var(--card));
+    padding: 0;
+    overflow: hidden;
+    transition: border-color 180ms, box-shadow 180ms, transform 130ms;
+    position: relative;
+}
+.di-card:hover {
+    border-color: hsl(var(--primary)/0.35);
+    box-shadow: 0 8px 28px -10px hsl(var(--primary)/0.15);
+    transform: translateY(-1px);
+}
+/* Left accent bar based on status */
+.di-card::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+}
+.di-card.status-pending::before   { background: hsl(38 90% 54%); }
+.di-card.status-accepted::before  { background: hsl(142 65% 44%); }
+.di-card.status-completed::before { background: hsl(var(--muted-foreground)/0.4); }
+.di-card.status-countered::before { background: hsl(270 70% 58%); }
+.di-card.status-rejected::before  { background: hsl(346 68% 50%); }
+
+.di-body { padding: 14px 16px 14px 18px; }
+
+/* ── Status badge ── */
+.di-status {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 800; letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+.ds-pending   { background: hsl(38 90% 54%/0.12); color: hsl(35 80% 34%); border: 1px solid hsl(38 90% 54%/0.3); }
+.ds-accepted  { background: hsl(142 65% 44%/0.12); color: hsl(142 52% 30%); border: 1px solid hsl(142 65% 44%/0.3); }
+.ds-completed { background: hsl(var(--muted)/0.8); color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border)); }
+.ds-countered { background: hsl(270 70% 58%/0.12); color: hsl(270 60% 42%); border: 1px solid hsl(270 70% 58%/0.28); }
+.ds-rejected  { background: hsl(346 68% 50%/0.1); color: hsl(346 60% 36%); border: 1px solid hsl(346 68% 50%/0.25); }
+html.dark .ds-pending   { color: hsl(38 90% 68%); }
+html.dark .ds-accepted  { color: hsl(142 60% 58%); }
+html.dark .ds-countered { color: hsl(270 70% 72%); }
+html.dark .ds-rejected  { color: hsl(346 70% 62%); }
+
+/* ── Side chip ── */
+.side-yes { color: hsl(142 60% 36%); font-weight: 700; }
+.side-no  { color: hsl(346 65% 44%); font-weight: 700; }
+html.dark .side-yes { color: hsl(142 60% 58%); }
+html.dark .side-no  { color: hsl(346 70% 62%); }
+
+/* ── Action buttons ── */
+.di-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 12px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 700; border: 1px solid transparent;
+    transition: all 0.18s; cursor: pointer; white-space: nowrap; text-decoration: none;
+}
+.di-btn-primary   { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.di-btn-primary:hover { opacity: 0.88; }
+.di-btn-success   { background: hsl(142 65% 44%); color: #fff; }
+.di-btn-success:hover { background: hsl(142 65% 38%); }
+.di-btn-warning   { background: hsl(38 90% 52%); color: #fff; }
+.di-btn-warning:hover { background: hsl(38 90% 45%); }
+.di-btn-violet    { background: hsl(270 70% 56%); color: #fff; }
+.di-btn-violet:hover { background: hsl(270 70% 48%); }
+.di-btn-ghost     { background: transparent; color: hsl(var(--muted-foreground)); border-color: hsl(var(--border)); }
+.di-btn-ghost:hover { background: hsl(var(--muted)/0.55); color: hsl(var(--foreground)); }
+.di-btn-danger    { background: transparent; color: hsl(346 65% 44%); border-color: hsl(346 65% 44%/0.4); }
+.di-btn-danger:hover { background: hsl(346 65% 44%/0.08); }
+
+/* ── Counter banner ── */
+.di-counter-banner {
+    margin: 0 16px 12px 18px;
+    border-radius: 10px;
+    border: 1px solid hsl(270 70% 58%/0.3);
+    background: hsl(270 70% 58%/0.07);
+    padding: 10px 12px;
+}
+
+/* ── Counter form ── */
+.di-counter-form {
+    margin: 0 16px 14px 18px;
+    border-radius: 10px;
+    border: 1px solid hsl(270 70% 58%/0.3);
+    background: hsl(270 70% 58%/0.06);
+    padding: 12px;
+}
+
+/* ── Pulse dot ── */
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+.pulse { animation: pulse 1.6s ease-in-out infinite; }
+</style>
+
+<div class="max-w-2xl mx-auto px-4 py-4">
+
+  <!-- ── Header ── -->
+  <div class="flex items-center justify-between mb-4 gap-3">
+    <div class="flex items-center gap-3">
+        <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-xl shadow-lg shadow-amber-400/30">⚔️</div>
+        <div>
+            <h1 class="text-base font-black text-foreground">Debate Inbox</h1>
+            <p class="text-xs text-muted-foreground">All your debates in one place{% if pending_count %} · <span class="text-amber-500 font-bold">{{ pending_count }} pending</span>{% endif %}</p>
+        </div>
     </div>
+    {% if pending_count %}
+    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-400 text-xs font-bold">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 pulse inline-block"></span>
+        {{ pending_count }} pending
+    </span>
+    {% endif %}
   </div>
 
   {% if not debates %}
   <div class="rounded-2xl border border-dashed border-border bg-card/70 p-12 text-center">
-    <p class="text-2xl mb-2">⚔️</p>
-    <p class="font-semibold text-foreground mb-1">No debates yet</p>
+    <div class="text-4xl mb-3">⚔️</div>
+    <p class="font-bold text-foreground mb-1">No debates yet</p>
     <p class="text-sm text-muted-foreground">Challenge someone on a discussion to get started.</p>
   </div>
+
   {% else %}
-  <div class="space-y-3">
+  <div class="space-y-2.5">
     {% for item in debates %}
     {% with d=item.debate %}
-    <div class="rounded-2xl border border-border/70 bg-card p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow" id="debate-card-{{ d.id }}">
-      <div class="flex items-start justify-between gap-3 mb-2">
-        {% with durl=d.get_discussion_url %}{% if durl %}<a href="{{ durl }}" class="text-sm font-bold text-foreground hover:text-primary transition-colors line-clamp-2 flex-1">{{ d.post.title }}</a>{% else %}<span class="text-sm font-bold text-muted-foreground line-clamp-2 flex-1">(deleted post)</span>{% endif %}{% endwith %}
-        <span class="shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full
-          {% if d.status == 'pending' %}bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400
-          {% elif d.status == 'countered' %}bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400
-          {% elif d.status == 'accepted' %}bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400
-          {% elif d.status == 'completed' %}bg-secondary text-muted-foreground
-          {% else %}bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400{% endif %}">
-          {% if d.status == 'countered' %}↩ Counter Proposed{% else %}{{ d.status|title }}{% endif %}
-        </span>
-      </div>
-      <div class="flex items-center gap-2 text-xs text-muted-foreground mb-3 flex-wrap">
-        <span>vs <a href="{% url 'user_profile' item.opponent.username %}" class="font-semibold text-foreground hover:text-primary">@{{ item.opponent.username }}</a></span>
-        <span>·</span>
-        <span>Your side: <strong class="{% if item.side == 'yes' %}text-emerald-600{% else %}text-rose-600{% endif %}">{{ item.side|upper }}</strong></span>
-        <span>·</span>
-        <span>{{ d.created_at|date:"M j, Y" }}</span>
-        {% if d.status == 'pending' and item.expires_at %}
-        <span>·</span>
-        <span class="debate-expiry-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-400 font-semibold"
-              data-expires="{{ item.expires_at|date:'c' }}">
-          ⏳ <span class="expiry-text">calculating…</span>
-        </span>
-        {% endif %}
+    <div class="di-card status-{{ d.status }}" id="debate-card-{{ d.id }}">
+      <div class="di-body">
+        <!-- Title + status row -->
+        <div class="flex items-start justify-between gap-3 mb-2">
+            {% with durl=d.get_discussion_url %}
+            {% if durl %}
+            <a href="{{ durl }}" class="text-sm font-bold text-foreground hover:text-primary transition-colors line-clamp-2 flex-1 leading-snug">{{ d.post.title }}</a>
+            {% else %}
+            <span class="text-sm font-bold text-muted-foreground line-clamp-2 flex-1 leading-snug italic">(deleted post)</span>
+            {% endif %}
+            {% endwith %}
+            <span class="di-status ds-{{ d.status }} flex-shrink-0">
+                {% if d.status == 'pending' %}<span class="w-1.5 h-1.5 rounded-full bg-amber-500 pulse inline-block"></span>{% endif %}
+                {% if d.status == 'countered' %}↩ Counter{% else %}{{ d.status|title }}{% endif %}
+            </span>
+        </div>
+
+        <!-- Meta row -->
+        <div class="flex items-center gap-2 text-xs text-muted-foreground mb-3 flex-wrap">
+            <span>vs <a href="{% url 'user_profile' item.opponent.username %}" class="font-semibold text-foreground hover:text-primary transition-colors">@{{ item.opponent.username }}</a></span>
+            <span class="text-border">·</span>
+            <span>Your side: <strong class="side-{{ item.side }}">{{ item.side|upper }}</strong></span>
+            <span class="text-border">·</span>
+            <span>{{ d.created_at|date:"M j, Y" }}</span>
+            {% if d.status == 'pending' and item.expires_at %}
+            <span class="debate-expiry-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-400 font-semibold text-[10px]"
+                  data-expires="{{ item.expires_at|date:'c' }}">
+              ⏳ <span class="expiry-text">calculating…</span>
+            </span>
+            {% endif %}
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex flex-wrap gap-1.5">
+            {% if d.status == 'accepted' %}
+            <a href="{% url 'debate_chat' d.id %}" class="di-btn di-btn-primary">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                Open Chat
+            </a>
+
+            {% elif d.status == 'pending' and d.target == request.user %}
+            <a href="{% url 'accept_debate' d.id %}" class="di-btn di-btn-success">✓ Accept</a>
+            <button onclick="showCounterForm('{{ d.id }}')" class="di-btn di-btn-violet">↩ Counter</button>
+            <form method="post" action="{% url 'reject_debate' d.id %}" class="inline">{% csrf_token %}
+                <button type="submit" class="di-btn di-btn-danger">✗ Reject</button>
+            </form>
+
+            {% elif d.status == 'pending' and item.is_initiator %}
+            <button onclick="cancelDebate('{{ d.id }}')" class="di-btn di-btn-ghost">✕ Cancel Challenge</button>
+
+            {% elif d.status == 'countered' and d.initiator == request.user %}
+            <button onclick="acceptCounter('{{ d.id }}')" class="di-btn di-btn-success">✓ Accept Counter</button>
+            <form method="post" action="{% url 'reject_debate' d.id %}" class="inline">{% csrf_token %}
+                <button type="submit" class="di-btn di-btn-danger">✗ Reject</button>
+            </form>
+
+            {% elif d.status == 'completed' %}
+            <a href="{% url 'debate_recap' d.id %}" class="di-btn di-btn-warning">🏆 Recap</a>
+            <a href="{% url 'debate_transcript' d.id %}" class="di-btn di-btn-ghost">Transcript</a>
+            <button onclick="requestRematch('{{ d.id }}', this)" class="di-btn" style="border:1px solid hsl(38 80% 54%/0.5);color:hsl(38 70% 38%);">
+                ⚔️ Rematch
+            </button>
+            {% endif %}
+
+            {% with durl=d.get_discussion_url %}{% if durl %}<a href="{{ durl }}" class="di-btn di-btn-ghost">View Post</a>{% endif %}{% endwith %}
+        </div>
       </div>
 
-      <!-- Counter-proposal details banner -->
+      <!-- Counter-proposal banner -->
       {% if d.status == 'countered' %}
-      <div class="mb-3 rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/30 px-4 py-3">
-        <p class="text-xs font-semibold text-violet-700 dark:text-violet-400 mb-1">↩ Counter-proposal from @{{ item.opponent.username }}</p>
+      <div class="di-counter-banner">
+        <p class="text-[11px] font-bold text-violet-700 dark:text-violet-400 mb-1">↩ Counter-proposal from @{{ item.opponent.username }}</p>
         <p class="text-sm text-foreground font-medium">{{ d.counter_topic }}</p>
         {% if d.counter_side %}
-        <p class="text-xs text-muted-foreground mt-1">Requested side: <strong class="{% if d.counter_side == 'yes' %}text-emerald-600{% else %}text-rose-600{% endif %}">{{ d.counter_side|upper }}</strong></p>
+        <p class="text-xs text-muted-foreground mt-0.5">Requested side: <strong class="side-{{ d.counter_side }}">{{ d.counter_side|upper }}</strong></p>
         {% endif %}
       </div>
       {% endif %}
 
-      <div class="flex flex-wrap gap-2">
-        {% if d.status == 'accepted' %}
-          <a href="{% url 'debate_chat' d.id %}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-            Open Chat
-          </a>
-
-        {% elif d.status == 'pending' and d.target == request.user %}
-          <a href="{% url 'accept_debate' d.id %}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition">Accept</a>
-          <button onclick="showCounterForm('{{ d.id }}')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-violet-500 text-white text-xs font-semibold hover:bg-violet-600 transition">↩ Counter</button>
-          <form method="post" action="{% url 'reject_debate' d.id %}" class="inline">{% csrf_token %}
-            <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:text-destructive hover:border-destructive transition">Reject</button>
-          </form>
-
-        {% elif d.status == 'pending' and item.is_initiator %}
-          <button onclick="cancelDebate('{{ d.id }}')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:text-destructive hover:border-destructive transition">✕ Cancel Challenge</button>
-
-        {% elif d.status == 'countered' and d.initiator == request.user %}
-          <button onclick="acceptCounter('{{ d.id }}')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition">Accept Counter</button>
-          <form method="post" action="{% url 'reject_debate' d.id %}" class="inline">{% csrf_token %}
-            <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:text-destructive hover:border-destructive transition">Reject</button>
-          </form>
-
-        {% elif d.status == 'completed' %}
-          <a href="{% url 'debate_recap' d.id %}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 transition">🏆 Recap</a>
-          <a href="{% url 'debate_transcript' d.id %}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-foreground hover:bg-muted/60 transition">Transcript</a>
-          <button onclick="requestRematch('{{ d.id }}', this)"
-              class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-amber-300 text-amber-600 dark:border-amber-700 dark:text-amber-400 text-xs font-semibold hover:bg-amber-50 dark:hover:bg-amber-950/30 transition">
-              ⚔️ Rematch
-          </button>
-        {% endif %}
-
-        {% with durl=d.get_discussion_url %}{% if durl %}<a href="{{ durl }}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:bg-muted/60 transition">View Post</a>{% endif %}{% endwith %}
-      </div>
-
-      <!-- Counter-proposal inline form (hidden by default) -->
+      <!-- Counter form (hidden) -->
       {% if d.status == 'pending' and d.target == request.user %}
-      <div id="counter-form-{{ d.id }}" class="hidden mt-3 rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/20 p-4 space-y-3">
-        <p class="text-xs font-semibold text-violet-700 dark:text-violet-400">Propose a counter-topic</p>
+      <div id="counter-form-{{ d.id }}" class="hidden di-counter-form space-y-2.5">
+        <p class="text-xs font-bold text-violet-700 dark:text-violet-400">Propose a counter-topic</p>
         <input type="text" id="counter-topic-{{ d.id }}" maxlength="200" placeholder="Alternative debate topic…"
           class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-400">
-        <div class="flex items-center gap-3">
-          <label class="flex items-center gap-1.5 text-xs font-medium text-foreground cursor-pointer">
+        <div class="flex items-center gap-4">
+          <label class="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
             <input type="radio" name="counter-side-{{ d.id }}" value="yes" class="accent-emerald-500"> I'll argue <strong class="text-emerald-600">YES</strong>
           </label>
-          <label class="flex items-center gap-1.5 text-xs font-medium text-foreground cursor-pointer">
+          <label class="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
             <input type="radio" name="counter-side-{{ d.id }}" value="no" class="accent-rose-500"> I'll argue <strong class="text-rose-600">NO</strong>
           </label>
           <label class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground cursor-pointer">
@@ -111,8 +223,8 @@
           </label>
         </div>
         <div class="flex gap-2">
-          <button onclick="submitCounter('{{ d.id }}')" class="px-4 py-1.5 rounded-full bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 transition">Send Counter</button>
-          <button onclick="hideCounterForm('{{ d.id }}')" class="px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:bg-muted/60 transition">Cancel</button>
+          <button onclick="submitCounter('{{ d.id }}')" class="di-btn di-btn-violet">Send Counter</button>
+          <button onclick="hideCounterForm('{{ d.id }}')" class="di-btn di-btn-ghost">Cancel</button>
         </div>
         <p id="counter-error-{{ d.id }}" class="text-xs text-destructive hidden"></p>
       </div>
@@ -125,12 +237,8 @@
 </div>
 
 <script>
-function showCounterForm(id) {
-  document.getElementById('counter-form-' + id).classList.remove('hidden');
-}
-function hideCounterForm(id) {
-  document.getElementById('counter-form-' + id).classList.add('hidden');
-}
+function showCounterForm(id) { document.getElementById('counter-form-' + id).classList.remove('hidden'); }
+function hideCounterForm(id) { document.getElementById('counter-form-' + id).classList.add('hidden'); }
 
 function submitCounter(id) {
   var topic = document.getElementById('counter-topic-' + id).value.trim();
@@ -138,81 +246,60 @@ function submitCounter(id) {
   var side = sideEl ? sideEl.value : '';
   var errEl = document.getElementById('counter-error-' + id);
   errEl.classList.add('hidden');
-
   if (!topic) { errEl.textContent = 'Please enter a counter-topic.'; errEl.classList.remove('hidden'); return; }
-
   fetch('/counter-debate/' + id + '/', {
     method: 'POST',
     headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
     body: 'counter_topic=' + encodeURIComponent(topic) + '&counter_side=' + encodeURIComponent(side),
   }).then(r => r.json()).then(d => {
-    if (d.success) {
-      location.reload();
-    } else {
-      errEl.textContent = d.error || 'Could not send counter.';
-      errEl.classList.remove('hidden');
-    }
+    if (d.success) { location.reload(); }
+    else { errEl.textContent = d.error || 'Could not send counter.'; errEl.classList.remove('hidden'); }
   });
 }
 
 function acceptCounter(id) {
-  fetch('/accept-counter-debate/' + id + '/', {
-    method: 'POST',
-    headers: {'X-CSRFToken': getCookie('csrftoken')},
-  }).then(r => r.json()).then(d => {
-    if (d.success && d.redirect_url) {
-      window.location.href = d.redirect_url;
-    } else {
-      alert(d.error || 'Could not accept counter.');
-    }
-  });
+  fetch('/accept-counter-debate/' + id + '/', { method: 'POST', headers: {'X-CSRFToken': getCookie('csrftoken')} })
+    .then(r => r.json()).then(d => {
+      if (d.success && d.redirect_url) { window.location.href = d.redirect_url; }
+      else { alert(d.error || 'Could not accept counter.'); }
+    });
 }
 
 function requestRematch(debateId, btn) {
   btn.disabled = true; btn.textContent = 'Requesting…';
   fetch('/debates/' + debateId + '/rematch/', {
-    method: 'POST',
-    headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'}
+    method: 'POST', headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'}
   }).then(r => r.json()).then(d => {
     if (d.success) { btn.textContent = '✓ Requested'; }
     else { btn.textContent = '⚔️ Rematch'; btn.disabled = false; alert(d.error || 'Could not request rematch.'); }
   });
 }
+
 function cancelDebate(id) {
-  if (!confirm('Cancel this debate challenge? This cannot be undone.')) return;
-  fetch('/cancel-debate/' + id + '/', {
-    method: 'POST',
-    headers: {'X-CSRFToken': getCookie('csrftoken')},
-  }).then(r => r.json()).then(d => {
-    if (d.success) {
-      var card = document.getElementById('debate-card-' + id);
-      if (card) card.remove();
-    } else {
-      alert(d.error || 'Could not cancel.');
-    }
-  });
+  if (!confirm('Cancel this debate challenge?')) return;
+  fetch('/cancel-debate/' + id + '/', { method: 'POST', headers: {'X-CSRFToken': getCookie('csrftoken')} })
+    .then(r => r.json()).then(d => {
+      if (d.success) { var c = document.getElementById('debate-card-' + id); if (c) c.remove(); }
+      else { alert(d.error || 'Could not cancel.'); }
+    });
 }
 
 function getCookie(n) { var v = document.cookie.match('(^|;) ?'+n+'=([^;]*)(;|$)'); return v ? v[2] : null; }
 
-// Expiry countdown for pending debates
 (function() {
   function fmtRemaining(ms) {
     if (ms <= 0) return 'Expired';
-    var h = Math.floor(ms / 3600000);
-    var m = Math.floor((ms % 3600000) / 60000);
+    var h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
     if (h > 0) return 'Expires in ' + h + 'h ' + m + 'm';
     if (m > 0) return 'Expires in ' + m + 'm';
     return 'Expires soon';
   }
   function updateCountdowns() {
     document.querySelectorAll('.debate-expiry-pill[data-expires]').forEach(function(el) {
-      var exp = new Date(el.dataset.expires);
-      var ms = exp - Date.now();
+      var ms = new Date(el.dataset.expires) - Date.now();
       el.querySelector('.expiry-text').textContent = fmtRemaining(ms);
       if (ms <= 0) {
-        el.classList.remove('bg-amber-50','border-amber-200','text-amber-600','dark:bg-amber-900/20','dark:border-amber-700','dark:text-amber-400');
-        el.classList.add('bg-red-50','border-red-200','text-red-600','dark:bg-red-900/20','dark:border-red-700','dark:text-red-400');
+        el.className = el.className.replace(/amber/g, 'red');
       }
     });
   }
