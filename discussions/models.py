@@ -45,7 +45,6 @@ CATEGORY_CHOICES = [
     ('Health', 'Health'),
     ('History', 'History'),
     ('Investment', 'Investment'),
-    ('Medicenes', 'Medicenes'),
     ('Music', 'Music'),
     ('Painting', 'Painting'),
     ('Photography', 'Photography'),

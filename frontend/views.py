@@ -581,7 +581,6 @@ FRONTEND_CATEGORY_STYLES = {
     'Painting': {'icon': '🎨', 'color': 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'},
     'Fashion': {'icon': '👗', 'color': 'bg-pink-500/10 text-pink-400 border-pink-500/20'},
     'Beauty': {'icon': '💄', 'color': 'bg-purple-500/10 text-purple-400 border-purple-500/20'},
-    'Medicenes': {'icon': '💊', 'color': 'bg-lime-500/10 text-lime-400 border-lime-500/20'},
     'Sports': {'icon': '⚽', 'color': 'bg-green-500/10 text-green-400 border-green-500/20'},
     'Science': {'icon': '🔬', 'color': 'bg-purple-500/10 text-purple-400 border-purple-500/20'},
     'History': {'icon': '🏺', 'color': 'bg-stone-500/10 text-stone-400 border-stone-500/20'},
