@@ -3,7 +3,6 @@
 {% block title %}Chats - Discussion Hub{% endblock %}
 
 {% block page_layout %}
-<main id="ch-main" style="position:fixed;top:64px;left:0;right:0;bottom:0;padding:0;margin:0;overflow:hidden;z-index:10;display:flex;">
 <style>
 @keyframes chRowIn {
     from { opacity: 0; transform: translateY(10px) scale(0.995); }
@@ -214,10 +213,8 @@
     z-index: 2;
     flex: 1 1 0%;
     min-width: 0;
-    width: auto;
-    left: 0;
-    margin-left: 0;
-    transform: none;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     background:
         radial-gradient(640px 270px at 12% -4%, hsl(var(--primary) / 0.12), transparent 65%),
@@ -344,7 +341,7 @@ body.ch-fullscreen {
     overflow: hidden;
 }
 </style>
-
+<main id="ch-main" style="position:fixed;top:64px;left:0;right:0;bottom:0;padding:0;margin:0;overflow:hidden;z-index:10;display:flex;">
 {% if chats %}
 <aside class="ch-list-col">
     <div class="ch-list-head">
@@ -524,20 +521,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof ResizeObserver !== 'undefined' && nav && main) {
         new ResizeObserver(applyNavHeight).observe(nav);
     }
-
-    // After ALL resources (iframe, fonts, Tailwind CDN async pass) have settled,
-    // strip any inline geometry that external code may have stamped on .ch-conv-col
-    // so the stylesheet flex values take over cleanly.
-    window.addEventListener('load', function() {
-        requestAnimationFrame(function() {
-            var conv = document.querySelector('.ch-conv-col');
-            if (conv) {
-                ['left', 'right', 'width', 'margin-left', 'transform'].forEach(function(p) {
-                    conv.style.removeProperty(p);
-                });
-            }
-        });
-    });
 
     bindChatSearch('ch-desktop-search', '#ch-desktop-list');
     if (activeChatId) {
