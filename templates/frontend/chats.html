@@ -212,8 +212,12 @@
 .ch-conv-col {
     position: relative;
     z-index: 2;
-    flex: 1;
+    flex: 1 1 0%;
     min-width: 0;
+    width: auto;
+    left: 0;
+    margin-left: 0;
+    transform: none;
     overflow: hidden;
     background:
         radial-gradient(640px 270px at 12% -4%, hsl(var(--primary) / 0.12), transparent 65%),
@@ -502,14 +506,37 @@ document.body.classList.add('ch-fullscreen');
 document.addEventListener('DOMContentLoaded', function() {
     var nav = document.querySelector('.nav-shell');
     var main = document.getElementById('ch-main');
-    if (nav && main) {
-        main.style.top = nav.getBoundingClientRect().height + 'px';
-    }
-    // Force layout recalculation after all resources (including async Tailwind CDN) load
-    window.addEventListener('load', function() {
+
+    function applyNavHeight() {
         if (nav && main) {
-            main.style.top = nav.getBoundingClientRect().height + 'px';
+            // Read nav height, write to main.style.top deferred via rAF to
+            // avoid forcing a synchronous layout (which would trigger Tailwind
+            // CDN's MutationObserver and cause a second reflow with stale flex
+            // geometry on .ch-conv-col).
+            requestAnimationFrame(function() {
+                main.style.top = nav.getBoundingClientRect().height + 'px';
+            });
         }
+    }
+    applyNavHeight();
+
+    // Keep nav height in sync without forcing synchronous layouts.
+    if (typeof ResizeObserver !== 'undefined' && nav && main) {
+        new ResizeObserver(applyNavHeight).observe(nav);
+    }
+
+    // After ALL resources (iframe, fonts, Tailwind CDN async pass) have settled,
+    // strip any inline geometry that external code may have stamped on .ch-conv-col
+    // so the stylesheet flex values take over cleanly.
+    window.addEventListener('load', function() {
+        requestAnimationFrame(function() {
+            var conv = document.querySelector('.ch-conv-col');
+            if (conv) {
+                ['left', 'right', 'width', 'margin-left', 'transform'].forEach(function(p) {
+                    conv.style.removeProperty(p);
+                });
+            }
+        });
     });
 
     bindChatSearch('ch-desktop-search', '#ch-desktop-list');
