@@ -242,7 +242,7 @@ html.dark .chip-down { color: hsl(346 70% 62%); }
                     <!-- Human sentence -->
                     <p class="text-sm leading-snug text-foreground/90 group-hover:text-primary transition-colors">
                         Predicts target of
-                        <strong class="font-black text-foreground">{{ sp.target_price }} {{ sp.currency }}</strong>
+                        <strong class="font-black text-foreground">{{ sp.currency_symbol }}{{ sp.target_price }}</strong>
                         <span class="text-muted-foreground">by</span>
                         <strong class="text-foreground">{{ sp.target_date|date:"M j, Y" }}</strong>
                     </p>
