@@ -2511,9 +2511,10 @@
 
         /* ══════════════════════════════════════════════════════ */
     </style>
-    <!-- Cropper.js for image cropping (loaded dynamically to avoid SyntaxError if CDN unreachable) -->
+    <!-- Cropper.js for image cropping — only loaded on the profile page where it is used -->
     <script>
     (function(){
+      if (!window.location.pathname.startsWith('/profile/')) return;
       var l=document.createElement('link');l.rel='stylesheet';
       l.href='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css';
       document.head.appendChild(l);

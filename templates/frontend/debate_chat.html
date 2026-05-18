@@ -5,7 +5,7 @@
 
 {% block content %}
 {{ active_participants|json_script:"dh-debate-active-participants" }}
-<link rel="stylesheet" href="{% static 'css/chatbox_modern.css' %}" defer>
+<link rel="stylesheet" href="{% static 'css/chatbox_modern.css' %}">
 <script>
 (function() {
     const isEmbedded = window.self !== window.top;
