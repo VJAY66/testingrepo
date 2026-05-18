@@ -281,6 +281,11 @@ SESSION_COOKIE_HTTPONLY = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+# COOP is only meaningful over HTTPS; sending it on HTTP generates a browser
+# warning ("origin was untrustworthy") without any security benefit. Set to
+# None so the header is omitted entirely — the default in Django < 4.0.
+# On production (HTTPS) this can be re-enabled via the env var.
+SECURE_CROSS_ORIGIN_OPENER_POLICY = os.getenv('SECURE_CROSS_ORIGIN_OPENER_POLICY', None)
 
 if not DEBUG:
     SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '31536000'))
