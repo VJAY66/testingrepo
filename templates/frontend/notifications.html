@@ -135,7 +135,7 @@
     .nf-section {
         border: 1px solid hsl(var(--border) / 0.8);
         border-radius: 20px;
-        padding: 0.9rem;
+        padding: 0.55rem;
         background: linear-gradient(180deg, hsl(var(--card) / 0.98), hsl(var(--background) / 0.96));
         box-shadow: 0 6px 20px -14px rgba(15, 23, 42, 0.3);
     }
@@ -144,7 +144,7 @@
         align-items: center;
         justify-content: space-between;
         gap: 0.75rem;
-        margin-bottom: 0.6rem;
+        margin-bottom: 0.4rem;
     }
     .nf-section-title {
         display: flex;
@@ -170,7 +170,7 @@
     }
     .nf-stream {
         display: grid;
-        gap: 0.5rem;
+        gap: 0.3rem;
     }
     .nf-moderation-tabs {
         display: inline-flex;
@@ -261,12 +261,12 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 0.75rem;
-        padding: 0.6rem 0.75rem 0.6rem 0.8rem;
+        gap: 0.5rem;
+        padding: 0.4rem 0.6rem 0.4rem 0.65rem;
     }
     .nf-post-icon {
-        width: 2rem;
-        height: 2rem;
+        width: 1.7rem;
+        height: 1.7rem;
         border-radius: 10px;
         flex-shrink: 0;
         display: inline-flex;
@@ -322,10 +322,10 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 0.35rem;
+        gap: 0.3rem;
         border-radius: 999px;
-        padding: 0.42rem 0.75rem;
-        font-size: 0.76rem;
+        padding: 0.28rem 0.65rem;
+        font-size: 0.72rem;
         font-weight: 700;
         letter-spacing: 0.012em;
         line-height: 1;
@@ -361,7 +361,7 @@
         box-shadow: 0 12px 24px -16px rgba(220, 38, 38, 0.75);
     }
     .nf-debate-card {
-        padding: 0.8rem;
+        padding: 0.45rem 0.6rem;
     }
     .nf-debate-excerpt { display: none; }
     .nf-debate-shell {
@@ -371,16 +371,16 @@
         min-width: 0;
     }
     .nf-avatar {
-        width: 2.2rem;
-        height: 2.2rem;
-        border-radius: 12px;
+        width: 1.8rem;
+        height: 1.8rem;
+        border-radius: 9px;
         flex-shrink: 0;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         background: linear-gradient(135deg, hsl(var(--primary)), hsl(186 72% 42%) 55%, hsl(var(--accent)));
         color: hsl(var(--primary-foreground));
-        font-size: 0.72rem;
+        font-size: 0.65rem;
         font-weight: 800;
         letter-spacing: -0.02em;
     }
@@ -462,22 +462,22 @@
     .nf-chip {
         display: inline-flex;
         align-items: center;
-        gap: 0.38rem;
+        gap: 0.3rem;
         border-radius: 999px;
         border: 1px solid hsl(var(--border));
         background: hsl(var(--background) / 0.68);
-        padding: 0.46rem 0.75rem;
-        font-size: 0.76rem;
+        padding: 0.25rem 0.55rem;
+        font-size: 0.72rem;
         font-weight: 700;
         color: hsl(var(--muted-foreground));
     }
     .nf-status {
         display: inline-flex;
         align-items: center;
-        gap: 0.38rem;
+        gap: 0.3rem;
         border-radius: 999px;
-        padding: 0.5rem 0.88rem;
-        font-size: 0.76rem;
+        padding: 0.28rem 0.65rem;
+        font-size: 0.7rem;
         font-weight: 800;
         letter-spacing: 0.04em;
         text-transform: uppercase;
@@ -865,17 +865,17 @@
             <div class="nf-stream">
                 {% for debate in debates %}
                 <article class="nf-debate-card nf-reveal" data-debate-id="{{ debate.id }}">
-                    <div class="flex items-start gap-3">
+                    <div class="flex items-start gap-2">
                         <div class="nf-avatar flex-shrink-0">{% if debate.initiator == user %}{{ debate.target.username|slice:":2"|upper }}{% else %}{{ debate.initiator.username|slice:":2"|upper }}{% endif %}</div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-start justify-between gap-2">
                                 <div class="min-w-0">
-                                    <p class="text-xs text-muted-foreground leading-snug">
+                                    <p class="text-[11px] text-muted-foreground leading-snug">
                                         {% if debate.initiator == user %}You challenged <strong class="text-foreground">{{ debate.target.username }}</strong>{% else %}<strong class="text-foreground">{{ debate.initiator.username }}</strong> challenged you{% endif %}
                                     </p>
-                                    {% with durl=debate.get_discussion_url %}{% if durl %}<a href="{{ durl }}" class="block text-sm font-bold text-foreground mt-0.5 leading-snug hover:text-primary transition-colors">{{ debate.post.title|truncatechars:70 }}</a>{% else %}<span class="block text-sm font-bold text-muted-foreground mt-0.5 leading-snug">(deleted post)</span>{% endif %}{% endwith %}
+                                    {% with durl=debate.get_discussion_url %}{% if durl %}<a href="{{ durl }}" class="block text-xs font-bold text-foreground leading-snug hover:text-primary transition-colors">{{ debate.post.title|truncatechars:70 }}</a>{% else %}<span class="block text-xs font-bold text-muted-foreground leading-snug">(deleted post)</span>{% endif %}{% endwith %}
                                 </div>
-                                <div class="flex flex-col items-end gap-1.5 flex-shrink-0">
+                                <div class="flex flex-col items-end gap-1 flex-shrink-0">
                                     <span id="debate-status-{{ debate.id }}" class="nf-status {% if debate.status == 'pending' %}pending{% elif debate.status == 'accepted' %}accepted{% else %}rejected{% endif %}">{{ debate.status|title }}</span>
                                     {% if debate.status == 'accepted' or debate.status == 'completed' %}
                                     {% if debate.user_can_view_chat %}
@@ -884,46 +884,38 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            <div class="mt-2 rounded-lg border border-border/60 bg-secondary/30 px-2.5 py-1.5">
-                                <span class="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Quoted</span>
-                                <p class="text-xs text-foreground/80 mt-0.5 leading-snug">"{{ debate.comment.content|truncatechars:100 }}" <span class="text-muted-foreground">— {{ debate.comment.user.username }}</span></p>
+                            <div class="mt-1 rounded-md border border-border/60 bg-secondary/30 px-2 py-1">
+                                <p class="text-[11px] text-foreground/80 leading-snug">"{{ debate.comment.content|truncatechars:80 }}" <span class="text-muted-foreground">— {{ debate.comment.user.username }}</span></p>
                             </div>
-                            <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <div class="mt-1 flex flex-wrap items-center gap-1">
                                 <span class="text-[10px] text-muted-foreground">{{ debate.created_at|timesince }} ago</span>
                                 {% if debate.status == 'accepted' %}<span class="nf-chip">Yes {{ debate.yes_supporters }}</span><span class="nf-chip">No {{ debate.no_supporters }}</span>{% endif %}
-                            </div>
-                            {# Accept/Reject for pending incoming #}
-                            {% if debate.status == 'pending' and debate.target == user %}
-                            <div id="debate-actions-{{ debate.id }}" class="mt-2 flex gap-1.5">
-                                <button type="button" onclick="acceptDebate('{{ debate.id }}')" class="nf-button">Accept</button>
-                                <form method="post" action="{% url 'reject_debate' debate.id %}" class="inline">
-                                    {% csrf_token %}<button type="submit" class="nf-button-danger">Reject</button>
-                                </form>
-                            </div>
-                            {% endif %}
-                            {# Leave/Rejoin/End controls #}
-                            {% if debate.status == 'accepted' %}
-                            <div class="mt-1.5 flex flex-wrap gap-1.5">
+                                {# Accept/Reject for pending incoming #}
+                                {% if debate.status == 'pending' and debate.target == user %}
+                                <div id="debate-actions-{{ debate.id }}" class="flex gap-1">
+                                    <button type="button" onclick="acceptDebate('{{ debate.id }}')" class="nf-button">Accept</button>
+                                    <form method="post" action="{% url 'reject_debate' debate.id %}" class="inline">
+                                        {% csrf_token %}<button type="submit" class="nf-button-danger">Reject</button>
+                                    </form>
+                                </div>
+                                {% endif %}
+                                {# Leave/Rejoin/End controls #}
+                                {% if debate.status == 'accepted' %}
                                 {% if debate.user_can_leave %}<button type="button" onclick="leaveDebate('{{ debate.id }}')" class="nf-button-ghost">Leave</button>{% endif %}
                                 {% if debate.user_can_rejoin %}<button type="button" onclick="rejoinDebate('{{ debate.id }}')" class="nf-button-ghost">Rejoin</button>{% endif %}
                                 {% if debate.user_can_end %}<button type="button" onclick="endDebate('{{ debate.id }}')" class="nf-button-danger">End Chat</button>{% endif %}
+                                {% endif %}
                             </div>
-                            {% if debate.user_can_moderate and debate.moderatable_participants %}
-                            <div class="mt-2 rounded-lg border border-border/60 bg-background/50 p-2">
-                                <p class="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Participant Controls</p>
-                                <div class="space-y-1">
+                            {% if debate.status == 'accepted' and debate.user_can_moderate and debate.moderatable_participants %}
+                            <div class="mt-1 rounded-md border border-border/60 bg-background/50 px-2 py-1">
+                                <p class="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Participant Controls</p>
                                 {% for participant in debate.moderatable_participants %}
                                 <div class="flex items-center justify-between gap-2">
-                                    <div>
-                                        <span class="text-xs font-semibold text-foreground">{{ participant.user.username }}</span>
-                                        <span class="text-[10px] text-muted-foreground ml-1">{{ participant.side|upper }}</span>
-                                    </div>
+                                    <span class="text-[11px] font-semibold text-foreground">{{ participant.user.username }} <span class="text-muted-foreground">{{ participant.side|upper }}</span></span>
                                     <button type="button" onclick="removeParticipantFromDebate('{{ debate.id }}', '{{ participant.user.id }}', '{{ participant.user.username|escapejs }}')" class="nf-button-soft">Remove</button>
                                 </div>
                                 {% endfor %}
-                                </div>
                             </div>
-                            {% endif %}
                             {% endif %}
                         </div>
                     </div>
