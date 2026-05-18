@@ -2511,9 +2511,18 @@
 
         /* ══════════════════════════════════════════════════════ */
     </style>
-    <!-- Cropper.js for image cropping -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+    <!-- Cropper.js for image cropping (loaded dynamically to avoid SyntaxError if CDN unreachable) -->
+    <script>
+    (function(){
+      var l=document.createElement('link');l.rel='stylesheet';
+      l.href='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css';
+      document.head.appendChild(l);
+      var s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js';
+      s.onerror=function(){};
+      document.head.appendChild(s);
+    })();
+    </script>
     {% if GOOGLE_ADSENSE_ENABLED and GOOGLE_ADSENSE_CLIENT %}
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ GOOGLE_ADSENSE_CLIENT }}" crossorigin="anonymous"></script>
     {% endif %}
@@ -6135,23 +6144,36 @@ function acceptCookies() {
   obs.observe(document.body, { childList: true, subtree: true });
 })();
 
-<!-- highlight.js for code syntax highlighting -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css" class="hljs-theme-dark" disabled>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" class="hljs-theme-light">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<!-- highlight.js loaded conditionally to avoid SyntaxError when CDN is blocked -->
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  if (typeof hljs !== 'undefined') hljs.highlightAll();
-  // sync theme
-  function syncHljsTheme() {
+(function() {
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js';
+  s.onload = function() {
+    hljs.highlightAll();
     var dark = document.documentElement.getAttribute('data-theme') === 'dark';
-    document.querySelectorAll('.hljs-theme-dark').forEach(function(el){ el.disabled = !dark; });
-    document.querySelectorAll('.hljs-theme-light').forEach(function(el){ el.disabled = dark; });
-  }
-  syncHljsTheme();
-  var themeObs = new MutationObserver(syncHljsTheme);
-  themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-});
+    var darkLink = document.getElementById('hljs-css-dark');
+    var lightLink = document.getElementById('hljs-css-light');
+    if (darkLink) darkLink.disabled = !dark;
+    if (lightLink) lightLink.disabled = dark;
+    var themeObs = new MutationObserver(function() {
+      var d = document.documentElement.getAttribute('data-theme') === 'dark';
+      if (darkLink) darkLink.disabled = !d;
+      if (lightLink) lightLink.disabled = d;
+    });
+    themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  };
+  s.onerror = function() {};
+  document.head.appendChild(s);
+  var darkLink = document.createElement('link');
+  darkLink.id = 'hljs-css-dark'; darkLink.rel = 'stylesheet'; darkLink.disabled = true;
+  darkLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css';
+  document.head.appendChild(darkLink);
+  var lightLink = document.createElement('link');
+  lightLink.id = 'hljs-css-light'; lightLink.rel = 'stylesheet';
+  lightLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css';
+  document.head.appendChild(lightLink);
+})();
 </script>
 
 <!-- Push Notification Registration -->
