@@ -5,29 +5,29 @@
 <style>
 /* ── Feed card ── */
 .disc-card {
-    display: block; text-decoration: none;
-    border-radius: 1.25rem;
-    border: 1.5px solid hsl(var(--border));
+    display: flex; flex-direction: column; text-decoration: none;
+    border-radius: 0.875rem;
+    border: 1px solid hsl(var(--border));
     background: hsl(var(--card));
     overflow: hidden;
-    transition: border-color 180ms, box-shadow 180ms, transform 140ms;
+    transition: border-color 160ms, box-shadow 160ms, transform 120ms;
 }
 .disc-card:hover {
-    border-color: hsl(var(--primary)/0.45);
-    box-shadow: 0 12px 36px -18px hsl(var(--primary)/0.2);
-    transform: translateY(-2px);
+    border-color: hsl(var(--primary)/0.4);
+    box-shadow: 0 8px 24px -12px hsl(var(--primary)/0.18);
+    transform: translateY(-1px);
 }
 
 /* ── Yes / No side pills ── */
 .side-yes {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 2px 10px; border-radius: 999px; font-size: 0.68rem; font-weight: 800;
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 1px 8px; border-radius: 999px; font-size: 0.65rem; font-weight: 800;
     background: hsl(142 65% 44%/0.1); color: hsl(142 52% 32%);
     border: 1px solid hsl(142 65% 44%/0.28);
 }
 .side-no {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 2px 10px; border-radius: 999px; font-size: 0.68rem; font-weight: 800;
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 1px 8px; border-radius: 999px; font-size: 0.65rem; font-weight: 800;
     background: hsl(346 68% 50%/0.1); color: hsl(346 60% 38%);
     border: 1px solid hsl(346 68% 50%/0.28);
 }
@@ -36,7 +36,7 @@ html[data-theme="dark"] .side-no  { color: hsl(346 68% 60%); }
 
 /* ── Sort / filter tabs ── */
 .sort-tab {
-    padding: 0.4rem 1rem; font-size: 0.75rem; font-weight: 700;
+    padding: 0.32rem 0.85rem; font-size: 0.72rem; font-weight: 700;
     transition: background 140ms, color 140ms; white-space: nowrap;
 }
 .sort-tab.active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
@@ -46,69 +46,79 @@ html[data-theme="dark"] .side-no  { color: hsl(346 68% 60%); }
 /* ── Stat chip ── */
 .stat-chip {
     display: inline-flex; align-items: center; gap: 3px;
-    font-size: 0.68rem; font-weight: 600; color: hsl(var(--muted-foreground));
+    font-size: 0.63rem; font-weight: 600; color: hsl(var(--muted-foreground));
 }
 
 /* ── Progress bar ── */
-.vote-track { height: 4px; border-radius: 999px; background: hsl(var(--muted)); overflow: hidden; flex: 1; }
+.vote-track { height: 3px; border-radius: 999px; background: hsl(var(--muted)); overflow: hidden; flex: 1; }
 .vote-yes   { height: 100%; background: linear-gradient(90deg, hsl(142 65% 40%), hsl(142 65% 52%)); border-radius: 999px 0 0 999px; transition: width 600ms cubic-bezier(.4,0,.2,1); }
 .vote-no    { height: 100%; background: linear-gradient(90deg, hsl(346 68% 44%), hsl(346 68% 56%)); border-radius: 0 999px 999px 0; }
 
 /* ── Hot badge ── */
 .hot-badge {
     display: inline-flex; align-items: center; gap: 3px;
-    padding: 1px 7px; border-radius: 999px; font-size: 0.64rem; font-weight: 800;
+    padding: 1px 6px; border-radius: 999px; font-size: 0.6rem; font-weight: 800;
     background: hsl(24 90% 54%/0.12); color: hsl(24 80% 40%);
     border: 1px solid hsl(24 90% 54%/0.25);
 }
 html[data-theme="dark"] .hot-badge { color: hsl(24 90% 65%); }
+
+/* ── 2-col grid ── */
+.disc-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+@media (max-width: 640px) {
+    .disc-grid { grid-template-columns: 1fr; }
+}
 </style>
 
-<div class="max-w-6xl mx-auto py-6 px-4">
+<div class="max-w-6xl mx-auto py-3 px-4">
 
     <!-- ── Page header ─────────────────────────────────────── -->
-    <div class="flex items-start justify-between flex-wrap gap-4 mb-6">
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div>
-            <h1 class="text-2xl font-black text-foreground flex items-center gap-2.5" style="font-family:'Playfair Display',serif;">
+            <h1 class="text-lg font-black text-foreground flex items-center gap-2" style="font-family:'Playfair Display',serif;">
                 <span>⚔️</span> Pick a Side
             </h1>
-            <p class="text-sm text-muted-foreground mt-0.5">Community debates — pick a side and defend your stance.</p>
+            <p class="text-xs text-muted-foreground">Community debates — pick a side and defend your stance.</p>
         </div>
         {% if user.is_authenticated %}
-        <a href="{% url 'create_post' %}" class="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-sm shadow-primary/25">
+        <a href="{% url 'create_post' %}" class="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-sm shadow-primary/25">
             + Start Discussion
         </a>
         {% endif %}
     </div>
 
     <!-- ── Search bar ──────────────────────────────────────── -->
-    <form method="get" class="relative group mb-4">
+    <form method="get" class="relative group mb-2.5">
         {% if sort != 'trending' %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
         {% if category_filter %}<input type="hidden" name="category" value="{{ category_filter }}">{% endif %}
-        <div class="flex items-center gap-2 bg-card border border-border rounded-2xl px-4 py-2.5 shadow-sm transition-all duration-200 focus-within:border-primary/60 focus-within:shadow-md focus-within:shadow-primary/10">
-            <svg class="w-4 h-4 text-muted-foreground flex-shrink-0 transition-colors group-focus-within:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35"/></svg>
+        <div class="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-1.5 shadow-sm transition-all duration-200 focus-within:border-primary/60 focus-within:shadow-md focus-within:shadow-primary/10">
+            <svg class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 transition-colors group-focus-within:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35"/></svg>
             <input type="text" name="q" value="{{ search_query }}"
                    placeholder="Search discussions{% if category_filter %} in {{ category_filter }}{% endif %}…"
-                   class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 outline-none min-w-0">
+                   class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 outline-none min-w-0">
             {% if search_query %}
             <a href="?{% if sort != 'trending' %}sort={{ sort }}&{% endif %}{% if category_filter %}category={{ category_filter|urlencode }}&{% endif %}"
                class="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded-full hover:bg-muted">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </a>
             {% endif %}
         </div>
     </form>
 
     <!-- ── Category filter chips ─────────────────────────────── -->
-    <div class="flex gap-1.5 overflow-x-auto pb-1 mb-4" style="scrollbar-width:none;">
+    <div class="flex gap-1 overflow-x-auto pb-1 mb-2.5" style="scrollbar-width:none;">
         <a href="?{% if sort != 'trending' %}sort={{ sort }}&{% endif %}{% if search_query %}q={{ search_query|urlencode }}&{% endif %}"
-           class="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all
+           class="flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all
                   {% if not category_filter %}bg-primary text-primary-foreground border-transparent{% else %}bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground{% endif %}">
             All
         </a>
         {% for cat_key, cat_label in categories %}
         <a href="?{% if sort != 'trending' %}sort={{ sort }}&{% endif %}{% if search_query %}q={{ search_query|urlencode }}&{% endif %}category={{ cat_key|urlencode }}"
-           class="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all whitespace-nowrap
+           class="flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all whitespace-nowrap
                   {% if category_filter == cat_key %}bg-primary text-primary-foreground border-transparent{% else %}bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground{% endif %}">
             {{ cat_label }}
         </a>
@@ -116,8 +126,8 @@ html[data-theme="dark"] .hot-badge { color: hsl(24 90% 65%); }
     </div>
 
     <!-- ── Sort tabs ─────────────────────────────────────────── -->
-    <div class="flex items-center gap-3 mb-6 overflow-x-auto pb-1" style="scrollbar-width:none;">
-        <div class="flex rounded-xl border border-border overflow-hidden flex-shrink-0">
+    <div class="flex items-center gap-2 mb-3 overflow-x-auto pb-1" style="scrollbar-width:none;">
+        <div class="flex rounded-lg border border-border overflow-hidden flex-shrink-0">
             <a href="?sort=trending{% if category_filter %}&category={{ category_filter|urlencode }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}"
                class="sort-tab {% if sort == 'trending' %}active{% endif %}">🔥 Trending</a>
             <a href="?sort=latest{% if category_filter %}&category={{ category_filter|urlencode }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}"
@@ -126,91 +136,82 @@ html[data-theme="dark"] .hot-badge { color: hsl(24 90% 65%); }
                class="sort-tab border-l border-border {% if sort == 'debated' %}active{% endif %}">⚔️ Most Debated</a>
         </div>
         {% if page_obj.paginator.count %}
-        <span class="text-xs text-muted-foreground ml-auto">{{ page_obj.paginator.count }} discussion{{ page_obj.paginator.count|pluralize }}</span>
+        <span class="text-[11px] text-muted-foreground ml-auto">{{ page_obj.paginator.count }} discussion{{ page_obj.paginator.count|pluralize }}</span>
         {% endif %}
     </div>
 
     <!-- ── Feed ──────────────────────────────────────────────── -->
     {% if page_obj.object_list %}
-    <div class="space-y-4">
+    <div class="disc-grid">
         {% for p in page_obj.object_list %}
         <a href="{% url 'discussion' p.id %}" class="disc-card group">
 
             <!-- Author row -->
-            <div class="flex items-center gap-3 px-4 pt-4 pb-0">
+            <div class="flex items-center gap-2 px-3 pt-2.5 pb-0">
                 {% with pic=p.user.profile.get_picture_url %}
                 {% if pic %}
-                <img src="{{ pic }}" alt="{{ p.user.username }}" class="w-9 h-9 rounded-full object-cover border border-border flex-shrink-0">
+                <img src="{{ pic }}" alt="{{ p.user.username }}" class="w-6 h-6 rounded-full object-cover border border-border flex-shrink-0">
                 {% else %}
-                <div class="flex w-9 h-9 items-center justify-center rounded-full bg-primary/12 text-primary font-black text-sm flex-shrink-0">{{ p.user.username|first|upper }}</div>
+                <div class="flex w-6 h-6 items-center justify-center rounded-full bg-primary/10 text-primary font-black text-[10px] flex-shrink-0">{{ p.user.username|first|upper }}</div>
                 {% endif %}
                 {% endwith %}
-                <div class="flex-1 min-w-0 flex items-baseline gap-1.5 flex-wrap">
-                    <span class="text-sm font-bold text-foreground truncate">{{ p.user.get_full_name|default:p.user.username }}</span>
-                    <span class="text-xs text-muted-foreground">@{{ p.user.username }}</span>
-                    <span class="text-muted-foreground/40 text-xs">·</span>
-                    <span class="text-xs text-muted-foreground">{{ p.created_at|timesince }} ago</span>
+                <div class="flex-1 min-w-0 flex items-baseline gap-1 flex-wrap">
+                    <span class="text-[11px] font-bold text-foreground truncate">{{ p.user.get_full_name|default:p.user.username }}</span>
+                    <span class="text-[10px] text-muted-foreground">· {{ p.created_at|timesince }} ago</span>
                 </div>
-                <!-- Category + hot badge -->
-                <div class="flex items-center gap-1.5 flex-shrink-0">
-                    {% if p.hot_count > 5 %}<span class="hot-badge">🔥 Hot</span>{% endif %}
-                    <span class="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full whitespace-nowrap">{{ p.category }}</span>
+                <div class="flex items-center gap-1 flex-shrink-0">
+                    {% if p.hot_count > 5 %}<span class="hot-badge">🔥</span>{% endif %}
+                    <span class="text-[9px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full whitespace-nowrap">{{ p.category }}</span>
                 </div>
             </div>
 
-            <!-- Mood + title -->
-            <div class="px-4 pt-3 pb-0">
-                <h2 class="text-sm font-semibold text-foreground leading-snug group-hover:text-primary transition-colors line-clamp-2">
-                    {% if p.mood %}<span class="mr-1">{{ p.get_mood_display }}</span>{% endif %}{{ p.title }}
+            <!-- Title -->
+            <div class="px-3 pt-1.5 pb-0 flex-1">
+                <h2 class="text-xs font-semibold text-foreground leading-snug group-hover:text-primary transition-colors line-clamp-2">
+                    {% if p.mood %}<span class="mr-0.5">{{ p.get_mood_display }}</span>{% endif %}{{ p.title }}
                 </h2>
             </div>
 
             <!-- Yes / No side pills -->
-            <div class="px-4 pt-2 pb-0 flex items-center gap-2">
+            <div class="px-3 pt-1.5 pb-0 flex items-center gap-1.5">
                 <span class="side-yes">✓ {{ p.yes_label|default:"Yes" }}</span>
-                <span class="text-muted-foreground/40 text-[10px] font-bold">vs</span>
+                <span class="text-muted-foreground/40 text-[9px] font-bold">vs</span>
                 <span class="side-no">✗ {{ p.no_label|default:"No" }}</span>
             </div>
 
-            <!-- Vote bar (if votes exist) -->
+            <!-- Vote bar -->
             {% if p.comment_count %}
-            {% with yes_pct=p.comment_count|add:0 %}
-            <div class="px-4 pt-2.5 pb-0">
-                <div class="flex items-center gap-2">
-                    <div class="vote-track">
-                        <div class="vote-yes" style="width:50%"></div>
-                    </div>
-                </div>
+            <div class="px-3 pt-1.5 pb-0">
+                <div class="vote-track"><div class="vote-yes" style="width:50%"></div></div>
             </div>
-            {% endwith %}
             {% endif %}
 
             <!-- Hashtags -->
             {% if p.hashtags %}
-            <div class="px-4 pt-2 pb-0 flex flex-wrap gap-1">
-                {% for tag in p.get_hashtags_list|slice:":4" %}
-                <span class="text-[10px] font-medium text-cyan-600 dark:text-cyan-400">#{{ tag }}</span>
+            <div class="px-3 pt-1 pb-0 flex flex-wrap gap-1">
+                {% for tag in p.get_hashtags_list|slice:":3" %}
+                <span class="text-[9px] font-medium text-cyan-600 dark:text-cyan-400">#{{ tag }}</span>
                 {% endfor %}
             </div>
             {% endif %}
 
             <!-- Stats row -->
-            <div class="px-4 pt-3 pb-4 flex items-center gap-4 flex-wrap border-t border-border/40 mt-3">
+            <div class="px-3 pt-1.5 pb-2.5 flex items-center gap-3 border-t border-border/30 mt-1.5">
                 {% if p.comment_count %}
                 <span class="stat-chip">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
                     {{ p.comment_count }} vote{{ p.comment_count|pluralize }}
                 </span>
                 {% endif %}
                 {% if p.debate_count %}
                 <span class="stat-chip">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
                     {{ p.debate_count }} debate{{ p.debate_count|pluralize }}
                 </span>
                 {% endif %}
                 {% if p.like_count %}
                 <span class="stat-chip">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                     {{ p.like_count }}
                 </span>
                 {% endif %}
