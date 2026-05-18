@@ -932,9 +932,8 @@ min-width: 0;
     <span>Please do not insult others, maintain respect and collaborate effectively.</span>
     <button type="button" id="mc-caution-accept">I Understand</button>
   </div>
-  </div>{# end #mc-collapsible-panels #}
-
   <div id="mc-top-actions"></div>
+  </div>{# end #mc-collapsible-panels #}
 
   <div id="mc-members"></div>
 
@@ -1284,6 +1283,20 @@ min-width: 0;
     return btn;
   }
 
+  function ensureHeaderButton(id, label, onClick) {
+    const hacts = document.getElementById('mc-hacts');
+    if (!hacts) return null;
+    let btn = document.getElementById(id);
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = id;
+      hacts.insertBefore(btn, hacts.firstChild);
+    }
+    btn.textContent = label;
+    btn.onclick = onClick;
+    return btn;
+  }
+
   function ensureOverflowActionButton(id, label, onClick, variant) {
     if (!overflowMenu) return null;
     let btn = document.getElementById(id);
@@ -1372,7 +1385,7 @@ min-width: 0;
     }
 
     if (canEnd && canSend && debateStatus === 'accepted') {
-      ensureActionButton('mc-end-btn', 'End', function() { mcEndConversation(); });
+      ensureHeaderButton('mc-end-btn', 'End', function() { mcEndConversation(); });
     } else {
       const eb = document.getElementById('mc-end-btn');
       if (eb) eb.remove();
@@ -2782,13 +2795,19 @@ min-width: 0;
     fetch('/debates/' + DEBATE_ID + '/timer/')
       .then(r => r.json())
       .then(d => {
-        showTimerStrip();
         if (d.ends_at && d.remaining_seconds > 0) {
+          showTimerStrip();
           timerEndsAt = new Date(d.ends_at);
           if (timerInterval) clearInterval(timerInterval);
           timerInterval = setInterval(tickTimer, 1000);
           tickTimer();
         }
+        // showTimerStrip() for Set button — show strip only if user can set timer
+        {% if user == debate.initiator or user == debate.target %}
+        if (document.getElementById('mc-timer-strip')) {
+          document.getElementById('mc-timer-strip').style.display = 'flex';
+        }
+        {% endif %}
       }).catch(function(){});
   }
 
