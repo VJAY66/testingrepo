@@ -6141,7 +6141,7 @@ function acceptCookies() {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  hljs.highlightAll();
+  if (typeof hljs !== 'undefined') hljs.highlightAll();
   // sync theme
   function syncHljsTheme() {
     var dark = document.documentElement.getAttribute('data-theme') === 'dark';

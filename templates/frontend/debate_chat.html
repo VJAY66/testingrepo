@@ -2591,6 +2591,14 @@
     document.head.appendChild(style);
   }
 
+  function refreshOtherChats() {
+    try {
+      if (window.parent && window.parent !== window && typeof window.parent.markActiveChatRead === 'function') {
+        window.parent.markActiveChatRead();
+      }
+    } catch(e) {}
+  }
+
   poll();
   pollTimer = setInterval(poll, 3000);
   document.addEventListener('visibilitychange', () => {
