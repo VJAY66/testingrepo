@@ -532,7 +532,12 @@
     @keyframes mcRemodeIn { from { opacity: 0; } to { opacity: 1; } }
     .mc-remove-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); }
     .mc-remove-modal-sheet {
-      position: relative; z-index: 1; width: 100%; max-width: 480px;
+     position: relative;
+z-index: 1;
+width: 100%;
+max-width: 100%;
+min-width: 0;
+
       background: hsl(var(--card)); border-top-left-radius: 18px; border-top-right-radius: 18px;
       padding: 12px 20px 28px; display: flex; flex-direction: column; align-items: center; gap: 10px;
       border-top: 1px solid hsl(var(--border)); box-shadow: 0 -8px 32px rgba(0,0,0,0.18);
@@ -701,15 +706,23 @@
       #mc-shell { top: calc(env(safe-area-inset-top, 0px) + 60px); bottom: 6px; }
     }
     @media (min-width: 768px) {
-      #mc-shell {
-        left: 50%; right: auto;
-        transform: translateX(-50%);
-        width: min(700px, calc(100vw - 32px));
-        top: calc(env(safe-area-inset-top, 0px) + 72px);
-        bottom: 24px;
-      }
-      #mc-shell.mc-hidden { transform: translateX(-50%) translateY(40px) scale(0.96); }
-    }
+  #mc-shell {
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    transform: none;
+
+    top: calc(env(safe-area-inset-top, 0px) + 72px);
+    bottom: 24px;
+  }
+
+  #mc-shell.mc-hidden {
+    transform: translateY(40px) scale(0.96);
+  }
+}
     @media (prefers-reduced-motion: reduce) {
       #mc-shell, .mc-msg { animation: none !important; }
       .mc-msg-hover-bar { transition: none !important; }
@@ -717,6 +730,26 @@
     .mc-read-receipt { opacity: 0.7; }
     .mc-read-receipt.seen { color: hsl(var(--primary)); opacity: 1; }
   }
+  html, body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.mc-embed,
+.mc-shell,
+.mc-chat,
+.mc-layout,
+.mc-body {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.mc-scroll {
+    width: 100%;
+    min-width: 0;
+}
 </style>
 
 {# ── Chat shell (mobile) ── #}

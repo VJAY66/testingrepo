@@ -10,15 +10,14 @@
 }
 
 .ch-list-col {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 336px;
+    position: relative;
     z-index: 1;
+    width: 336px;
+    flex-shrink: 0;
     border-right: 1px solid hsl(var(--border) / 0.9);
     display: flex;
     flex-direction: column;
+    min-height: 0;
     overflow: hidden;
 }
 /* backdrop-filter moved off the outer flex item to avoid unintended compositing overlap */
@@ -209,13 +208,13 @@
     white-space: nowrap;
 }
 .ch-preview { margin-top: 0.08rem; }
+
 .ch-conv-col {
-    position: absolute;
-    top: 0;
-    left: 336px;
-    right: 0;
-    bottom: 0;
+    position: relative;
     z-index: 2;
+    flex: 1 1 auto;
+    width: 0;
+    min-width: 0;
     overflow: hidden;
     background:
         radial-gradient(640px 270px at 12% -4%, hsl(var(--primary) / 0.12), transparent 65%),
@@ -224,6 +223,7 @@
 }
 .ch-conv-frame {
     position: absolute;
+    display: block;
     inset: 0;
     width: 100%;
     height: 100%;
@@ -341,7 +341,7 @@
     color: hsl(var(--muted-foreground));
 }
 @media (max-width: 900px) {
-    .ch-list-col { width: 100%; right: 0; }
+    .ch-list-col { width: 100%; }
     .ch-conv-col { display: none; }
     .ch-empty-wrap { padding: 0.85rem; }
 }
@@ -349,7 +349,7 @@ body.ch-fullscreen {
     overflow: hidden;
 }
 </style>
-<main id="ch-main" style="position:fixed;top:64px;left:0;right:0;bottom:0;padding:0;margin:0;overflow:hidden;z-index:10;display:flex;">
+<main id="ch-main" style="position:fixed;top:64px;left:0;right:0;bottom:0;padding:0;margin:0;overflow:hidden;z-index:10;display:flex;min-width:0;">
 {% if chats %}
 <aside class="ch-list-col">
     <div class="ch-list-head">
@@ -513,16 +513,11 @@ document.addEventListener('DOMContentLoaded', function() {
     var main = document.getElementById('ch-main');
 
     function applyNavHeight() {
-        if (nav && main) {
-            // Read nav height, write to main.style.top deferred via rAF to
-            // avoid forcing a synchronous layout (which would trigger Tailwind
-            // CDN's MutationObserver and cause a second reflow with stale flex
-            // geometry on .ch-conv-col).
-            requestAnimationFrame(function() {
-                main.style.top = nav.getBoundingClientRect().height + 'px';
-            });
-        }
+    if (nav && main) {
+        const navHeight = nav.offsetHeight || 64;
+        main.style.top = navHeight + 'px';
     }
+}
     applyNavHeight();
 
     // Keep nav height in sync without forcing synchronous layouts.
@@ -557,3 +552,4 @@ function openDesktopChat(chatId, btn) {
 
 </main>
 {% endblock page_layout %}
+
