@@ -12,39 +12,38 @@
 .ch-list-col {
     position: relative;
     z-index: 1;
-    width: 336px;
+    width: 360px;
     flex-shrink: 0;
-    border-right: 1px solid hsl(var(--border) / 0.9);
+    border-right: 1px solid hsl(var(--border) / 0.5);
     display: flex;
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
 }
-/* backdrop-filter moved off the outer flex item to avoid unintended compositing overlap */
 .ch-list-col::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, hsl(var(--card) / 0.92), hsl(var(--card) / 0.72));
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
+    background: linear-gradient(180deg, hsl(var(--card) / 0.97), hsl(var(--card) / 0.88));
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     z-index: -1;
     pointer-events: none;
 }
 .ch-list-head {
-    padding: 1rem 0.95rem 0.88rem;
-    border-bottom: 1px solid hsl(var(--border) / 0.8);
+    padding: 1.25rem 1.1rem 1rem;
+    border-bottom: 1px solid hsl(var(--border) / 0.5);
 }
 .ch-list-title {
-    font-size: 1.06rem;
+    font-size: 1.15rem;
     font-weight: 900;
     letter-spacing: 0.01em;
     color: hsl(var(--foreground));
 }
 .ch-list-sub {
-    font-size: 0.76rem;
+    font-size: 0.78rem;
     color: hsl(var(--muted-foreground));
-    margin-top: 0.22rem;
+    margin-top: 0.28rem;
 }
 .ch-search-wrap {
     position: relative;
@@ -102,16 +101,16 @@
 .ch-item {
     width: 100%;
     text-align: left;
-    border: 1px solid hsl(var(--border) / 0.85);
-    border-radius: 0.9rem;
-    background: linear-gradient(155deg, hsl(var(--card) / 0.98), hsl(var(--background) / 0.92));
-    padding: 0.6rem;
+    border: 1px solid hsl(var(--border) / 0.7);
+    border-radius: 1rem;
+    background: linear-gradient(155deg, hsl(var(--card) / 0.98), hsl(var(--background) / 0.9));
+    padding: 0.75rem;
     display: flex;
-    gap: 0.55rem;
+    gap: 0.65rem;
     align-items: flex-start;
     position: relative;
     overflow: hidden;
-    transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+    transition: border-color 160ms ease, background 160ms ease, transform 160ms cubic-bezier(0.34,1.2,0.64,1), box-shadow 160ms ease;
 }
 .ch-list.animate .ch-item {
     opacity: 0;
@@ -119,9 +118,10 @@
     animation-delay: var(--ch-delay, 0ms);
 }
 .ch-item:hover {
-    border-color: hsl(var(--primary) / 0.5);
-    background: linear-gradient(150deg, hsl(var(--card)), hsl(var(--primary) / 0.08));
-    transform: translateY(-1px);
+    border-color: hsl(var(--primary) / 0.45);
+    background: linear-gradient(150deg, hsl(var(--card)), hsl(var(--primary) / 0.07));
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
 }
 .ch-item.active {
     border-color: hsl(var(--primary) / 0.58);
@@ -141,23 +141,25 @@
 }
 .ch-avatar,
 .ch-avatar-fallback {
-    width: 2rem;
-    height: 2rem;
+    width: 2.4rem;
+    height: 2.4rem;
     border-radius: 999px;
     flex-shrink: 0;
 }
 .ch-avatar {
     object-fit: cover;
-    border: 1px solid hsl(var(--border));
+    border: 1.5px solid hsl(var(--border));
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 .ch-avatar-fallback {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.78rem;
+    font-size: 0.85rem;
     font-weight: 800;
     color: white;
     background: linear-gradient(135deg, #06b6d4, #6366f1);
+    box-shadow: 0 2px 8px rgba(99,102,241,0.28);
 }
 .ch-meta { min-width: 0; flex: 1; }
 .ch-name-line {
@@ -165,10 +167,10 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.35rem;
-    font-size: 0.77rem;
+    font-size: 0.82rem;
 }
 .ch-name {
-    font-weight: 700;
+    font-weight: 800;
     color: hsl(var(--foreground));
     overflow: hidden;
     text-overflow: ellipsis;
@@ -201,13 +203,13 @@
 }
 .ch-topic,
 .ch-preview {
-    font-size: 0.72rem;
+    font-size: 0.76rem;
     color: hsl(var(--muted-foreground));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.ch-preview { margin-top: 0.08rem; }
+.ch-preview { margin-top: 0.12rem; }
 
 .ch-conv-col {
     position: relative;
@@ -340,7 +342,7 @@
     font-size: 0.76rem;
     color: hsl(var(--muted-foreground));
 }
-@media (max-width: 900px) {
+@media (max-width: 960px) {
     .ch-list-col { width: 100%; }
     .ch-conv-col { display: none; }
     .ch-empty-wrap { padding: 0.85rem; }
