@@ -1153,6 +1153,7 @@ min-width: 0;
   let minimized  = false;
   let lastMsgId  = 0;
   let unread     = 0;
+  let lastActivityAt = Date.now();
   let replyTarget = null;
   let canSend = {% if is_active_participant %}true{% else %}false{% endif %};
   let canEnd = {% if can_end_chat %}true{% else %}false{% endif %};
@@ -1948,6 +1949,9 @@ min-width: 0;
           const prevLastMsgId = lastMsgId;
           d.messages.forEach(addMsg);
           d.messages.forEach(updateReactionSummaryUI);
+          if (lastMsgId > prevLastMsgId) {
+            lastActivityAt = Date.now();
+          }
           if (typeof d.opponent_last_read_msg_id === 'number') {
             const opponentRead = d.opponent_last_read_msg_id;
             document.querySelectorAll('[id^="receipt-"]').forEach(function(el) {
@@ -1956,6 +1960,14 @@ min-width: 0;
                 el.textContent = '✓ Seen';
                 el.classList.add('seen');
               }
+            });
+          }
+          // Show/hide typing indicators for other participants
+          if (Array.isArray(d.typing_users)) {
+            const activeTyping = new Set(d.typing_users);
+            d.typing_users.forEach(u => showTypingIndicator(u));
+            typingTimeouts.forEach((_, u) => {
+              if (!activeTyping.has(u)) removeTypingIndicator(u);
             });
           }
           updateStickyDate();
@@ -2092,6 +2104,8 @@ min-width: 0;
       if (d.success) {
         inp.value = '';
         inp.style.height = 'auto';
+        lastActivityAt = Date.now();
+        if (typeof schedulePoll === 'function') schedulePoll();
         addMsg(d.message);
         setReply(null);
       } else {
@@ -2123,13 +2137,29 @@ min-width: 0;
     }
   });
 
-  // Enhance input with send button state
+  // Enhance input with send button state + debounced typing signal
+  let typingSignalTimer = null;
+  function sendTypingSignal() {
+    const csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+    fetch('{% url "debate_typing" debate.id %}', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest'},
+      body: 'csrfmiddlewaretoken=' + csrf,
+    }).catch(() => {});
+  }
   inp.addEventListener('input', function() {
     const isEmpty = !this.value.trim();
     const sendBtn = document.getElementById('mc-send');
     if (sendBtn) {
       sendBtn.style.opacity = isEmpty ? '0.4' : '1';
       sendBtn.style.pointerEvents = isEmpty ? 'none' : 'auto';
+    }
+    if (!isEmpty) {
+      if (!typingSignalTimer) {
+        sendTypingSignal();
+      }
+      clearTimeout(typingSignalTimer);
+      typingSignalTimer = setTimeout(() => { typingSignalTimer = null; }, 3000);
     }
   });
 
@@ -2682,8 +2712,24 @@ min-width: 0;
     } catch(e) {}
   }
 
+  // Adaptive polling: 3s when active, 8s when idle (no new messages for 30s)
+  const POLL_ACTIVE_MS = 3000;
+  const POLL_IDLE_MS = 8000;
+  const IDLE_THRESHOLD_MS = 30000;
+
+  function schedulePoll() {
+    if (pollTimer) clearInterval(pollTimer);
+    const interval = (Date.now() - lastActivityAt < IDLE_THRESHOLD_MS) ? POLL_ACTIVE_MS : POLL_IDLE_MS;
+    pollTimer = setInterval(() => {
+      poll();
+      // Re-evaluate interval after each tick
+      const nextInterval = (Date.now() - lastActivityAt < IDLE_THRESHOLD_MS) ? POLL_ACTIVE_MS : POLL_IDLE_MS;
+      if (nextInterval !== interval) schedulePoll();
+    }, interval);
+  }
+
   poll();
-  pollTimer = setInterval(poll, 3000);
+  schedulePoll();
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
       refreshOtherChats();

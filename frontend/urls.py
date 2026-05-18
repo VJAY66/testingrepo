@@ -71,6 +71,7 @@ urlpatterns = [
     path('debates/<str:debate_id>/messages/<int:message_id>/report/', views.report_debate_message, name='report_debate_message'),
     path('debates/<str:debate_id>/messages/list/', views.debate_messages, name='debate_messages'),
     path('debates/<str:debate_id>/messages/mark-read/', views.mark_debate_read, name='mark_debate_read'),
+    path('debates/<str:debate_id>/typing/', views.debate_typing, name='debate_typing'),
     path('moderation/debate-message-reports/<int:report_id>/review/', views.moderate_debate_message_report, name='moderate_debate_message_report'),
     path('moderation/profile-reports/<int:report_id>/review/', views.moderate_profile_report, name='moderate_profile_report'),
     path('moderation/post-reports/<int:report_id>/review/', views.moderate_post_report, name='moderate_post_report'),

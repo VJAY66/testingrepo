@@ -4897,6 +4897,13 @@ def debate_messages(request, debate_id):
     obs_yes = ObserverVote.objects.filter(debate=debate, winner_side='yes').count()
     obs_no = ObserverVote.objects.filter(debate=debate, winner_side='no').count()
 
+    # Collect typing signals from other participants (not self)
+    other_participants = DebateParticipant.objects.filter(debate=debate).exclude(user=request.user).select_related('user')
+    typing_users = [
+        p.user.username for p in other_participants
+        if cache.get(f'debate_typing_{debate_id}_{p.user_id}')
+    ]
+
     return JsonResponse({
         'success': True,
         'messages': messages,
@@ -4922,6 +4929,7 @@ def debate_messages(request, debate_id):
             DebateParticipant.objects.filter(debate=debate, user=opponent)
             .values_list('last_read_message_id', flat=True).first() or 0
         ),
+        'typing_users': typing_users,
     })
 
 
@@ -4938,6 +4946,18 @@ def mark_debate_read(request, debate_id):
         participation.last_read_message_id = latest_id
         participation.save(update_fields=['last_read_message_id'])
     return JsonResponse({'success': True, 'last_read': latest_id})
+
+
+@login_required
+@require_POST
+def debate_typing(request, debate_id):
+    """Signal that the current user is actively typing in a debate chat."""
+    debate = get_object_or_404(Debate, id=debate_id)
+    participation = DebateParticipant.objects.filter(debate=debate, user=request.user).first()
+    if not participation:
+        return JsonResponse({'success': False}, status=403)
+    cache.set(f'debate_typing_{debate_id}_{request.user.id}', request.user.username, timeout=5)
+    return JsonResponse({'success': True})
 
 
 @login_required
