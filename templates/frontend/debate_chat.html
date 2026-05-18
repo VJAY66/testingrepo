@@ -729,8 +729,6 @@ min-width: 0;
     }
     .mc-gif-item:hover { transform: scale(1.04); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
     #mc-inputbar { position: relative; }
-    #mc-emoji-panel, #mc-gif-panel { display: none; }
-    #mc-emoji-panel.open, #mc-gif-panel.open { display: flex; }
     #mc-send:hover {
       filter: brightness(1.1);
       box-shadow: 0 6px 22px hsl(var(--primary) / 0.52), 0 2px 6px rgba(0,0,0,0.1);
@@ -1076,7 +1074,7 @@ min-width: 0;
   </div>
 
   <!-- Emoji picker popup -->
-  <div id="mc-emoji-panel" style="display:none;position:absolute;bottom:58px;left:8px;right:8px;z-index:200;background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.18);overflow:hidden;max-height:280px;display:none;flex-direction:column;">
+  <div id="mc-emoji-panel" style="position:absolute;bottom:58px;left:8px;right:8px;z-index:200;background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.18);overflow:hidden;max-height:280px;flex-direction:column;display:none;">
     <div style="padding:8px 10px 6px;border-bottom:1px solid hsl(var(--border)/0.5);display:flex;gap:6px;align-items:center;flex-shrink:0;">
       <input id="mc-emoji-search" type="text" placeholder="Search emoji…" autocomplete="off"
         style="flex:1;border:1px solid hsl(var(--border));border-radius:8px;padding:4px 10px;font-size:12px;background:hsl(var(--background));color:hsl(var(--foreground));outline:none;">
@@ -1096,7 +1094,7 @@ min-width: 0;
   </div>
 
   <!-- GIF picker popup -->
-  <div id="mc-gif-panel" style="display:none;position:absolute;bottom:58px;left:8px;right:8px;z-index:200;background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.18);overflow:hidden;max-height:300px;flex-direction:column;">
+  <div id="mc-gif-panel" style="position:absolute;bottom:58px;left:8px;right:8px;z-index:200;background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.18);overflow:hidden;max-height:300px;flex-direction:column;display:none;">
     <div style="padding:8px 10px 6px;border-bottom:1px solid hsl(var(--border)/0.5);flex-shrink:0;">
       <input id="mc-gif-search" type="text" placeholder="Search GIFs…" autocomplete="off"
         style="width:100%;border:1px solid hsl(var(--border));border-radius:8px;padding:4px 10px;font-size:12px;background:hsl(var(--background));color:hsl(var(--foreground));outline:none;box-sizing:border-box;">
@@ -3054,8 +3052,8 @@ min-width: 0;
 
   function closeAll() {
     emojiOpen = false; gifOpen = false;
-    if (emojiPanel) emojiPanel.classList.remove('open');
-    if (gifPanel)   gifPanel.classList.remove('open');
+    if (emojiPanel) emojiPanel.style.display = 'none';
+    if (gifPanel)   gifPanel.style.display   = 'none';
   }
 
   const emojiBtn = document.getElementById('mc-emoji-btn');
@@ -3067,7 +3065,7 @@ min-width: 0;
       if (emojiOpen) { closeAll(); return; }
       closeAll();
       emojiOpen = true;
-      emojiPanel.classList.add('open');
+      emojiPanel.style.display = 'flex';
       showCat(currentCat);
       setTimeout(function() { if (emojiSearch) emojiSearch.focus(); }, 50);
     });
@@ -3079,7 +3077,7 @@ min-width: 0;
       if (gifOpen) { closeAll(); return; }
       closeAll();
       gifOpen = true;
-      gifPanel.classList.add('open');
+      gifPanel.style.display = 'flex';
       loadGifs('');
       setTimeout(function() { if (gifSearch) gifSearch.focus(); }, 50);
     });
