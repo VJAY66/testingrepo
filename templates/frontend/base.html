@@ -794,39 +794,126 @@
         .user-menu-panel {
             position: absolute;
             right: 0;
-            top: calc(100% + 8px);
-            width: min(280px, calc(100vw - 2rem));
-            border-radius: 14px;
-            border: 1px solid hsl(var(--border));
-            background: hsl(var(--card));
-            box-shadow: 0 16px 36px -20px rgba(15,23,42,0.6);
-            padding: 10px;
+            top: calc(100% + 10px);
+            width: min(272px, calc(100vw - 2rem));
+            border-radius: 18px;
+            border: 1px solid hsl(var(--border)/0.65);
+            background: hsl(var(--card)/0.97);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            box-shadow: 0 24px 64px -24px rgba(15,23,42,0.55), 0 0 0 1px hsl(var(--primary)/0.05);
+            padding: 6px;
             z-index: 130;
+            overflow: hidden;
+        }
+
+        .user-menu-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)));
+            border-radius: 18px 18px 0 0;
+        }
+
+        .user-menu-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 8px 8px;
+        }
+
+        .user-menu-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: hsl(var(--primary-foreground));
+            font-size: 14px;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+
+        .user-menu-name {
+            font-size: 13px;
+            font-weight: 800;
+            color: hsl(var(--foreground));
+            line-height: 1.2;
+        }
+
+        .user-menu-email {
+            font-size: 11px;
+            color: hsl(var(--muted-foreground));
+            line-height: 1.4;
+            max-width: 170px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .user-menu-item {
             display: flex;
             width: 100%;
             align-items: center;
-            justify-content: space-between;
+            gap: 8px;
             border-radius: 10px;
-            padding: 8px 10px;
+            padding: 6px 8px;
             font-size: 12.5px;
-            font-weight: 700;
+            font-weight: 600;
             letter-spacing: 0.01em;
             color: hsl(var(--foreground));
             border: 1px solid transparent;
+            transition: background 130ms, border-color 130ms, color 130ms;
+        }
+
+        .umi-icon {
+            width: 26px;
+            height: 26px;
+            border-radius: 7px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: hsl(var(--muted)/0.6);
+            font-size: 13px;
+            flex-shrink: 0;
+            transition: background 130ms;
         }
 
         .user-menu-item:hover {
-            border-color: hsl(var(--border));
-            background: hsl(var(--background));
+            background: hsl(var(--primary)/0.08);
+            border-color: hsl(var(--primary)/0.15);
+            color: hsl(var(--primary));
+        }
+
+        .user-menu-item:hover .umi-icon {
+            background: hsl(var(--primary)/0.15);
+        }
+
+        .user-menu-item-danger {
+            color: hsl(0 72% 48%);
+        }
+
+        .user-menu-item-danger .umi-icon {
+            background: hsl(0 72% 48%/0.1);
+        }
+
+        .user-menu-item-danger:hover {
+            background: hsl(0 72% 48%/0.08);
+            border-color: hsl(0 72% 48%/0.2);
+            color: hsl(0 72% 48%);
+        }
+
+        .user-menu-item-danger:hover .umi-icon {
+            background: hsl(0 72% 48%/0.15);
         }
 
         .user-menu-divider {
             height: 1px;
-            background: hsl(var(--border));
-            margin: 8px 2px;
+            background: hsl(var(--border)/0.7);
+            margin: 4px 4px;
         }
 
         @media (max-width: 640px) {
@@ -2962,22 +3049,28 @@ function acceptCookies() {
                                 {% endif %}
                             </a>
                             <div id="user-menu-panel" class="user-menu-panel hidden">
-                                <div class="px-2 py-1">
-                                    <p class="text-sm font-semibold text-foreground">{{ user.username }}</p>
-                                    <p class="text-xs text-muted-foreground truncate">{{ user.email }}</p>
+                                <div class="user-menu-header">
+                                    <div class="user-menu-avatar">{{ user.username|first|upper }}</div>
+                                    <div>
+                                        <div class="user-menu-name">{{ user.username }}</div>
+                                        <div class="user-menu-email">{{ user.email }}</div>
+                                    </div>
                                 </div>
                                 <div class="user-menu-divider"></div>
-                                <a href="{% url 'profile' %}" class="user-menu-item">My Profile</a>
-                                <a href="{% url 'bookmarks' %}" class="user-menu-item">Bookmarks</a>
-                                <a href="{% url 'read_later' %}" class="user-menu-item">📚 Read Later</a>
-                                <a href="{% url 'analytics_dashboard' %}" class="user-menu-item">Analytics</a>
-                                <a href="{% url 'interests_onboarding' %}?force=1" class="user-menu-item">Interested Categories</a>
-                                <a href="{% url 'hashtag_followed_feed' %}" class="user-menu-item"># Hashtag Feed</a>
-                                <a href="{% url 'scheduled_posts' %}" class="user-menu-item">Scheduled Posts</a>
-                                <a href="{% url 'people_you_may_know' %}" class="user-menu-item">👥 People You May Know</a>
-                                <a href="{% url 'trending_users' %}" class="user-menu-item">🚀 Rising Creators</a>
-                                <a href="{% url 'muted_users' %}" class="user-menu-item">🔇 Muted Users</a>
-                                <a href="{% url 'logout' %}" class="user-menu-item text-red-600">Logout</a>
+                                <a href="{% url 'profile' %}" class="user-menu-item"><span class="umi-icon">👤</span>My Profile</a>
+                                <a href="{% url 'bookmarks' %}" class="user-menu-item"><span class="umi-icon">🔖</span>Bookmarks</a>
+                                <a href="{% url 'read_later' %}" class="user-menu-item"><span class="umi-icon">📚</span>Read Later</a>
+                                <a href="{% url 'analytics_dashboard' %}" class="user-menu-item"><span class="umi-icon">📊</span>Analytics</a>
+                                <div class="user-menu-divider"></div>
+                                <a href="{% url 'interests_onboarding' %}?force=1" class="user-menu-item"><span class="umi-icon">🎯</span>Interested Categories</a>
+                                <a href="{% url 'hashtag_followed_feed' %}" class="user-menu-item"><span class="umi-icon">#</span>Hashtag Feed</a>
+                                <a href="{% url 'scheduled_posts' %}" class="user-menu-item"><span class="umi-icon">📅</span>Scheduled Posts</a>
+                                <div class="user-menu-divider"></div>
+                                <a href="{% url 'people_you_may_know' %}" class="user-menu-item"><span class="umi-icon">👥</span>People You May Know</a>
+                                <a href="{% url 'trending_users' %}" class="user-menu-item"><span class="umi-icon">🚀</span>Rising Creators</a>
+                                <a href="{% url 'muted_users' %}" class="user-menu-item"><span class="umi-icon">🔇</span>Muted Users</a>
+                                <div class="user-menu-divider"></div>
+                                <a href="{% url 'logout' %}" class="user-menu-item user-menu-item-danger"><span class="umi-icon">🚪</span>Logout</a>
                             </div>
                         </div>
                     {% else %}
@@ -3028,22 +3121,28 @@ function acceptCookies() {
                                 {% endif %}
                             </button>
                             <div id="mobile-user-menu-panel" class="user-menu-panel nav-mobile-user-menu-panel hidden">
-                                <div class="px-2 py-1">
-                                    <p class="text-sm font-semibold text-foreground">{{ user.username }}</p>
-                                    <p class="text-xs text-muted-foreground truncate">{{ user.email }}</p>
+                                <div class="user-menu-header">
+                                    <div class="user-menu-avatar">{{ user.username|first|upper }}</div>
+                                    <div>
+                                        <div class="user-menu-name">{{ user.username }}</div>
+                                        <div class="user-menu-email">{{ user.email }}</div>
+                                    </div>
                                 </div>
                                 <div class="user-menu-divider"></div>
-                                <a href="{% url 'profile' %}" class="user-menu-item">My Profile</a>
-                                <a href="{% url 'bookmarks' %}" class="user-menu-item">Bookmarks</a>
-                                <a href="{% url 'read_later' %}" class="user-menu-item">📚 Read Later</a>
-                                <a href="{% url 'analytics_dashboard' %}" class="user-menu-item">Analytics</a>
-                                <a href="{% url 'interests_onboarding' %}?force=1" class="user-menu-item">Interested Categories</a>
-                                <a href="{% url 'hashtag_followed_feed' %}" class="user-menu-item"># Hashtag Feed</a>
-                                <a href="{% url 'scheduled_posts' %}" class="user-menu-item">Scheduled Posts</a>
-                                <a href="{% url 'people_you_may_know' %}" class="user-menu-item">👥 People You May Know</a>
-                                <a href="{% url 'trending_users' %}" class="user-menu-item">🚀 Rising Creators</a>
-                                <a href="{% url 'muted_users' %}" class="user-menu-item">🔇 Muted Users</a>
-                                <a href="{% url 'logout' %}" class="user-menu-item text-red-600">Logout</a>
+                                <a href="{% url 'profile' %}" class="user-menu-item"><span class="umi-icon">👤</span>My Profile</a>
+                                <a href="{% url 'bookmarks' %}" class="user-menu-item"><span class="umi-icon">🔖</span>Bookmarks</a>
+                                <a href="{% url 'read_later' %}" class="user-menu-item"><span class="umi-icon">📚</span>Read Later</a>
+                                <a href="{% url 'analytics_dashboard' %}" class="user-menu-item"><span class="umi-icon">📊</span>Analytics</a>
+                                <div class="user-menu-divider"></div>
+                                <a href="{% url 'interests_onboarding' %}?force=1" class="user-menu-item"><span class="umi-icon">🎯</span>Interested Categories</a>
+                                <a href="{% url 'hashtag_followed_feed' %}" class="user-menu-item"><span class="umi-icon">#</span>Hashtag Feed</a>
+                                <a href="{% url 'scheduled_posts' %}" class="user-menu-item"><span class="umi-icon">📅</span>Scheduled Posts</a>
+                                <div class="user-menu-divider"></div>
+                                <a href="{% url 'people_you_may_know' %}" class="user-menu-item"><span class="umi-icon">👥</span>People You May Know</a>
+                                <a href="{% url 'trending_users' %}" class="user-menu-item"><span class="umi-icon">🚀</span>Rising Creators</a>
+                                <a href="{% url 'muted_users' %}" class="user-menu-item"><span class="umi-icon">🔇</span>Muted Users</a>
+                                <div class="user-menu-divider"></div>
+                                <a href="{% url 'logout' %}" class="user-menu-item user-menu-item-danger"><span class="umi-icon">🚪</span>Logout</a>
                             </div>
                         </div>
                     </div>
