@@ -35,14 +35,16 @@
 .mini-card:hover { box-shadow:0 6px 24px -10px hsl(var(--primary)/0.18); border-color:hsl(var(--primary)/0.3); }
 </style>
 
-<!-- Hero -->
-<div class="explore-hero py-7 px-4">
-  <div class="max-w-5xl mx-auto">
-    <h1 class="text-2xl font-bold text-foreground mb-0.5">Explore</h1>
-    <p class="text-muted-foreground text-sm mb-4">Discover content outside your network</p>
-    <form method="get" class="explore-search relative" style="max-width:500px">
-      <span class="icon"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
-      <input name="q" value="{{ search_query }}" placeholder="Search topics, hashtags, keywords…" autocomplete="off">
+<!-- Header row -->
+<div class="explore-hero px-4 py-3">
+  <div class="max-w-6xl mx-auto flex items-center gap-4 flex-wrap">
+    <div class="flex-shrink-0">
+      <h1 class="text-base font-bold text-foreground leading-tight">🔍 Explore</h1>
+      <p class="text-[11px] text-muted-foreground">Discover content outside your network</p>
+    </div>
+    <form method="get" class="explore-search relative flex-1" style="min-width:200px;max-width:420px;">
+      <span class="icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
+      <input name="q" value="{{ search_query }}" placeholder="Search topics, hashtags, keywords…" autocomplete="off" style="padding:7px 16px 7px 38px;font-size:13px;">
       {% if section != 'all' %}<input type="hidden" name="section" value="{{ section }}">{% endif %}
       {% if active_category %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}
     </form>
