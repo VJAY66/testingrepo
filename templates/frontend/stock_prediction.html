@@ -176,15 +176,13 @@
             <!-- Prediction sentence -->
             <div class="rounded-xl border border-border/60 bg-muted/25 px-3 py-2.5 mb-3">
                 <p class="text-sm leading-snug text-foreground">
-                    I think
+                    I predict
                     <strong class="text-primary font-black mx-0.5" style="font-family:'Playfair Display',serif;">{{ sp.stock_symbol }}</strong>
-                    will go
                     {% if sp.direction == 'up' or sp.direction == 'above' %}
-                    <strong class="font-black" style="color:hsl(142 65% 38%);">▲ Up</strong>
+                    hits <strong class="font-black" style="color:hsl(142 65% 38%);">{{ sp.currency_symbol }}{{ sp.target_price }}</strong>
                     {% else %}
-                    <strong class="font-black" style="color:hsl(346 65% 44%);">▼ Down</strong>
+                    drops to <strong class="font-black" style="color:hsl(346 65% 44%);">{{ sp.currency_symbol }}{{ sp.target_price }}</strong>
                     {% endif %}
-                    to <strong class="font-black text-foreground">{{ sp.target_price }} {{ sp.currency }}</strong>
                     by <strong class="text-foreground">{{ sp.target_date|date:"M j, Y" }}</strong>
                 </p>
                 {% if sp.days_remaining is not None and sp.status == 'active' %}

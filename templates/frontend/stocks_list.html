@@ -260,7 +260,9 @@ html.dark .chip-down { color: hsl(346 70% 62%); }
                     </div>
                     <!-- Human sentence -->
                     <p class="text-xs leading-snug text-foreground/90 group-hover:text-primary transition-colors">
-                        Predicts <strong class="font-black text-foreground">{{ sp.currency_symbol }}{{ sp.target_price }}</strong>
+                        I predict <strong class="font-black text-foreground">{{ sp.stock_symbol }}</strong>
+                        {% if sp.direction == 'up' or sp.direction == 'above' %}hits{% else %}drops to{% endif %}
+                        <strong class="font-black text-foreground">{{ sp.currency_symbol }}{{ sp.target_price }}</strong>
                         <span class="text-muted-foreground">by</span>
                         <strong class="text-foreground">{{ sp.target_date|date:"M j, Y" }}</strong>
                     </p>
