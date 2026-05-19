@@ -325,6 +325,7 @@ html.dark .debate-expiry-pill { color: hsl(38 90% 68%); }
           {% endif %}
 
           {% with durl=d.get_discussion_url %}{% if durl %}<a href="{{ durl }}" class="di-btn di-btn-ghost">Post</a>{% endif %}{% endwith %}
+          <button onclick="dismissDebate('{{ d.id }}')" class="di-btn di-btn-danger" title="Delete from inbox">🗑️</button>
         </div>
       </div>
 
@@ -386,6 +387,15 @@ function cancelDebate(id) {
     .then(r => r.json()).then(d => {
       if (d.success) { var c = document.getElementById('debate-card-' + id); if (c) c.remove(); }
       else { alert(d.error || 'Could not cancel.'); }
+    });
+}
+
+function dismissDebate(id) {
+  if (!confirm('Remove this debate from your inbox?')) return;
+  fetch('/dismiss-debate/' + id + '/', { method: 'POST', headers: {'X-CSRFToken': getCookie('csrftoken')} })
+    .then(r => r.json()).then(d => {
+      if (d.success) { var c = document.getElementById('debate-card-' + id); if (c) c.remove(); }
+      else { alert(d.error || 'Could not delete.'); }
     });
 }
 

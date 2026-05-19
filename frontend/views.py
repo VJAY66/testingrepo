@@ -4518,6 +4518,16 @@ def cancel_debate(request, debate_id):
 
 @login_required
 @require_POST
+def dismiss_debate(request, debate_id):
+    """Remove a debate from the current user's inbox by deleting their participation record."""
+    deleted, _ = DebateParticipant.objects.filter(debate_id=debate_id, user=request.user).delete()
+    if deleted:
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False, 'error': 'Debate not found.'}, status=404)
+
+
+@login_required
+@require_POST
 def counter_debate(request, debate_id):
     """Target user proposes a counter-topic/side instead of accepting or rejecting."""
     try:
@@ -6552,6 +6562,8 @@ def review_detail(request, review_id):
         comments.filter(user=request.user).exists()
     )
 
+    is_author = request.user.is_authenticated and review.user == request.user
+
     return render(request, 'frontend/review_detail.html', {
         'review': review,
         'user_reaction': user_reaction,
@@ -6559,7 +6571,19 @@ def review_detail(request, review_id):
         'disagree_comments': disagree_comments,
         'user_debate': user_debate,
         'user_has_commented': user_has_commented,
+        'is_author': is_author,
     })
+
+
+@login_required
+@require_POST
+def delete_review(request, review_id):
+    """Author deletes their own review."""
+    review = get_object_or_404(Review, id=review_id)
+    if review.user != request.user:
+        return JsonResponse({'success': False, 'error': 'You can only delete your own review.'}, status=403)
+    review.delete()
+    return JsonResponse({'success': True, 'redirect_url': '/reviews/'})
 
 
 @require_POST
