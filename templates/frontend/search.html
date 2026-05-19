@@ -1,222 +1,455 @@
 {% extends 'frontend/base.html' %}
 
-{% block title %}{% if is_hashtag_search %}#{{ tag }}{% else %}Search{% endif %} - Discussion Hub{% endblock %}
+{% block title %}{% if is_hashtag_search %}#{{ tag }}{% else %}Search{% endif %} - PickASide{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto space-y-8">
-    <!-- Search Header -->
-    <div>
-        {% if is_hashtag_search %}
-        <h1 class="text-3xl font-bold text-foreground mb-4">Posts with <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 via-teal-500 to-amber-500">#{{ tag }}</span></h1>
-        {% else %}
-        <h1 class="text-3xl font-bold text-foreground mb-4">Search Discussions</h1>
-        {% endif %}
-        <div class="flex items-center justify-end mb-2">
-          <a href="{% url 'search_advanced' %}{% if query %}?q={{ query }}{% endif %}" class="text-xs text-primary hover:underline font-semibold">⚙️ Advanced Search</a>
-        </div>
+<style>
+.search-hero {
+    padding: 2.5rem 0 1.5rem;
+    border-bottom: 1px solid hsl(var(--border) / 0.5);
+    margin-bottom: 1.75rem;
+}
+.search-title {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-weight: 700;
+    font-size: 2rem;
+    letter-spacing: -0.01em;
+    color: hsl(var(--foreground));
+    margin-bottom: 0.1rem;
+    line-height: 1.2;
+}
+.search-subtitle {
+    font-size: 0.8rem;
+    color: hsl(var(--muted-foreground));
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 500;
+}
+.search-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 1.25rem;
+}
+.search-input {
+    flex: 1;
+    padding: 0.65rem 1.1rem 0.65rem 2.6rem;
+    border-radius: 999px;
+    border: 1.5px solid hsl(var(--border));
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 0.18s, box-shadow 0.18s;
+}
+.search-input:focus {
+    border-color: hsl(var(--primary) / 0.6);
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+}
+.search-input-wrap { position: relative; flex: 1; }
+.search-input-icon {
+    position: absolute;
+    left: 0.9rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: hsl(var(--muted-foreground));
+    pointer-events: none;
+}
+.search-btn {
+    padding: 0.65rem 1.4rem;
+    border-radius: 999px;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    font-size: 0.825rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    border: none;
+    cursor: pointer;
+    transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
+    white-space: nowrap;
+}
+.search-btn:hover {
+    background: hsl(var(--primary) / 0.88);
+    box-shadow: 0 4px 16px -4px hsl(var(--primary) / 0.4);
+    transform: translateY(-1px);
+}
+.advanced-link {
+    font-size: 0.72rem;
+    color: hsl(var(--muted-foreground));
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 600;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    transition: color 0.15s;
+}
+.advanced-link:hover { color: hsl(var(--foreground)); }
+/* Result tabs */
+.stab-bar {
+    display: flex;
+    gap: 0;
+    border-bottom: 1.5px solid hsl(var(--border) / 0.6);
+    margin-bottom: 1.25rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.stab-bar::-webkit-scrollbar { display: none; }
+.stab-btn-new {
+    padding: 0.55rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: hsl(var(--muted-foreground));
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1.5px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.18s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.stab-btn-new:hover { color: hsl(var(--foreground)); }
+.stab-btn-new.active {
+    color: hsl(var(--primary));
+    border-bottom-color: hsl(var(--primary));
+}
+.stab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    padding: 0 4px;
+    height: 16px;
+    border-radius: 999px;
+    background: hsl(var(--primary) / 0.12);
+    color: hsl(var(--primary));
+    font-size: 9px;
+    font-weight: 700;
+}
+/* Result cards */
+.sresult-card {
+    padding: 1rem 1.1rem;
+    border: 1.5px solid hsl(var(--border) / 0.7);
+    border-radius: 14px;
+    background: hsl(var(--card));
+    transition: border-color 160ms, box-shadow 160ms, transform 120ms;
+    text-decoration: none;
+    display: block;
+    margin-bottom: 0.6rem;
+}
+.sresult-card:hover {
+    border-color: hsl(var(--primary) / 0.35);
+    box-shadow: 0 4px 20px -6px hsl(var(--primary) / 0.15);
+    transform: translateY(-1px);
+}
+.sresult-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+    line-height: 1.35;
+    margin-bottom: 0.2rem;
+    transition: color 0.15s;
+}
+.sresult-card:hover .sresult-title { color: hsl(var(--primary)); }
+.sresult-excerpt {
+    font-size: 0.775rem;
+    color: hsl(var(--muted-foreground));
+    line-height: 1.55;
+    margin-bottom: 0.5rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.sresult-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    font-size: 0.7rem;
+    color: hsl(var(--muted-foreground));
+}
+.sresult-tag {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+/* Filter chips */
+.filter-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1rem; }
+.filter-chip {
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1.5px solid hsl(var(--border) / 0.7);
+    background: hsl(var(--card) / 0.7);
+    color: hsl(var(--muted-foreground));
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.filter-chip:hover {
+    border-color: hsl(var(--primary) / 0.5);
+    color: hsl(var(--foreground));
+}
+.filter-chip.active {
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    border-color: hsl(var(--primary));
+}
+/* Empty state */
+.search-empty {
+    text-align: center;
+    padding: 4rem 0 3rem;
+    color: hsl(var(--muted-foreground));
+}
+.search-empty-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+    line-height: 1;
+    display: block;
+    opacity: 0.7;
+}
+.search-empty-title {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 1.15rem;
+    color: hsl(var(--foreground));
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+}
+.search-empty-sub { font-size: 0.8rem; }
+</style>
 
-        <!-- Search Form -->
-        <form method="get" class="mb-8">
+<div class="max-w-3xl mx-auto px-4">
+    <!-- Hero / header -->
+    <div class="search-hero">
+        {% if is_hashtag_search %}
+        <div class="search-subtitle">Hashtag</div>
+        <h1 class="search-title">#{{ tag }}</h1>
+        {% else %}
+        <div class="search-subtitle">Discover</div>
+        <h1 class="search-title">Search</h1>
+        {% endif %}
+
+        <form method="get" class="search-bar-wrap">
             {% if is_hashtag_search %}
             <input type="hidden" name="tag" value="{{ tag }}">
             {% endif %}
-            <div class="flex space-x-4">
+            <div class="search-input-wrap">
+                <span class="search-input-icon">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                </span>
                 {% if is_hashtag_search %}
-                <input type="text" name="tag" value="{{ tag }}" placeholder="Search hashtags..." disabled
-                       class="flex-1 px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent opacity-60 cursor-not-allowed">
+                <input type="text" name="tag" value="{{ tag }}" placeholder="Search hashtags…" class="search-input" disabled style="opacity:.6;cursor:not-allowed">
                 {% else %}
-                <input type="text" name="q" value="{{ query }}" placeholder="Search for discussions..."
-                       class="flex-1 px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                <input type="text" name="q" value="{{ query }}" placeholder="Search discussions, reviews, questions…" class="search-input" autofocus>
                 {% endif %}
-                <button type="submit"
-                        class="bg-primary text-primary-foreground px-6 py-2 rounded-lg hover:bg-primary/90">
-                    Search
-                </button>
             </div>
+            <button type="submit" class="search-btn">Search</button>
+            {% if not is_hashtag_search %}
+            <a href="{% url 'search_advanced' %}{% if query %}?q={{ query }}{% endif %}" class="advanced-link">
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                Advanced
+            </a>
+            {% endif %}
         </form>
     </div>
 
-    <!-- Search Results -->
+    <!-- Results -->
     {% if query and not is_hashtag_search %}
     {% if total_all > 0 %}
+
+    <!-- Sort / date filter chips -->
     {% if query %}
-    <div class="flex flex-wrap items-center gap-2 mb-4">
-      <!-- Sort -->
-      <div class="flex items-center gap-1 rounded-xl border border-border bg-card px-1 py-1">
+    <div class="filter-bar">
         {% for val, label in sort_options %}
         <a href="?q={{ query|urlencode }}&tab={{ active_tab }}&sort={{ val }}&date_range={{ date_range }}"
-           class="px-3 py-1 rounded-lg text-xs font-semibold transition-colors {% if sort == val %}bg-primary text-primary-foreground{% else %}text-muted-foreground hover:text-foreground{% endif %}">{{ label }}</a>
+           class="filter-chip {% if sort == val %}active{% endif %}">{{ label }}</a>
         {% endfor %}
-      </div>
-      <!-- Date range -->
-      <div class="flex items-center gap-1 rounded-xl border border-border bg-card px-1 py-1">
+        <span style="width:1px;height:18px;background:hsl(var(--border)/.5);align-self:center;display:inline-block"></span>
         {% for val, label in date_options %}
         <a href="?q={{ query|urlencode }}&tab={{ active_tab }}&sort={{ sort }}&date_range={{ val }}"
-           class="px-3 py-1 rounded-lg text-xs font-semibold transition-colors {% if date_range == val %}bg-primary text-primary-foreground{% else %}text-muted-foreground hover:text-foreground{% endif %}">{{ label }}</a>
+           class="filter-chip {% if date_range == val %}active{% endif %}">{{ label }}</a>
         {% endfor %}
-      </div>
     </div>
     {% endif %}
+
     <!-- Type tabs -->
-    <div class="flex gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 shadow-sm overflow-x-auto mb-6">
+    <div class="stab-bar">
         <button type="button" onclick="switchSearchTab('posts')" id="stab-btn-posts"
-            class="stab-btn {% if active_tab == 'posts' or not active_tab %}active bg-primary/10 text-primary shadow-sm{% else %}text-muted-foreground hover:text-foreground hover:bg-secondary/60{% endif %} flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all duration-200">
-            🗳️ Posts <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold">{{ totals.posts }}</span>
+            class="stab-btn-new {% if active_tab == 'posts' or not active_tab %}active{% endif %}">
+            🗳️ Posts <span class="stab-count">{{ totals.posts }}</span>
         </button>
         <button type="button" onclick="switchSearchTab('reviews')" id="stab-btn-reviews"
-            class="stab-btn {% if active_tab == 'reviews' %}active bg-primary/10 text-primary shadow-sm{% else %}text-muted-foreground hover:text-foreground hover:bg-secondary/60{% endif %} flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all duration-200">
-            ⭐ Reviews <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold">{{ totals.reviews }}</span>
+            class="stab-btn-new {% if active_tab == 'reviews' %}active{% endif %}">
+            ⭐ Reviews <span class="stab-count">{{ totals.reviews }}</span>
         </button>
         <button type="button" onclick="switchSearchTab('questions')" id="stab-btn-questions"
-            class="stab-btn {% if active_tab == 'questions' %}active bg-primary/10 text-primary shadow-sm{% else %}text-muted-foreground hover:text-foreground hover:bg-secondary/60{% endif %} flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all duration-200">
-            💬 Questions <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold">{{ totals.questions }}</span>
+            class="stab-btn-new {% if active_tab == 'questions' %}active{% endif %}">
+            💬 Questions <span class="stab-count">{{ totals.questions }}</span>
         </button>
         <button type="button" onclick="switchSearchTab('polls')" id="stab-btn-polls"
-            class="stab-btn {% if active_tab == 'polls' %}active bg-primary/10 text-primary shadow-sm{% else %}text-muted-foreground hover:text-foreground hover:bg-secondary/60{% endif %} flex-1 inline-flex items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition-all duration-200">
-            📊 Polls <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold">{{ totals.polls }}</span>
+            class="stab-btn-new {% if active_tab == 'polls' %}active{% endif %}">
+            📊 Polls <span class="stab-count">{{ totals.polls }}</span>
         </button>
     </div>
 
-    <p class="text-sm text-muted-foreground mb-4">{{ total_all }} result{{ total_all|pluralize }} for "<strong class="text-foreground">{{ query }}</strong>"</p>
+    <p style="font-size:.75rem;color:hsl(var(--muted-foreground));margin-bottom:1rem;">
+        <strong style="color:hsl(var(--foreground))">{{ total_all }}</strong> result{{ total_all|pluralize }} for
+        &ldquo;<em style="color:hsl(var(--foreground))">{{ query }}</em>&rdquo;
+    </p>
 
     <!-- Posts tab -->
-    <div id="stab-posts" class="space-y-4 {% if active_tab and active_tab != 'posts' %}hidden{% endif %}">
+    <div id="stab-posts" class="{% if active_tab and active_tab != 'posts' %}hidden{% endif %}">
         {% for post in post_results %}
-        <div class="bg-card border border-border rounded-xl p-5 hover:border-primary/30 hover:shadow-md transition-all">
-            <h3 class="text-base font-bold text-foreground mb-1">
-                <a href="{% url 'discussion' post.id %}" class="hover:text-primary">{{ post.title }}</a>
-            </h3>
-            <p class="text-sm text-muted-foreground mb-3 line-clamp-2">{{ post.content|truncatechars:180 }}</p>
-            <div class="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+        <a href="{% url 'discussion' post.id %}" class="sresult-card">
+            <div class="sresult-title">{{ post.title }}</div>
+            <div class="sresult-excerpt">{{ post.content|truncatechars:180 }}</div>
+            <div class="sresult-meta">
                 <span>{{ post.created_at|date:"M j, Y" }}</span>
-                <a href="{% url 'user_profile' post.user.username %}" class="font-semibold hover:text-primary">{{ post.user.username }}</a>
-                <span class="px-2 py-0.5 bg-secondary rounded-full">{{ post.category }}</span>
-                {% if post.hashtags %}
+                <span style="color:hsl(var(--foreground));font-weight:600">{{ post.user.username }}</span>
+                <span class="sresult-tag" style="background:hsl(var(--secondary));color:hsl(var(--foreground))">{{ post.category }}</span>
                 {% for tag in post.get_hashtags_list %}
-                <a href="{% url 'hashtag_search' %}?tag={{ tag }}" class="text-cyan-600 dark:text-cyan-400 hover:underline">#{{ tag }}</a>
+                <span style="color:hsl(var(--primary));font-size:.65rem">#{{ tag }}</span>
                 {% endfor %}
-                {% endif %}
             </div>
-        </div>
+        </a>
         {% empty %}
-        <div class="text-center py-8 text-muted-foreground">No posts match "{{ query }}".</div>
+        <div class="search-empty">
+            <span class="search-empty-icon">🗳️</span>
+            <div class="search-empty-title">No posts found</div>
+            <div class="search-empty-sub">Try different keywords.</div>
+        </div>
         {% endfor %}
     </div>
 
     <!-- Reviews tab -->
-    <div id="stab-reviews" class="space-y-4 {% if active_tab != 'reviews' %}hidden{% endif %}">
+    <div id="stab-reviews" class="{% if active_tab != 'reviews' %}hidden{% endif %}">
         {% for review in review_results %}
-        <div class="bg-card border border-border rounded-xl p-5 hover:border-primary/30 hover:shadow-md transition-all">
-            <div class="flex items-start justify-between gap-3 mb-1">
-                <h3 class="text-base font-bold text-foreground">
-                    <a href="{% url 'review_detail' review.id %}" class="hover:text-primary">{{ review.subject }}</a>
-                </h3>
-                <div class="flex items-center gap-0.5 flex-shrink-0">
-                    {% for i in "12345" %}
-                    <svg class="w-3.5 h-3.5 {% if forloop.counter <= review.rating %}text-amber-400{% else %}text-muted-foreground/30{% endif %}" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                    {% endfor %}
+        <a href="{% url 'review_detail' review.id %}" class="sresult-card">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:2px">
+                <div class="sresult-title" style="margin-bottom:0">{{ review.subject }}</div>
+                <div style="display:flex;align-items:center;gap:2px;flex-shrink:0">
+                    {% for i in "12345" %}<svg width="11" height="11" fill="{% if forloop.counter <= review.rating %}#f59e0b{% else %}none{% endif %}" stroke="#f59e0b" stroke-width="1.5" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>{% endfor %}
                 </div>
             </div>
-            <p class="text-sm text-muted-foreground mb-3 line-clamp-2">{{ review.content|truncatechars:180 }}</p>
-            <div class="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                <span class="px-2 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full font-bold">{{ review.subject_type }}</span>
-                <a href="{% url 'user_profile' review.user.username %}" class="font-semibold hover:text-primary">{{ review.user.username }}</a>
+            <div class="sresult-excerpt">{{ review.content|truncatechars:180 }}</div>
+            <div class="sresult-meta">
+                <span class="sresult-tag" style="background:hsl(45 96% 90%);color:hsl(33 92% 35%)">{{ review.subject_type }}</span>
+                <span style="font-weight:600;color:hsl(var(--foreground))">{{ review.user.username }}</span>
                 <span>{{ review.created_at|date:"M j, Y" }}</span>
             </div>
-        </div>
+        </a>
         {% empty %}
-        <div class="text-center py-8 text-muted-foreground">No reviews match "{{ query }}".</div>
+        <div class="search-empty">
+            <span class="search-empty-icon">⭐</span>
+            <div class="search-empty-title">No reviews found</div>
+            <div class="search-empty-sub">Try different keywords.</div>
+        </div>
         {% endfor %}
     </div>
 
     <!-- Questions tab -->
-    <div id="stab-questions" class="space-y-4 {% if active_tab != 'questions' %}hidden{% endif %}">
+    <div id="stab-questions" class="{% if active_tab != 'questions' %}hidden{% endif %}">
         {% for q in question_results %}
-        <div class="bg-card border border-border rounded-xl p-5 hover:border-primary/30 hover:shadow-md transition-all">
-            <h3 class="text-base font-bold text-foreground mb-1">
-                <a href="{% url 'question_detail' q.id %}" class="hover:text-primary">{{ q.title }}</a>
-            </h3>
-            {% if q.content %}<p class="text-sm text-muted-foreground mb-3 line-clamp-2">{{ q.content|truncatechars:180 }}</p>{% endif %}
-            <div class="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                <span class="px-2 py-0.5 bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 rounded-full font-bold">{{ q.category }}</span>
-                <a href="{% url 'user_profile' q.user.username %}" class="font-semibold hover:text-primary">{{ q.user.username }}</a>
+        <a href="{% url 'question_detail' q.id %}" class="sresult-card">
+            <div class="sresult-title">{{ q.title }}</div>
+            {% if q.content %}<div class="sresult-excerpt">{{ q.content|truncatechars:180 }}</div>{% endif %}
+            <div class="sresult-meta">
+                <span class="sresult-tag" style="background:hsl(263 90% 95%);color:hsl(263 70% 45%)">{{ q.category }}</span>
+                <span style="font-weight:600;color:hsl(var(--foreground))">{{ q.user.username }}</span>
                 <span>{{ q.answer_count }} answer{{ q.answer_count|pluralize }}</span>
                 <span>{{ q.created_at|date:"M j, Y" }}</span>
             </div>
-        </div>
+        </a>
         {% empty %}
-        <div class="text-center py-8 text-muted-foreground">No questions match "{{ query }}".</div>
+        <div class="search-empty">
+            <span class="search-empty-icon">💬</span>
+            <div class="search-empty-title">No questions found</div>
+            <div class="search-empty-sub">Try different keywords.</div>
+        </div>
         {% endfor %}
     </div>
 
     <!-- Polls tab -->
-    <div id="stab-polls" class="space-y-4 {% if active_tab != 'polls' %}hidden{% endif %}">
+    <div id="stab-polls" class="{% if active_tab != 'polls' %}hidden{% endif %}">
         {% for poll in poll_results %}
-        <div class="bg-card border border-border rounded-xl p-5 hover:border-primary/30 hover:shadow-md transition-all">
-            <h3 class="text-base font-bold text-foreground mb-1">
-                <a href="{% url 'poll_detail' poll.id %}" class="hover:text-primary">{{ poll.title }}</a>
-            </h3>
-            {% if poll.description %}<p class="text-sm text-muted-foreground mb-3 line-clamp-2">{{ poll.description }}</p>{% endif %}
-            <div class="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                <span class="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded-full font-bold">{{ poll.category }}</span>
-                <a href="{% url 'user_profile' poll.user.username %}" class="font-semibold hover:text-primary">{{ poll.user.username }}</a>
+        <a href="{% url 'poll_detail' poll.id %}" class="sresult-card">
+            <div class="sresult-title">{{ poll.title }}</div>
+            {% if poll.description %}<div class="sresult-excerpt">{{ poll.description }}</div>{% endif %}
+            <div class="sresult-meta">
+                <span class="sresult-tag" style="background:hsl(213 90% 93%);color:hsl(213 70% 38%)">{{ poll.category }}</span>
+                <span style="font-weight:600;color:hsl(var(--foreground))">{{ poll.user.username }}</span>
                 <span>{{ poll.total_votes }} vote{{ poll.total_votes|pluralize }}</span>
                 <span>{{ poll.created_at|date:"M j, Y" }}</span>
             </div>
-        </div>
+        </a>
         {% empty %}
-        <div class="text-center py-8 text-muted-foreground">No polls match "{{ query }}".</div>
+        <div class="search-empty">
+            <span class="search-empty-icon">📊</span>
+            <div class="search-empty-title">No polls found</div>
+            <div class="search-empty-sub">Try different keywords.</div>
+        </div>
         {% endfor %}
     </div>
 
     {% else %}
-    <div class="text-center py-12">
-        <div class="text-6xl mb-4">🔍</div>
-        <h3 class="text-xl font-semibold text-foreground mb-2">No results found</h3>
-        <p class="text-muted-foreground">Try different keywords or check your spelling.</p>
+    <div class="search-empty">
+        <span class="search-empty-icon">🔍</span>
+        <div class="search-empty-title">No results found</div>
+        <div class="search-empty-sub">Try different keywords or check your spelling.</div>
     </div>
     {% endif %}
 
     {% elif is_hashtag_search %}
     <div>
         {% if results %}
-        <h2 class="text-xl font-semibold text-foreground mb-4">Found {{ results.count }} post{{ results.count|pluralize }} with #{{ tag }}</h2>
-        <div class="space-y-4">
-            {% for post in results %}
-            <div class="bg-card border border-border rounded-xl p-5 hover:border-primary/30 hover:shadow-md transition-all">
-                <h3 class="text-base font-bold text-foreground mb-1">
-                    <a href="{% url 'discussion' post.id %}" class="hover:text-primary">{{ post.title }}</a>
-                </h3>
-                <p class="text-sm text-muted-foreground mb-3 line-clamp-2">{{ post.content|truncatechars:180 }}</p>
-                {% if post.hashtags %}
-                <div class="mb-3 flex flex-wrap gap-2">
-                    {% for hashtag in post.get_hashtags_list %}
-                    <a href="{% url 'hashtag_search' %}?tag={{ hashtag }}" class="inline-flex items-center px-2 py-1 rounded-full text-cyan-600 dark:text-cyan-400 text-xs font-medium bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 transition">#{{ hashtag }}</a>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                <div class="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>{{ post.created_at|date:"M j, Y" }}</span>
-                    <a href="{% url 'user_profile' post.user.username %}" class="font-semibold hover:text-primary">{{ post.user.username }}</a>
-                    <span class="px-2 py-0.5 bg-secondary rounded-full">{{ post.category }}</span>
-                </div>
+        <p style="font-size:.75rem;color:hsl(var(--muted-foreground));margin-bottom:1rem;">
+            <strong style="color:hsl(var(--foreground))">{{ results.count }}</strong> post{{ results.count|pluralize }} tagged
+            <strong style="color:hsl(var(--primary))">#{{ tag }}</strong>
+        </p>
+        {% for post in results %}
+        <a href="{% url 'discussion' post.id %}" class="sresult-card">
+            <div class="sresult-title">{{ post.title }}</div>
+            <div class="sresult-excerpt">{{ post.content|truncatechars:180 }}</div>
+            {% if post.hashtags %}
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+                {% for hashtag in post.get_hashtags_list %}
+                <span style="color:hsl(var(--primary));font-size:.65rem;font-weight:600">#{{ hashtag }}</span>
+                {% endfor %}
             </div>
-            {% endfor %}
-        </div>
+            {% endif %}
+            <div class="sresult-meta">
+                <span>{{ post.created_at|date:"M j, Y" }}</span>
+                <span style="font-weight:600;color:hsl(var(--foreground))">{{ post.user.username }}</span>
+                <span class="sresult-tag" style="background:hsl(var(--secondary));color:hsl(var(--foreground))">{{ post.category }}</span>
+            </div>
+        </a>
+        {% endfor %}
         {% else %}
-        <div class="text-center py-12">
-            <div class="text-6xl mb-4">🔍</div>
-            <h3 class="text-xl font-semibold text-foreground mb-2">No results found</h3>
-            <p class="text-muted-foreground">No posts found with #{{ tag }}</p>
+        <div class="search-empty">
+            <span class="search-empty-icon">🔍</span>
+            <div class="search-empty-title">No posts found</div>
+            <div class="search-empty-sub">No posts found with #{{ tag }}</div>
         </div>
         {% endif %}
     </div>
 
     {% else %}
-    <div class="text-center py-12">
-        <div class="text-6xl mb-4">💡</div>
-        <h3 class="text-xl font-semibold text-foreground mb-2">Search everything</h3>
-        <p class="text-muted-foreground">Search across posts, reviews, questions, and polls.</p>
+    <div class="search-empty">
+        <span class="search-empty-icon">✦</span>
+        <div class="search-empty-title">Search everything</div>
+        <div class="search-empty-sub">Posts · Reviews · Questions · Polls</div>
     </div>
     {% endif %}
 </div>
@@ -230,12 +463,10 @@ function switchSearchTab(name) {
         if (!panel || !btn) return;
         if (t === name) {
             panel.classList.remove('hidden');
-            btn.classList.add('active', 'bg-primary/10', 'text-primary', 'shadow-sm');
-            btn.classList.remove('text-muted-foreground', 'hover:text-foreground', 'hover:bg-secondary/60');
+            btn.classList.add('active');
         } else {
             panel.classList.add('hidden');
-            btn.classList.remove('active', 'bg-primary/10', 'text-primary', 'shadow-sm');
-            btn.classList.add('text-muted-foreground', 'hover:text-foreground', 'hover:bg-secondary/60');
+            btn.classList.remove('active');
         }
     });
 }

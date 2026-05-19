@@ -2675,11 +2675,6 @@ function acceptCookies() {
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div class="nav-bar-inner flex justify-between h-16">
                 <div class="nav-left">
-                    <button id="nav-menu-toggle" type="button" class="nav-menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu-drawer">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                        </svg>
-                    </button>
                     <div class="nav-brand flex items-center" style="position:relative;">
                         <button type="button" id="nav-hub-toggle" onclick="toggleHubMenu()" class="flex items-center gap-1 text-xl font-bold text-primary hover:text-primary/80 transition-colors focus:outline-none" aria-haspopup="true" aria-expanded="false">
                             PickASide
@@ -3019,36 +3014,6 @@ function acceptCookies() {
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                             </svg>
                         </button>
-                        <a href="{% url 'notifications' %}" id="nav-notifications-link" class="relative nav-icon-pill" aria-label="Notifications" title="Notifications" data-tooltip="Notifications">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"></path>
-                            </svg>
-                            {% if pending_notifications_count > 0 %}
-                            <span id="nav-notification-badge" class="nav-counter-badge absolute -right-2 -top-2 inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground">
-                                {{ pending_notifications_count }}
-                            </span>
-                            {% endif %}
-                        </a>
-                        <div class="user-menu-wrap" style="position:relative;">
-                            <button type="button" id="nav-chat-toggle" class="relative nav-icon-pill" aria-label="Active Conversations" title="Active Conversations" data-tooltip="Active Conversations" aria-expanded="false">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                                </svg>
-                                <span id="nav-chat-badge" class="nav-counter-badge absolute -right-2 -top-2 hidden inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"></span>
-                            </button>
-                            <div id="nav-chat-panel" class="nav-chat-panel hidden" style="right:0;top:calc(100% + 8px);position:absolute;">
-                                <div class="nav-chat-panel-header">
-                                    <div class="nav-chat-panel-title-wrap">
-                                        <span class="nav-chat-panel-title">💬 Chats</span>
-                                        <span class="nav-chat-panel-subtitle">Live conversations</span>
-                                    </div>
-                                    <span id="nav-chat-panel-count" class="text-xs text-muted-foreground"></span>
-                                </div>
-                                <div id="nav-chat-list" class="nav-chat-list">
-                                    <div class="nav-chat-loading">Loading chats…</div>
-                                </div>
-                            </div>
-                        </div>
                         <div class="user-menu-wrap">
                             <a id="user-menu-toggle" href="{% url 'profile' %}" class="nav-icon-pill" aria-label="My Profile" title="My Profile" data-tooltip="My Profile" aria-expanded="false">
                                 {% if current_user_avatar %}
@@ -3105,22 +3070,6 @@ function acceptCookies() {
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                             </svg>
                         </button>
-                        <a href="{% url 'notifications' %}" id="mobile-nav-notifications-link" class="relative nav-icon-pill" aria-label="Notifications">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9"></path>
-                            </svg>
-                            {% if pending_notifications_count > 0 %}
-                            <span id="mobile-nav-notification-badge" class="nav-counter-badge absolute -right-2 -top-2 inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground">
-                                {{ pending_notifications_count }}
-                            </span>
-                            {% endif %}
-                        </a>
-                        <a href="{% url 'chats' %}" class="relative nav-icon-pill" aria-label="Chats">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                            </svg>
-                            <span id="dm-count-badge" class="nav-counter-badge absolute -right-2 -top-2 inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-accent-foreground" style="display:none"></span>
-                        </a>
                         <div class="user-menu-wrap">
                             <button type="button" id="mobile-user-menu-toggle" class="nav-icon-pill" aria-label="Profile" aria-expanded="false">
                                 {% if current_user_avatar %}
@@ -3193,39 +3142,34 @@ function acceptCookies() {
         </div>
     </nav>
 
-    <div id="mobile-menu-backdrop" class="mobile-menu-backdrop"></div>
-    <aside id="mobile-menu-drawer" class="mobile-menu-drawer" aria-hidden="true">
-        <div class="mobile-menu-head">
-            <a href="{% url 'index' %}" class="text-base font-semibold text-primary">Menu</a>
-            <button id="mobile-menu-close" class="mobile-menu-close" type="button" aria-label="Close menu">✕</button>
-        </div>
 
-        <a href="{% url 'index' %}" class="mobile-menu-link">Home</a>
-        {% if user.is_authenticated %}
-        <a href="{% url 'profile' %}" class="mobile-menu-link">Profile</a>
-        <a href="{% url 'search' %}" class="mobile-menu-link">Search</a>
-        <a href="{% url 'notifications' %}" class="mobile-menu-link">Notifications</a>
-        <a href="{% url 'chats' %}" class="mobile-menu-link mobile-menu-theme" aria-label="Chats">
-            <span>Chats</span>
-            <span id="mobile-menu-chat-badge" class="nav-mobile-chat-badge"></span>
-        </a>
-        <a href="{% url 'bookmarks' %}" class="mobile-menu-link">Bookmarks</a>
-        <a href="{% url 'read_later' %}" class="mobile-menu-link">📚 Read Later</a>
-        <a href="{% url 'analytics_dashboard' %}" class="mobile-menu-link">Analytics</a>
-        <a href="{% url 'interests_onboarding' %}?force=1" class="mobile-menu-link">Interested Categories</a>
-        <a href="{% url 'hashtag_followed_feed' %}" class="mobile-menu-link"># Hashtag Feed</a>
-        <a href="{% url 'scheduled_posts' %}" class="mobile-menu-link">Scheduled Posts</a>
-        <a href="{% url 'people_you_may_know' %}" class="mobile-menu-link">👥 People You May Know</a>
-        <a href="{% url 'trending_users' %}" class="mobile-menu-link">🚀 Rising Creators</a>
-        <a href="{% url 'muted_users' %}" class="mobile-menu-link">🔇 Muted Users</a>
-        <a href="{% url 'logout' %}" class="mobile-menu-link">Logout</a>
-        {% endif %}
-
-        <button type="button" id="mobile-menu-theme" class="mobile-menu-link mobile-menu-theme" onclick="toggleTheme()">
-            <span>Change Theme</span>
-            <span id="mobile-theme-icon">🌙</span>
-        </button>
-    </aside>
+    <!-- Classy inline search bar below nav -->
+    <div id="global-search-bar" style="border-bottom:1px solid hsl(var(--border)/.4);background:hsl(var(--background)/.98);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:10px 16px;">
+        <form method="get" action="{% url 'search' %}" style="max-width:42rem;margin:0 auto;display:flex;align-items:center;gap:8px;">
+            <div style="position:relative;flex:1;">
+                <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:hsl(var(--muted-foreground));pointer-events:none;display:flex;align-items:center;">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                </span>
+                <input type="text" name="q" placeholder="Search discussions, reviews, questions…"
+                    style="width:100%;padding:7px 12px 7px 34px;border-radius:999px;border:1.5px solid hsl(var(--border)/.8);background:hsl(var(--card)/.7);color:hsl(var(--foreground));font-size:0.78rem;outline:none;transition:border-color .18s,box-shadow .18s;box-sizing:border-box;"
+                    onfocus="this.style.borderColor='hsl(var(--primary)/.55)';this.style.boxShadow='0 0 0 3px hsl(var(--primary)/.1)'"
+                    onblur="this.style.borderColor='';this.style.boxShadow=''">
+            </div>
+            <button type="submit"
+                style="padding:7px 16px;border-radius:999px;background:hsl(var(--primary));color:hsl(var(--primary-foreground));font-size:0.75rem;font-weight:700;letter-spacing:.04em;border:none;cursor:pointer;white-space:nowrap;transition:background .15s,transform .12s;"
+                onmouseover="this.style.background='hsl(var(--primary)/.85)';this.style.transform='translateY(-1px)'"
+                onmouseout="this.style.background='hsl(var(--primary))';this.style.transform=''">
+                Search
+            </button>
+            <a href="{% url 'search_advanced' %}"
+                style="font-size:0.68rem;color:hsl(var(--muted-foreground));letter-spacing:.06em;text-transform:uppercase;font-weight:600;text-decoration:none;white-space:nowrap;transition:color .15s;display:flex;align-items:center;gap:3px;"
+                onmouseover="this.style.color='hsl(var(--foreground))'"
+                onmouseout="this.style.color='hsl(var(--muted-foreground))'">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                Advanced
+            </a>
+        </form>
+    </div>
 
     <!-- Main Content -->
     {% block page_layout %}
