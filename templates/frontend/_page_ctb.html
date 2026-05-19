@@ -1,0 +1,86 @@
+{% comment %}
+Shared content-type navigation bar for all list pages.
+Pass active_ctb as one of: discussions, stocks, reviews, questions, polls
+{% endcomment %}
+<style>
+.page-ctb-bar {
+    position: sticky;
+    top: 64px;
+    z-index: 92;
+    background: hsl(var(--background) / 0.96);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-bottom: 1px solid hsl(var(--border) / 0.45);
+}
+.page-ctb-scroll {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 6px 12px 7px;
+    max-width: 56rem;
+    margin: 0 auto;
+}
+.page-ctb-scroll::-webkit-scrollbar { display: none; }
+.page-ctb-chip {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: none;
+    border: 1.5px solid hsl(var(--border) / 0.7);
+    background: hsl(var(--card) / 0.7);
+    color: hsl(var(--muted-foreground));
+    transition: color 0.15s, border-color 0.18s, background 0.18s, box-shadow 0.18s;
+    letter-spacing: 0.01em;
+}
+.page-ctb-chip:hover {
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--primary) / 0.5);
+    background: hsl(var(--card));
+    box-shadow: 0 2px 12px -4px hsl(var(--primary) / 0.18);
+}
+.page-ctb-chip.page-ctb-active {
+    color: hsl(var(--primary-foreground));
+    background: hsl(var(--primary));
+    border-color: hsl(var(--primary));
+    box-shadow: 0 3px 14px -4px hsl(var(--primary) / 0.4);
+}
+.page-ctb-icon { font-size: 13px; line-height: 1; }
+</style>
+
+<div class="page-ctb-bar">
+  <div class="page-ctb-scroll">
+
+    <a href="{% url 'index' %}" class="page-ctb-chip">
+      <span class="page-ctb-icon">⚡</span> All
+    </a>
+    <a href="{% url 'discussions_list' %}" class="page-ctb-chip {% if active_ctb == 'discussions' %}page-ctb-active{% endif %}">
+      <svg class="page-ctb-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+      Pick a Side
+    </a>
+    <a href="{% url 'stocks_list' %}" class="page-ctb-chip {% if active_ctb == 'stocks' %}page-ctb-active{% endif %}">
+      <svg class="page-ctb-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      Stock Predictions
+    </a>
+    <a href="{% url 'reviews_list' %}" class="page-ctb-chip {% if active_ctb == 'reviews' %}page-ctb-active{% endif %}">
+      <svg class="page-ctb-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Reviews
+    </a>
+    <a href="{% url 'questions_list' %}" class="page-ctb-chip {% if active_ctb == 'questions' %}page-ctb-active{% endif %}">
+      <svg class="page-ctb-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Questions
+    </a>
+    <a href="{% url 'polls_list' %}" class="page-ctb-chip {% if active_ctb == 'polls' %}page-ctb-active{% endif %}">
+      <svg class="page-ctb-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Polls
+    </a>
+
+  </div>
+</div>

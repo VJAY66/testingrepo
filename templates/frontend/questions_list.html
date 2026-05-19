@@ -2,17 +2,22 @@
 {% block title %}Questions — PickASide{% endblock %}
 
 {% block content %}
+{% include 'frontend/_page_ctb.html' with active_ctb='questions' %}
 <style>
 .qlc {
     background: hsl(var(--card));
-    border: 1px solid hsl(var(--border));
-    border-radius: 1.2rem;
-    transition: border-color 180ms ease, box-shadow 180ms ease;
-    padding: 1.15rem 1.25rem;
+    border: 1px solid hsl(var(--border)/0.8);
+    border-radius: 14px;
+    transition: border-color 160ms, box-shadow 160ms, transform 120ms;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 .qlc:hover {
-    border-color: hsl(var(--primary) / 0.35);
-    box-shadow: 0 8px 32px -12px hsl(var(--primary) / 0.18);
+    border-color: hsl(var(--primary) / 0.4);
+    box-shadow: 0 8px 24px -12px hsl(var(--primary) / 0.18);
+    transform: translateY(-2px);
 }
 /* ── Filter bar ── */
 .cfb { display:flex; align-items:center; gap:8px; overflow-x:auto; padding-bottom:6px; scrollbar-width:none; }
@@ -33,42 +38,40 @@
 .ca-like.ca-active svg,.ca-repost.ca-active svg,.ca-save.ca-active svg,.ca-follow.ca-active svg { transform:scale(1.15); }
 </style>
 
-<div class="max-w-3xl mx-auto px-4 py-6 sm:py-10 space-y-6">
+<div class="max-w-6xl mx-auto py-3 px-4">
 
     <!-- Header -->
-    <div class="flex items-center justify-between flex-wrap gap-3">
-        <div class="flex items-center gap-3">
-            <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100 text-2xl dark:bg-violet-900/40">💬</span>
-            <div>
-                <h1 class="text-xl font-bold text-foreground">Questions{% if active_category %} · {{ active_category }}{% endif %}</h1>
-                <p class="text-sm text-muted-foreground">Ask anything — get community answers.</p>
-            </div>
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="text-lg font-black text-foreground flex items-center gap-2" style="font-family:'Playfair Display',serif;">
+                <span>💬</span> Questions{% if active_category %} · {{ active_category }}{% endif %}
+            </h1>
+            <p class="text-xs text-muted-foreground">Ask anything — get community answers.</p>
         </div>
         {% if user.is_authenticated %}
-        <a href="{% url 'ask_general_question' %}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-bold shadow-sm shadow-primary/30 hover:shadow-md transition">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-            Ask Question
+        <a href="{% url 'ask_general_question' %}" class="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-sm shadow-primary/25">
+            + Ask Question
         </a>
         {% endif %}
     </div>
 
     <!-- Search bar -->
-    <form method="get" action="" class="relative group">
+    <form method="get" action="" class="relative group mb-2.5">
         {% if active_category %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}
-        <div class="flex items-center gap-2 bg-card border border-border rounded-2xl px-4 py-2.5 shadow-sm transition-all duration-200 focus-within:border-primary/60 focus-within:shadow-md focus-within:shadow-primary/10">
-            <svg class="w-4 h-4 text-muted-foreground flex-shrink-0 transition-colors group-focus-within:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35"/></svg>
+        <div class="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-1.5 shadow-sm transition-all focus-within:border-primary/60 focus-within:shadow-primary/10">
+            <svg class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 group-focus-within:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35"/></svg>
             <input type="text" name="q" value="{{ search_query }}" placeholder="Search questions{% if active_category %} in {{ active_category }}{% endif %}…"
-                   class="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 outline-none min-w-0">
+                   class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 outline-none min-w-0">
             {% if search_query %}
-            <a href="?{% if active_category %}category={{ active_category }}&{% endif %}" class="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded-full hover:bg-muted">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            <a href="?{% if active_category %}category={{ active_category }}&{% endif %}" class="text-muted-foreground hover:text-foreground p-0.5 rounded-full hover:bg-muted">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </a>
             {% endif %}
         </div>
     </form>
 
     <!-- Category filter bar -->
-    <div class="relative">
+    <div class="relative mb-3">
         <div class="cfb">
             <a href="{% url 'questions_list' %}{% if search_query %}?q={{ search_query|urlencode }}{% endif %}" class="cfb-pill {% if not active_category %}cfb-active{% endif %}"><span>✨</span> All</a>
             {% for cat in categories %}
@@ -81,7 +84,8 @@
 
     <!-- Question cards -->
     {% if questions_data %}
-    <div class="space-y-4">
+    <div class="disc-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:0.75rem;">
+    <style>@media(max-width:640px){.disc-grid{grid-template-columns:1fr!important;}}</style>
         {% for qd in questions_data %}
         {% with q=qd.question %}
         <div class="qlc">
