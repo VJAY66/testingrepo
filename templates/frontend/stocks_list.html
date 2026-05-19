@@ -91,6 +91,16 @@ html.dark .dir-down { color: hsl(346 70% 62%); }
 }
 .pulse-dot { animation: activePulse 1.5s ease-in-out infinite; }
 
+/* ── 2-col grid on desktop ── */
+.stock-feed-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+}
+@media (min-width: 768px) {
+    .stock-feed-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* ── Leaderboard sidebar ── */
 .lb-row {
     display: flex; align-items: center; gap: 0.75rem;
@@ -188,9 +198,10 @@ html.dark .chip-down { color: hsl(346 70% 62%); }
         <!-- ════════════════════════════════════════════════════
              LEFT: FEED
         ════════════════════════════════════════════════════ -->
-        <div class="flex-1 min-w-0 space-y-2.5">
+        <div class="flex-1 min-w-0">
 
             {% if page_obj.object_list %}
+            <div class="stock-feed-grid">
             {% for sp in page_obj.object_list %}
             {% with total=sp.bull_count|add:sp.bear_count %}
             <a href="{% url 'stock_prediction_detail' sp.post.id %}"
@@ -276,6 +287,7 @@ html.dark .chip-down { color: hsl(346 70% 62%); }
             </a>
             {% endwith %}
             {% endfor %}
+            </div><!-- /stock-feed-grid -->
 
             <!-- Pagination -->
             {% if page_obj.has_other_pages %}
