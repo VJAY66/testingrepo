@@ -44,25 +44,22 @@
 .rc-search-input:focus { border-color: hsl(var(--primary)); box-shadow: 0 0 0 3px hsl(var(--primary)/0.12); }
 .rc-search-input::placeholder { color: hsl(var(--muted-foreground)/0.55); }
 
-/* ── Period tabs ── */
-.rc-tabs {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 18px;
-}
+/* ── Period tabs (inline in hero) ── */
+.rc-tabs { display: flex; gap: 4px; flex-shrink: 0; }
 .rc-tab {
-  padding: 6px 16px;
+  padding: 4px 12px;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-decoration: none;
   border: 1.5px solid hsl(var(--border));
   color: hsl(var(--muted-foreground));
   background: transparent;
   transition: all .15s;
+  white-space: nowrap;
 }
 .rc-tab:hover { border-color: hsl(var(--primary)/0.5); color: hsl(var(--primary)); background: hsl(var(--primary)/0.05); }
-.rc-tab.active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: hsl(var(--primary)); box-shadow: 0 2px 8px -2px hsl(var(--primary)/0.4); }
+.rc-tab.active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: hsl(var(--primary)); box-shadow: 0 2px 6px -2px hsl(var(--primary)/0.4); }
 
 /* ── Section label ── */
 .rc-label {
@@ -144,31 +141,30 @@
 .rc-empty { text-align: center; padding: 48px 24px; }
 #rc-no-results { display: none; text-align: center; padding: 28px; color: hsl(var(--muted-foreground)); font-size: 0.875rem; }
 
-@media (max-width: 480px) {
-  .rc-hero { flex-wrap: wrap; }
-  .rc-search-wrap { width: 100%; }
+@media (max-width: 560px) {
+  .rc-hero { flex-wrap: wrap; gap: 8px; }
+  .rc-search-wrap { width: 100%; order: 3; }
+  .rc-tabs { order: 2; }
 }
 </style>
 
 <div class="rc-page">
 
-  <!-- Slim hero bar -->
+  <!-- Hero + tabs in one row -->
   <div class="rc-hero">
     <span class="rc-hero-icon">🚀</span>
     <h1>Rising Creators</h1>
+    <div class="rc-tabs">
+      <a href="?period=week"  class="rc-tab {% if period == 'week' %}active{% endif %}">Week</a>
+      <a href="?period=month" class="rc-tab {% if period == 'month' %}active{% endif %}">Month</a>
+      <a href="?period=year"  class="rc-tab {% if period == 'year' %}active{% endif %}">Year</a>
+    </div>
     <div class="rc-search-wrap">
       <svg class="rc-search-icon w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
       </svg>
       <input type="text" id="rc-search" class="rc-search-input" placeholder="Search people…" autocomplete="off" oninput="filterCreators(this.value)">
     </div>
-  </div>
-
-  <!-- Period tabs -->
-  <div class="rc-tabs">
-    <a href="?period=week"  class="rc-tab {% if period == 'week' %}active{% endif %}">This Week</a>
-    <a href="?period=month" class="rc-tab {% if period == 'month' %}active{% endif %}">This Month</a>
-    <a href="?period=year"  class="rc-tab {% if period == 'year' %}active{% endif %}">This Year</a>
   </div>
 
   {% if creators %}
