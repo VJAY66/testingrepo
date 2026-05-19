@@ -7887,35 +7887,32 @@ def _get_trending_hashtags(limit=10):
     return result
 
 
-def _get_rising_creators(limit=20):
-    """Return users ranked by follower gains + post engagement over the last 7 days."""
-    cache_key = f'rising_creators_{limit}'
+def _get_rising_creators(limit=20, days=7):
+    """Return users ranked by follower gains + post engagement over the given period."""
+    cache_key = f'rising_creators_{limit}_{days}'
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
     from discussions.models import PostAction as _PostAction
-    week_ago = timezone.now() - timedelta(days=7)
+    cutoff = timezone.now() - timedelta(days=days)
 
-    # New followers gained this week per user
     new_follows = (
         Follow.objects
-        .filter(created_at__gte=week_ago)
+        .filter(created_at__gte=cutoff)
         .values('following_id')
         .annotate(new_followers=Count('id'))
     )
     follower_gain = {row['following_id']: row['new_followers'] for row in new_follows}
 
-    # Post engagement (all actions) on posts published this week
     engagement = (
         _PostAction.objects
-        .filter(created_at__gte=week_ago, post__is_draft=False, post__is_deleted_by_moderation=False)
+        .filter(created_at__gte=cutoff, post__is_draft=False, post__is_deleted_by_moderation=False)
         .values('post__user_id')
         .annotate(actions=Count('id'))
     )
     eng_map = {row['post__user_id']: row['actions'] for row in engagement}
 
-    # Combine: 3× follower gain + 1× engagement actions
     all_ids = set(follower_gain) | set(eng_map)
     scored = sorted(
         all_ids,
@@ -7941,14 +7938,16 @@ def _get_rising_creators(limit=20):
             'engagement': eng_map.get(uid, 0),
         })
 
-    cache.set(cache_key, result, 900)  # 15 min cache
+    cache.set(cache_key, result, 900)
     return result
 
 
 @login_required
 def trending_users(request):
-    creators = _get_rising_creators(limit=30)
-    # Annotate is_following for the current user
+    period = request.GET.get('period', 'week')
+    days_map = {'week': 7, 'month': 30, 'year': 365}
+    days = days_map.get(period, 7)
+    creators = _get_rising_creators(limit=30, days=days)
     if creators:
         following_ids = set(
             Follow.objects.filter(follower=request.user)
@@ -7957,7 +7956,7 @@ def trending_users(request):
         for item in creators:
             item['is_following'] = item['user'].id in following_ids
             item['is_self'] = item['user'] == request.user
-    return render(request, 'frontend/trending_users.html', {'creators': creators})
+    return render(request, 'frontend/trending_users.html', {'creators': creators, 'period': period})
 
 
 # ─── Endorsements ─────────────────────────────────────────────────────────────
