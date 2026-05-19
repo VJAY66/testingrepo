@@ -4,244 +4,329 @@
 {% block content %}
 {% include 'frontend/_page_ctb.html' with active_ctb='reviews' %}
 <style>
-/* ── Card ── */
-.rv-card {
-    display: flex; flex-direction: column;
-    border-radius: 14px;
-    border: 1px solid hsl(var(--border)/0.8);
-    background: hsl(var(--card));
-    padding: 14px;
-    gap: 9px;
-    text-decoration: none;
-    transition: border-color 160ms, box-shadow 160ms, transform 120ms;
-}
-.rv-card:hover {
-    border-color: hsl(var(--primary)/0.4);
-    box-shadow: 0 8px 24px -12px hsl(var(--primary)/0.18);
-    transform: translateY(-2px);
-}
-.rv-av {
-    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: hsl(var(--primary)/0.12); color: hsl(var(--primary));
-    font-weight: 800; font-size: 13px; overflow: hidden;
-}
-.rv-av img { width: 100%; height: 100%; object-fit: cover; }
-.rv-handle { font-size: 12px; font-weight: 700; color: hsl(var(--primary)); line-height: 1.2; }
-.rv-meta   { font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 1px; }
-.rv-subject {
-    font-size: 13.5px; font-weight: 700; line-height: 1.35;
-    color: hsl(var(--foreground));
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-.rv-card:hover .rv-subject { color: hsl(var(--primary)); }
-.rv-excerpt {
-    font-size: 11.5px; color: hsl(var(--muted-foreground)); line-height: 1.4;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-.rv-type-badge {
-    display: inline-flex; align-items: center;
-    padding: 2px 8px; border-radius: 999px;
-    background: hsl(38 90% 54%/0.1); color: hsl(38 70% 38%);
-    font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
-    border: 1px solid hsl(38 90% 54%/0.22);
-}
-html.dark .rv-type-badge { color: hsl(38 90% 65%); }
-.rv-verified {
-    display: inline-flex; align-items: center; gap: 3px;
-    padding: 2px 6px; border-radius: 999px;
-    background: hsl(142 65% 44%/0.1); color: hsl(142 52% 30%);
-    font-size: 10px; font-weight: 700;
-    border: 1px solid hsl(142 65% 44%/0.25);
-}
-html.dark .rv-verified { color: hsl(142 60% 55%); }
-.rv-star-filled { color: hsl(38 92% 50%); }
-.rv-star-empty  { color: hsl(var(--muted-foreground)/0.3); }
-.rv-stat { display: flex; align-items: center; gap: 3px; font-size: 11px; color: hsl(var(--muted-foreground)); font-weight: 600; }
-.rv-footer { display: flex; align-items: center; justify-content: space-between; margin-top: auto; }
-.rv-read { display: flex; align-items: center; gap: 4px; color: hsl(var(--primary)); font-size: 11.5px; font-weight: 700; }
+.rl-page { max-width: 900px; margin: 0 auto; padding: 20px 16px 64px; }
 
-/* ── Filter bar ── */
-.cfb { display:flex; align-items:center; gap:6px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none; }
-.cfb::-webkit-scrollbar { display:none; }
-.cfb-pill { flex-shrink:0; padding:4px 12px; border-radius:999px; font-size:11.5px; font-weight:600; white-space:nowrap; border:1px solid hsl(var(--border)); background:hsl(var(--card)); color:hsl(var(--muted-foreground)); transition:all 0.18s ease; text-decoration:none; }
-.cfb-pill:hover { border-color:hsl(var(--primary)/0.4); color:hsl(var(--foreground)); }
-.cfb-pill.cfb-active { background:hsl(var(--primary)); border-color:transparent; color:hsl(var(--primary-foreground)); }
+/* ── Header bar ── */
+.rl-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+  background: hsl(var(--card));
+  border-radius: 999px;
+  border: 1px solid hsl(var(--border)/0.6);
+  margin-bottom: 14px;
+}
+.rl-header h1 {
+  font-size: 1rem; font-weight: 800; letter-spacing: -0.01em;
+  color: hsl(var(--foreground));
+  font-family: 'Playfair Display', Georgia, serif;
+  font-style: italic;
+  margin: 0; flex: 1;
+  display: flex; align-items: center; gap: 7px;
+}
+.rl-write-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 14px; border-radius: 999px;
+  background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+  font-size: 0.72rem; font-weight: 700; text-decoration: none;
+  box-shadow: 0 2px 8px -2px hsl(var(--primary)/0.4);
+  transition: filter .15s;
+  white-space: nowrap; flex-shrink: 0;
+}
+.rl-write-btn:hover { filter: brightness(1.08); }
+
+/* ── Search ── */
+.rl-search-form { position: relative; margin-bottom: 12px; }
+.rl-search-icon {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  color: hsl(var(--muted-foreground)); pointer-events: none;
+}
+.rl-search-input {
+  width: 100%; padding: 10px 40px 10px 40px;
+  border-radius: 999px;
+  border: 1.5px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-size: 0.85rem; font-family: inherit; outline: none;
+  transition: border-color .18s, box-shadow .18s;
+  box-sizing: border-box;
+}
+.rl-search-input:focus {
+  border-color: hsl(var(--primary)/0.6);
+  box-shadow: 0 0 0 3px hsl(var(--primary)/0.1);
+}
+.rl-search-input::placeholder { color: hsl(var(--muted-foreground)/0.55); }
+.rl-search-clear {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  color: hsl(var(--muted-foreground)); padding: 3px; border-radius: 50%;
+  text-decoration: none; transition: color .15s, background .15s;
+}
+.rl-search-clear:hover { color: hsl(var(--foreground)); background: hsl(var(--muted)); }
+
+/* ── Type filter ── */
+.rl-filters { display: flex; align-items: center; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; margin-bottom: 16px; }
+.rl-filters::-webkit-scrollbar { display: none; }
+.rl-pill {
+  flex-shrink: 0; padding: 5px 13px; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+  border: 1.5px solid hsl(var(--border)); background: hsl(var(--card));
+  color: hsl(var(--muted-foreground)); text-decoration: none;
+  transition: all .15s;
+}
+.rl-pill:hover { border-color: hsl(var(--primary)/0.45); color: hsl(var(--foreground)); }
+.rl-pill.active { background: hsl(var(--primary)); border-color: hsl(var(--primary)); color: hsl(var(--primary-foreground)); box-shadow: 0 2px 6px -2px hsl(var(--primary)/0.4); }
 
 /* ── Grid ── */
-.reviews-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:0.75rem; }
-@media (max-width:640px) { .reviews-grid { grid-template-columns:1fr; } }
+.rl-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (max-width: 600px) { .rl-grid { grid-template-columns: 1fr; } }
 
-/* ── Action buttons (kept for JS, hidden visually on cards) ── */
-.ca-btn { display:inline-flex; align-items:center; gap:4px; padding:4px 8px; border-radius:999px; font-size:11.5px; font-weight:600; border:1px solid transparent; background:transparent; color:hsl(var(--muted-foreground)); cursor:pointer; transition:all 0.2s ease; line-height:1; }
-.ca-btn:hover { background:hsl(var(--muted)/0.6); color:hsl(var(--foreground)); }
-.ca-btn:disabled { opacity:0.6; cursor:default; }
-.ca-btn svg { width:13px; height:13px; flex-shrink:0; }
-.ca-like:hover,.ca-like.ca-active { color:#f59e0b; background:rgba(245,158,11,0.1); }
-.ca-repost:hover,.ca-repost.ca-active { color:#22c55e; background:rgba(34,197,94,0.1); }
-.ca-save:hover,.ca-save.ca-active { color:hsl(var(--primary)); background:hsl(var(--primary)/0.1); }
+/* ── Review card ── */
+.rl-card {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 14px 16px;
+  border-radius: 1.1rem;
+  border: 1px solid hsl(var(--border)/0.7);
+  background: hsl(var(--card));
+  text-decoration: none;
+  transition: border-color .18s, box-shadow .18s, transform .15s;
+  position: relative; overflow: hidden;
+}
+.rl-card:hover {
+  border-color: hsl(var(--primary)/0.35);
+  box-shadow: 0 6px 24px -10px hsl(var(--primary)/0.18);
+  transform: translateY(-1px);
+}
+
+/* ── Card header ── */
+.rl-card-top { display: flex; align-items: center; gap: 8px; }
+.rl-avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: hsl(var(--primary)/0.1); color: hsl(var(--primary));
+  font-weight: 800; font-size: 0.75rem; overflow: hidden;
+  text-decoration: none;
+}
+.rl-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.rl-author { font-size: 0.75rem; font-weight: 700; color: hsl(var(--primary)); }
+.rl-date   { font-size: 0.68rem; color: hsl(var(--muted-foreground)); }
+.rl-badges { display: flex; align-items: center; gap: 4px; margin-left: auto; flex-shrink: 0; }
+.rl-type-badge {
+  display: inline-flex; padding: 2px 8px; border-radius: 999px;
+  background: hsl(38 90% 54%/0.1); color: hsl(38 68% 38%);
+  font-size: 0.65rem; font-weight: 700;
+  border: 1px solid hsl(38 90% 54%/0.2);
+}
+.dark .rl-type-badge { color: hsl(38 90% 65%); }
+.rl-verified {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 2px 6px; border-radius: 999px;
+  background: hsl(142 65% 44%/0.1); color: hsl(142 52% 30%);
+  font-size: 0.6rem; font-weight: 700;
+  border: 1px solid hsl(142 65% 44%/0.2);
+}
+.dark .rl-verified { color: hsl(142 60% 58%); }
+
+/* ── Stars ── */
+.rl-stars { display: flex; align-items: center; gap: 3px; }
+.rl-star-f { color: hsl(38 92% 50%); }
+.rl-star-e { color: hsl(var(--muted-foreground)/0.25); }
+.rl-rating { font-size: 0.68rem; font-weight: 800; color: hsl(38 68% 40%); margin-left: 3px; }
+.dark .rl-rating { color: hsl(38 80% 60%); }
+
+/* ── Subject & excerpt ── */
+.rl-subject {
+  font-size: 0.875rem; font-weight: 700; color: hsl(var(--foreground));
+  line-height: 1.35; text-decoration: none;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  transition: color .15s;
+}
+.rl-card:hover .rl-subject { color: hsl(var(--primary)); }
+.rl-excerpt {
+  font-size: 0.72rem; color: hsl(var(--muted-foreground)/0.85); line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* ── Footer ── */
+.rl-footer { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 4px; border-top: 1px solid hsl(var(--border)/0.4); }
+.rl-stats { display: flex; align-items: center; gap: 8px; }
+.rl-stat { display: flex; align-items: center; gap: 3px; font-size: 0.7rem; font-weight: 600; color: hsl(var(--muted-foreground)); }
+.rl-agree  { color: hsl(142 55% 38%); }
+.rl-disagree { color: hsl(346 60% 50%); }
+.rl-action-btn {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 3px 7px; border-radius: 999px; font-size: 0.68rem; font-weight: 600;
+  border: 1px solid transparent; background: transparent;
+  color: hsl(var(--muted-foreground)); cursor: pointer; transition: all .18s;
+}
+.rl-action-btn:hover { background: hsl(var(--muted)/0.6); color: hsl(var(--foreground)); }
+.rl-action-btn.active-like { color: hsl(38 80% 50%); background: hsl(38 80% 50%/0.1); }
+.rl-action-btn.active-save { color: hsl(var(--primary)); background: hsl(var(--primary)/0.1); }
+.rl-read {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.7rem; font-weight: 700; color: hsl(var(--primary));
+  text-decoration: none; transition: gap .15s;
+}
+.rl-read:hover { gap: 7px; }
+
+/* ── Empty ── */
+.rl-empty { text-align: center; padding: 56px 24px; border: 1.5px dashed hsl(var(--border)/0.7); border-radius: 1.25rem; background: hsl(var(--muted)/0.2); }
+
+/* ── Pagination ── */
+.rl-pager { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 24px; }
+.rl-page-btn {
+  padding: 6px 18px; border-radius: 999px; border: 1.5px solid hsl(var(--border));
+  background: hsl(var(--card)); font-size: 0.75rem; font-weight: 700;
+  color: hsl(var(--foreground)); text-decoration: none; transition: all .15s;
+}
+.rl-page-btn:hover { border-color: hsl(var(--primary)/0.5); color: hsl(var(--primary)); }
+.rl-page-cur { padding: 6px 14px; border-radius: 999px; background: hsl(var(--primary)/0.1); color: hsl(var(--primary)); font-size: 0.72rem; font-weight: 800; }
 </style>
 
-<div class="max-w-6xl mx-auto py-3 px-4">
+<div class="rl-page">
 
-    <!-- Header -->
-    <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
-        <div>
-            <h1 class="text-lg font-black text-foreground flex items-center gap-2" style="font-family:'Playfair Display',serif;">
-                <span>⭐</span> Reviews{% if active_category %} · {{ active_category }}{% endif %}
-            </h1>
-            <p class="text-xs text-muted-foreground">Community verdicts on anything.</p>
-        </div>
-        {% if user.is_authenticated %}
-        <a href="{% url 'create_review' %}" class="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-sm shadow-primary/25">
-            + Write Review
+  <!-- Header bar -->
+  <div class="rl-header">
+    <h1>⭐ Reviews{% if active_category %} · {{ active_category }}{% endif %}</h1>
+    {% if user.is_authenticated %}
+    <a href="{% url 'create_review' %}" class="rl-write-btn">
+      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 5v14M5 12h14"/></svg>
+      Write Review
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Search -->
+  <form method="get" action="" class="rl-search-form">
+    {% if active_type %}<input type="hidden" name="type" value="{{ active_type }}">{% endif %}
+    <svg class="rl-search-icon w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35"/></svg>
+    <input type="text" name="q" value="{{ search_query }}" class="rl-search-input"
+           placeholder="Search reviews{% if active_type %} in {{ active_type }}{% endif %}…">
+    {% if search_query %}
+    <a href="?{% if active_type %}type={{ active_type }}&{% endif %}" class="rl-search-clear">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+    </a>
+    {% endif %}
+  </form>
+
+  <!-- Type filter pills -->
+  <div class="rl-filters">
+    <a href="{% url 'reviews_list' %}{% if search_query %}?q={{ search_query|urlencode }}{% endif %}" class="rl-pill {% if not active_type %}active{% endif %}">✨ All</a>
+    {% for rt_key, rt_label in review_types %}
+    <a href="{% url 'reviews_list' %}?type={{ rt_key|urlencode }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="rl-pill {% if active_type == rt_key %}active{% endif %}">{{ rt_label }}</a>
+    {% endfor %}
+  </div>
+
+  <!-- Cards -->
+  {% if reviews_data %}
+  <div class="rl-grid">
+    {% for rd in reviews_data %}{% with rv=rd.review %}
+    <div class="rl-card">
+
+      <!-- Author row -->
+      <div class="rl-card-top">
+        <a href="{% url 'user_profile' rv.user.username %}" class="rl-avatar">
+          {% with pic=rv.user.profile.get_picture_url %}{% if pic %}<img src="{{ pic }}" alt="">{% else %}{{ rv.user.username|first|upper }}{% endif %}{% endwith %}
         </a>
-        {% endif %}
-    </div>
-
-    <!-- Search bar -->
-    <form method="get" action="" class="relative group mb-2.5">
-        {% if active_type %}<input type="hidden" name="type" value="{{ active_type }}">{% endif %}
-        <div class="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-1.5 shadow-sm transition-all focus-within:border-primary/60 focus-within:shadow-primary/10">
-            <svg class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 group-focus-within:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35"/></svg>
-            <input type="text" name="q" value="{{ search_query }}" placeholder="Search reviews{% if active_type %} in {{ active_type }}{% endif %}…"
-                   class="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 outline-none min-w-0">
-            {% if search_query %}
-            <a href="?{% if active_type %}type={{ active_type }}&{% endif %}" class="text-muted-foreground hover:text-foreground p-0.5 rounded-full hover:bg-muted">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-            </a>
-            {% endif %}
+        <div>
+          <div class="rl-author">@{{ rv.user.username }}</div>
+          <div class="rl-date">{{ rv.created_at|date:"M j, Y" }}</div>
         </div>
-    </form>
-
-    <!-- Review type filter bar -->
-    <div class="cfb mb-3">
-        <a href="{% url 'reviews_list' %}{% if search_query %}?q={{ search_query|urlencode }}{% endif %}" class="cfb-pill {% if not active_type %}cfb-active{% endif %}">✨ All</a>
-        {% for rt_key, rt_label in review_types %}
-        <a href="{% url 'reviews_list' %}?type={{ rt_key|urlencode }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="cfb-pill {% if active_type == rt_key %}cfb-active{% endif %}">{{ rt_label }}</a>
-        {% endfor %}
-    </div>
-
-    <!-- Review cards -->
-    {% if reviews_data %}
-    <div class="reviews-grid">
-        {% for rd in reviews_data %}
-        {% with rv=rd.review %}
-        <div class="rv-card">
-            <!-- Author header -->
-            <div class="flex items-center gap-2.5">
-                <a href="{% url 'user_profile' rv.user.username %}" class="rv-av">
-                    {% with pic=rv.user.profile.get_picture_url %}{% if pic %}<img src="{{ pic }}" alt="{{ rv.user.username }}">{% else %}{{ rv.user.username|first|upper }}{% endif %}{% endwith %}
-                </a>
-                <div class="flex-1 min-w-0">
-                    <div class="rv-handle">@{{ rv.user.username }}</div>
-                    <div class="rv-meta">{{ rv.created_at|date:"M j" }}</div>
-                </div>
-                <div class="flex items-center gap-1.5 flex-shrink-0">
-                    {% if rv.is_verified %}<span class="rv-verified">✓ Verified</span>{% endif %}
-                    <a href="{% url 'reviews_list' %}?type={{ rv.subject_type|urlencode }}" class="rv-type-badge" onclick="event.stopPropagation()">{{ rv.subject_type }}</a>
-                </div>
-            </div>
-
-            <!-- Subject + stars -->
-            <div>
-                <div class="flex items-center gap-1.5 mb-1 flex-wrap">
-                    <div class="flex items-center gap-0.5">
-                        {% for i in "12345" %}
-                        <svg class="w-3 h-3 {% if forloop.counter <= rv.rating %}rv-star-filled{% else %}rv-star-empty{% endif %}" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                        </svg>
-                        {% endfor %}
-                    </div>
-                    <span style="font-size:10.5px;font-weight:700;color:hsl(38 70% 38%);">{{ rv.rating }}/5</span>
-                </div>
-                <a href="{% url 'review_detail' rv.id %}" class="rv-subject">{{ rv.subject }}</a>
-            </div>
-
-            <!-- Excerpt -->
-            {% if rv.content %}
-            <p class="rv-excerpt">{{ rv.content }}</p>
-            {% endif %}
-
-            <!-- Footer -->
-            <div class="rv-footer">
-                <div class="flex items-center gap-2">
-                    <span class="rv-stat" style="color:hsl(142 55% 40%)">✓ {{ rv.agree_count }}</span>
-                    <span class="rv-stat" style="color:hsl(346 60% 50%)">✗ {{ rv.disagree_count }}</span>
-                    {% if user.is_authenticated %}
-                    <button type="button" class="ca-btn ca-like {% if rd.is_liked %}ca-active{% endif %}" onclick="doAction('review','{{ rv.id }}','like',this)">
-                        <svg fill="{% if rd.is_liked %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                        <span data-count>{{ rd.like_count }}</span>
-                    </button>
-                    <button type="button" class="ca-btn ca-save {% if rd.is_saved %}ca-active{% endif %}" onclick="doAction('review','{{ rv.id }}','save',this)">
-                        <svg fill="{% if rd.is_saved %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 3H7C5.9 3 5 3.9 5 5v16l7-4 7 4V5c0-1.1-.9-2-2-2z"/></svg>
-                        <span data-count>{{ rd.save_count }}</span>
-                    </button>
-                    {% else %}
-                    <span class="rv-stat">♥ {{ rd.like_count }}</span>
-                    {% endif %}
-                </div>
-                <a href="{% url 'review_detail' rv.id %}" class="rv-read">🔖 Read →</a>
-            </div>
+        <div class="rl-badges">
+          {% if rv.is_verified %}<span class="rl-verified">✓ Verified</span>{% endif %}
+          <a href="{% url 'reviews_list' %}?type={{ rv.subject_type|urlencode }}" class="rl-type-badge" onclick="event.stopPropagation()">{{ rv.subject_type }}</a>
         </div>
-        {% endwith %}
-        {% endfor %}
-    </div>
+      </div>
 
-    <!-- Pagination -->
-    {% if page_obj.has_other_pages %}
-    <div class="flex justify-center gap-2 mt-8">
-        {% if page_obj.has_previous %}
-        <a href="?{% if active_category %}category={{ active_category|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}"
-           class="inline-flex items-center gap-1 px-4 py-2 rounded-full border border-border bg-card text-xs font-bold text-foreground hover:border-primary/40 hover:text-primary transition">← Prev</a>
-        {% endif %}
-        <span class="inline-flex items-center px-4 py-2 rounded-full bg-primary/10 text-primary text-xs font-bold">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-        {% if page_obj.has_next %}
-        <a href="?{% if active_category %}category={{ active_category|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}"
-           class="inline-flex items-center gap-1 px-4 py-2 rounded-full border border-border bg-card text-xs font-bold text-foreground hover:border-primary/40 hover:text-primary transition">Next →</a>
-        {% endif %}
-    </div>
-    {% endif %}
+      <!-- Stars + subject -->
+      <div>
+        <div class="rl-stars">
+          {% for i in "12345" %}
+          <svg class="w-3 h-3 {% if forloop.counter <= rv.rating %}rl-star-f{% else %}rl-star-e{% endif %}" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+          </svg>
+          {% endfor %}
+          <span class="rl-rating">{{ rv.rating }}/5</span>
+        </div>
+        <a href="{% url 'review_detail' rv.id %}" class="rl-subject">{{ rv.subject }}</a>
+      </div>
 
-    {% else %}
-    <div class="text-center py-20 space-y-3">
-        <div class="text-5xl">⭐</div>
-        <h3 class="text-lg font-bold text-foreground">No reviews yet{% if active_category %} in {{ active_category }}{% endif %}</h3>
-        <p class="text-sm text-muted-foreground">Be the first to share your verdict on something!</p>
-        {% if user.is_authenticated %}
-        <a href="{% url 'create_review' %}" class="inline-flex items-center gap-2 mt-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 transition shadow-sm shadow-primary/25">Write a Review</a>
-        {% endif %}
+      <!-- Excerpt -->
+      {% if rv.content %}<p class="rl-excerpt">{{ rv.content }}</p>{% endif %}
+
+      <!-- Footer -->
+      <div class="rl-footer">
+        <div class="rl-stats">
+          <span class="rl-stat rl-agree">✓ {{ rv.agree_count }}</span>
+          <span class="rl-stat rl-disagree">✗ {{ rv.disagree_count }}</span>
+          {% if user.is_authenticated %}
+          <button type="button" class="rl-action-btn {% if rd.is_liked %}active-like{% endif %}" onclick="doAction('review','{{ rv.id }}','like',this)">
+            <svg class="w-3 h-3" fill="{% if rd.is_liked %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <span data-count>{{ rd.like_count }}</span>
+          </button>
+          <button type="button" class="rl-action-btn {% if rd.is_saved %}active-save{% endif %}" onclick="doAction('review','{{ rv.id }}','save',this)">
+            <svg class="w-3 h-3" fill="{% if rd.is_saved %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 3H7C5.9 3 5 3.9 5 5v16l7-4 7 4V5c0-1.1-.9-2-2-2z"/></svg>
+            <span data-count>{{ rd.save_count }}</span>
+          </button>
+          {% else %}
+          <span class="rl-stat">♥ {{ rd.like_count }}</span>
+          {% endif %}
+        </div>
+        <a href="{% url 'review_detail' rv.id %}" class="rl-read">Read →</a>
+      </div>
     </div>
+    {% endwith %}{% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div class="rl-pager">
+    {% if page_obj.has_previous %}
+    <a href="?{% if active_type %}type={{ active_type|urlencode }}&{% endif %}{% if search_query %}q={{ search_query|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}" class="rl-page-btn">← Prev</a>
     {% endif %}
+    <span class="rl-page-cur">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?{% if active_type %}type={{ active_type|urlencode }}&{% endif %}{% if search_query %}q={{ search_query|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}" class="rl-page-btn">Next →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="rl-empty">
+    <div class="text-4xl mb-3">⭐</div>
+    <p class="font-semibold text-foreground mb-1">No reviews yet{% if active_category %} in {{ active_category }}{% endif %}</p>
+    <p class="text-xs text-muted-foreground mb-4">Be the first to share your verdict on something!</p>
+    {% if user.is_authenticated %}
+    <a href="{% url 'create_review' %}" class="rl-write-btn" style="display:inline-flex;">Write a Review</a>
+    {% endif %}
+  </div>
+  {% endif %}
 
 </div>
 
 <script>
 function getCsrf() {
-    const m = document.cookie.match(/csrftoken=([^;]+)/);
-    return m ? m[1] : '';
+  const m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : '';
 }
 async function doAction(type, id, action, btn) {
-    if (btn && btn.disabled) return;
-    if (btn) btn.disabled = true;
-    try {
-        const fd = new FormData();
-        fd.append('action', action);
-        fd.append('csrfmiddlewaretoken', getCsrf());
-        const resp = await fetch(`/${type}s/${id}/action/`, { method: 'POST', body: fd });
-        const data = await resp.json();
-        if (data.success && btn) {
-            const active = data.status === 'added';
-            btn.classList.toggle('ca-active', active);
-            const svgEl = btn.querySelector('svg');
-            const countEl = btn.querySelector('[data-count]');
-            if (countEl) countEl.textContent = data.count;
-            if (svgEl && (action === 'like' || action === 'save')) {
-                svgEl.setAttribute('fill', active ? 'currentColor' : 'none');
-            }
-        }
-    } catch(e) {}
-    if (btn) btn.disabled = false;
+  if (btn && btn.disabled) return;
+  if (btn) btn.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append('action', action);
+    fd.append('csrfmiddlewaretoken', getCsrf());
+    const resp = await fetch(`/${type}s/${id}/action/`, { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (data.success && btn) {
+      const active = data.status === 'added';
+      const cls = action === 'like' ? 'active-like' : 'active-save';
+      btn.classList.toggle(cls, active);
+      const svgEl = btn.querySelector('svg');
+      const countEl = btn.querySelector('[data-count]');
+      if (countEl) countEl.textContent = data.count;
+      if (svgEl) svgEl.setAttribute('fill', active ? 'currentColor' : 'none');
+    }
+  } catch(e) {}
+  if (btn) btn.disabled = false;
 }
 </script>
 {% endblock %}
