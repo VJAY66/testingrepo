@@ -460,73 +460,47 @@
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
         <!-- AGREE (Bullish) -->
-        <div class="group rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white via-emerald-50/70 to-teal-50/60 p-4 shadow-[0_18px_42px_-30px_rgba(16,185,129,0.5)] transition hover:border-emerald-300/90 dark:border-emerald-500/20 dark:bg-gradient-to-br dark:from-slate-900/90 dark:via-slate-900/85 dark:to-emerald-950/55 dark:hover:border-emerald-400/45">
-            <div class="flex items-center gap-3 mb-3">
-                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-sm shadow-emerald-500/35 flex-shrink-0">
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+        <div class="group rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white via-emerald-50/70 to-teal-50/60 p-3 shadow-[0_18px_42px_-30px_rgba(16,185,129,0.5)] transition hover:border-emerald-300/90 dark:border-emerald-500/20 dark:bg-gradient-to-br dark:from-slate-900/90 dark:via-slate-900/85 dark:to-emerald-950/55 dark:hover:border-emerald-400/45">
+            <div class="flex items-center gap-2 mb-2">
+                <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-sm shadow-emerald-500/35 flex-shrink-0">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                 </div>
-                <div>
-                    <p class="text-sm font-bold text-emerald-700 dark:text-emerald-300">Agree · Bullish</p>
-                </div>
+                <p class="text-sm font-bold text-emerald-700 dark:text-emerald-300">Agree · Bullish</p>
             </div>
-            <p class="text-xs text-muted-foreground mb-2">Pick Agree if you think this prediction is correct.</p>
             <!-- Confidence slider -->
             <div class="mb-2">
-                <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center justify-between mb-1">
                     <label class="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Confidence</label>
                     <div class="flex items-center gap-1"><span id="agree-emoji" class="text-sm">🤔</span><span id="agree-val" class="text-sm font-black tabular-nums">5/10</span></div>
                 </div>
                 <input type="range" id="agree-slider" min="1" max="10" value="5" class="conf-slider sl-green w-full" oninput="updateSlider(this,'agree')">
-                <div class="flex justify-between text-[10px] text-muted-foreground mt-1"><span>Unsure</span><span>Moderate</span><span>Certain</span></div>
             </div>
-            <textarea id="agree-comment" class="w-full rounded-2xl border border-emerald-200/70 bg-white/85 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-500/30 dark:bg-slate-900/70 resize-none outline-none font-[inherit] mb-2" rows="2" maxlength="1000" placeholder="Optional: explain your view…"></textarea>
-            <div class="flex items-center gap-2 mb-2">
-                <label class="flex items-center gap-1.5 cursor-pointer select-none text-xs text-muted-foreground">
-                    <input type="checkbox" id="agree-anon" class="sr-only peer">
-                    <span class="relative inline-flex h-4 w-7 rounded-full border border-border bg-muted transition-colors peer-checked:bg-primary/80 peer-checked:border-primary/80">
-                        <span class="absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-muted-foreground transition-transform peer-checked:translate-x-3 peer-checked:bg-white [input:checked~&]:translate-x-3 [input:checked~&]:bg-white"></span>
-                    </span>
-                    Post anonymously
-                </label>
-            </div>
+            <textarea id="agree-comment" class="w-full rounded-xl border border-emerald-200/70 bg-white/85 px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20 dark:border-emerald-500/30 dark:bg-slate-900/70 resize-none outline-none font-[inherit] mb-2" rows="2" maxlength="1000" placeholder="Optional: explain your view…"></textarea>
             <button type="button" id="agree-btn" onclick="castVote('yes')"
-                    class="mt-1 inline-flex w-full justify-center rounded-full bg-gradient-to-r from-emerald-500 to-green-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:from-emerald-400 hover:to-green-400">
+                    class="inline-flex w-full justify-center rounded-full bg-gradient-to-r from-emerald-500 to-green-500 px-4 py-1.5 text-sm font-semibold text-white shadow-lg transition hover:from-emerald-400 hover:to-green-400">
                 Agree ({{ bull_count }})
             </button>
         </div>
 
         <!-- DISAGREE (Bearish) -->
-        <div class="group rounded-2xl border border-rose-200/80 bg-gradient-to-br from-white via-rose-50/70 to-red-50/60 p-4 shadow-[0_18px_42px_-30px_rgba(239,68,68,0.5)] transition hover:border-rose-300/90 dark:border-rose-500/20 dark:bg-gradient-to-br dark:from-slate-900/90 dark:via-slate-900/85 dark:to-rose-950/55 dark:hover:border-rose-400/45">
-            <div class="flex items-center gap-3 mb-3">
-                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-red-500 text-white shadow-sm shadow-rose-500/35 flex-shrink-0">
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+        <div class="group rounded-2xl border border-rose-200/80 bg-gradient-to-br from-white via-rose-50/70 to-red-50/60 p-3 shadow-[0_18px_42px_-30px_rgba(239,68,68,0.5)] transition hover:border-rose-300/90 dark:border-rose-500/20 dark:bg-gradient-to-br dark:from-slate-900/90 dark:via-slate-900/85 dark:to-rose-950/55 dark:hover:border-rose-400/45">
+            <div class="flex items-center gap-2 mb-2">
+                <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-rose-500 to-red-500 text-white shadow-sm shadow-rose-500/35 flex-shrink-0">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
                 </div>
-                <div>
-                    <p class="text-sm font-bold text-rose-700 dark:text-rose-300">Disagree · Bearish</p>
-                </div>
+                <p class="text-sm font-bold text-rose-700 dark:text-rose-300">Disagree · Bearish</p>
             </div>
-            <p class="text-xs text-muted-foreground mb-2">Pick Disagree if you think this prediction is wrong.</p>
             <!-- Confidence slider -->
             <div class="mb-2">
-                <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center justify-between mb-1">
                     <label class="text-[10px] font-black uppercase tracking-wide text-muted-foreground">Confidence</label>
                     <div class="flex items-center gap-1"><span id="disagree-emoji" class="text-sm">🤔</span><span id="disagree-val" class="text-sm font-black tabular-nums">5/10</span></div>
                 </div>
                 <input type="range" id="disagree-slider" min="1" max="10" value="5" class="conf-slider sl-red w-full" oninput="updateSlider(this,'disagree')">
-                <div class="flex justify-between text-[10px] text-muted-foreground mt-1"><span>Unsure</span><span>Moderate</span><span>Certain</span></div>
             </div>
-            <textarea id="disagree-comment" class="w-full rounded-2xl border border-rose-200/70 bg-white/85 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20 dark:border-rose-500/30 dark:bg-slate-900/70 resize-none outline-none font-[inherit] mb-2" rows="2" maxlength="1000" placeholder="Optional: explain your view…"></textarea>
-            <div class="flex items-center gap-2 mb-2">
-                <label class="flex items-center gap-1.5 cursor-pointer select-none text-xs text-muted-foreground">
-                    <input type="checkbox" id="disagree-anon" class="sr-only peer">
-                    <span class="relative inline-flex h-4 w-7 rounded-full border border-border bg-muted transition-colors peer-checked:bg-primary/80 peer-checked:border-primary/80">
-                        <span class="absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-muted-foreground transition-transform peer-checked:translate-x-3 peer-checked:bg-white [input:checked~&]:translate-x-3 [input:checked~&]:bg-white"></span>
-                    </span>
-                    Post anonymously
-                </label>
-            </div>
+            <textarea id="disagree-comment" class="w-full rounded-xl border border-rose-200/70 bg-white/85 px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-rose-400 focus:ring-2 focus:ring-rose-500/20 dark:border-rose-500/30 dark:bg-slate-900/70 resize-none outline-none font-[inherit] mb-2" rows="2" maxlength="1000" placeholder="Optional: explain your view…"></textarea>
             <button type="button" id="disagree-btn" onclick="castVote('no')"
-                    class="mt-1 inline-flex w-full justify-center rounded-full bg-gradient-to-r from-rose-500 to-red-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:from-rose-400 hover:to-red-400">
+                    class="inline-flex w-full justify-center rounded-full bg-gradient-to-r from-rose-500 to-red-500 px-4 py-1.5 text-sm font-semibold text-white shadow-lg transition hover:from-rose-400 hover:to-red-400">
                 Disagree ({{ bear_count }})
             </button>
         </div>
