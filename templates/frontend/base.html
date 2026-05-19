@@ -2897,14 +2897,29 @@ function acceptCookies() {
                                     </div>
                                     <svg class="hub-item-arrow w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
                                 </a>
-                                <a href="{% url 'live_debate_rooms' %}" class="hub-item">
+                                <button type="button" onclick="document.getElementById('live-debate-soon-modal').classList.remove('hidden')" class="hub-item w-full text-left">
                                     <span class="hub-item-icon" style="background:linear-gradient(135deg,#fee2e2,#fecaca); color:#991b1b;">🔴</span>
                                     <div class="hub-item-text">
-                                        <div class="hub-item-title">Live Debates</div>
+                                        <div class="hub-item-title flex items-center gap-2">Live Debates <span style="font-size:9px;font-weight:800;letter-spacing:0.06em;padding:2px 7px;border-radius:999px;background:hsl(38 90% 54%/0.12);color:hsl(35 80% 38%);border:1px solid hsl(38 90% 54%/0.3);">SOON</span></div>
                                         <div class="hub-item-desc">Real-time debates with live voting</div>
                                     </div>
                                     <svg class="hub-item-arrow w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
-                                </a>
+                                </button>
+
+                                <!-- Live Debates Coming Soon Modal -->
+                                <div id="live-debate-soon-modal" class="hidden fixed inset-0 z-[999] flex items-center justify-center p-4" onclick="if(event.target===this)this.classList.add('hidden')">
+                                    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+                                    <div class="relative bg-card border border-border rounded-2xl shadow-2xl max-w-sm w-full p-8 text-center">
+                                        <div class="text-5xl mb-4">🔴</div>
+                                        <h2 style="font-family:'Playfair Display',serif;font-style:italic;font-size:1.4rem;font-weight:600;" class="text-foreground mb-2">Live Debates</h2>
+                                        <p class="text-sm text-muted-foreground mb-5 leading-relaxed">Real-time debates with live voting are coming soon.<br>We're building something exciting — stay tuned!</p>
+                                        <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 18px;border-radius:999px;background:hsl(38 90% 54%/0.1);color:hsl(35 80% 34%);border:1px solid hsl(38 90% 54%/0.3);font-size:11px;font-weight:800;letter-spacing:0.08em;" class="mb-5">⚡ IMPLEMENTING SOON</div>
+                                        <br>
+                                        <button onclick="document.getElementById('live-debate-soon-modal').classList.add('hidden')" class="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 transition mt-2">
+                                            Got it
+                                        </button>
+                                    </div>
+                                </div>
                                 <a href="{% url 'my_interests' %}" class="hub-item">
                                     <span class="hub-item-icon" style="background:linear-gradient(135deg,#fef9c3,#fde68a); color:#92400e;">✨</span>
                                     <div class="hub-item-text">
