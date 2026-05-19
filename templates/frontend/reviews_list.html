@@ -210,8 +210,8 @@
   <!-- Type filter pills -->
   <div class="rl-filters">
     <a href="{% url 'reviews_list' %}{% if search_query %}?q={{ search_query|urlencode }}{% endif %}" class="rl-pill {% if not active_type %}active{% endif %}">✨ All</a>
-    {% for rt_key, rt_label in review_types %}
-    <a href="{% url 'reviews_list' %}?type={{ rt_key|urlencode }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="rl-pill {% if active_type == rt_key %}active{% endif %}">{{ rt_label }}</a>
+    {% for rt_key, rt_label, rt_icon in review_types %}
+    <a href="{% url 'reviews_list' %}?type={{ rt_key|urlencode }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="rl-pill {% if active_type == rt_key %}active{% endif %}">{{ rt_icon }} {{ rt_label }}</a>
     {% endfor %}
   </div>
 

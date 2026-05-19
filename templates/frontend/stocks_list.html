@@ -162,11 +162,11 @@ html.dark .chip-down { color: hsl(346 70% 62%); }
                       {% if not category_filter %}bg-primary text-primary-foreground border-transparent{% else %}bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground{% endif %}">
                 All
             </a>
-            {% for cat_key, cat_label in stock_categories %}
+            {% for cat_key, cat_label, cat_icon in stock_categories %}
             <a href="?{% if status_filter %}status={{ status_filter }}&{% endif %}{% if search_query %}q={{ search_query|urlencode }}&{% endif %}category={{ cat_key|urlencode }}"
                class="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all whitespace-nowrap
                       {% if category_filter == cat_key %}bg-primary text-primary-foreground border-transparent{% else %}bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground{% endif %}">
-                {{ cat_label }}
+                {{ cat_icon }} {{ cat_label }}
             </a>
             {% endfor %}
         </div>

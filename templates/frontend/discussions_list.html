@@ -97,8 +97,8 @@
     <!-- ── Category chips ── -->
     <div class="flex gap-1 overflow-x-auto pb-1 mb-2.5" style="scrollbar-width:none;">
         <a href="?{% if sort != 'trending' %}sort={{ sort }}&{% endif %}{% if search_query %}q={{ search_query|urlencode }}&{% endif %}" class="flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all {% if not category_filter %}bg-primary text-primary-foreground border-transparent{% else %}bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground{% endif %}">All</a>
-        {% for cat_key, cat_label in categories %}
-        <a href="?{% if sort != 'trending' %}sort={{ sort }}&{% endif %}{% if search_query %}q={{ search_query|urlencode }}&{% endif %}category={{ cat_key|urlencode }}" class="flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all whitespace-nowrap {% if category_filter == cat_key %}bg-primary text-primary-foreground border-transparent{% else %}bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground{% endif %}">{{ cat_label }}</a>
+        {% for cat_key, cat_label, cat_icon in categories %}
+        <a href="?{% if sort != 'trending' %}sort={{ sort }}&{% endif %}{% if search_query %}q={{ search_query|urlencode }}&{% endif %}category={{ cat_key|urlencode }}" class="flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all whitespace-nowrap {% if category_filter == cat_key %}bg-primary text-primary-foreground border-transparent{% else %}bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground{% endif %}">{{ cat_icon }} {{ cat_label }}</a>
         {% endfor %}
     </div>
 
