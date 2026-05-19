@@ -1,8 +1,8 @@
 {% extends 'frontend/base.html' %}
-{% block title %}Debate Inbox — Discussion Hub{% endblock %}
+{% block title %}Debate Inbox — PickASide{% endblock %}
 {% block content %}
 <style>
-.di-page { max-width: 680px; margin: 0 auto; padding: 16px 16px 64px; }
+.di-page { max-width: 900px; margin: 0 auto; padding: 16px 16px 64px; }
 
 /* ── Slim pill header ── */
 .di-header {
@@ -35,7 +35,7 @@ html.dark .di-pending-badge { color: hsl(38 90% 68%); }
   background: hsl(var(--muted)/0.35);
   border-radius: 999px; padding: 4px;
   border: 1px solid hsl(var(--border)/0.5);
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 .di-tab {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px;
@@ -58,19 +58,31 @@ html.dark .di-pending-badge { color: hsl(38 90% 68%); }
 }
 .di-tab.active .di-tab-count { background: hsl(var(--primary)/0.12); color: hsl(var(--primary)); }
 
-/* ── Cards ── */
-.di-card {
-    border-radius: 10px;
-    border: 1px solid hsl(var(--border)/0.7);
-    background: hsl(var(--card));
-    overflow: hidden;
-    transition: border-color 150ms, background 150ms;
-    position: relative;
-    margin-bottom: 5px;
+/* ── 2-column grid ── */
+.di-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
-.di-card:hover { border-color: hsl(var(--primary)/0.4); background: hsl(var(--card)/0.95); }
+@media (max-width: 600px) { .di-grid { grid-template-columns: 1fr; } }
+
+/* ── Card ── */
+.di-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border)/0.7);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 10px;
+  transition: border-color 160ms, box-shadow 160ms, transform 130ms;
+  position: relative; overflow: hidden;
+}
+.di-card:hover {
+  border-color: hsl(var(--primary)/0.35);
+  box-shadow: 0 6px 24px -8px hsl(var(--primary)/0.15);
+  transform: translateY(-1px);
+}
 .di-card::before {
-    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
 }
 .di-card.status-pending::before   { background: hsl(38 90% 54%); }
 .di-card.status-accepted::before  { background: hsl(142 65% 44%); }
@@ -78,31 +90,29 @@ html.dark .di-pending-badge { color: hsl(38 90% 68%); }
 .di-card.status-countered::before { background: hsl(270 70% 58%); }
 .di-card.status-rejected::before  { background: hsl(346 68% 50%); }
 
-/* Main row — everything in one line */
-.di-row {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 12px 8px 14px; min-height: 0;
+/* ── Card top: avatar + user + status ── */
+.di-card-top {
+  display: flex; align-items: center; gap: 10px;
 }
-.di-title-wrap { flex: 1; min-width: 0; }
-.di-title {
-    font-size: 0.8rem; font-weight: 700; color: hsl(var(--foreground));
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    text-decoration: none; display: block; transition: color .15s;
+.di-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: hsl(var(--muted)); display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; font-weight: 800; color: hsl(var(--muted-foreground));
+  flex-shrink: 0; text-decoration: none; border: 1.5px solid hsl(var(--border)/0.5);
 }
-.di-title:hover { color: hsl(var(--primary)); }
-.di-title-deleted { font-size: 0.8rem; font-weight: 600; color: hsl(var(--muted-foreground)); font-style: italic; }
-.di-meta {
-    font-size: 0.67rem; color: hsl(var(--muted-foreground));
-    display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; margin-top: 1px;
+.di-card-top-info { flex: 1; min-width: 0; }
+.di-opponent {
+  font-size: 0.78rem; font-weight: 700; color: hsl(var(--foreground));
+  text-decoration: none; display: block; transition: color .15s;
 }
-.di-meta .sep { opacity: 0.3; }
-.di-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.di-opponent:hover { color: hsl(var(--primary)); }
+.di-date { font-size: 0.65rem; color: hsl(var(--muted-foreground)); }
 
 /* ── Status badge ── */
 .di-status {
-    display: inline-flex; align-items: center; gap: 3px;
-    padding: 2px 8px; border-radius: 999px;
-    font-size: 9.5px; font-weight: 800; letter-spacing: 0.03em; white-space: nowrap; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.03em; white-space: nowrap; flex-shrink: 0;
 }
 .ds-pending   { background: hsl(38 90% 54%/0.12); color: hsl(35 80% 34%); border: 1px solid hsl(38 90% 54%/0.3); }
 .ds-accepted  { background: hsl(142 65% 44%/0.12); color: hsl(142 52% 30%); border: 1px solid hsl(142 65% 44%/0.3); }
@@ -114,17 +124,40 @@ html.dark .ds-accepted  { color: hsl(142 60% 58%); }
 html.dark .ds-countered { color: hsl(270 70% 72%); }
 html.dark .ds-rejected  { color: hsl(346 70% 62%); }
 
-.side-yes { color: hsl(142 60% 36%); font-weight: 700; }
-.side-no  { color: hsl(346 65% 44%); font-weight: 700; }
-html.dark .side-yes { color: hsl(142 60% 58%); }
-html.dark .side-no  { color: hsl(346 70% 62%); }
+/* ── Title ── */
+.di-card-title {
+  font-size: 0.88rem; font-weight: 700; color: hsl(var(--foreground));
+  line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  text-decoration: none; transition: color .15s; flex: 1;
+}
+.di-card-title:hover { color: hsl(var(--primary)); }
+.di-card-title-deleted { font-size: 0.88rem; color: hsl(var(--muted-foreground)); font-style: italic; }
 
-/* ── Action buttons — tiny pill style ── */
+/* ── Side chip ── */
+.di-side-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 8px; border-radius: 999px; font-size: 0.67rem; font-weight: 800;
+}
+.di-side-yes { background: hsl(142 65% 44%/0.1); color: hsl(142 52% 32%); border: 1px solid hsl(142 65% 44%/0.3); }
+.di-side-no  { background: hsl(346 65% 44%/0.1); color: hsl(346 52% 36%); border: 1px solid hsl(346 65% 44%/0.3); }
+html.dark .di-side-yes { color: hsl(142 60% 58%); }
+html.dark .di-side-no  { color: hsl(346 70% 62%); }
+
+/* ── Bottom bar: side + actions ── */
+.di-card-bottom {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: auto; padding-top: 4px;
+  border-top: 1px solid hsl(var(--border)/0.4);
+}
+.di-actions { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+/* ── Action buttons ── */
 .di-btn {
-    display: inline-flex; align-items: center; gap: 3px;
-    padding: 3px 9px; border-radius: 999px;
-    font-size: 10.5px; font-weight: 700; border: 1px solid transparent;
-    transition: all 0.15s; cursor: pointer; white-space: nowrap; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; border: 1px solid transparent;
+  transition: all 0.15s; cursor: pointer; white-space: nowrap; text-decoration: none;
 }
 .di-btn-primary   { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
 .di-btn-primary:hover { opacity: 0.88; }
@@ -139,19 +172,29 @@ html.dark .side-no  { color: hsl(346 70% 62%); }
 .di-btn-danger    { background: transparent; color: hsl(346 65% 44%); border-color: hsl(346 65% 44%/0.4); }
 .di-btn-danger:hover { background: hsl(346 65% 44%/0.08); }
 
-/* ── Counter forms (expand below row) ── */
+/* ── Counter forms ── */
 .di-counter-banner {
-    margin: 0 12px 8px 14px; border-radius: 8px;
-    border: 1px solid hsl(270 70% 58%/0.3); background: hsl(270 70% 58%/0.07); padding: 7px 10px;
+  border-radius: 8px; border: 1px solid hsl(270 70% 58%/0.3);
+  background: hsl(270 70% 58%/0.07); padding: 8px 10px;
 }
 .di-counter-form {
-    margin: 0 12px 8px 14px; border-radius: 8px;
-    border: 1px solid hsl(270 70% 58%/0.3); background: hsl(270 70% 58%/0.06); padding: 10px;
+  border-radius: 8px; border: 1px solid hsl(270 70% 58%/0.3);
+  background: hsl(270 70% 58%/0.06); padding: 10px;
 }
+
+/* ── Expiry pill ── */
+.debate-expiry-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 6px; border-radius: 999px;
+  font-size: 9px; font-weight: 700;
+  background: hsl(38 90% 54%/0.1); border: 1px solid hsl(38 90% 54%/0.25);
+  color: hsl(35 80% 36%);
+}
+html.dark .debate-expiry-pill { color: hsl(38 90% 68%); }
 
 /* ── Empty state ── */
 .di-empty {
-  text-align: center; padding: 44px 24px;
+  text-align: center; padding: 48px 24px;
   border: 1.5px dashed hsl(var(--border)/0.7);
   border-radius: 1.25rem; background: hsl(var(--muted)/0.2);
 }
@@ -184,7 +227,7 @@ html.dark .side-no  { color: hsl(346 70% 62%); }
     {% endfor %}
   </div>
 
-  <!-- ── Cards ── -->
+  <!-- ── Grid ── -->
   {% if not debates %}
   <div class="di-empty">
     <div style="font-size:2rem;margin-bottom:10px;opacity:.5;">⚔️</div>
@@ -193,54 +236,82 @@ html.dark .side-no  { color: hsl(346 70% 62%); }
   </div>
 
   {% else %}
-  <div>
+  <div class="di-grid">
     {% for item in debates %}
     {% with d=item.debate %}
     <div class="di-card status-{{ d.status }}" id="debate-card-{{ d.id }}">
 
-      <!-- ── Single compact row ── -->
-      <div class="di-row">
-        <!-- Left: title + meta -->
-        <div class="di-title-wrap">
-          {% with durl=d.get_discussion_url %}
-          {% if durl %}
-          <a href="{{ durl }}" class="di-title">{{ d.post.title }}</a>
-          {% else %}
-          <span class="di-title-deleted">(deleted post)</span>
-          {% endif %}
-          {% endwith %}
-          <div class="di-meta">
-            <span>vs <a href="{% url 'user_profile' item.opponent.username %}" class="font-semibold text-foreground hover:text-primary" style="transition:color .15s">@{{ item.opponent.username }}</a></span>
-            <span class="sep">·</span>
-            <strong class="side-{{ item.side }}">{{ item.side|upper }}</strong>
-            <span class="sep">·</span>
-            <span>{{ d.created_at|date:"M j" }}</span>
-            {% if d.status == 'pending' and item.expires_at %}
-            <span class="debate-expiry-pill inline-flex items-center gap-1 px-1.5 py-0 rounded-full bg-amber-50 border border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-400 font-semibold" style="font-size:9px"
-                  data-expires="{{ item.expires_at|date:'c' }}">⏳ <span class="expiry-text">…</span></span>
-            {% endif %}
-          </div>
+      <!-- Top: avatar + opponent + date + status -->
+      <div class="di-card-top">
+        <a href="{% url 'user_profile' item.opponent.username %}" class="di-avatar">{{ item.opponent.username|slice:":1"|upper }}</a>
+        <div class="di-card-top-info">
+          <a href="{% url 'user_profile' item.opponent.username %}" class="di-opponent">@{{ item.opponent.username }}</a>
+          <span class="di-date">{{ d.created_at|date:"M j, Y" }}</span>
         </div>
+        <span class="di-status ds-{{ d.status }}">
+          {% if d.status == 'pending' %}<span class="w-1.5 h-1.5 rounded-full bg-amber-500 pulse inline-block"></span>{% endif %}
+          {% if d.status == 'countered' %}↩ Counter{% else %}{{ d.status|title }}{% endif %}
+        </span>
+      </div>
 
-        <!-- Right: status badge + action buttons -->
+      <!-- Title -->
+      {% with durl=d.get_discussion_url %}
+      {% if durl %}
+      <a href="{{ durl }}" class="di-card-title">{{ d.post.title }}</a>
+      {% else %}
+      <span class="di-card-title-deleted">(deleted post)</span>
+      {% endif %}
+      {% endwith %}
+
+      <!-- Expiry for pending -->
+      {% if d.status == 'pending' and item.expires_at %}
+      <span class="debate-expiry-pill" data-expires="{{ item.expires_at|date:'c' }}">⏳ <span class="expiry-text">calculating…</span></span>
+      {% endif %}
+
+      <!-- Counter banner -->
+      {% if d.status == 'countered' %}
+      <div class="di-counter-banner">
+        <p style="font-size:10.5px;font-weight:700;color:hsl(270 60% 50%);margin-bottom:3px;">↩ Counter from @{{ item.opponent.username }}</p>
+        <p style="font-size:0.8rem;font-weight:600;color:hsl(var(--foreground));">{{ d.counter_topic }}</p>
+        {% if d.counter_side %}<p style="font-size:10px;color:hsl(var(--muted-foreground));margin-top:2px;">Side: <strong class="side-{{ d.counter_side }}">{{ d.counter_side|upper }}</strong></p>{% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Counter form -->
+      {% if d.status == 'pending' and d.target == request.user %}
+      <div id="counter-form-{{ d.id }}" class="hidden di-counter-form" style="display:none;">
+        <p style="font-size:11px;font-weight:700;color:hsl(270 60% 50%);margin-bottom:6px;">Propose a counter-topic</p>
+        <input type="text" id="counter-topic-{{ d.id }}" maxlength="200" placeholder="Alternative topic…"
+          class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-400" style="margin-bottom:6px;">
+        <div style="display:flex;gap:12px;margin-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;cursor:pointer;"><input type="radio" name="counter-side-{{ d.id }}" value="yes" class="accent-emerald-500"> <strong style="color:hsl(142 52% 32%)">YES</strong></label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;cursor:pointer;"><input type="radio" name="counter-side-{{ d.id }}" value="no" class="accent-rose-500"> <strong style="color:hsl(346 52% 40%)">NO</strong></label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:hsl(var(--muted-foreground));cursor:pointer;"><input type="radio" name="counter-side-{{ d.id }}" value="" checked> Any</label>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button onclick="submitCounter('{{ d.id }}')" class="di-btn di-btn-violet">Send</button>
+          <button onclick="hideCounterForm('{{ d.id }}')" class="di-btn di-btn-ghost">Cancel</button>
+        </div>
+        <p id="counter-error-{{ d.id }}" class="text-xs text-destructive hidden"></p>
+      </div>
+      {% endif %}
+
+      <!-- Bottom: your side + action buttons -->
+      <div class="di-card-bottom">
+        <span class="di-side-chip di-side-{{ item.side }}">Your side: {{ item.side|upper }}</span>
         <div class="di-actions">
-          <span class="di-status ds-{{ d.status }}">
-            {% if d.status == 'pending' %}<span class="w-1.5 h-1.5 rounded-full bg-amber-500 pulse inline-block"></span>{% endif %}
-            {% if d.status == 'countered' %}↩{% else %}{{ d.status|title }}{% endif %}
-          </span>
-
           {% if d.status == 'accepted' %}
-          <a href="{% url 'chats' %}?chat={{ d.id }}" class="di-btn di-btn-primary">💬 Chat</a>
+          <a href="{% url 'chats' %}?chat={{ d.id }}" class="di-btn di-btn-primary">💬 Open Chat</a>
 
           {% elif d.status == 'pending' and d.target == request.user %}
-          <a href="{% url 'accept_debate' d.id %}" class="di-btn di-btn-success">✓</a>
+          <a href="{% url 'accept_debate' d.id %}" class="di-btn di-btn-success">✓ Accept</a>
           <button onclick="showCounterForm('{{ d.id }}')" class="di-btn di-btn-violet">↩</button>
           <form method="post" action="{% url 'reject_debate' d.id %}" class="inline">{% csrf_token %}
             <button type="submit" class="di-btn di-btn-danger">✗</button>
           </form>
 
           {% elif d.status == 'pending' and item.is_initiator %}
-          <button onclick="cancelDebate('{{ d.id }}')" class="di-btn di-btn-ghost">✕</button>
+          <button onclick="cancelDebate('{{ d.id }}')" class="di-btn di-btn-ghost">✕ Cancel</button>
 
           {% elif d.status == 'countered' and d.initiator == request.user %}
           <button onclick="acceptCounter('{{ d.id }}')" class="di-btn di-btn-success">✓ Accept</button>
@@ -249,50 +320,14 @@ html.dark .side-no  { color: hsl(346 70% 62%); }
           </form>
 
           {% elif d.status == 'completed' %}
-          <a href="{% url 'debate_recap' d.id %}" class="di-btn di-btn-warning">🏆</a>
-          <a href="{% url 'debate_transcript' d.id %}" class="di-btn di-btn-ghost">Transcript</a>
+          <a href="{% url 'debate_recap' d.id %}" class="di-btn di-btn-warning">🏆 Recap</a>
           <button onclick="requestRematch('{{ d.id }}', this)" class="di-btn di-btn-ghost">⚔️</button>
           {% endif %}
 
-          {% with durl=d.get_discussion_url %}{% if durl %}<a href="{{ durl }}" class="di-btn di-btn-ghost" style="font-size:10px;padding:3px 8px;">Post</a>{% endif %}{% endwith %}
+          {% with durl=d.get_discussion_url %}{% if durl %}<a href="{{ durl }}" class="di-btn di-btn-ghost">Post</a>{% endif %}{% endwith %}
         </div>
       </div>
 
-      <!-- Counter-proposal banner (only when countered) -->
-      {% if d.status == 'countered' %}
-      <div class="di-counter-banner">
-        <p class="text-[11px] font-bold text-violet-700 dark:text-violet-400 mb-1">↩ Counter from @{{ item.opponent.username }}</p>
-        <p class="text-xs text-foreground font-medium">{{ d.counter_topic }}</p>
-        {% if d.counter_side %}<p class="text-[10px] text-muted-foreground mt-0.5">Side: <strong class="side-{{ d.counter_side }}">{{ d.counter_side|upper }}</strong></p>{% endif %}
-        {% if d.initiator == request.user %}
-        <div class="flex gap-2 mt-2">
-          <button onclick="acceptCounter('{{ d.id }}')" class="di-btn di-btn-success">✓ Accept Counter</button>
-          <form method="post" action="{% url 'reject_debate' d.id %}" class="inline">{% csrf_token %}
-            <button type="submit" class="di-btn di-btn-danger">✗ Reject</button>
-          </form>
-        </div>
-        {% endif %}
-      </div>
-      {% endif %}
-
-      <!-- Counter form (pending, target only) -->
-      {% if d.status == 'pending' and d.target == request.user %}
-      <div id="counter-form-{{ d.id }}" class="hidden di-counter-form space-y-2">
-        <p class="text-xs font-bold text-violet-700 dark:text-violet-400">Propose a counter-topic</p>
-        <input type="text" id="counter-topic-{{ d.id }}" maxlength="200" placeholder="Alternative debate topic…"
-          class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-400">
-        <div class="flex items-center gap-4">
-          <label class="flex items-center gap-1.5 text-xs font-medium cursor-pointer"><input type="radio" name="counter-side-{{ d.id }}" value="yes" class="accent-emerald-500"> <strong class="text-emerald-600">YES</strong></label>
-          <label class="flex items-center gap-1.5 text-xs font-medium cursor-pointer"><input type="radio" name="counter-side-{{ d.id }}" value="no" class="accent-rose-500"> <strong class="text-rose-600">NO</strong></label>
-          <label class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground cursor-pointer"><input type="radio" name="counter-side-{{ d.id }}" value="" checked> Any</label>
-        </div>
-        <div class="flex gap-2">
-          <button onclick="submitCounter('{{ d.id }}')" class="di-btn di-btn-violet">Send Counter</button>
-          <button onclick="hideCounterForm('{{ d.id }}')" class="di-btn di-btn-ghost">Cancel</button>
-        </div>
-        <p id="counter-error-{{ d.id }}" class="text-xs text-destructive hidden"></p>
-      </div>
-      {% endif %}
     </div>
     {% endwith %}
     {% endfor %}
@@ -301,8 +336,14 @@ html.dark .side-no  { color: hsl(346 70% 62%); }
 </div>
 
 <script>
-function showCounterForm(id) { document.getElementById('counter-form-' + id).classList.remove('hidden'); }
-function hideCounterForm(id) { document.getElementById('counter-form-' + id).classList.add('hidden'); }
+function showCounterForm(id) {
+  var el = document.getElementById('counter-form-' + id);
+  el.classList.remove('hidden'); el.style.display = '';
+}
+function hideCounterForm(id) {
+  var el = document.getElementById('counter-form-' + id);
+  el.classList.add('hidden'); el.style.display = 'none';
+}
 
 function submitCounter(id) {
   var topic = document.getElementById('counter-topic-' + id).value.trim();
@@ -335,7 +376,7 @@ function requestRematch(debateId, btn) {
     method: 'POST', headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'}
   }).then(r => r.json()).then(d => {
     if (d.success) { btn.textContent = '✓ Requested'; }
-    else { btn.textContent = '⚔️ Rematch'; btn.disabled = false; alert(d.error || 'Could not request rematch.'); }
+    else { btn.textContent = '⚔️'; btn.disabled = false; alert(d.error || 'Could not request rematch.'); }
   });
 }
 
@@ -362,9 +403,6 @@ function getCookie(n) { var v = document.cookie.match('(^|;) ?'+n+'=([^;]*)(;|$)
     document.querySelectorAll('.debate-expiry-pill[data-expires]').forEach(function(el) {
       var ms = new Date(el.dataset.expires) - Date.now();
       el.querySelector('.expiry-text').textContent = fmtRemaining(ms);
-      if (ms <= 0) {
-        el.className = el.className.replace(/amber/g, 'red');
-      }
     });
   }
   updateCountdowns();
