@@ -43,10 +43,10 @@
     <!-- Header -->
     <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
         <div>
-            <h1 class="text-lg font-black text-foreground flex items-center gap-2" style="font-family:'Playfair Display',serif;">
-                <span>💬</span> Questions{% if active_category %} · {{ active_category }}{% endif %}
+            <h1 class="flex items-center gap-2" style="font-family:'Playfair Display',serif; font-style:italic; font-weight:600; font-size:1.35rem; letter-spacing:0.01em; color:hsl(var(--foreground));">
+                <span style="font-style:normal;">💬</span> Questions{% if active_category %} · {{ active_category }}{% endif %}
             </h1>
-            <p class="text-xs text-muted-foreground">Ask anything — get community answers.</p>
+            <p class="text-xs text-muted-foreground" style="font-style:italic; letter-spacing:0.015em;">Ask anything — get community answers.</p>
         </div>
         {% if user.is_authenticated %}
         <a href="{% url 'ask_general_question' %}" class="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-sm shadow-primary/25">
