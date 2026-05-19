@@ -6,14 +6,18 @@
 <style>
 .plc {
     background: hsl(var(--card));
-    border: 1px solid hsl(var(--border));
-    border-radius: 1.2rem;
-    transition: border-color 180ms ease, box-shadow 180ms ease;
-    padding: 1.15rem 1.25rem;
+    border: 1px solid hsl(var(--border)/0.8);
+    border-radius: 14px;
+    transition: border-color 160ms, box-shadow 160ms, transform 120ms;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 .plc:hover {
-    border-color: hsl(var(--primary) / 0.35);
-    box-shadow: 0 8px 32px -12px hsl(var(--primary) / 0.18);
+    border-color: hsl(var(--primary) / 0.4);
+    box-shadow: 0 8px 24px -12px hsl(var(--primary) / 0.18);
+    transform: translateY(-2px);
 }
 .mini-bar-track { height: 0.42rem; border-radius: 999px; background: hsl(var(--muted)); overflow: hidden; }
 .mini-bar-a { height: 100%; background: hsl(142 71% 45%); border-radius: 999px; }
@@ -39,27 +43,25 @@
 .ca-like.ca-active svg,.ca-repost.ca-active svg,.ca-save.ca-active svg,.ca-follow.ca-active svg { transform:scale(1.15); }
 </style>
 
-<div class="max-w-3xl mx-auto px-4 py-6 sm:py-10 space-y-6">
+<div class="max-w-6xl mx-auto py-3 px-4">
 
     <!-- Header -->
-    <div class="flex items-center justify-between flex-wrap gap-3">
-        <div class="flex items-center gap-3">
-            <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-100 text-2xl dark:bg-blue-900/40">📊</span>
-            <div>
-                <h1 class="text-xl font-bold text-foreground">Polls{% if active_category %} · {{ active_category }}{% endif %}</h1>
-                <p class="text-sm text-muted-foreground">Vote and see what the community thinks.</p>
-            </div>
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <div>
+            <h1 class="text-lg font-black text-foreground flex items-center gap-2" style="font-family:'Playfair Display',serif;">
+                <span>📊</span> Polls{% if active_category %} · {{ active_category }}{% endif %}
+            </h1>
+            <p class="text-xs text-muted-foreground">Vote and see what the community thinks.</p>
         </div>
         {% if user.is_authenticated %}
-        <a href="{% url 'create_poll' %}" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-bold shadow-sm shadow-primary/30 hover:shadow-md transition">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-            New Poll
+        <a href="{% url 'create_poll' %}" class="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-sm shadow-primary/25">
+            + New Poll
         </a>
         {% endif %}
     </div>
 
     <!-- Category filter bar -->
-    <div class="relative">
+    <div class="relative mb-3">
         <div class="cfb">
             <a href="{% url 'polls_list' %}" class="cfb-pill {% if not active_category %}cfb-active{% endif %}"><span>✨</span> All</a>
             {% for cat in categories %}
@@ -72,7 +74,8 @@
 
     <!-- Poll cards -->
     {% if polls_data %}
-    <div class="space-y-4">
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:0.75rem;">
+    <style>@media(max-width:640px){.polls-grid-wrap{grid-template-columns:1fr!important;}}</style>
         {% for pd in polls_data %}
         <div class="plc" data-poll-id="{{ pd.poll.id }}">
             <!-- Author row -->
