@@ -2,25 +2,79 @@
 {% block title %}Debate Inbox — Discussion Hub{% endblock %}
 {% block content %}
 <style>
-/* ── Premium card ── */
+.di-page { max-width: 680px; margin: 0 auto; padding: 16px 16px 64px; }
+
+/* ── Slim pill header ── */
+.di-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px;
+  background: hsl(var(--card));
+  border-radius: 999px;
+  border: 1px solid hsl(var(--border)/0.6);
+  margin-bottom: 10px;
+}
+.di-header h1 {
+  font-size: 0.95rem; font-weight: 800; letter-spacing: -0.01em;
+  color: hsl(var(--foreground));
+  font-family: 'Playfair Display', Georgia, serif;
+  font-style: italic;
+  margin: 0; flex: 1;
+}
+.di-pending-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+  background: hsl(38 90% 54%/0.12); color: hsl(35 80% 34%);
+  border: 1px solid hsl(38 90% 54%/0.3);
+  padding: 3px 9px; border-radius: 999px;
+}
+html.dark .di-pending-badge { color: hsl(38 90% 68%); }
+
+/* ── Tab bar ── */
+.di-tabs {
+  display: flex; gap: 3px;
+  background: hsl(var(--muted)/0.35);
+  border-radius: 999px; padding: 4px;
+  border: 1px solid hsl(var(--border)/0.5);
+  margin-bottom: 14px;
+}
+.di-tab {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px;
+  padding: 6px 8px; border-radius: 999px;
+  font-size: 0.72rem; font-weight: 700;
+  text-decoration: none;
+  color: hsl(var(--muted-foreground));
+  transition: all .18s; white-space: nowrap;
+}
+.di-tab:hover { color: hsl(var(--foreground)); background: hsl(var(--card)/0.6); }
+.di-tab.active {
+  background: hsl(var(--card)); color: hsl(var(--foreground));
+  box-shadow: 0 1px 6px -1px hsl(var(--foreground)/0.1);
+  border: 1px solid hsl(var(--border)/0.6);
+}
+.di-tab-count {
+  font-size: 0.62rem; font-weight: 800;
+  background: hsl(var(--muted)/0.7); color: hsl(var(--muted-foreground));
+  padding: 1px 5px; border-radius: 999px; min-width: 16px; text-align: center;
+}
+.di-tab.active .di-tab-count { background: hsl(var(--primary)/0.12); color: hsl(var(--primary)); }
+
+/* ── Cards ── */
 .di-card {
-    border-radius: 16px;
+    border-radius: 14px;
     border: 1px solid hsl(var(--border)/0.7);
     background: hsl(var(--card));
-    padding: 0;
     overflow: hidden;
     transition: border-color 180ms, box-shadow 180ms, transform 130ms;
     position: relative;
+    margin-bottom: 7px;
 }
 .di-card:hover {
     border-color: hsl(var(--primary)/0.35);
-    box-shadow: 0 8px 28px -10px hsl(var(--primary)/0.15);
+    box-shadow: 0 6px 22px -8px hsl(var(--primary)/0.15);
     transform: translateY(-1px);
 }
-/* Left accent bar based on status */
 .di-card::before {
-    content: '';
-    position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
 }
 .di-card.status-pending::before   { background: hsl(38 90% 54%); }
 .di-card.status-accepted::before  { background: hsl(142 65% 44%); }
@@ -28,14 +82,13 @@
 .di-card.status-countered::before { background: hsl(270 70% 58%); }
 .di-card.status-rejected::before  { background: hsl(346 68% 50%); }
 
-.di-body { padding: 14px 16px 14px 18px; }
+.di-body { padding: 10px 14px 10px 16px; }
 
 /* ── Status badge ── */
 .di-status {
     display: inline-flex; align-items: center; gap: 4px;
-    padding: 3px 10px; border-radius: 999px;
-    font-size: 10.5px; font-weight: 800; letter-spacing: 0.03em;
-    white-space: nowrap;
+    padding: 2px 9px; border-radius: 999px;
+    font-size: 10px; font-weight: 800; letter-spacing: 0.03em; white-space: nowrap;
 }
 .ds-pending   { background: hsl(38 90% 54%/0.12); color: hsl(35 80% 34%); border: 1px solid hsl(38 90% 54%/0.3); }
 .ds-accepted  { background: hsl(142 65% 44%/0.12); color: hsl(142 52% 30%); border: 1px solid hsl(142 65% 44%/0.3); }
@@ -47,7 +100,6 @@ html.dark .ds-accepted  { color: hsl(142 60% 58%); }
 html.dark .ds-countered { color: hsl(270 70% 72%); }
 html.dark .ds-rejected  { color: hsl(346 70% 62%); }
 
-/* ── Side chip ── */
 .side-yes { color: hsl(142 60% 36%); font-weight: 700; }
 .side-no  { color: hsl(346 65% 44%); font-weight: 700; }
 html.dark .side-yes { color: hsl(142 60% 58%); }
@@ -55,9 +107,9 @@ html.dark .side-no  { color: hsl(346 70% 62%); }
 
 /* ── Action buttons ── */
 .di-btn {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 5px 12px; border-radius: 999px;
-    font-size: 11.5px; font-weight: 700; border: 1px solid transparent;
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; border: 1px solid transparent;
     transition: all 0.18s; cursor: pointer; white-space: nowrap; text-decoration: none;
 }
 .di-btn-primary   { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
@@ -73,68 +125,72 @@ html.dark .side-no  { color: hsl(346 70% 62%); }
 .di-btn-danger    { background: transparent; color: hsl(346 65% 44%); border-color: hsl(346 65% 44%/0.4); }
 .di-btn-danger:hover { background: hsl(346 65% 44%/0.08); }
 
-/* ── Counter banner ── */
+/* ── Counter forms ── */
 .di-counter-banner {
-    margin: 0 16px 12px 18px;
-    border-radius: 10px;
-    border: 1px solid hsl(270 70% 58%/0.3);
-    background: hsl(270 70% 58%/0.07);
-    padding: 10px 12px;
+    margin: 0 14px 10px 16px; border-radius: 10px;
+    border: 1px solid hsl(270 70% 58%/0.3); background: hsl(270 70% 58%/0.07); padding: 8px 10px;
 }
-
-/* ── Counter form ── */
 .di-counter-form {
-    margin: 0 16px 14px 18px;
-    border-radius: 10px;
-    border: 1px solid hsl(270 70% 58%/0.3);
-    background: hsl(270 70% 58%/0.06);
-    padding: 12px;
+    margin: 0 14px 10px 16px; border-radius: 10px;
+    border: 1px solid hsl(270 70% 58%/0.3); background: hsl(270 70% 58%/0.06); padding: 10px;
 }
 
-/* ── Pulse dot ── */
+/* ── Empty state ── */
+.di-empty {
+  text-align: center; padding: 44px 24px;
+  border: 1.5px dashed hsl(var(--border)/0.7);
+  border-radius: 1.25rem; background: hsl(var(--muted)/0.2);
+}
+
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
 .pulse { animation: pulse 1.6s ease-in-out infinite; }
 </style>
 
-<div class="max-w-2xl mx-auto px-4 py-4">
+<div class="di-page">
 
-  <!-- ── Header ── -->
-  <div class="flex items-center justify-between mb-4 gap-3">
-    <div class="flex items-center gap-3">
-        <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-xl shadow-lg shadow-amber-400/30">⚔️</div>
-        <div>
-            <h1 class="text-base font-black text-foreground">Debate Inbox</h1>
-            <p class="text-xs text-muted-foreground">All your debates in one place{% if pending_count %} · <span class="text-amber-500 font-bold">{{ pending_count }} pending</span>{% endif %}</p>
-        </div>
-    </div>
+  <!-- ── Slim pill header ── -->
+  <div class="di-header">
+    <span style="font-size:1.05rem;">⚔️</span>
+    <h1>Debate Inbox</h1>
     {% if pending_count %}
-    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-400 text-xs font-bold">
-        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 pulse inline-block"></span>
-        {{ pending_count }} pending
+    <span class="di-pending-badge">
+      <span class="w-1.5 h-1.5 rounded-full bg-amber-500 pulse inline-block"></span>
+      {{ pending_count }} pending
     </span>
     {% endif %}
   </div>
 
+  <!-- ── Status filter tabs ── -->
+  <div class="di-tabs">
+    {% for tab_key, tab_label, tab_count in tabs %}
+    <a href="?status={{ tab_key }}" class="di-tab {% if status_filter == tab_key %}active{% endif %}">
+      {{ tab_label }}
+      {% if tab_count %}<span class="di-tab-count">{{ tab_count }}</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- ── Cards ── -->
   {% if not debates %}
-  <div class="rounded-2xl border border-dashed border-border bg-card/70 p-12 text-center">
-    <div class="text-4xl mb-3">⚔️</div>
-    <p class="font-bold text-foreground mb-1">No debates yet</p>
-    <p class="text-sm text-muted-foreground">Challenge someone on a discussion to get started.</p>
+  <div class="di-empty">
+    <div style="font-size:2rem;margin-bottom:10px;opacity:.5;">⚔️</div>
+    <p class="font-semibold text-foreground mb-1">No debates here</p>
+    <p class="text-xs text-muted-foreground">{% if status_filter != 'all' %}Try another tab or{% else %}Challenge someone on a discussion to{% endif %} get started.</p>
   </div>
 
   {% else %}
-  <div class="space-y-2.5">
+  <div>
     {% for item in debates %}
     {% with d=item.debate %}
     <div class="di-card status-{{ d.status }}" id="debate-card-{{ d.id }}">
       <div class="di-body">
         <!-- Title + status row -->
-        <div class="flex items-start justify-between gap-3 mb-2">
+        <div class="flex items-start justify-between gap-3 mb-1.5">
             {% with durl=d.get_discussion_url %}
             {% if durl %}
-            <a href="{{ durl }}" class="text-sm font-bold text-foreground hover:text-primary transition-colors line-clamp-2 flex-1 leading-snug">{{ d.post.title }}</a>
+            <a href="{{ durl }}" class="text-sm font-bold text-foreground hover:text-primary transition-colors line-clamp-1 flex-1 leading-snug">{{ d.post.title }}</a>
             {% else %}
-            <span class="text-sm font-bold text-muted-foreground line-clamp-2 flex-1 leading-snug italic">(deleted post)</span>
+            <span class="text-sm font-bold text-muted-foreground flex-1 leading-snug italic">(deleted post)</span>
             {% endif %}
             {% endwith %}
             <span class="di-status ds-{{ d.status }} flex-shrink-0">
@@ -144,11 +200,11 @@ html.dark .side-no  { color: hsl(346 70% 62%); }
         </div>
 
         <!-- Meta row -->
-        <div class="flex items-center gap-2 text-xs text-muted-foreground mb-3 flex-wrap">
+        <div class="flex items-center gap-2 text-xs text-muted-foreground mb-2 flex-wrap">
             <span>vs <a href="{% url 'user_profile' item.opponent.username %}" class="font-semibold text-foreground hover:text-primary transition-colors">@{{ item.opponent.username }}</a></span>
-            <span class="text-border">·</span>
+            <span class="opacity-30">·</span>
             <span>Your side: <strong class="side-{{ item.side }}">{{ item.side|upper }}</strong></span>
-            <span class="text-border">·</span>
+            <span class="opacity-30">·</span>
             <span>{{ d.created_at|date:"M j, Y" }}</span>
             {% if d.status == 'pending' and item.expires_at %}
             <span class="debate-expiry-pill inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-600 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-400 font-semibold text-[10px]"
@@ -162,7 +218,7 @@ html.dark .side-no  { color: hsl(346 70% 62%); }
         <div class="flex flex-wrap gap-1.5">
             {% if d.status == 'accepted' %}
             <a href="{% url 'chats' %}?chat={{ d.id }}" class="di-btn di-btn-primary">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
                 Open Chat
             </a>
 
@@ -174,7 +230,7 @@ html.dark .side-no  { color: hsl(346 70% 62%); }
             </form>
 
             {% elif d.status == 'pending' and item.is_initiator %}
-            <button onclick="cancelDebate('{{ d.id }}')" class="di-btn di-btn-ghost">✕ Cancel Challenge</button>
+            <button onclick="cancelDebate('{{ d.id }}')" class="di-btn di-btn-ghost">✕ Cancel</button>
 
             {% elif d.status == 'countered' and d.initiator == request.user %}
             <button onclick="acceptCounter('{{ d.id }}')" class="di-btn di-btn-success">✓ Accept Counter</button>
@@ -185,29 +241,23 @@ html.dark .side-no  { color: hsl(346 70% 62%); }
             {% elif d.status == 'completed' %}
             <a href="{% url 'debate_recap' d.id %}" class="di-btn di-btn-warning">🏆 Recap</a>
             <a href="{% url 'debate_transcript' d.id %}" class="di-btn di-btn-ghost">Transcript</a>
-            <button onclick="requestRematch('{{ d.id }}', this)" class="di-btn" style="border:1px solid hsl(38 80% 54%/0.5);color:hsl(38 70% 38%);">
-                ⚔️ Rematch
-            </button>
+            <button onclick="requestRematch('{{ d.id }}', this)" class="di-btn" style="border:1px solid hsl(38 80% 54%/0.5);color:hsl(38 70% 38%);">⚔️ Rematch</button>
             {% endif %}
 
             {% with durl=d.get_discussion_url %}{% if durl %}<a href="{{ durl }}" class="di-btn di-btn-ghost">View Post</a>{% endif %}{% endwith %}
         </div>
       </div>
 
-      <!-- Counter-proposal banner -->
       {% if d.status == 'countered' %}
       <div class="di-counter-banner">
         <p class="text-[11px] font-bold text-violet-700 dark:text-violet-400 mb-1">↩ Counter-proposal from @{{ item.opponent.username }}</p>
         <p class="text-sm text-foreground font-medium">{{ d.counter_topic }}</p>
-        {% if d.counter_side %}
-        <p class="text-xs text-muted-foreground mt-0.5">Requested side: <strong class="side-{{ d.counter_side }}">{{ d.counter_side|upper }}</strong></p>
-        {% endif %}
+        {% if d.counter_side %}<p class="text-xs text-muted-foreground mt-0.5">Requested side: <strong class="side-{{ d.counter_side }}">{{ d.counter_side|upper }}</strong></p>{% endif %}
       </div>
       {% endif %}
 
-      <!-- Counter form (hidden) -->
       {% if d.status == 'pending' and d.target == request.user %}
-      <div id="counter-form-{{ d.id }}" class="hidden di-counter-form space-y-2.5">
+      <div id="counter-form-{{ d.id }}" class="hidden di-counter-form space-y-2">
         <p class="text-xs font-bold text-violet-700 dark:text-violet-400">Propose a counter-topic</p>
         <input type="text" id="counter-topic-{{ d.id }}" maxlength="200" placeholder="Alternative debate topic…"
           class="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-400">

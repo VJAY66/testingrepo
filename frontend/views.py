@@ -4589,6 +4589,8 @@ def accept_counter_debate(request, debate_id):
 
 @login_required
 def debate_inbox(request):
+    status_filter = request.GET.get('status', 'all')
+
     participations = DebateParticipant.objects.filter(
         user=request.user
     ).select_related(
@@ -4596,12 +4598,12 @@ def debate_inbox(request):
         'debate__initiator__profile', 'debate__target__profile',
     ).order_by('-debate__created_at')
 
-    debates_with_status = []
+    all_debates = []
     for p in participations:
         d = p.debate
         opponent = d.target if d.initiator == request.user else d.initiator
         expires_at = (d.created_at + timedelta(hours=48)) if d.status == 'pending' else None
-        debates_with_status.append({
+        all_debates.append({
             'debate': d,
             'opponent': opponent,
             'side': p.side,
@@ -4611,11 +4613,27 @@ def debate_inbox(request):
             'is_initiator': d.initiator == request.user,
         })
 
-    pending_count = sum(1 for x in debates_with_status if x['status'] == 'pending')
+    pending_count = sum(1 for x in all_debates if x['status'] == 'pending')
+    accepted_count = sum(1 for x in all_debates if x['status'] == 'accepted')
+    completed_count = sum(1 for x in all_debates if x['status'] == 'completed')
+
+    if status_filter in ('pending', 'accepted', 'completed', 'rejected', 'countered'):
+        debates_with_status = [x for x in all_debates if x['status'] == status_filter]
+    else:
+        debates_with_status = all_debates
+
+    tabs = [
+        ('all', 'All', len(all_debates)),
+        ('pending', 'Pending', pending_count),
+        ('accepted', 'Active', accepted_count),
+        ('completed', 'Completed', completed_count),
+    ]
 
     return render(request, 'frontend/debate_inbox.html', {
         'debates': debates_with_status,
         'pending_count': pending_count,
+        'status_filter': status_filter,
+        'tabs': tabs,
     })
 
 
