@@ -118,6 +118,7 @@
   margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px;
 }
 .rc-stats { display: flex; align-items: center; gap: 5px; margin-top: 4px; flex-wrap: wrap; }
+.rc-why { font-size: 0.67rem; color: hsl(var(--muted-foreground)/0.7); margin-top: 3px; font-style: italic; }
 .rc-stat {
   display: inline-flex; align-items: center; gap: 3px;
   font-size: 0.65rem; font-weight: 600; padding: 1px 7px; border-radius: 999px;
@@ -195,9 +196,25 @@
         </a>
         {% if item.user.profile.bio %}<p class="rc-bio">{{ item.user.profile.bio|truncatechars:55 }}</p>{% endif %}
         <div class="rc-stats">
-          {% if item.new_followers %}<span class="rc-stat rc-stat-green">📈 +{{ item.new_followers }}</span>{% endif %}
-          {% if item.engagement %}<span class="rc-stat rc-stat-amber">⚡ {{ item.engagement }} actions</span>{% endif %}
+          {% if item.new_followers %}
+          <span class="rc-stat rc-stat-green" title="New followers gained this period">📈 +{{ item.new_followers }} follower{{ item.new_followers|pluralize }}</span>
+          {% endif %}
+          {% if item.engagement %}
+          <span class="rc-stat rc-stat-amber" title="Likes, saves & comments on their posts">⚡ {{ item.engagement }} engagement{{ item.engagement|pluralize }}</span>
+          {% endif %}
+          {% if not item.new_followers and not item.engagement %}
+          <span class="rc-stat" style="background:hsl(var(--muted)/0.5);color:hsl(var(--muted-foreground));border:1px solid hsl(var(--border)/0.4);">📊 Active this period</span>
+          {% endif %}
         </div>
+        <p class="rc-why">
+          {% if item.new_followers and item.engagement %}
+            Ranked for gaining {{ item.new_followers }} new follower{{ item.new_followers|pluralize }} and {{ item.engagement }} engagement{{ item.engagement|pluralize }}
+          {% elif item.new_followers %}
+            Ranked for gaining {{ item.new_followers }} new follower{{ item.new_followers|pluralize }} this period
+          {% elif item.engagement %}
+            Ranked for {{ item.engagement }} engagement action{{ item.engagement|pluralize }} on their posts
+          {% endif %}
+        </p>
       </div>
       {% if user.is_authenticated and not item.is_self %}
       <button class="rc-follow-btn {% if item.is_following %}following{% else %}follow{% endif %}"
