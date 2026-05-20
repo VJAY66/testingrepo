@@ -480,6 +480,14 @@ function setBadge(item, show) {
 function refreshUnreadBadges() {
     var lr = getLastRead();
     document.querySelectorAll('.ch-item[data-chat-id]').forEach(function(item) {
+        // Force-remove badge on active item before any calculations
+        if (item.classList.contains('active')) {
+            console.log('FORCING ACTIVE CHAT BADGE REMOVAL', item.getAttribute('data-chat-id'));
+            var activeBadge = item.querySelector('.ch-unread-badge');
+            if (activeBadge) activeBadge.remove();
+            return;
+        }
+
         var chatId       = String(item.getAttribute('data-chat-id'));
         var lastId       = parseInt(item.getAttribute('data-last-id') || '0', 10);
         var serverReadId = parseInt(item.getAttribute('data-server-read-id') || '0', 10);
@@ -489,7 +497,16 @@ function refreshUnreadBadges() {
         var isMine       = item.getAttribute('data-last-sender') === currentUsername;
         var isUnread     = !isActive && !isMine && lastId > readFloor;
 
-        console.log('[unread]', { chatId: chatId, isActive: isActive, lastId: lastId, serverReadId: serverReadId, localReadId: localReadId, readFloor: readFloor, isUnread: isUnread });
+        console.log('UNREAD DEBUG', {
+            chatId: item.getAttribute('data-chat-id'),
+            lastId: item.getAttribute('data-last-id'),
+            serverReadId: item.getAttribute('data-server-read-id'),
+            active: item.classList.contains('active'),
+            activeChatId: activeChatId,
+            isMine: isMine,
+            isUnread: isUnread
+        });
+        console.log(item.outerHTML);
 
         setBadge(item, isUnread);
     });
@@ -563,11 +580,23 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function openDesktopChat(chatId, btn) {
+    // Synchronously save the PREVIOUS active chat as fully read before switching.
+    // This prevents the race condition where markActiveChatRead()'s async fetch
+    // hasn't returned yet when refreshUnreadBadges() runs for the old chat.
+    if (activeChatId && activeChatId !== String(chatId)) {
+        var prevBtn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
+        if (prevBtn) {
+            var lr0 = getLastRead();
+            var prevLastId = parseInt(prevBtn.getAttribute('data-last-id') || '0', 10);
+            lr0[String(activeChatId)] = Math.max(lr0[String(activeChatId)] || 0, prevLastId);
+            setLastRead(lr0);
+        }
+    }
+
     activeChatId = String(chatId);
     document.querySelectorAll('.ch-item.active').forEach(function(item) { item.classList.remove('active'); });
     btn.classList.add('active');
 
-    // Remove badge immediately; localStorage update happens in markActiveChatRead()
     setBadge(btn, false);
     var lr = getLastRead();
     var lastId = parseInt(btn.getAttribute('data-last-id') || '0', 10);
