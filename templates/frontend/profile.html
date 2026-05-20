@@ -487,47 +487,53 @@
     <!-- Tab: Posts -->
     <section id="tab-posts">
         {% if user_posts %}
-        <div class="grid gap-4 sm:gap-5">
+        <div class="flex flex-col gap-2">
             {% for post in user_posts %}
-            <article class="group rounded-2xl border border-border/70 bg-card p-5 sm:p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
-                <div class="flex items-start justify-between gap-3 mb-2">
-                    <h3 class="text-base sm:text-lg font-bold tracking-tight text-foreground leading-snug">
-                        {% if post.id %}
-                        <a href="{% url 'discussion' post.id %}" class="hover:text-primary transition-colors">{{ post.title }}</a>
-                        {% else %}
-                        <span>{{ post.title }}</span>
-                        {% endif %}
-                    </h3>
-                    <span class="shrink-0 px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground text-[10px] sm:text-xs font-semibold">{{ post.category }}</span>
-                </div>
-                {% if post.content %}
-                <p class="text-sm text-muted-foreground mb-3 leading-relaxed">{{ post.content|truncatechars:190 }}</p>
-                {% endif %}
-                <div class="flex items-center justify-between gap-2 flex-wrap">
-                    <div class="flex items-center gap-2">
-                        <div class="text-xs text-muted-foreground">{{ post.created_at|date:"M j, Y g:i A" }}</div>
-                        {% if post.is_pinned %}<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 text-[10px] font-bold">📌 Pinned</span>{% endif %}
+            <article class="group rounded-2xl border border-border/60 bg-card transition-all duration-150 hover:border-primary/30 hover:shadow-[0_4px_20px_-6px_hsl(var(--primary)/0.15)] overflow-hidden"
+                     style="{% if post.is_pinned %}border-left: 3px solid hsl(38 90% 54%);{% endif %}">
+                <div class="px-5 py-4">
+                    <!-- Title row -->
+                    <div class="flex items-start gap-3 mb-2">
+                        <div class="flex-1 min-w-0">
+                            {% if post.is_pinned %}<span class="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400 mb-1">📌 Pinned</span><br>{% endif %}
+                            {% if post.id %}
+                            <a href="{% url 'discussion' post.id %}" class="text-sm font-bold text-foreground hover:text-primary transition-colors leading-snug line-clamp-2">{{ post.title }}</a>
+                            {% else %}
+                            <span class="text-sm font-bold text-foreground leading-snug">{{ post.title }}</span>
+                            {% endif %}
+                        </div>
+                        <span class="shrink-0 px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/50 text-[10px] font-semibold whitespace-nowrap">{{ post.category }}</span>
                     </div>
-                    <div class="flex items-center gap-1.5">
-                        <button id="pin-btn-{{ post.id }}" onclick="togglePin('{{ post.id }}', this)" class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold border border-border/70 text-muted-foreground hover:border-amber-400 hover:text-amber-600 transition">
-                            {% if post.is_pinned %}Unpin{% else %}📌 Pin{% endif %}
-                        </button>
-                    {% if post.can_delete_today %}
-                    <button onclick="deletePost('{{ post.id }}', this)" class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold bg-gradient-to-r from-cyan-500 via-teal-500 to-amber-500 bg-clip-text text-transparent hover:opacity-80 transition-opacity">
-                        <svg class="w-3.5 h-3.5 text-teal-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                        Delete
-                    </button>
-                    {% else %}
-                    <span class="text-[11px] font-medium text-muted-foreground">Locked after today</span>
+
+                    {% if post.content %}
+                    <p class="text-xs text-muted-foreground leading-relaxed line-clamp-2 mb-3">{{ post.content|truncatechars:160 }}</p>
                     {% endif %}
+
+                    <!-- Bottom: date left, actions right -->
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-[11px] text-muted-foreground/70">{{ post.created_at|date:"M j, Y · g:i A" }}</span>
+                        <div class="flex items-center gap-1.5">
+                            <button id="pin-btn-{{ post.id }}" onclick="togglePin('{{ post.id }}', this)"
+                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all
+                                {% if post.is_pinned %}bg-amber-50 border-amber-300 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-600 dark:text-amber-400{% else %}border-border/60 text-muted-foreground hover:border-amber-400 hover:text-amber-600{% endif %}">
+                                📌 {% if post.is_pinned %}Unpin{% else %}Pin{% endif %}
+                            </button>
+                            {% if post.can_delete_today %}
+                            <button onclick="deletePost('{{ post.id }}', this)"
+                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-rose-300/60 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                Delete
+                            </button>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </article>
             {% endfor %}
         </div>
         {% else %}
-        <div class="rounded-2xl border border-dashed border-border bg-card/70 p-10 text-center">
-            <p class="text-muted-foreground">No posts yet.</p>
+        <div class="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-10 text-center">
+            <p class="text-sm text-muted-foreground">No posts yet.</p>
         </div>
         {% endif %}
     </section>
