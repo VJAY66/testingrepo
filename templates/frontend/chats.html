@@ -369,6 +369,7 @@ body.ch-fullscreen {
             data-chat-id="{{ chat.id }}"
             data-last-id="{{ chat.last_message_id|default:0 }}"
             data-server-read-id="{{ chat.last_read_message_id|default:0 }}"
+            data-last-sender="{{ chat.last_message_sender|default:'' }}"
             data-filter="{{ chat.opponent|lower }} {{ chat.title|lower }} {{ chat.last_message|default:''|lower }}"
             data-chat-url="{% url 'debate_chat' chat.id %}?return_to={% url 'chats' %}?chat={{ chat.id }}"
             onclick="openDesktopChat('{{ chat.id }}', this)">
@@ -457,6 +458,7 @@ function setLastRead(lr) {
 }
 
 var activeChatId = '{{ selected_chat_id }}';
+var currentUsername = '{{ request.user.username|escapejs }}';
 
 // DOM-removal approach — avoids CSS specificity war where .ch-unread-badge
 // { display: inline-flex } overrides Tailwind's .hidden { display: none }.
@@ -478,17 +480,16 @@ function setBadge(item, show) {
 function refreshUnreadBadges() {
     var lr = getLastRead();
     document.querySelectorAll('.ch-item[data-chat-id]').forEach(function(item) {
-        var chatId = String(item.getAttribute('data-chat-id'));
-        // Active chat is always "read"
-        if (activeChatId && chatId === String(activeChatId)) { setBadge(item, false); return; }
-
-        var lastId      = parseInt(item.getAttribute('data-last-id') || '0', 10);
+        var chatId       = String(item.getAttribute('data-chat-id'));
+        var lastId       = parseInt(item.getAttribute('data-last-id') || '0', 10);
         var serverReadId = parseInt(item.getAttribute('data-server-read-id') || '0', 10);
         var localReadId  = parseInt(lr[chatId] || '0', 10);
         var readFloor    = Math.max(serverReadId, localReadId);
-        var isUnread     = lastId > readFloor;
+        var isActive     = activeChatId && chatId === String(activeChatId);
+        var isMine       = item.getAttribute('data-last-sender') === currentUsername;
+        var isUnread     = !isActive && !isMine && lastId > readFloor;
 
-        console.log('[unread]', { chatId: chatId, lastId: lastId, serverReadId: serverReadId, localReadId: localReadId, readFloor: readFloor, isUnread: isUnread });
+        console.log('[unread]', { chatId: chatId, isActive: isActive, lastId: lastId, serverReadId: serverReadId, localReadId: localReadId, readFloor: readFloor, isUnread: isUnread });
 
         setBadge(item, isUnread);
     });
