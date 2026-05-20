@@ -2069,7 +2069,9 @@ min-width: 0;
             });
           }
           updateStickyDate();
-          if (isEmbedded && lastMsgId > prevLastMsgId) markCurrentChatRead();
+          // Mark read whenever new messages arrive, regardless of whether the chat
+          // is embedded in the /chats/ sidebar or opened directly from a debate page.
+          if (lastMsgId > prevLastMsgId) markCurrentChatRead();
           return;
         }
         if (d.error === 'Access denied') {
@@ -2295,8 +2297,11 @@ min-width: 0;
   }
 
   scrollBottom();
-  // When embedded in the chats iframe, mark as read immediately on load.
-  if (isEmbedded) markCurrentChatRead();
+  // Mark as read on load whether opened from a debate page or the /chats/ sidebar.
+  // This updates both localStorage and DebateParticipant.last_read_message_id on the
+  // server, so the unread badge on /chats/ clears even when the chat was opened
+  // directly (isEmbedded=false) rather than through the sidebar iframe.
+  markCurrentChatRead();
   updateComposerState();
   refreshActionButtons();
   updateSupporterBadges();
