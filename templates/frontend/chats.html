@@ -384,7 +384,6 @@ body.ch-fullscreen {
                     <span class="ch-name">@{{ chat.opponent }}</span>
                     <span class="ch-time-wrap">
                         <span class="ch-time" data-chat-time>{{ chat.last_message_time|default:'' }}</span>
-                        <span class="ch-unread-badge hidden" data-unread-badge>1</span>
                     </span>
                 </span>
                 <span class="ch-topic" data-chat-topic">{{ chat.title }}</span>
@@ -458,19 +457,36 @@ function setLastRead(lr) {
 
 var activeChatId = '{{ selected_chat_id }}';
 
+// DOM-removal approach — avoids CSS specificity war where .ch-unread-badge
+// { display: inline-flex } overrides Tailwind's .hidden { display: none }.
+function setBadge(item, show) {
+    var timeWrap = item.querySelector('.ch-time-wrap');
+    var badge = item.querySelector('[data-unread-badge]');
+    if (!show) {
+        if (badge) badge.remove();
+        return;
+    }
+    if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'ch-unread-badge';
+        badge.setAttribute('data-unread-badge', '');
+        if (timeWrap) timeWrap.appendChild(badge);
+    }
+}
+
 function refreshUnreadBadges() {
     var lr = getLastRead();
     document.querySelectorAll('.ch-item[data-chat-id]').forEach(function(item) {
         var chatId = item.getAttribute('data-chat-id');
-        var badge = item.querySelector('[data-unread-badge]');
-        if (!badge) return;
-        if (activeChatId && chatId === activeChatId) {
-            badge.classList.add('hidden');
-            return;
-        }
+        // Active chat is always "read"
+        if (activeChatId && chatId === activeChatId) { setBadge(item, false); return; }
+
         var lastId = parseInt(item.getAttribute('data-last-id') || '0', 10);
-        var readId = parseInt(lr[chatId] || '0', 10);
-        badge.classList.toggle('hidden', lastId <= readId);
+        var readId = Math.max(
+            parseInt(lr[chatId] || '0', 10),
+            parseInt(item.getAttribute('data-server-read-id') || '0', 10)
+        );
+        setBadge(item, lastId > readId);
     });
 }
 
@@ -545,6 +561,15 @@ function openDesktopChat(chatId, btn) {
     activeChatId = String(chatId);
     document.querySelectorAll('.ch-item.active').forEach(function(item) { item.classList.remove('active'); });
     btn.classList.add('active');
+
+    // Remove badge immediately; localStorage update happens in markActiveChatRead()
+    setBadge(btn, false);
+    var lr = getLastRead();
+    var lastId = parseInt(btn.getAttribute('data-last-id') || '0', 10);
+    lr[String(chatId)] = Math.max(lr[String(chatId)] || 0, lastId);
+    setLastRead(lr);
+
+
     var frame = document.getElementById('ch-conv-frame');
     if (frame) frame.src = btn.getAttribute('data-chat-url');
     var placeholder = document.getElementById('ch-conv-placeholder');
