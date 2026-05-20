@@ -277,7 +277,7 @@
         <div class="hfb-inner">
             <a href="{% url 'index' %}" class="hfb-pill {% if not active_category and active_tab != 'for_you' and active_tab != 'following' %}hfb-active{% endif %}">All</a>
             {% for cat in categories %}
-            <a href="?category={{ cat.name|urlencode }}" class="hfb-pill {% if active_category == cat.name %}hfb-active{% endif %}">{{ cat.name }}</a>
+            <a href="?category={{ cat.name|urlencode }}" class="hfb-pill {% if active_category == cat.name %}hfb-active{% endif %}">{% if cat.icon %}{{ cat.icon }} {% endif %}{{ cat.name }}</a>
             {% endfor %}
             {% if user.is_authenticated and active_category %}
             <button id="cat-follow-btn-bar" onclick="toggleCategoryFollow('{{ active_category|escapejs }}')"
