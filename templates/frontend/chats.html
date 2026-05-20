@@ -484,6 +484,10 @@ function markActiveChatRead() {
             var activeChat = d.chats.find(function(c) { return String(c.id) === String(activeChatId); });
             if (activeChat) {
                 lr[String(activeChatId)] = activeChat.last_message_id || 0;
+                var activeBtn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
+                if (activeBtn && activeChat.last_message_id) {
+                    activeBtn.setAttribute('data-last-id', String(activeChat.last_message_id));
+                }
             } else {
                 var btn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
                 if (btn) lr[String(activeChatId)] = parseInt(btn.getAttribute('data-last-id') || '0', 10);
@@ -537,6 +541,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     refreshUnreadBadges();
     markActiveChatRead();
+    setInterval(markActiveChatRead, 10000);
     window.addEventListener('storage', function(e) {
         if (e.key === 'dhChatLastRead') refreshUnreadBadges();
     });
