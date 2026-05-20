@@ -5556,12 +5556,26 @@ function acceptCookies() {
             saveLastRead(lr);
             updateBadge();
             renderList();
+            // Persist to server so the badge stays cleared after page reload
+            const csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+            fetch('/debates/' + encodeURIComponent(id) + '/messages/mark-read/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRFToken': csrf },
+            }).catch(() => {});
         }
 
         function unreadCount(chat) {
+            // Use the higher of localStorage or the server-persisted read position.
+            // Without last_read_message_id the badge re-inflated on every 30 s poll
+            // because localStorage could be stale or absent on a fresh browser.
+            if (chat.last_message_sender === '{{ user.username }}') return 0;
             const lr = loadLastRead();
-            const stored = lr[String(chat.id)] || 0;
-            return (chat.last_message_id || 0) > stored ? 1 : 0;
+            const floor = Math.max(
+                lr[String(chat.id)] || 0,
+                chat.last_read_message_id || 0
+            );
+            return (chat.last_message_id || 0) > floor ? 1 : 0;
         }
         function totalUnread() {
             return chats.reduce((acc, c) => acc + unreadCount(c), 0);
