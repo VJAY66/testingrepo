@@ -368,6 +368,7 @@ body.ch-fullscreen {
         <button type="button" class="ch-item"
             data-chat-id="{{ chat.id }}"
             data-last-id="{{ chat.last_message_id|default:0 }}"
+            data-server-read-id="{{ chat.last_read_message_id|default:0 }}"
             data-filter="{{ chat.opponent|lower }} {{ chat.title|lower }} {{ chat.last_message|default:''|lower }}"
             data-chat-url="{% url 'debate_chat' chat.id %}?return_to={% url 'chats' %}?chat={{ chat.id }}"
             onclick="openDesktopChat('{{ chat.id }}', this)">

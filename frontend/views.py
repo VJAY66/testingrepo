@@ -2870,6 +2870,7 @@ def _build_chat_payload_for_user(user, only_active=False):
             'last_message_time': last_msg.created_at.strftime('%b %d, %H:%M') if last_msg else None,
             'last_message_at': last_msg.created_at.isoformat() if last_msg else None,
             'last_message_id': last_msg.id if last_msg else 0,
+            'last_read_message_id': p.last_read_message_id or 0,
             'updated_at': debate.updated_at.isoformat() if debate.updated_at else '',
         })
 
@@ -2884,6 +2885,15 @@ def chats(request):
     requested_chat = str(request.GET.get('chat', '')).strip()
     chat_ids = {str(item.get('id')) for item in chats_data}
     selected_chat_id = requested_chat if requested_chat in chat_ids else (str(chats_data[0]['id']) if chats_data else '')
+
+    # The active chat is open right now — treat it as fully read in the initial
+    # render so the badge never appears for it, even before JS runs.
+    if selected_chat_id:
+        for chat in chats_data:
+            if str(chat['id']) == selected_chat_id:
+                chat['last_read_message_id'] = chat.get('last_message_id') or 0
+                break
+
     return render(request, 'frontend/chats.html', {
         'chats': chats_data,
         'selected_chat_id': selected_chat_id,
