@@ -23,7 +23,7 @@
         <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-900/35 text-3xl shadow-inner flex-shrink-0">📈</div>
         <div>
             <h1 class="text-2xl font-bold text-foreground" style="font-family:'Playfair Display',serif;">Make a Stock Prediction</h1>
-            <p class="text-sm text-muted-foreground mt-0.5">Name your symbol, pick a direction and set a target — let the community debate.</p>
+            <p class="text-sm text-muted-foreground mt-0.5">Name your symbol, choose a condition and set a price threshold — let the community debate.</p>
         </div>
     </div>
 
@@ -111,34 +111,55 @@
                 </div>
             </div>
 
-            <!-- ── Direction toggle cards ──────────────────────── -->
+            <!-- ── Prediction condition cards ──────────────────── -->
             <div>
                 <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
-                    Direction <span class="text-red-500">*</span>
+                    Prediction Type <span class="text-red-500">*</span>
                 </label>
                 <div class="grid grid-cols-2 gap-3">
 
-                    <!-- Up (bullish) -->
-                    <label class="dir-card relative border-2 border-border rounded-2xl p-4 cursor-pointer text-center transition-all duration-200 bg-background/50 hover:border-emerald-400/60 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 select-none" id="card-up" onclick="selectDirection('up')">
+                    <!-- Crosses Above -->
+                    <label class="dir-card relative border-2 border-border rounded-2xl p-4 cursor-pointer transition-all duration-200 bg-background/50 hover:border-emerald-400/60 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 select-none" id="card-above" onclick="selectDirection('above')">
+                        <input type="radio" name="direction" value="above" id="dir-above" required class="absolute opacity-0 pointer-events-none">
+                        <div class="absolute top-2.5 right-2.5 w-4 h-4 rounded-full border-2 border-border flex items-center justify-center transition-all" id="check-above">
+                            <div class="w-2 h-2 rounded-full bg-white scale-0 transition-transform duration-150" id="check-inner-above"></div>
+                        </div>
+                        <span class="block text-2xl mb-1.5 leading-none">🚀</span>
+                        <span class="block text-xs font-black uppercase tracking-wide" style="color:hsl(142 65% 38%);">Crosses Above</span>
+                        <p class="text-[11px] text-muted-foreground mt-1 leading-tight">Price will break past a threshold</p>
+                    </label>
+
+                    <!-- Drops Below -->
+                    <label class="dir-card relative border-2 border-border rounded-2xl p-4 cursor-pointer transition-all duration-200 bg-background/50 hover:border-rose-400/60 hover:bg-rose-50/40 dark:hover:bg-rose-950/20 select-none" id="card-below" onclick="selectDirection('below')">
+                        <input type="radio" name="direction" value="below" id="dir-below" required class="absolute opacity-0 pointer-events-none">
+                        <div class="absolute top-2.5 right-2.5 w-4 h-4 rounded-full border-2 border-border flex items-center justify-center transition-all" id="check-below">
+                            <div class="w-2 h-2 rounded-full bg-white scale-0 transition-transform duration-150" id="check-inner-below"></div>
+                        </div>
+                        <span class="block text-2xl mb-1.5 leading-none">📉</span>
+                        <span class="block text-xs font-black uppercase tracking-wide" style="color:hsl(346 65% 44%);">Drops Below</span>
+                        <p class="text-[11px] text-muted-foreground mt-1 leading-tight">Price will fall under a threshold</p>
+                    </label>
+
+                    <!-- Gains (% up) -->
+                    <label class="dir-card relative border-2 border-border rounded-2xl p-4 cursor-pointer transition-all duration-200 bg-background/50 hover:border-emerald-400/60 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20 select-none" id="card-up" onclick="selectDirection('up')">
                         <input type="radio" name="direction" value="up" id="dir-up" required class="absolute opacity-0 pointer-events-none">
-                        <!-- checkmark dot -->
                         <div class="absolute top-2.5 right-2.5 w-4 h-4 rounded-full border-2 border-border flex items-center justify-center transition-all" id="check-up">
                             <div class="w-2 h-2 rounded-full bg-white scale-0 transition-transform duration-150" id="check-inner-up"></div>
                         </div>
-                        <span class="block text-3xl mb-1.5 leading-none">▲</span>
-                        <span class="block text-xs font-black uppercase tracking-wide" style="color:hsl(142 65% 38%);">Up (Bullish)</span>
-                        <p class="text-[11px] text-muted-foreground mt-1 leading-tight">Price will rise by X%</p>
+                        <span class="block text-2xl mb-1.5 leading-none">📈</span>
+                        <span class="block text-xs font-black uppercase tracking-wide" style="color:hsl(142 65% 38%);">Will Reach</span>
+                        <p class="text-[11px] text-muted-foreground mt-1 leading-tight">Price will climb to target value</p>
                     </label>
 
-                    <!-- Down (bearish) -->
-                    <label class="dir-card relative border-2 border-border rounded-2xl p-4 cursor-pointer text-center transition-all duration-200 bg-background/50 hover:border-rose-400/60 hover:bg-rose-50/40 dark:hover:bg-rose-950/20 select-none" id="card-down" onclick="selectDirection('down')">
+                    <!-- Loses (% down) -->
+                    <label class="dir-card relative border-2 border-border rounded-2xl p-4 cursor-pointer transition-all duration-200 bg-background/50 hover:border-rose-400/60 hover:bg-rose-50/40 dark:hover:bg-rose-950/20 select-none" id="card-down" onclick="selectDirection('down')">
                         <input type="radio" name="direction" value="down" id="dir-down" required class="absolute opacity-0 pointer-events-none">
                         <div class="absolute top-2.5 right-2.5 w-4 h-4 rounded-full border-2 border-border flex items-center justify-center transition-all" id="check-down">
                             <div class="w-2 h-2 rounded-full bg-white scale-0 transition-transform duration-150" id="check-inner-down"></div>
                         </div>
-                        <span class="block text-3xl mb-1.5 leading-none">▼</span>
-                        <span class="block text-xs font-black uppercase tracking-wide" style="color:hsl(346 65% 44%);">Down (Bearish)</span>
-                        <p class="text-[11px] text-muted-foreground mt-1 leading-tight">Price will fall by X%</p>
+                        <span class="block text-2xl mb-1.5 leading-none">🔻</span>
+                        <span class="block text-xs font-black uppercase tracking-wide" style="color:hsl(346 65% 44%);">Will Sink To</span>
+                        <p class="text-[11px] text-muted-foreground mt-1 leading-tight">Price will decline to target value</p>
                     </label>
 
                 </div>
@@ -146,11 +167,11 @@
 
             <!-- ── % change + target date ──────────────────────── -->
             <div class="rounded-xl border border-border bg-background/50 p-4 space-y-3">
-                <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Prediction Target</p>
+                <p class="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Price Threshold & Timeline</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5" for="id_target_price">
-                            Target Price <span class="text-red-500">*</span>
+                            Price Threshold <span class="text-red-500">*</span>
                         </label>
                         <div class="relative">
                             <span id="target-price-prefix" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground pointer-events-none">$</span>
@@ -262,10 +283,11 @@
 <script>
 // ── Direction state ──────────────────────────────────────────
 var selectedDirection = null;
+var DIR_BULLISH = {'above': true, 'up': true};
 
 function selectDirection(dir) {
     selectedDirection = dir;
-    var cards = ['up','down'];
+    var cards = ['above','below','up','down'];
     cards.forEach(function(d) {
         var card  = document.getElementById('card-' + d);
         var check = document.getElementById('check-' + d);
@@ -274,7 +296,7 @@ function selectDirection(dir) {
         if (d === dir) {
             radio.checked = true;
             card.classList.remove('border-border','bg-background/50');
-            if (d === 'up') {
+            if (DIR_BULLISH[d]) {
                 card.classList.add('border-emerald-500','bg-emerald-50/50','dark:bg-emerald-950/25');
                 card.style.boxShadow = '0 0 0 3px hsl(142 71% 45% / 0.18)';
                 check.style.background = 'hsl(142 65% 44%)';
@@ -524,10 +546,16 @@ function updatePreview() {
 
     var sym      = selectedCurrency.sym;
     var symHtml  = symbol ? '<strong class="text-primary font-black" style="font-family:\'Playfair Display\',serif;">' + symbol + '</strong>' : '<span class="text-muted-foreground italic">[SYMBOL]</span>';
-    var dirColor = selectedDirection === 'up' ? 'color:hsl(142 65% 38%)' : selectedDirection === 'down' ? 'color:hsl(346 65% 44%)' : '';
-    var arrow    = selectedDirection === 'up' ? '▲' : selectedDirection === 'down' ? '▼' : '';
-    var dirWord  = selectedDirection === 'up' ? 'Up' : selectedDirection === 'down' ? 'Down' : '<span class="text-muted-foreground italic">[direction]</span>';
-    var dirHtml  = selectedDirection ? '<strong style="' + dirColor + '">' + arrow + ' ' + dirWord + '</strong>' : dirWord;
+    var isBull   = selectedDirection === 'above' || selectedDirection === 'up';
+    var dirColor = selectedDirection ? (isBull ? 'color:hsl(142 65% 38%)' : 'color:hsl(346 65% 44%)') : '';
+    var conditionMap = {
+        'above': '🚀 cross above',
+        'below': '📉 drop below',
+        'up':    '📈 reach',
+        'down':  '🔻 sink to'
+    };
+    var conditionWord = selectedDirection ? conditionMap[selectedDirection] : '<span class="text-muted-foreground italic">[prediction type]</span>';
+    var dirHtml  = selectedDirection ? '<strong style="' + dirColor + '">' + conditionWord + '</strong>' : conditionWord;
     var priceHtml = price ? '<strong style="' + dirColor + '">' + sym + parseFloat(price).toFixed(2) + '</strong>' : '<span class="text-muted-foreground italic">[target price]</span>';
     var dateStr  = '';
     if (dateRaw) {
@@ -536,7 +564,7 @@ function updatePreview() {
     }
     var dateHtml = dateStr ? '<strong class="text-foreground">' + dateStr + '</strong>' : '<span class="text-muted-foreground italic">[date]</span>';
 
-    sent.innerHTML = 'I think ' + symHtml + ' will go ' + dirHtml + ' to ' + priceHtml + ' by ' + dateHtml;
+    sent.innerHTML = 'I predict ' + symHtml + ' will ' + dirHtml + ' ' + priceHtml + ' by ' + dateHtml + '.';
 }
 
 // ── Form submit guard ────────────────────────────────────────
@@ -571,6 +599,8 @@ document.getElementById('spf-form').addEventListener('submit', function(e) {
 (function() {
     {% if form_data.direction %}
     selectDirection('{{ form_data.direction }}');
+    {% else %}
+    selectDirection('above');
     {% endif %}
     {% if form_data.currency and form_data.currency != 'USD' %}
     selectCurrency('{{ form_data.currency }}');

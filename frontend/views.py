@@ -11176,8 +11176,14 @@ def create_stock_prediction(request):
     # Build auto title if not submitted
     title = request.POST.get('title', '').strip()
     if not title and stock_symbol and direction and target_price:
-        dir_word = 'Up' if direction in ('up', 'above') else 'Down'
-        title = f"I think {stock_symbol} will go {dir_word} to {target_price:.2f} {currency} by {target_date}"
+        condition_map = {
+            'above': 'cross above',
+            'below': 'drop below',
+            'up': 'reach',
+            'down': 'sink to',
+        }
+        cond = condition_map.get(direction, 'reach')
+        title = f"I predict {stock_symbol} will {cond} {currency} {target_price:.2f} by {target_date}"
 
     if not title:
         errors.append('Could not generate a title — please fill in all fields.')
