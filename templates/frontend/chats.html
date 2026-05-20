@@ -566,8 +566,8 @@ function refreshFromServer() {
                 var btn = document.querySelector('.ch-item[data-chat-id="' + c.id + '"]');
                 if (!btn) return;
                 // Refresh all data attributes from server
-                if (c.last_message_id)      btn.setAttribute('data-last-id',       String(c.last_message_id));
-                if (c.last_message_sender != null) btn.setAttribute('data-last-sender', c.last_message_sender || '');
+                if (c.last_message_id)           btn.setAttribute('data-last-id',        String(c.last_message_id));
+                if (c.last_message_sender != null) btn.setAttribute('data-last-sender',   c.last_message_sender || '');
                 if (c.last_read_message_id != null) btn.setAttribute('data-server-read-id', String(c.last_read_message_id || 0));
 
                 // Update localStorage read floor for every chat from server state
@@ -575,11 +575,23 @@ function refreshFromServer() {
                 if (serverRead > (lr[String(c.id)] || 0)) {
                     lr[String(c.id)] = serverRead;
                 }
+
+                // If this is the currently open chat and new messages arrived,
+                // immediately re-persist the read state so the badge can't show.
+                if (String(c.id) === String(activeChatId)) {
+                    var newLastId = c.last_message_id || 0;
+                    var currentRead = Math.max(lr[String(c.id)] || 0, serverRead);
+                    if (newLastId > currentRead) {
+                        lr[String(c.id)] = newLastId;
+                        persistReadToServer(String(c.id), btn);
+                    }
+                }
             });
             setLastRead(lr);
 
-            // Compute nav badge count: chats where opponent has sent an unread message
+            // Compute nav badge count: skip active chat and own-sent messages
             var totalUnread = d.chats.reduce(function(acc, c) {
+                if (String(c.id) === String(activeChatId)) return acc;   // currently open
                 if (c.last_message_sender === currentUsername) return acc; // own message
                 var floor = Math.max(lr[String(c.id)] || 0, c.last_read_message_id || 0);
                 return acc + ((c.last_message_id || 0) > floor ? 1 : 0);
