@@ -3,6 +3,20 @@
 
 {% block title %}Debate Chat - Discussion Hub{% endblock %}
 
+{% block jsonld %}
+{# Hide nav/footer immediately when loaded inside the chats sidebar iframe.
+   The style is removed by JS if this page is opened directly (not embedded). #}
+<style id="mc-embed-guard">
+    .nav-shell, footer, aside, #flash-messages, #mobile-menu-drawer { display: none !important; }
+</style>
+<script>
+    if (window.self === window.top) {
+        var g = document.getElementById('mc-embed-guard');
+        if (g) g.remove();
+    }
+</script>
+{% endblock %}
+
 {% block content %}
 {{ active_participants|json_script:"dh-debate-active-participants" }}
 <link rel="stylesheet" href="{% static 'css/chatbox_modern.css' %}">
