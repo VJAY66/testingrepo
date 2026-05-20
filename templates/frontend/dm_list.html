@@ -13,9 +13,11 @@
     <p class="text-sm mt-1">Visit a user's profile to start a conversation.</p>
   </div>
   {% else %}
-  <div class="space-y-2">
+  <div class="space-y-2" id="dm-conversation-list">
     {% for conv in conversations %}
-    <a href="{% url 'dm_thread' conv.partner.username %}" class="flex items-center gap-3 p-4 bg-card border border-border rounded-2xl hover:border-primary/30 transition-colors">
+    <a href="{% url 'dm_thread' conv.partner.username %}"
+       data-partner="{{ conv.partner.username }}"
+       class="flex items-center gap-3 p-4 bg-card border border-border rounded-2xl hover:border-primary/30 transition-colors">
       {% if conv.partner.profile.get_picture_url %}
       <img src="{{ conv.partner.profile.get_picture_url }}" class="w-10 h-10 rounded-full object-cover border border-border" loading="lazy">
       {% else %}
@@ -24,7 +26,7 @@
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
           <p class="font-semibold text-foreground text-sm">{{ conv.partner.username }}</p>
-          {% if conv.unread %}<span class="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">{{ conv.unread }}</span>{% endif %}
+          <span class="dm-unread-badge bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full{% if not conv.unread %} hidden{% endif %}">{{ conv.unread|default:'' }}</span>
         </div>
         {% if conv.last_msg %}<p class="text-xs text-muted-foreground truncate mt-0.5">{% if conv.last_msg.sender == request.user %}You: {% endif %}{{ conv.last_msg.content|truncatechars:60 }}</p>{% endif %}
       </div>
@@ -35,23 +37,42 @@
   {% endif %}
 </div>
 <script>
-// Reload if navigating back from bfcache OR if a DM thread was read since
-// we last rendered this page (so stale unread badges are cleared).
-var _dmListRenderedAt = Date.now();
-window.addEventListener('pageshow', function(e) {
-    if (e.persisted) { window.location.reload(); return; }
-    // Non-bfcache arrival: check if any thread was read after our render time
-    try {
-        var readAt = parseInt(localStorage.getItem('dmThreadReadAt') || '0', 10);
-        if (readAt > _dmListRenderedAt) { window.location.reload(); }
-    } catch (_) {}
-});
+// Dynamically refresh unread badges from the server without a full page reload.
+// This handles: bfcache back navigation, tab switching, and any scenario where
+// the server-rendered badge count is stale.
+function refreshDmBadges() {
+    fetch('/dm/unread-counts/', {credentials: 'same-origin'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            var counts = d.unread || {};
+            document.querySelectorAll('[data-partner]').forEach(function(row) {
+                var partner = row.getAttribute('data-partner');
+                var badge = row.querySelector('.dm-unread-badge');
+                if (!badge) return;
+                var count = counts[partner] || 0;
+                if (count > 0) {
+                    badge.textContent = count;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.textContent = '';
+                    badge.classList.add('hidden');
+                }
+            });
+        })
+        .catch(function() {});
+}
+
+// Refresh on load (catches any stale server-render)
+refreshDmBadges();
+
+// Refresh when tab becomes visible (handles returning from dm_thread or another tab)
 document.addEventListener('visibilitychange', function() {
-    if (document.hidden) return;
-    try {
-        var readAt = parseInt(localStorage.getItem('dmThreadReadAt') || '0', 10);
-        if (readAt > _dmListRenderedAt) { _dmListRenderedAt = Date.now(); window.location.reload(); }
-    } catch (_) {}
+    if (!document.hidden) refreshDmBadges();
+});
+
+// Refresh on bfcache restore (browser back button)
+window.addEventListener('pageshow', function(e) {
+    if (e.persisted) refreshDmBadges();
 });
 </script>
 {% endblock %}

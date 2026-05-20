@@ -235,6 +235,7 @@ urlpatterns = [
     path('dm/', views.dm_list, name='dm_list'),
     path('dm/delete/', views.dm_delete, name='dm_delete'),
     path('dm/unread/', views.dm_unread_count, name='dm_unread_count'),
+    path('dm/unread-counts/', views.dm_unread_counts, name='dm_unread_counts'),
     path('dm/requests/', views.dm_requests_list, name='dm_requests_list'),
     path('dm/request/<str:username>/', views.dm_request_send, name='dm_request_send'),
     path('dm/request/<int:request_id>/respond/', views.dm_request_respond, name='dm_request_respond'),

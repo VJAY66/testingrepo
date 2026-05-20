@@ -9520,6 +9520,20 @@ def dm_unread_count(request):
     return JsonResponse({'count': count})
 
 
+@login_required
+def dm_unread_counts(request):
+    """Return per-partner unread DM counts for the sidebar refresh."""
+    from django.db.models import Count
+    rows = (
+        DirectMessage.objects
+        .filter(recipient=request.user, is_read=False)
+        .values('sender__username')
+        .annotate(count=Count('id'))
+    )
+    counts = {r['sender__username']: r['count'] for r in rows}
+    return JsonResponse({'unread': counts})
+
+
 # ── Push Notifications ───────────────────────────────────────────────────────
 
 @login_required
