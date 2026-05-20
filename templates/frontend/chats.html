@@ -539,18 +539,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     bindChatSearch('ch-desktop-search', '#ch-desktop-list');
+
+    // Seed localStorage for every chat that has no entry yet so only
+    // messages arriving AFTER this page load will show a badge.
+    (function seedBaseline() {
+        var lr = getLastRead();
+        var changed = false;
+        document.querySelectorAll('.ch-item[data-chat-id]').forEach(function(item) {
+            var cid = item.getAttribute('data-chat-id');
+            var lastId = parseInt(item.getAttribute('data-last-id') || '0', 10);
+            if (lastId > (parseInt(lr[cid] || '0', 10))) {
+                lr[cid] = lastId;
+                changed = true;
+            }
+        });
+        if (changed) setLastRead(lr);
+    })();
+
     if (activeChatId) {
         var autoBtn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
-        if (autoBtn) {
-            autoBtn.classList.add('active');
-            // Immediately mark as read from rendered data-last-id (async fetch will refine it)
-            var lr = getLastRead();
-            var initLastId = parseInt(autoBtn.getAttribute('data-last-id') || '0', 10);
-            if (initLastId > (parseInt(lr[String(activeChatId)] || '0', 10))) {
-                lr[String(activeChatId)] = initLastId;
-                setLastRead(lr);
-            }
-        }
+        if (autoBtn) autoBtn.classList.add('active');
     }
     refreshUnreadBadges();
     markActiveChatRead();
