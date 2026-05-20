@@ -9297,7 +9297,9 @@ def dm_list(request):
         unread = DirectMessage.objects.filter(sender=partner, recipient=user, is_read=False).count()
         conversations.append({'partner': partner, 'last_msg': last_msg, 'unread': unread})
     conversations.sort(key=lambda x: x['last_msg'].created_at if x['last_msg'] else timezone.now(), reverse=True)
-    return render(request, 'frontend/dm_list.html', {'conversations': conversations})
+    response = render(request, 'frontend/dm_list.html', {'conversations': conversations})
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    return response
 
 
 @login_required

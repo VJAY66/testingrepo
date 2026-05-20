@@ -613,7 +613,11 @@
 
         {% include "frontend/_ad_unit.html" %}
 
-        {% if user.is_authenticated and not is_post_creator %}
+        {% if user.is_authenticated and is_post_creator %}
+        <div class="rounded-2xl border border-border bg-card p-5 text-center">
+            <p class="text-sm text-muted-foreground">You created this debate — you can't vote on your own post. Watch as others weigh in! 👀</p>
+        </div>
+        {% elif user.is_authenticated and not is_post_creator %}
             {% if not user_has_voted or not user_has_commented %}
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <form method="post" action="{% url 'create_comment' post.id %}" data-vote-form="true" class="group rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white via-emerald-50/70 to-teal-50/60 p-5 shadow-[0_18px_42px_-30px_rgba(16,185,129,0.5)] transition hover:border-emerald-300/90 dark:border-emerald-500/20 dark:bg-gradient-to-br dark:from-slate-900/90 dark:via-slate-900/85 dark:to-emerald-950/55 dark:hover:border-emerald-400/45">
@@ -712,6 +716,7 @@
             <a href="{% url 'login' %}" class="inline-flex items-center justify-center rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">Sign In</a>
         </div>
         {% endif %}
+
 
         <div class="grid grid-cols-2 gap-2">
             <div class="space-y-2 min-w-0">

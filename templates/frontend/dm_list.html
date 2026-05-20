@@ -34,4 +34,10 @@
   </div>
   {% endif %}
 </div>
+<script>
+// Force a fresh load when navigating back so unread counts are current
+window.addEventListener('pageshow', function(e) {
+    if (e.persisted) { window.location.reload(); }
+});
+</script>
 {% endblock %}

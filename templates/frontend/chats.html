@@ -503,6 +503,7 @@ function markActiveChatRead() {
                 if (totalUnread > 0) { mobBadge.textContent = totalUnread > 9 ? '9+' : String(totalUnread); mobBadge.style.display = 'inline-flex'; }
                 else { mobBadge.style.display = 'none'; }
             }
+            refreshUnreadBadges();
             if (typeof ChatListManager !== 'undefined') ChatListManager.refresh();
         })
         .catch(function() {});
