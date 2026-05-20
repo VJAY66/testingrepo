@@ -9441,6 +9441,35 @@ def dm_unread_count(request):
     return JsonResponse({'count': count})
 
 
+@login_required
+@require_POST
+def mark_dm_read(request, username):
+    partner = get_object_or_404(User, username=username)
+    DirectMessage.objects.filter(
+        sender=partner,
+        recipient=request.user,
+        is_read=False,
+    ).update(is_read=True)
+    unread_remaining = DirectMessage.objects.filter(
+        recipient=request.user,
+        is_read=False,
+    ).count()
+    return JsonResponse({'success': True, 'unread_total': unread_remaining})
+
+
+@login_required
+def dm_unread_counts(request):
+    from django.db.models import Count
+    rows = (
+        DirectMessage.objects
+        .filter(recipient=request.user, is_read=False)
+        .values('sender__username')
+        .annotate(count=Count('id'))
+    )
+    counts = {r['sender__username']: r['count'] for r in rows}
+    return JsonResponse({'unread': counts})
+
+
 # ── Push Notifications ───────────────────────────────────────────────────────
 
 @login_required
