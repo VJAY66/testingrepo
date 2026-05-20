@@ -458,6 +458,15 @@ function setLastRead(lr) {
 
 var activeChatId = '{{ selected_chat_id }}';
 
+// Snapshot of last_message_id values at page-load time.
+// A badge only shows when data-last-id exceeds BOTH this baseline AND
+// whatever the user explicitly read by clicking. This prevents stale
+// badges for messages that existed before the user opened the page.
+var pageLoadBaseline = {};
+document.querySelectorAll('.ch-item[data-chat-id]').forEach(function(item) {
+    pageLoadBaseline[item.getAttribute('data-chat-id')] = parseInt(item.getAttribute('data-last-id') || '0', 10);
+});
+
 function refreshUnreadBadges() {
     var lr = getLastRead();
     document.querySelectorAll('.ch-item[data-chat-id]').forEach(function(item) {
@@ -469,7 +478,10 @@ function refreshUnreadBadges() {
             return;
         }
         var lastId = parseInt(item.getAttribute('data-last-id') || '0', 10);
-        var readId = parseInt(lr[chatId] || '0', 10);
+        var readId = Math.max(
+            parseInt(lr[chatId] || '0', 10),
+            pageLoadBaseline[chatId] || 0
+        );
         badge.classList.toggle('hidden', lastId <= readId);
     });
 }
@@ -539,22 +551,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     bindChatSearch('ch-desktop-search', '#ch-desktop-list');
-
-    // Seed localStorage for every chat that has no entry yet so only
-    // messages arriving AFTER this page load will show a badge.
-    (function seedBaseline() {
-        var lr = getLastRead();
-        var changed = false;
-        document.querySelectorAll('.ch-item[data-chat-id]').forEach(function(item) {
-            var cid = item.getAttribute('data-chat-id');
-            var lastId = parseInt(item.getAttribute('data-last-id') || '0', 10);
-            if (lastId > (parseInt(lr[cid] || '0', 10))) {
-                lr[cid] = lastId;
-                changed = true;
-            }
-        });
-        if (changed) setLastRead(lr);
-    })();
 
     if (activeChatId) {
         var autoBtn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
