@@ -4528,6 +4528,16 @@ def cancel_debate(request, debate_id):
 
 @login_required
 @require_POST
+def dismiss_debate(request, debate_id):
+    """Remove a debate from the current user's inbox by deleting their participation record."""
+    deleted, _ = DebateParticipant.objects.filter(debate_id=debate_id, user=request.user).delete()
+    if deleted:
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False, 'error': 'Debate not found.'}, status=404)
+
+
+@login_required
+@require_POST
 def counter_debate(request, debate_id):
     """Target user proposes a counter-topic/side instead of accepting or rejecting."""
     try:
