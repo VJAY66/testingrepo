@@ -8297,32 +8297,41 @@ def _compute_spam_score(post):
 def for_you_feed(request):
     """Instagram-style personalised feed using pre-computed FeedScore."""
     active_content_type = request.GET.get('content_type', '').strip()
+    search_query = request.GET.get('q', '').strip()
     user_followed_tags = set(
         HashtagFollow.objects.filter(user=request.user).values_list('tag', flat=True)
     )
 
-    scored_post_ids = (
-        FeedScore.objects
-        .filter(user=request.user)
-        .order_by('-score')
-        .values_list('post_id', flat=True)[:100]
-    )
-
-    if scored_post_ids:
-        id_list = list(scored_post_ids)
-        annotated = _annotated_feed_posts_queryset().filter(id__in=id_list)
-        if active_content_type in ('discussion', 'stock_prediction'):
-            annotated = annotated.filter(post_type=active_content_type)
-        id_to_post = {p.id: p for p in annotated}
-        posts_qs = [id_to_post[pid] for pid in id_list if pid in id_to_post]
-    else:
-        interests = list(request.user.profile.interested_categories or [])
+    # When searching, skip personalisation and search all posts directly
+    if search_query:
         base_qs = _annotated_feed_posts_queryset().filter(is_draft=False, is_deleted_by_moderation=False)
-        if interests:
-            base_qs = base_qs.filter(category__in=interests)
+        base_qs = base_qs.filter(Q(title__icontains=search_query) | Q(content__icontains=search_query) | Q(hashtags__icontains=search_query))
         if active_content_type in ('discussion', 'stock_prediction'):
             base_qs = base_qs.filter(post_type=active_content_type)
         posts_qs = list(base_qs.order_by('-created_at')[:50])
+    else:
+        scored_post_ids = (
+            FeedScore.objects
+            .filter(user=request.user)
+            .order_by('-score')
+            .values_list('post_id', flat=True)[:100]
+        )
+
+        if scored_post_ids:
+            id_list = list(scored_post_ids)
+            annotated = _annotated_feed_posts_queryset().filter(id__in=id_list)
+            if active_content_type in ('discussion', 'stock_prediction'):
+                annotated = annotated.filter(post_type=active_content_type)
+            id_to_post = {p.id: p for p in annotated}
+            posts_qs = [id_to_post[pid] for pid in id_list if pid in id_to_post]
+        else:
+            interests = list(request.user.profile.interested_categories or [])
+            base_qs = _annotated_feed_posts_queryset().filter(is_draft=False, is_deleted_by_moderation=False)
+            if interests:
+                base_qs = base_qs.filter(category__in=interests)
+            if active_content_type in ('discussion', 'stock_prediction'):
+                base_qs = base_qs.filter(post_type=active_content_type)
+            posts_qs = list(base_qs.order_by('-created_at')[:50])
 
     # Inject recent followed-hashtag posts not already in the scored list
     if user_followed_tags and active_content_type not in ('discussion', 'stock_prediction'):
@@ -8365,6 +8374,7 @@ def for_you_feed(request):
         'page_obj': page_obj,
         'active_tab': 'for_you',
         'active_content_type': active_content_type,
+        'search_query': search_query,
         'is_suggested_page': False,
         'categories': get_frontend_categories(),
         'active_category': '',
