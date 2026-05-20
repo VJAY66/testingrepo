@@ -2884,6 +2884,14 @@ function acceptCookies() {
                                     </div>
                                     <svg class="hub-item-arrow w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
                                 </a>
+                                <a href="{% url 'dm_list' %}" class="hub-item">
+                                    <span class="hub-item-icon" style="background:linear-gradient(135deg,#e0f2fe,#bae6fd); color:#075985;">💬</span>
+                                    <div class="hub-item-text">
+                                        <div class="hub-item-title">Messages</div>
+                                        <div class="hub-item-desc">Private conversations</div>
+                                    </div>
+                                    <svg class="hub-item-arrow w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                                </a>
                                 <a href="{% url 'user_lists' %}" class="hub-item">
                                     <span class="hub-item-icon" style="background:linear-gradient(135deg,#ede9fe,#c4b5fd); color:#4c1d95;">📋</span>
                                     <div class="hub-item-text">
@@ -3028,6 +3036,7 @@ function acceptCookies() {
                                 </div>
                                 <div class="user-menu-divider"></div>
                                 <a href="{% url 'profile' %}" class="user-menu-item"><span class="umi-icon">👤</span>My Profile</a>
+                                <a href="{% url 'dm_list' %}" class="user-menu-item"><span class="umi-icon">💬</span>Messages</a>
                                 <a href="{% url 'bookmarks' %}" class="user-menu-item"><span class="umi-icon">🔖</span>Bookmarks</a>
                                 <a href="{% url 'read_later' %}" class="user-menu-item"><span class="umi-icon">📚</span>Read Later</a>
                                 <a href="{% url 'analytics_dashboard' %}" class="user-menu-item"><span class="umi-icon">📊</span>Analytics</a>
@@ -3092,6 +3101,7 @@ function acceptCookies() {
                                 </div>
                                 <div class="user-menu-divider"></div>
                                 <a href="{% url 'profile' %}" class="user-menu-item"><span class="umi-icon">👤</span>My Profile</a>
+                                <a href="{% url 'dm_list' %}" class="user-menu-item"><span class="umi-icon">💬</span>Messages</a>
                                 <a href="{% url 'bookmarks' %}" class="user-menu-item"><span class="umi-icon">🔖</span>Bookmarks</a>
                                 <a href="{% url 'read_later' %}" class="user-menu-item"><span class="umi-icon">📚</span>Read Later</a>
                                 <a href="{% url 'analytics_dashboard' %}" class="user-menu-item"><span class="umi-icon">📊</span>Analytics</a>
