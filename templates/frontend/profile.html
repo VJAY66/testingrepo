@@ -434,15 +434,9 @@
             <span>Questions</span>
             <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_questions.count }}</span>
         </button>
-        <button type="button" id="tab-btn-polls" onclick="switchProfileTab('polls')"
-            class="profile-tab-btn inline-flex items-center justify-center gap-1 transition-colors duration-200">
-            <span class="hidden sm:inline">📊</span>
-            <span>Polls</span>
-            <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_polls.count }}</span>
-        </button>
         <button type="button" id="tab-btn-stocks" onclick="switchProfileTab('stocks')"
             class="profile-tab-btn inline-flex items-center justify-center gap-1 transition-colors duration-200">
-            <span class="hidden sm:inline">&#128200;</span>
+            <span class="hidden sm:inline">📈</span>
             <span>Stocks</span>
             <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_stock_predictions.count }}</span>
         </button>
@@ -451,6 +445,12 @@
             <svg class="w-3.5 h-3.5 shrink-0 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             <span>Answers</span>
             <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_answers.count }}</span>
+        </button>
+        <button type="button" id="tab-btn-polls" onclick="switchProfileTab('polls')"
+            class="profile-tab-btn inline-flex items-center justify-center gap-1 transition-colors duration-200">
+            <span class="hidden sm:inline">📊</span>
+            <span>Polls</span>
+            <span class="rounded-full bg-primary/15 text-primary px-1.5 py-0.5 text-[9px] font-bold leading-none">{{ user_polls.count }}</span>
         </button>
         <button type="button" id="tab-btn-drafts" onclick="switchProfileTab('drafts')"
             class="profile-tab-btn inline-flex items-center justify-center gap-1 transition-colors duration-200">
