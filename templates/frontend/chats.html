@@ -368,6 +368,7 @@ body.ch-fullscreen {
         <button type="button" class="ch-item"
             data-chat-id="{{ chat.id }}"
             data-last-id="{{ chat.last_message_id|default:0 }}"
+            data-last-sender="{{ chat.last_message_sender|default:'' }}"
             data-filter="{{ chat.opponent|lower }} {{ chat.title|lower }} {{ chat.last_message|default:''|lower }}"
             data-chat-url="{% url 'debate_chat' chat.id %}?return_to={% url 'chats' %}?chat={{ chat.id }}"
             onclick="openDesktopChat('{{ chat.id }}', this)">
@@ -457,6 +458,7 @@ function setLastRead(lr) {
 }
 
 var activeChatId = '{{ selected_chat_id }}';
+var currentUsername = '{{ request.user.username|escapejs }}';
 
 // Snapshot of last_message_id values at page-load time.
 // A badge only shows when data-last-id exceeds BOTH this baseline AND
@@ -477,6 +479,11 @@ function refreshUnreadBadges() {
             badge.classList.add('hidden');
             return;
         }
+        // No badge if the current user sent the last message
+        if (item.getAttribute('data-last-sender') === currentUsername) {
+            badge.classList.add('hidden');
+            return;
+        }
         var lastId = parseInt(item.getAttribute('data-last-id') || '0', 10);
         var readId = Math.max(
             parseInt(lr[chatId] || '0', 10),
@@ -493,11 +500,12 @@ function markActiveChatRead() {
         .then(function(d) {
             if (!d.success || !d.chats) return;
             var lr = getLastRead();
-            // Update data-last-id for ALL chats from fresh server data
+            // Update data-last-id and data-last-sender for ALL chats from fresh server data
             d.chats.forEach(function(c) {
                 var btn = document.querySelector('.ch-item[data-chat-id="' + c.id + '"]');
-                if (btn && c.last_message_id) {
-                    btn.setAttribute('data-last-id', String(c.last_message_id));
+                if (btn) {
+                    if (c.last_message_id) btn.setAttribute('data-last-id', String(c.last_message_id));
+                    if (c.last_message_sender != null) btn.setAttribute('data-last-sender', c.last_message_sender || '');
                 }
             });
             // Mark active chat as read up to the latest message
