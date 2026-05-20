@@ -478,16 +478,19 @@ function setBadge(item, show) {
 function refreshUnreadBadges() {
     var lr = getLastRead();
     document.querySelectorAll('.ch-item[data-chat-id]').forEach(function(item) {
-        var chatId = item.getAttribute('data-chat-id');
+        var chatId = String(item.getAttribute('data-chat-id'));
         // Active chat is always "read"
-        if (activeChatId && chatId === activeChatId) { setBadge(item, false); return; }
+        if (activeChatId && chatId === String(activeChatId)) { setBadge(item, false); return; }
 
-        var lastId = parseInt(item.getAttribute('data-last-id') || '0', 10);
-        var readId = Math.max(
-            parseInt(lr[chatId] || '0', 10),
-            parseInt(item.getAttribute('data-server-read-id') || '0', 10)
-        );
-        setBadge(item, lastId > readId);
+        var lastId      = parseInt(item.getAttribute('data-last-id') || '0', 10);
+        var serverReadId = parseInt(item.getAttribute('data-server-read-id') || '0', 10);
+        var localReadId  = parseInt(lr[chatId] || '0', 10);
+        var readFloor    = Math.max(serverReadId, localReadId);
+        var isUnread     = lastId > readFloor;
+
+        console.log('[unread]', { chatId: chatId, lastId: lastId, serverReadId: serverReadId, localReadId: localReadId, readFloor: readFloor, isUnread: isUnread });
+
+        setBadge(item, isUnread);
     });
 }
 
