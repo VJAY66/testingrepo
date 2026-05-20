@@ -3114,21 +3114,24 @@ def interests_onboarding(request):
     profile = Profile.objects.filter(user=request.user).first()
     already_set = bool(profile and profile.interested_categories)
 
+    force = request.GET.get('force') == '1' or request.POST.get('force') == '1'
+
     if request.method == 'POST':
         selected = request.POST.getlist('categories')
         valid = [c for c in selected if c in all_categories]
         if profile:
             profile.interested_categories = valid
             profile.save(update_fields=['interested_categories'])
-        return redirect('onboarding_step2')
+        return redirect('people_you_may_know' if force else 'onboarding_step2')
 
     # If user visits again after already setting interests, redirect away
-    if already_set and request.GET.get('force') != '1':
+    if already_set and not force:
         return redirect('suggested')
 
     return render(request, 'frontend/interests_onboarding.html', {
         'all_categories': all_categories,
         'selected_categories': profile.interested_categories if profile else [],
+        'force': force,
     })
 
 
