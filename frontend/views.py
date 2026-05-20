@@ -9381,6 +9381,23 @@ def dm_thread_poll(request, username):
     })
 
 
+@login_required
+@require_POST
+def mark_dm_read(request, username):
+    """Mark all unread DMs from the given partner as read."""
+    partner = get_object_or_404(User, username=username)
+    DirectMessage.objects.filter(
+        sender=partner,
+        recipient=request.user,
+        is_read=False,
+    ).update(is_read=True)
+    unread_remaining = DirectMessage.objects.filter(
+        recipient=request.user,
+        is_read=False,
+    ).count()
+    return JsonResponse({'success': True, 'unread_total': unread_remaining})
+
+
 # ─── Ban / Unban User ─────────────────────────────────────────────────────────
 
 @login_required

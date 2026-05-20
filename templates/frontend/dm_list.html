@@ -35,9 +35,23 @@
   {% endif %}
 </div>
 <script>
-// Force a fresh load when navigating back so unread counts are current
+// Reload if navigating back from bfcache OR if a DM thread was read since
+// we last rendered this page (so stale unread badges are cleared).
+var _dmListRenderedAt = Date.now();
 window.addEventListener('pageshow', function(e) {
-    if (e.persisted) { window.location.reload(); }
+    if (e.persisted) { window.location.reload(); return; }
+    // Non-bfcache arrival: check if any thread was read after our render time
+    try {
+        var readAt = parseInt(localStorage.getItem('dmThreadReadAt') || '0', 10);
+        if (readAt > _dmListRenderedAt) { window.location.reload(); }
+    } catch (_) {}
+});
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) return;
+    try {
+        var readAt = parseInt(localStorage.getItem('dmThreadReadAt') || '0', 10);
+        if (readAt > _dmListRenderedAt) { _dmListRenderedAt = Date.now(); window.location.reload(); }
+    } catch (_) {}
 });
 </script>
 {% endblock %}

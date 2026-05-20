@@ -240,6 +240,7 @@ urlpatterns = [
     path('dm/request/<int:request_id>/respond/', views.dm_request_respond, name='dm_request_respond'),
     path('dm/<str:username>/', views.dm_thread, name='dm_thread'),
     path('dm/<str:username>/poll/', views.dm_thread_poll, name='dm_thread_poll'),
+    path('dm/<str:username>/mark-read/', views.mark_dm_read, name='mark_dm_read'),
     # Push notifications
     path('push/subscribe/', views.push_subscribe, name='push_subscribe'),
     path('push/unsubscribe/', views.push_unsubscribe, name='push_unsubscribe'),
