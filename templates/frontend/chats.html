@@ -481,13 +481,17 @@ function markActiveChatRead() {
         .then(function(d) {
             if (!d.success || !d.chats) return;
             var lr = getLastRead();
+            // Update data-last-id for ALL chats from fresh server data
+            d.chats.forEach(function(c) {
+                var btn = document.querySelector('.ch-item[data-chat-id="' + c.id + '"]');
+                if (btn && c.last_message_id) {
+                    btn.setAttribute('data-last-id', String(c.last_message_id));
+                }
+            });
+            // Mark active chat as read up to the latest message
             var activeChat = d.chats.find(function(c) { return String(c.id) === String(activeChatId); });
             if (activeChat) {
                 lr[String(activeChatId)] = activeChat.last_message_id || 0;
-                var activeBtn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
-                if (activeBtn && activeChat.last_message_id) {
-                    activeBtn.setAttribute('data-last-id', String(activeChat.last_message_id));
-                }
             } else {
                 var btn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
                 if (btn) lr[String(activeChatId)] = parseInt(btn.getAttribute('data-last-id') || '0', 10);
@@ -537,7 +541,16 @@ document.addEventListener('DOMContentLoaded', function() {
     bindChatSearch('ch-desktop-search', '#ch-desktop-list');
     if (activeChatId) {
         var autoBtn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
-        if (autoBtn) autoBtn.classList.add('active');
+        if (autoBtn) {
+            autoBtn.classList.add('active');
+            // Immediately mark as read from rendered data-last-id (async fetch will refine it)
+            var lr = getLastRead();
+            var initLastId = parseInt(autoBtn.getAttribute('data-last-id') || '0', 10);
+            if (initLastId > (parseInt(lr[String(activeChatId)] || '0', 10))) {
+                lr[String(activeChatId)] = initLastId;
+                setLastRead(lr);
+            }
+        }
     }
     refreshUnreadBadges();
     markActiveChatRead();
@@ -551,6 +564,13 @@ function openDesktopChat(chatId, btn) {
     activeChatId = String(chatId);
     document.querySelectorAll('.ch-item.active').forEach(function(item) { item.classList.remove('active'); });
     btn.classList.add('active');
+    // Synchronously mark as read so switching chats quickly doesn't resurrect the badge
+    var lr = getLastRead();
+    var currentLastId = parseInt(btn.getAttribute('data-last-id') || '0', 10);
+    if (currentLastId > (parseInt(lr[String(chatId)] || '0', 10))) {
+        lr[String(chatId)] = currentLastId;
+        setLastRead(lr);
+    }
     var frame = document.getElementById('ch-conv-frame');
     if (frame) frame.src = btn.getAttribute('data-chat-url');
     var placeholder = document.getElementById('ch-conv-placeholder');
