@@ -2655,6 +2655,31 @@ function acceptCookies() {
     })();
     </script>
     <div id="toast-root" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Coming Soon Modal -->
+    <div id="coming-soon-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:center;justify-content:center;" onclick="if(event.target===this)closeComingSoon()">
+      <div style="background:hsl(var(--card));border:1px solid hsl(var(--border));border-radius:20px;padding:40px 32px;max-width:380px;width:90%;text-align:center;box-shadow:0 24px 60px -12px rgba(0,0,0,0.45);position:relative;animation:csModalIn 0.25s ease;">
+        <button onclick="closeComingSoon()" style="position:absolute;top:14px;right:14px;background:none;border:none;cursor:pointer;color:hsl(var(--muted-foreground));font-size:18px;line-height:1;padding:4px;">✕</button>
+        <div style="width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#fee2e2,#fecaca);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 16px;">🔴</div>
+        <h2 style="font-size:20px;font-weight:800;color:hsl(var(--foreground));margin:0 0 8px;">Live Debates</h2>
+        <div style="display:inline-block;font-size:10px;font-weight:800;letter-spacing:0.08em;padding:3px 10px;border-radius:999px;background:hsl(38 90% 54%/0.15);color:hsl(35 80% 35%);border:1px solid hsl(38 90% 54%/0.4);margin-bottom:14px;">COMING SOON</div>
+        <p style="font-size:14px;color:hsl(var(--muted-foreground));line-height:1.6;margin:0;">Real-time debates with live audience voting are on the way. We're putting the finishing touches on it — stay tuned!</p>
+      </div>
+    </div>
+    <style>
+      @keyframes csModalIn { from { opacity:0; transform:scale(0.93) translateY(8px); } to { opacity:1; transform:scale(1) translateY(0); } }
+    </style>
+    <script>
+      function openComingSoon() {
+        var m = document.getElementById('coming-soon-modal');
+        if (m) { m.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
+      }
+      function closeComingSoon() {
+        var m = document.getElementById('coming-soon-modal');
+        if (m) { m.style.display = 'none'; document.body.style.overflow = ''; }
+      }
+      document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeComingSoon(); });
+    </script>
     {% if request.resolver_match.url_name == 'index' %}
     <!-- Full-page galaxy background layer -->
     <div class="galaxy-layer" aria-hidden="true" style="position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;">
@@ -2900,7 +2925,7 @@ function acceptCookies() {
                                     </div>
                                     <svg class="hub-item-arrow w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
                                 </a>
-                                <a href="#" onclick="event.preventDefault();if(typeof showToast==='function')showToast('Live Debates is coming soon — stay tuned! 🔴','info');" class="hub-item">
+                                <a href="#" onclick="event.preventDefault();openComingSoon();" class="hub-item">
                                     <span class="hub-item-icon" style="background:linear-gradient(135deg,#fee2e2,#fecaca); color:#991b1b;">🔴</span>
                                     <div class="hub-item-text">
                                         <div class="hub-item-title flex items-center gap-2">Live Debates <span style="font-size:9px;font-weight:800;letter-spacing:0.06em;padding:2px 7px;border-radius:999px;background:hsl(38 90% 54%/0.12);color:hsl(35 80% 38%);border:1px solid hsl(38 90% 54%/0.3);">SOON</span></div>
