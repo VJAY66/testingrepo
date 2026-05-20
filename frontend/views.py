@@ -2870,6 +2870,10 @@ def _build_chat_payload_for_user(user, only_active=False):
             'last_message_time': last_msg.created_at.strftime('%b %d, %H:%M') if last_msg else None,
             'last_message_at': last_msg.created_at.isoformat() if last_msg else None,
             'last_message_id': last_msg.id if last_msg else 0,
+            # Server-authoritative read position: the highest message ID this user has
+            # acknowledged via mark_debate_read.  Returned so the frontend can use it as
+            # the unread baseline instead of relying solely on localStorage.
+            'last_read_message_id': p.last_read_message_id or 0,
             'updated_at': debate.updated_at.isoformat() if debate.updated_at else '',
         })
 
