@@ -26,7 +26,7 @@
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2">
           <p class="font-semibold text-foreground text-sm">{{ conv.partner.username }}</p>
-          <span class="dm-unread-badge bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full{% if not conv.unread %} hidden{% endif %}">{{ conv.unread|default:'' }}</span>
+          {% if conv.unread %}<span class="dm-unread-badge bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">{{ conv.unread }}</span>{% endif %}
         </div>
         {% if conv.last_msg %}<p class="text-xs text-muted-foreground truncate mt-0.5">{% if conv.last_msg.sender == request.user %}You: {% endif %}{{ conv.last_msg.content|truncatechars:60 }}</p>{% endif %}
       </div>
@@ -37,29 +37,35 @@
   {% endif %}
 </div>
 <script>
-// Dynamically refresh unread badges from the server without a full page reload.
-// This handles: bfcache back navigation, tab switching, and any scenario where
-// the server-rendered badge count is stale.
 function refreshDmBadges() {
-    fetch('/dm/unread-counts/', {credentials: 'same-origin'})
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-            var counts = d.unread || {};
-            document.querySelectorAll('[data-partner]').forEach(function(row) {
-                var partner = row.getAttribute('data-partner');
-                var badge = row.querySelector('.dm-unread-badge');
-                if (!badge) return;
-                var count = counts[partner] || 0;
-                if (count > 0) {
-                    badge.textContent = count;
-                    badge.classList.remove('hidden');
-                } else {
-                    badge.textContent = '';
-                    badge.classList.add('hidden');
-                }
-            });
-        })
-        .catch(function() {});
+  fetch('/dm/unread-counts/', {
+    headers: {'X-Requested-With': 'XMLHttpRequest'}
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    document.querySelectorAll('[data-partner]').forEach(function(row) {
+      var partner = row.dataset.partner;
+      var unread = (data.unread && data.unread[partner]) || 0;
+      var badge = row.querySelector('.dm-unread-badge');
+
+      // completely remove badge node when no unread — don't rely on hidden/display
+      if (unread <= 0) {
+        if (badge) badge.remove();
+        return;
+      }
+
+      // create badge if it doesn't exist (e.g. was removed earlier)
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'dm-unread-badge bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full';
+        var nameRow = row.querySelector('.flex.items-center.gap-2');
+        if (nameRow) nameRow.appendChild(badge);
+      }
+
+      badge.textContent = unread;
+    });
+  })
+  .catch(function() {});
 }
 
 // Refresh on load (catches any stale server-render)
