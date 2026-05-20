@@ -6558,6 +6558,17 @@ def review_detail(request, review_id):
     })
 
 
+@login_required
+@require_POST
+def delete_review(request, review_id):
+    """Author deletes their own review."""
+    review = get_object_or_404(Review, id=review_id)
+    if review.user != request.user:
+        return JsonResponse({'success': False, 'error': 'You can only delete your own review.'}, status=403)
+    review.delete()
+    return JsonResponse({'success': True, 'redirect_url': '/reviews/'})
+
+
 @require_POST
 def react_to_review(request, review_id):
     if not request.user.is_authenticated:
