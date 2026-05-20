@@ -255,8 +255,8 @@
       <!-- Footer -->
       <div class="rl-footer">
         <div class="rl-stats">
-          <span class="rl-stat rl-agree">✓ {{ rv.agree_count }}</span>
-          <span class="rl-stat rl-disagree">✗ {{ rv.disagree_count }}</span>
+          <span class="rl-stat rl-agree">👍 {{ rv.agree_count }}</span>
+          <span class="rl-stat rl-disagree">👎 {{ rv.disagree_count }}</span>
           {% if user.is_authenticated %}
           <button type="button" class="rl-action-btn {% if rd.is_liked %}active-like{% endif %}" onclick="doAction('review','{{ rv.id }}','like',this)">
             <svg class="w-3 h-3" fill="{% if rd.is_liked %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
@@ -267,7 +267,7 @@
             <span data-count>{{ rd.save_count }}</span>
           </button>
           {% else %}
-          <span class="rl-stat">♥ {{ rd.like_count }}</span>
+          <span class="rl-stat">❤️ {{ rd.like_count }}</span>
           {% endif %}
         </div>
         <a href="{% url 'review_detail' rv.id %}" class="rl-read">Read →</a>
