@@ -2870,9 +2870,6 @@ def _build_chat_payload_for_user(user, only_active=False):
             'last_message_time': last_msg.created_at.strftime('%b %d, %H:%M') if last_msg else None,
             'last_message_at': last_msg.created_at.isoformat() if last_msg else None,
             'last_message_id': last_msg.id if last_msg else 0,
-            # Server-authoritative read position: the highest message ID this user has
-            # acknowledged via mark_debate_read.  Returned so the frontend can use it as
-            # the unread baseline instead of relying solely on localStorage.
             'last_read_message_id': p.last_read_message_id or 0,
             'updated_at': debate.updated_at.isoformat() if debate.updated_at else '',
         })
@@ -2888,6 +2885,15 @@ def chats(request):
     requested_chat = str(request.GET.get('chat', '')).strip()
     chat_ids = {str(item.get('id')) for item in chats_data}
     selected_chat_id = requested_chat if requested_chat in chat_ids else (str(chats_data[0]['id']) if chats_data else '')
+
+    # The active chat is open right now — treat it as fully read in the initial
+    # render so the badge never appears for it, even before JS runs.
+    if selected_chat_id:
+        for chat in chats_data:
+            if str(chat['id']) == selected_chat_id:
+                chat['last_read_message_id'] = chat.get('last_message_id') or 0
+                break
+
     return render(request, 'frontend/chats.html', {
         'chats': chats_data,
         'selected_chat_id': selected_chat_id,
@@ -3118,24 +3124,21 @@ def interests_onboarding(request):
     profile = Profile.objects.filter(user=request.user).first()
     already_set = bool(profile and profile.interested_categories)
 
-    force = request.GET.get('force') == '1' or request.POST.get('force') == '1'
-
     if request.method == 'POST':
         selected = request.POST.getlist('categories')
         valid = [c for c in selected if c in all_categories]
         if profile:
             profile.interested_categories = valid
             profile.save(update_fields=['interested_categories'])
-        return redirect('people_you_may_know' if force else 'onboarding_step2')
+        return redirect('onboarding_step2')
 
     # If user visits again after already setting interests, redirect away
-    if already_set and not force:
+    if already_set and request.GET.get('force') != '1':
         return redirect('suggested')
 
     return render(request, 'frontend/interests_onboarding.html', {
         'all_categories': all_categories,
         'selected_categories': profile.interested_categories if profile else [],
-        'force': force,
     })
 
 
@@ -4525,16 +4528,6 @@ def cancel_debate(request, debate_id):
 
 @login_required
 @require_POST
-def dismiss_debate(request, debate_id):
-    """Remove a debate from the current user's inbox by deleting their participation record."""
-    deleted, _ = DebateParticipant.objects.filter(debate_id=debate_id, user=request.user).delete()
-    if deleted:
-        return JsonResponse({'success': True})
-    return JsonResponse({'success': False, 'error': 'Debate not found.'}, status=404)
-
-
-@login_required
-@require_POST
 def counter_debate(request, debate_id):
     """Target user proposes a counter-topic/side instead of accepting or rejecting."""
     try:
@@ -4606,8 +4599,6 @@ def accept_counter_debate(request, debate_id):
 
 @login_required
 def debate_inbox(request):
-    status_filter = request.GET.get('status', 'all')
-
     participations = DebateParticipant.objects.filter(
         user=request.user
     ).select_related(
@@ -4615,12 +4606,12 @@ def debate_inbox(request):
         'debate__initiator__profile', 'debate__target__profile',
     ).order_by('-debate__created_at')
 
-    all_debates = []
+    debates_with_status = []
     for p in participations:
         d = p.debate
         opponent = d.target if d.initiator == request.user else d.initiator
         expires_at = (d.created_at + timedelta(hours=48)) if d.status == 'pending' else None
-        all_debates.append({
+        debates_with_status.append({
             'debate': d,
             'opponent': opponent,
             'side': p.side,
@@ -4630,27 +4621,11 @@ def debate_inbox(request):
             'is_initiator': d.initiator == request.user,
         })
 
-    pending_count = sum(1 for x in all_debates if x['status'] == 'pending')
-    accepted_count = sum(1 for x in all_debates if x['status'] == 'accepted')
-    completed_count = sum(1 for x in all_debates if x['status'] == 'completed')
-
-    if status_filter in ('pending', 'accepted', 'completed', 'rejected', 'countered'):
-        debates_with_status = [x for x in all_debates if x['status'] == status_filter]
-    else:
-        debates_with_status = all_debates
-
-    tabs = [
-        ('all', 'All', len(all_debates)),
-        ('pending', 'Pending', pending_count),
-        ('accepted', 'Active', accepted_count),
-        ('completed', 'Completed', completed_count),
-    ]
+    pending_count = sum(1 for x in debates_with_status if x['status'] == 'pending')
 
     return render(request, 'frontend/debate_inbox.html', {
         'debates': debates_with_status,
         'pending_count': pending_count,
-        'status_filter': status_filter,
-        'tabs': tabs,
     })
 
 
@@ -4970,19 +4945,13 @@ def debate_messages(request, debate_id):
 @login_required
 @require_POST
 def mark_debate_read(request, debate_id):
-    """Mark all messages in a debate as read up to the latest message.
-
-    Works for both formal participants and spectators/observers: if the user
-    has no DebateParticipant record (e.g. they joined as a spectator), the
-    call still succeeds and returns the latest message ID so the frontend can
-    update its local read floor.
-    """
+    """Mark all messages in a debate as read up to the latest message."""
     debate = get_object_or_404(Debate, id=debate_id)
+    participation = get_object_or_404(DebateParticipant, debate=debate, user=request.user)
     latest_id = DebateMessage.objects.filter(debate=debate).aggregate(
         max_id=Max('id')
     )['max_id'] or 0
-    participation = DebateParticipant.objects.filter(debate=debate, user=request.user).first()
-    if participation and latest_id > participation.last_read_message_id:
+    if latest_id > participation.last_read_message_id:
         participation.last_read_message_id = latest_id
         participation.save(update_fields=['last_read_message_id'])
     return JsonResponse({'success': True, 'last_read': latest_id})
@@ -6455,13 +6424,7 @@ def reviews_list(request):
     return render(request, 'frontend/reviews_list.html', {
         'reviews_data': reviews_data,
         'page_obj': page_obj,
-        'review_types': [
-            ('Movie', 'Movie', '🎬'), ('TV Show', 'TV Show', '📺'),
-            ('Book', 'Book', '📚'), ('Music / Album', 'Music / Album', '🎵'),
-            ('Product', 'Product', '📦'), ('Restaurant', 'Restaurant', '🍽️'),
-            ('Place', 'Place', '📍'), ('App / Game', 'App / Game', '🎮'),
-            ('Person', 'Person', '👤'), ('Other', 'Other', '✏️'),
-        ],
+        'review_types': REVIEW_TYPE_CHOICES,
         'active_type': type_filter,
         'search_query': search_query,
     })
@@ -6575,8 +6538,6 @@ def review_detail(request, review_id):
         comments.filter(user=request.user).exists()
     )
 
-    is_author = request.user.is_authenticated and review.user == request.user
-
     return render(request, 'frontend/review_detail.html', {
         'review': review,
         'user_reaction': user_reaction,
@@ -6584,19 +6545,7 @@ def review_detail(request, review_id):
         'disagree_comments': disagree_comments,
         'user_debate': user_debate,
         'user_has_commented': user_has_commented,
-        'is_author': is_author,
     })
-
-
-@login_required
-@require_POST
-def delete_review(request, review_id):
-    """Author deletes their own review."""
-    review = get_object_or_404(Review, id=review_id)
-    if review.user != request.user:
-        return JsonResponse({'success': False, 'error': 'You can only delete your own review.'}, status=403)
-    review.delete()
-    return JsonResponse({'success': True, 'redirect_url': '/reviews/'})
 
 
 @require_POST
@@ -7948,32 +7897,35 @@ def _get_trending_hashtags(limit=10):
     return result
 
 
-def _get_rising_creators(limit=20, days=7):
-    """Return users ranked by follower gains + post engagement over the given period."""
-    cache_key = f'rising_creators_{limit}_{days}'
+def _get_rising_creators(limit=20):
+    """Return users ranked by follower gains + post engagement over the last 7 days."""
+    cache_key = f'rising_creators_{limit}'
     cached = cache.get(cache_key)
     if cached is not None:
         return cached
 
     from discussions.models import PostAction as _PostAction
-    cutoff = timezone.now() - timedelta(days=days)
+    week_ago = timezone.now() - timedelta(days=7)
 
+    # New followers gained this week per user
     new_follows = (
         Follow.objects
-        .filter(created_at__gte=cutoff)
+        .filter(created_at__gte=week_ago)
         .values('following_id')
         .annotate(new_followers=Count('id'))
     )
     follower_gain = {row['following_id']: row['new_followers'] for row in new_follows}
 
+    # Post engagement (all actions) on posts published this week
     engagement = (
         _PostAction.objects
-        .filter(created_at__gte=cutoff, post__is_draft=False, post__is_deleted_by_moderation=False)
+        .filter(created_at__gte=week_ago, post__is_draft=False, post__is_deleted_by_moderation=False)
         .values('post__user_id')
         .annotate(actions=Count('id'))
     )
     eng_map = {row['post__user_id']: row['actions'] for row in engagement}
 
+    # Combine: 3× follower gain + 1× engagement actions
     all_ids = set(follower_gain) | set(eng_map)
     scored = sorted(
         all_ids,
@@ -7999,16 +7951,14 @@ def _get_rising_creators(limit=20, days=7):
             'engagement': eng_map.get(uid, 0),
         })
 
-    cache.set(cache_key, result, 900)
+    cache.set(cache_key, result, 900)  # 15 min cache
     return result
 
 
 @login_required
 def trending_users(request):
-    period = request.GET.get('period', 'week')
-    days_map = {'week': 7, 'month': 30, 'year': 365}
-    days = days_map.get(period, 7)
-    creators = _get_rising_creators(limit=30, days=days)
+    creators = _get_rising_creators(limit=30)
+    # Annotate is_following for the current user
     if creators:
         following_ids = set(
             Follow.objects.filter(follower=request.user)
@@ -8017,7 +7967,7 @@ def trending_users(request):
         for item in creators:
             item['is_following'] = item['user'].id in following_ids
             item['is_self'] = item['user'] == request.user
-    return render(request, 'frontend/trending_users.html', {'creators': creators, 'period': period})
+    return render(request, 'frontend/trending_users.html', {'creators': creators})
 
 
 # ─── Endorsements ─────────────────────────────────────────────────────────────
@@ -8307,41 +8257,32 @@ def _compute_spam_score(post):
 def for_you_feed(request):
     """Instagram-style personalised feed using pre-computed FeedScore."""
     active_content_type = request.GET.get('content_type', '').strip()
-    search_query = request.GET.get('q', '').strip()
     user_followed_tags = set(
         HashtagFollow.objects.filter(user=request.user).values_list('tag', flat=True)
     )
 
-    # When searching, skip personalisation and search all posts directly
-    if search_query:
+    scored_post_ids = (
+        FeedScore.objects
+        .filter(user=request.user)
+        .order_by('-score')
+        .values_list('post_id', flat=True)[:100]
+    )
+
+    if scored_post_ids:
+        id_list = list(scored_post_ids)
+        annotated = _annotated_feed_posts_queryset().filter(id__in=id_list)
+        if active_content_type in ('discussion', 'stock_prediction'):
+            annotated = annotated.filter(post_type=active_content_type)
+        id_to_post = {p.id: p for p in annotated}
+        posts_qs = [id_to_post[pid] for pid in id_list if pid in id_to_post]
+    else:
+        interests = list(request.user.profile.interested_categories or [])
         base_qs = _annotated_feed_posts_queryset().filter(is_draft=False, is_deleted_by_moderation=False)
-        base_qs = base_qs.filter(Q(title__icontains=search_query) | Q(content__icontains=search_query) | Q(hashtags__icontains=search_query))
+        if interests:
+            base_qs = base_qs.filter(category__in=interests)
         if active_content_type in ('discussion', 'stock_prediction'):
             base_qs = base_qs.filter(post_type=active_content_type)
         posts_qs = list(base_qs.order_by('-created_at')[:50])
-    else:
-        scored_post_ids = (
-            FeedScore.objects
-            .filter(user=request.user)
-            .order_by('-score')
-            .values_list('post_id', flat=True)[:100]
-        )
-
-        if scored_post_ids:
-            id_list = list(scored_post_ids)
-            annotated = _annotated_feed_posts_queryset().filter(id__in=id_list)
-            if active_content_type in ('discussion', 'stock_prediction'):
-                annotated = annotated.filter(post_type=active_content_type)
-            id_to_post = {p.id: p for p in annotated}
-            posts_qs = [id_to_post[pid] for pid in id_list if pid in id_to_post]
-        else:
-            interests = list(request.user.profile.interested_categories or [])
-            base_qs = _annotated_feed_posts_queryset().filter(is_draft=False, is_deleted_by_moderation=False)
-            if interests:
-                base_qs = base_qs.filter(category__in=interests)
-            if active_content_type in ('discussion', 'stock_prediction'):
-                base_qs = base_qs.filter(post_type=active_content_type)
-            posts_qs = list(base_qs.order_by('-created_at')[:50])
 
     # Inject recent followed-hashtag posts not already in the scored list
     if user_followed_tags and active_content_type not in ('discussion', 'stock_prediction'):
@@ -8384,7 +8325,6 @@ def for_you_feed(request):
         'page_obj': page_obj,
         'active_tab': 'for_you',
         'active_content_type': active_content_type,
-        'search_query': search_query,
         'is_suggested_page': False,
         'categories': get_frontend_categories(),
         'active_category': '',
@@ -9307,9 +9247,7 @@ def dm_list(request):
         unread = DirectMessage.objects.filter(sender=partner, recipient=user, is_read=False).count()
         conversations.append({'partner': partner, 'last_msg': last_msg, 'unread': unread})
     conversations.sort(key=lambda x: x['last_msg'].created_at if x['last_msg'] else timezone.now(), reverse=True)
-    response = render(request, 'frontend/dm_list.html', {'conversations': conversations})
-    response['Cache-Control'] = 'no-store, no-cache, must-revalidate'
-    return response
+    return render(request, 'frontend/dm_list.html', {'conversations': conversations})
 
 
 @login_required
@@ -9379,23 +9317,6 @@ def dm_thread_poll(request, username):
             for m in new_msgs
         ],
     })
-
-
-@login_required
-@require_POST
-def mark_dm_read(request, username):
-    """Mark all unread DMs from the given partner as read."""
-    partner = get_object_or_404(User, username=username)
-    DirectMessage.objects.filter(
-        sender=partner,
-        recipient=request.user,
-        is_read=False,
-    ).update(is_read=True)
-    unread_remaining = DirectMessage.objects.filter(
-        recipient=request.user,
-        is_read=False,
-    ).count()
-    return JsonResponse({'success': True, 'unread_total': unread_remaining})
 
 
 # ─── Ban / Unban User ─────────────────────────────────────────────────────────
@@ -9518,20 +9439,6 @@ def dm_delete(request):
 def dm_unread_count(request):
     count = DirectMessage.objects.filter(recipient=request.user, is_read=False).count()
     return JsonResponse({'count': count})
-
-
-@login_required
-def dm_unread_counts(request):
-    """Return per-partner unread DM counts for the sidebar refresh."""
-    from django.db.models import Count
-    rows = (
-        DirectMessage.objects
-        .filter(recipient=request.user, is_read=False)
-        .values('sender__username')
-        .annotate(count=Count('id'))
-    )
-    counts = {r['sender__username']: r['count'] for r in rows}
-    return JsonResponse({'unread': counts})
 
 
 # ── Push Notifications ───────────────────────────────────────────────────────
@@ -11219,14 +11126,8 @@ def create_stock_prediction(request):
     # Build auto title if not submitted
     title = request.POST.get('title', '').strip()
     if not title and stock_symbol and direction and target_price:
-        condition_map = {
-            'above': 'cross above',
-            'below': 'drop below',
-            'up': 'reach',
-            'down': 'sink to',
-        }
-        cond = condition_map.get(direction, 'reach')
-        title = f"I predict {stock_symbol} will {cond} {currency} {target_price:.2f} by {target_date}"
+        dir_word = 'Up' if direction in ('up', 'above') else 'Down'
+        title = f"I think {stock_symbol} will go {dir_word} to {target_price:.2f} {currency} by {target_date}"
 
     if not title:
         errors.append('Could not generate a title — please fill in all fields.')
@@ -11758,31 +11659,7 @@ def discussions_list(request):
         'sort': sort,
         'category_filter': category_filter,
         'search_query': search_query,
-        'categories': [
-            ('Astrology', 'Astrology', '🔮'),
-            ('Beauty', 'Beauty', '💄'),
-            ('Business', 'Business', '💼'),
-            ('Education', 'Education', '📚'),
-            ('Entertainment', 'Entertainment', '🎭'),
-            ('Fashion', 'Fashion', '👗'),
-            ('Food', 'Food', '🍕'),
-            ('Gadgets', 'Gadgets', '📱'),
-            ('Health', 'Health', '❤️'),
-            ('History', 'History', '🏛️'),
-            ('Investment', 'Investment', '💰'),
-            ('Music', 'Music', '🎵'),
-            ('Painting', 'Painting', '🎨'),
-            ('Photography', 'Photography', '📷'),
-            ('Politics', 'Politics', '🗳️'),
-            ('Relationships', 'Relationships', '💑'),
-            ('Science', 'Science', '🔬'),
-            ('Spirituality', 'Spirituality', '🙏'),
-            ('Sports', 'Sports', '⚽'),
-            ('Technology', 'Technology', '💻'),
-            ('Travel', 'Travel', '✈️'),
-            ('Vehicles', 'Vehicles', '🚗'),
-            ('Others', 'Others', '📌'),
-        ],
+        'categories': _CAT_CHOICES,
     })
 
 
@@ -11828,16 +11705,7 @@ def stocks_list(request):
         'symbol_filter': symbol_filter,
         'category_filter': category_filter,
         'search_query': search_query,
-        'stock_categories': [
-            ('Technology', 'Technology', '💻'), ('Energy', 'Energy', '⚡'),
-            ('Healthcare', 'Healthcare', '🏥'), ('Finance & Banking', 'Finance & Banking', '🏦'),
-            ('Consumer Goods', 'Consumer Goods', '🛒'), ('Automotive', 'Automotive', '🚗'),
-            ('Real Estate', 'Real Estate', '🏠'), ('Cryptocurrency', 'Cryptocurrency', '₿'),
-            ('Commodities', 'Commodities', '🌾'), ('Market Indices', 'Market Indices', '📊'),
-            ('Pharmaceuticals', 'Pharmaceuticals', '💊'), ('Retail & E-Commerce', 'Retail & E-Commerce', '🛍️'),
-            ('Telecom', 'Telecom', '📡'), ('Infrastructure', 'Infrastructure', '🏗️'),
-            ('Other', 'Other', '📌'),
-        ],
+        'stock_categories': STOCK_CATEGORY_CHOICES,
         'leaderboard': leaderboard,
         'total_resolved': total_resolved,
     })

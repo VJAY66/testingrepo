@@ -368,8 +368,8 @@ body.ch-fullscreen {
         <button type="button" class="ch-item"
             data-chat-id="{{ chat.id }}"
             data-last-id="{{ chat.last_message_id|default:0 }}"
-            data-last-sender="{{ chat.last_message_sender|default:'' }}"
             data-server-read-id="{{ chat.last_read_message_id|default:0 }}"
+            data-last-sender="{{ chat.last_message_sender|default:'' }}"
             data-filter="{{ chat.opponent|lower }} {{ chat.title|lower }} {{ chat.last_message|default:''|lower }}"
             data-chat-url="{% url 'debate_chat' chat.id %}?return_to={% url 'chats' %}?chat={{ chat.id }}"
             onclick="openDesktopChat('{{ chat.id }}', this)">
@@ -386,7 +386,6 @@ body.ch-fullscreen {
                     <span class="ch-name">@{{ chat.opponent }}</span>
                     <span class="ch-time-wrap">
                         <span class="ch-time" data-chat-time>{{ chat.last_message_time|default:'' }}</span>
-                        <span class="ch-unread-badge hidden" data-unread-badge>1</span>
                     </span>
                 </span>
                 <span class="ch-topic" data-chat-topic">{{ chat.title }}</span>
@@ -431,25 +430,6 @@ body.ch-fullscreen {
 {% endif %}
 
 <script>
-/*
- * UNREAD COUNT — ROOT CAUSE AND FIX
- *
- * Root cause: _build_chat_payload_for_user returned last_message_id (the newest
- * message in the debate) but never returned last_read_message_id from
- * DebateParticipant. The frontend therefore had no server-authoritative read
- * baseline, so every badge decision was comparing a server number against
- * localStorage — which is per-browser and survives no page reload on a fresh
- * device/browser. That made the badge reappear on every refresh or after
- * switching chats, even after the user had fully read the conversation.
- *
- * Fix: the backend now includes last_read_message_id in the chat payload.
- * The HTML button carries that value as data-server-read-id. refreshUnreadBadges
- * uses max(localStorage, data-server-read-id) as the read floor, so the badge
- * only appears when last_message_id exceeds both. openDesktopChat immediately
- * POSTs to mark_debate_read so the server state is updated before the iframe
- * even loads, making the fix survive page reloads and cross-device sessions.
- */
-
 function bindChatSearch(inputId, listSelector) {
     var input = document.getElementById(inputId);
     var list = document.querySelector(listSelector);
@@ -460,15 +440,16 @@ function bindChatSearch(inputId, listSelector) {
         items.forEach(function(item) {
             var haystack = String(item.getAttribute('data-filter') || '');
             var ok = !q || haystack.indexOf(q) !== -1;
-            item.tagName === 'BUTTON'
-                ? (item.style.display = ok ? '' : 'none')
-                : item.classList.toggle('hidden', !ok);
+            if (item.tagName === 'BUTTON') {
+                item.style.display = ok ? '' : 'none';
+            } else {
+                item.classList.toggle('hidden', !ok);
+            }
             if (!ok) item.classList.remove('active');
         });
     });
 }
 
-// localStorage cache — secondary fallback; server state is authoritative
 function getLastRead() {
     try { return JSON.parse(localStorage.getItem('dhChatLastRead') || '{}'); } catch { return {}; }
 }
@@ -478,202 +459,157 @@ function setLastRead(lr) {
 
 var activeChatId = '{{ selected_chat_id }}';
 var currentUsername = '{{ request.user.username|escapejs }}';
-var csrfToken = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
 
-/*
- * readFloor(chatId, item) — the highest message ID the user has "seen",
- * considering three sources in descending reliability:
- *   1. data-server-read-id  — written by mark_debate_read on the server DB
- *   2. localStorage          — written client-side; survives tab switches but
- *                              not cross-device or after cache clear
- *   3. pageLoadBaseline      — snapshot of data-last-id at page-render time;
- *                              prevents flashing badges for pre-existing messages
- *                              on first load before any server call completes
- */
-var pageLoadBaseline = {};
-document.querySelectorAll('.ch-item[data-chat-id]').forEach(function(item) {
-    var cid = item.getAttribute('data-chat-id');
-    // Use server-read as baseline, fall back to last-message-id at page render
-    var serverRead = parseInt(item.getAttribute('data-server-read-id') || '0', 10);
-    var lastMsgId  = parseInt(item.getAttribute('data-last-id') || '0', 10);
-    pageLoadBaseline[cid] = Math.max(serverRead, lastMsgId);
-});
-
-function readFloor(chatId, item) {
-    return Math.max(
-        parseInt(getLastRead()[chatId] || '0', 10),                      // localStorage
-        parseInt(item.getAttribute('data-server-read-id') || '0', 10),  // server DB
-        pageLoadBaseline[chatId] || 0                                    // page-render snapshot
-    );
+// DOM-removal approach — avoids CSS specificity war where .ch-unread-badge
+// { display: inline-flex } overrides Tailwind's .hidden { display: none }.
+function setBadge(item, show) {
+    var timeWrap = item.querySelector('.ch-time-wrap');
+    var badge = item.querySelector('[data-unread-badge]');
+    if (!show) {
+        if (badge) badge.remove();
+        return;
+    }
+    if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'ch-unread-badge';
+        badge.setAttribute('data-unread-badge', '');
+        if (timeWrap) timeWrap.appendChild(badge);
+    }
 }
 
 function refreshUnreadBadges() {
+    var lr = getLastRead();
     document.querySelectorAll('.ch-item[data-chat-id]').forEach(function(item) {
-        var chatId = item.getAttribute('data-chat-id');
-        var badge  = item.querySelector('[data-unread-badge]');
-        if (!badge) return;
-
-        // Active chat is always "read" — user is looking at it right now
-        if (activeChatId && chatId === activeChatId) {
-            badge.classList.add('hidden');
-            return;
-        }
-        // No badge when the current user sent the last message
-        if (item.getAttribute('data-last-sender') === currentUsername) {
-            badge.classList.add('hidden');
+        // Force-remove badge on active item before any calculations
+        if (item.classList.contains('active')) {
+            console.log('FORCING ACTIVE CHAT BADGE REMOVAL', item.getAttribute('data-chat-id'));
+            var activeBadge = item.querySelector('.ch-unread-badge');
+            if (activeBadge) activeBadge.remove();
             return;
         }
 
-        var lastId = parseInt(item.getAttribute('data-last-id') || '0', 10);
-        badge.classList.toggle('hidden', lastId <= readFloor(chatId, item));
+        var chatId       = String(item.getAttribute('data-chat-id'));
+        var lastId       = parseInt(item.getAttribute('data-last-id') || '0', 10);
+        var serverReadId = parseInt(item.getAttribute('data-server-read-id') || '0', 10);
+        var localReadId  = parseInt(lr[chatId] || '0', 10);
+        var readFloor    = Math.max(serverReadId, localReadId);
+        var isActive     = activeChatId && chatId === String(activeChatId);
+        var isMine       = item.getAttribute('data-last-sender') === currentUsername;
+        var isUnread     = !isActive && !isMine && lastId > readFloor;
+
+        console.log('UNREAD DEBUG', {
+            chatId: item.getAttribute('data-chat-id'),
+            lastId: item.getAttribute('data-last-id'),
+            serverReadId: item.getAttribute('data-server-read-id'),
+            active: item.classList.contains('active'),
+            activeChatId: activeChatId,
+            isMine: isMine,
+            isUnread: isUnread
+        });
+        console.log(item.outerHTML);
+
+        setBadge(item, isUnread);
     });
 }
 
-// POST to mark_debate_read and update the button's data-server-read-id.
-// Called immediately when a chat is opened so the server state is persisted
-// before the iframe even finishes loading.
-function persistReadToServer(chatId, btn) {
-    fetch('/debates/' + chatId + '/messages/mark-read/', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'X-CSRFToken': csrfToken },
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-        if (!d.success) return;
-        var newRead = d.last_read || 0;
-        // Update server-read attribute on the button so readFloor stays correct
-        if (btn) btn.setAttribute('data-server-read-id', String(newRead));
-        // Mirror into localStorage as a fast-path for same-browser tab switches
-        var lr = getLastRead();
-        lr[String(chatId)] = Math.max(lr[String(chatId)] || 0, newRead);
-        setLastRead(lr);
-        refreshUnreadBadges();
-    })
-    .catch(function() {});
-}
-
-// Poll /chats/list/ to refresh all button attributes from live server data.
-// Also re-marks the active chat as read in case new messages arrived.
-function refreshFromServer() {
+function markActiveChatRead() {
+    if (!activeChatId) return;
     fetch('/chats/list/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function(r) { return r.json(); })
         .then(function(d) {
             if (!d.success || !d.chats) return;
             var lr = getLastRead();
-
-            d.chats.forEach(function(c) {
-                var btn = document.querySelector('.ch-item[data-chat-id="' + c.id + '"]');
-                if (!btn) return;
-                // Refresh all data attributes from server
-                if (c.last_message_id)           btn.setAttribute('data-last-id',        String(c.last_message_id));
-                if (c.last_message_sender != null) btn.setAttribute('data-last-sender',   c.last_message_sender || '');
-                if (c.last_read_message_id != null) btn.setAttribute('data-server-read-id', String(c.last_read_message_id || 0));
-
-                // Update localStorage read floor for every chat from server state
-                var serverRead = c.last_read_message_id || 0;
-                if (serverRead > (lr[String(c.id)] || 0)) {
-                    lr[String(c.id)] = serverRead;
-                }
-
-                // If this is the currently open chat and new messages arrived,
-                // immediately re-persist the read state so the badge can't show.
-                if (String(c.id) === String(activeChatId)) {
-                    var newLastId = c.last_message_id || 0;
-                    var currentRead = Math.max(lr[String(c.id)] || 0, serverRead);
-                    if (newLastId > currentRead) {
-                        lr[String(c.id)] = newLastId;
-                        persistReadToServer(String(c.id), btn);
-                    }
-                }
-            });
+            var activeChat = d.chats.find(function(c) { return String(c.id) === String(activeChatId); });
+            if (activeChat) {
+                lr[String(activeChatId)] = activeChat.last_message_id || 0;
+            } else {
+                var btn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
+                if (btn) lr[String(activeChatId)] = parseInt(btn.getAttribute('data-last-id') || '0', 10);
+            }
             setLastRead(lr);
-
-            // Compute nav badge count: skip active chat and own-sent messages
             var totalUnread = d.chats.reduce(function(acc, c) {
-                if (String(c.id) === String(activeChatId)) return acc;   // currently open
-                if (c.last_message_sender === currentUsername) return acc; // own message
-                var floor = Math.max(lr[String(c.id)] || 0, c.last_read_message_id || 0);
-                return acc + ((c.last_message_id || 0) > floor ? 1 : 0);
+                var stored = lr[String(c.id)] || 0;
+                return acc + ((c.last_message_id || 0) > stored ? 1 : 0);
             }, 0);
-
             var navBadge = document.getElementById('nav-chat-badge');
             var mobBadge = document.getElementById('mobile-menu-chat-badge');
             if (navBadge) {
-                navBadge.textContent = totalUnread > 9 ? '9+' : String(totalUnread);
-                navBadge.classList.toggle('hidden', totalUnread === 0);
+                if (totalUnread > 0) { navBadge.textContent = totalUnread > 9 ? '9+' : String(totalUnread); navBadge.classList.remove('hidden'); }
+                else { navBadge.classList.add('hidden'); }
             }
             if (mobBadge) {
-                mobBadge.textContent = totalUnread > 9 ? '9+' : String(totalUnread);
-                mobBadge.style.display = totalUnread > 0 ? 'inline-flex' : 'none';
+                if (totalUnread > 0) { mobBadge.textContent = totalUnread > 9 ? '9+' : String(totalUnread); mobBadge.style.display = 'inline-flex'; }
+                else { mobBadge.style.display = 'none'; }
             }
-            refreshUnreadBadges();
+            if (typeof ChatListManager !== 'undefined') ChatListManager.refresh();
         })
         .catch(function() {});
 }
 
+// Applied via early inline script; also set class for CSS targeting
 document.body.classList.add('ch-fullscreen');
 window.addEventListener('pagehide', function() { document.documentElement.style.overflow = ''; });
 
 document.addEventListener('DOMContentLoaded', function() {
-    var nav  = document.querySelector('.nav-shell');
+    var nav = document.querySelector('.nav-shell');
     var main = document.getElementById('ch-main');
 
     function applyNavHeight() {
-        if (nav && main) main.style.top = (nav.offsetHeight || 64) + 'px';
+    if (nav && main) {
+        const navHeight = nav.offsetHeight || 64;
+        main.style.top = navHeight + 'px';
     }
+}
     applyNavHeight();
+
+    // Keep nav height in sync without forcing synchronous layouts.
     if (typeof ResizeObserver !== 'undefined' && nav && main) {
         new ResizeObserver(applyNavHeight).observe(nav);
     }
 
     bindChatSearch('ch-desktop-search', '#ch-desktop-list');
-
     if (activeChatId) {
         var autoBtn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
-        if (autoBtn) {
-            autoBtn.classList.add('active');
-            // Persist the read state for the pre-selected chat immediately
-            persistReadToServer(activeChatId, autoBtn);
-        }
+        if (autoBtn) autoBtn.classList.add('active');
     }
-
     refreshUnreadBadges();
-    refreshFromServer();
-    setInterval(refreshFromServer, 10000);
-
-    // Sync across tabs: if debate_chat.html (iframe) writes localStorage, re-evaluate
+    markActiveChatRead();
     window.addEventListener('storage', function(e) {
         if (e.key === 'dhChatLastRead') refreshUnreadBadges();
     });
 });
 
 function openDesktopChat(chatId, btn) {
+    // Synchronously save the PREVIOUS active chat as fully read before switching.
+    // This prevents the race condition where markActiveChatRead()'s async fetch
+    // hasn't returned yet when refreshUnreadBadges() runs for the old chat.
+    if (activeChatId && activeChatId !== String(chatId)) {
+        var prevBtn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
+        if (prevBtn) {
+            var lr0 = getLastRead();
+            var prevLastId = parseInt(prevBtn.getAttribute('data-last-id') || '0', 10);
+            lr0[String(activeChatId)] = Math.max(lr0[String(activeChatId)] || 0, prevLastId);
+            setLastRead(lr0);
+        }
+    }
+
     activeChatId = String(chatId);
-    document.querySelectorAll('.ch-item.active').forEach(function(el) { el.classList.remove('active'); });
+    document.querySelectorAll('.ch-item.active').forEach(function(item) { item.classList.remove('active'); });
     btn.classList.add('active');
 
-    // 1. Optimistic UI update — hide badge immediately so there's no flash
-    var badge = btn.querySelector('[data-unread-badge]');
-    if (badge) badge.classList.add('hidden');
-
-    // 2. Write to localStorage now (before iframe loads) so tab-switch can't
-    //    resurrect the badge during the network round-trip to the server
+    setBadge(btn, false);
     var lr = getLastRead();
     var lastId = parseInt(btn.getAttribute('data-last-id') || '0', 10);
     lr[String(chatId)] = Math.max(lr[String(chatId)] || 0, lastId);
     setLastRead(lr);
 
-    // 3. Persist to server — this updates DebateParticipant.last_read_message_id
-    //    so the badge stays cleared after page reload and on other devices
-    persistReadToServer(chatId, btn);
 
     var frame = document.getElementById('ch-conv-frame');
     if (frame) frame.src = btn.getAttribute('data-chat-url');
     var placeholder = document.getElementById('ch-conv-placeholder');
     if (placeholder) placeholder.classList.add('hidden');
-
     refreshUnreadBadges();
+    markActiveChatRead();
 }
 </script>
 

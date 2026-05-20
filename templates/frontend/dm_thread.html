@@ -49,32 +49,9 @@
 var dmMessages = document.getElementById('dm-messages');
 if (dmMessages) dmMessages.scrollTop = dmMessages.scrollHeight;
 
+// Poll for new messages + updated read receipts every 4 seconds
 var partnerUsername = '{{ partner.username|escapejs }}';
 var lastMsgId = {% with last=messages|last %}{% if last %}{{ last.id }}{% else %}0{% endif %}{% endwith %};
-
-function getCsrf() {
-  return (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
-}
-
-// POST to mark all partner's unread messages as read in the DB.
-// Called on load, focus, and when new incoming messages arrive via poll.
-function markThreadRead() {
-  try { localStorage.setItem('dmThreadReadAt', String(Date.now())); } catch (_) {}
-  fetch('/dm/' + partnerUsername + '/mark-read/', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {'X-CSRFToken': getCsrf(), 'X-Requested-With': 'XMLHttpRequest'},
-  }).then(function(r) { return r.json(); }).then(function(d) {
-    // Update the global DM nav badge if it exists so it reflects the new total
-    if (d && typeof d.unread_total === 'number') {
-      var dmBadge = document.getElementById('dm-count-badge');
-      if (dmBadge) {
-        dmBadge.textContent = d.unread_total > 0 ? String(d.unread_total) : '';
-        dmBadge.style.display = d.unread_total > 0 ? '' : 'none';
-      }
-    }
-  }).catch(function() {});
-}
 
 function pollDmThread() {
   fetch('/dm/' + partnerUsername + '/poll/?after=' + lastMsgId, {
@@ -91,9 +68,8 @@ function pollDmThread() {
         }
       });
     }
-    // Append new incoming messages and mark them read immediately
+    // Append new incoming messages
     if (d.messages && d.messages.length) {
-      var hadIncoming = false;
       d.messages.forEach(function(msg) {
         lastMsgId = Math.max(lastMsgId, msg.id);
         var wrapper = document.createElement('div');
@@ -110,11 +86,8 @@ function pollDmThread() {
           + '</div>';
         wrapper.innerHTML = bubble;
         dmMessages.appendChild(wrapper);
-        if (!msg.is_own) hadIncoming = true;
       });
       dmMessages.scrollTop = dmMessages.scrollHeight;
-      // New messages from partner arrived — mark them read immediately
-      if (hadIncoming) markThreadRead();
     }
   }).catch(function() {});
 }
@@ -122,15 +95,6 @@ function pollDmThread() {
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-// Mark as read immediately when thread opens
-markThreadRead();
-
-// Re-mark when tab becomes active again (handles returning from another tab/app)
-window.addEventListener('focus', markThreadRead);
-document.addEventListener('visibilitychange', function() {
-  if (!document.hidden) markThreadRead();
-});
 
 setInterval(pollDmThread, 4000);
 
