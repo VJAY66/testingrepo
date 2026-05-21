@@ -4746,7 +4746,12 @@ def debate_chat(request, debate_id):
         'context_url': _context_url,
         'context_title': _context_title,
     }
-    return render(request, 'frontend/debate_chat.html', context)
+    template = (
+        'frontend/partials/debate_chat_partial.html'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        else 'frontend/debate_chat.html'
+    )
+    return render(request, template, context)
 
 
 @login_required
