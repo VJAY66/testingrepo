@@ -134,7 +134,7 @@
 .disc-search-wrap {
     position: relative;
     max-width: 540px;
-    margin-bottom: 1rem;
+    margin: 0 auto 1rem;
 }
 .disc-search-wrap input[type="text"] {
     width: 100%;
@@ -200,10 +200,7 @@
             <div class="disc-hero-sub">Choose your stance and defend it — every debate counts.</div>
         </div>
         {% if user.is_authenticated %}
-        <a href="{% url 'create_post' %}" class="disc-hero-btn">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
-            Start Discussion
-        </a>
+        <!-- Start Discussion button removed -->
         {% endif %}
     </div>
 
