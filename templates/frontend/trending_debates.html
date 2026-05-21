@@ -2,102 +2,109 @@
 {% block title %}Trending — PickASide{% endblock %}
 {% block content %}
 <style>
-.tr-page { max-width: 680px; margin: 0 auto; padding: 20px 16px 64px; }
+.tr-page { max-width: 1152px; margin: 0 auto; padding: 20px 16px 64px; }
 
-/* ── Header bar ── */
-.tr-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 16px;
-  background: hsl(var(--card));
-  border-radius: 999px;
-  border: 1px solid hsl(var(--border)/0.6);
-  margin-bottom: 12px;
+/* ── Hero header ── */
+.tr-hero {
+  position: relative; overflow: hidden;
+  border-radius: 20px; margin-bottom: 1.25rem;
+  padding: 24px 28px 20px;
+  background: linear-gradient(135deg, hsl(var(--primary)/0.1) 0%, hsl(var(--primary)/0.03) 60%, transparent 100%);
+  border: 1px solid hsl(var(--primary)/0.16);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
 }
-.tr-header h1 {
-  font-size: 1rem; font-weight: 800; letter-spacing: -0.01em;
+.tr-hero::before {
+  content: '🔥';
+  position: absolute; right: 22px; top: 50%; transform: translateY(-50%);
+  font-size: 64px; opacity: 0.07; pointer-events: none; user-select: none;
+}
+.tr-hero-label {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.12em;
+  text-transform: uppercase; color: hsl(var(--primary)/0.8); margin-bottom: 3px;
+}
+.tr-hero h1 {
+  font-size: 1.5rem; font-weight: 900; line-height: 1.1;
   color: hsl(var(--foreground));
   font-family: 'Playfair Display', Georgia, serif;
-  font-style: italic;
-  display: flex; align-items: center; gap: 7px;
-  margin: 0;
+  display: flex; align-items: center; gap: 10px; margin: 0 0 4px;
 }
+.tr-hero-sub { font-size: 12.5px; color: hsl(var(--muted-foreground)); }
 .tr-period {
-  font-size: 0.68rem; font-weight: 600; letter-spacing: 0.05em;
-  text-transform: uppercase; color: hsl(var(--muted-foreground));
-  background: hsl(var(--muted)/0.6); padding: 3px 10px; border-radius: 999px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: hsl(var(--primary));
+  background: hsl(var(--primary)/0.1); padding: 5px 14px; border-radius: 999px;
+  border: 1px solid hsl(var(--primary)/0.2); white-space: nowrap; flex-shrink: 0;
 }
 
 /* ── Tab bar ── */
 .tr-tabs {
   display: flex; gap: 4px;
   background: hsl(var(--muted)/0.35);
-  border-radius: 999px;
-  padding: 4px;
+  border-radius: 999px; padding: 4px;
   border: 1px solid hsl(var(--border)/0.5);
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 .tr-tab {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
-  padding: 7px 10px;
-  border-radius: 999px;
+  padding: 7px 10px; border-radius: 999px;
   font-size: 0.75rem; font-weight: 700;
-  text-decoration: none;
-  color: hsl(var(--muted-foreground));
-  transition: all .18s;
-  white-space: nowrap;
+  text-decoration: none; color: hsl(var(--muted-foreground));
+  transition: all .18s; white-space: nowrap;
 }
 .tr-tab:hover { color: hsl(var(--foreground)); background: hsl(var(--card)/0.6); }
 .tr-tab.active {
-  background: hsl(var(--card));
-  color: hsl(var(--foreground));
-  box-shadow: 0 1px 6px -1px hsl(var(--foreground)/0.1);
-  border: 1px solid hsl(var(--border)/0.6);
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary)/0.85) 100%);
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 2px 10px hsl(var(--primary)/0.35);
 }
+
+/* ── 2-col grid ── */
+.tr-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+@media (max-width: 640px) { .tr-grid { grid-template-columns: 1fr; } }
 
 /* ── Item cards ── */
 .tr-card {
   display: flex; align-items: flex-start; gap: 12px;
   padding: 14px 16px;
   background: hsl(var(--card));
-  border: 1px solid hsl(var(--border)/0.6);
-  border-radius: 1.1rem;
-  margin-bottom: 8px;
+  border: 1px solid hsl(var(--border)/0.8);
+  border-radius: 14px;
   text-decoration: none;
-  transition: border-color .18s, box-shadow .18s, transform .15s;
-  position: relative;
-  overflow: hidden;
+  transition: border-color .16s, box-shadow .16s, transform .12s;
+  position: relative; overflow: hidden;
+  height: 100%;
+  box-sizing: border-box;
 }
 .tr-card:hover {
-  border-color: hsl(var(--primary)/0.35);
-  box-shadow: 0 5px 20px -8px hsl(var(--primary)/0.18);
-  transform: translateY(-1px);
+  border-color: hsl(var(--primary)/0.4);
+  box-shadow: 0 8px 24px -12px hsl(var(--primary)/0.2);
+  transform: translateY(-2px);
 }
 .tr-card:nth-child(1) { border-left: 3px solid hsl(38 86% 52%/0.8); }
 .tr-card:nth-child(2) { border-left: 3px solid hsl(220 14% 65%/0.7); }
 .tr-card:nth-child(3) { border-left: 3px solid hsl(27 70% 50%/0.7); }
+.tr-card:hover .tr-title { color: hsl(var(--primary)); }
 
 /* ── Rank ── */
-.tr-rank {
-  width: 28px; flex-shrink: 0; text-align: center;
-  padding-top: 2px;
-}
+.tr-rank { width: 28px; flex-shrink: 0; text-align: center; padding-top: 2px; }
 .tr-rank-medal { font-size: 1.1rem; line-height: 1; }
-.tr-rank-num {
-  font-size: 0.75rem; font-weight: 800; color: hsl(var(--muted-foreground)/0.5);
-  font-variant-numeric: tabular-nums;
-}
+.tr-rank-num { font-size: 0.75rem; font-weight: 800; color: hsl(var(--muted-foreground)/0.5); }
 
 /* ── Content ── */
-.tr-body { flex: 1; min-width: 0; }
-.tr-tags { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-bottom: 5px; }
+.tr-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.tr-tags { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .tr-tag {
   font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 999px;
   letter-spacing: 0.03em;
 }
-.tr-tag-primary   { background: hsl(var(--primary)/0.1); color: hsl(var(--primary)); }
-.tr-tag-violet    { background: hsl(262 70% 55%/0.1); color: hsl(262 60% 50%); }
-.tr-tag-emerald   { background: hsl(142 65% 44%/0.1); color: hsl(142 52% 36%); }
-.tr-tag-blue      { background: hsl(217 90% 55%/0.1); color: hsl(217 80% 48%); }
+.tr-tag-primary { background: hsl(var(--primary)/0.1); color: hsl(var(--primary)); }
+.tr-tag-violet  { background: hsl(262 70% 55%/0.1); color: hsl(262 60% 50%); }
+.tr-tag-emerald { background: hsl(142 65% 44%/0.1); color: hsl(142 52% 36%); }
+.tr-tag-blue    { background: hsl(217 90% 55%/0.1); color: hsl(217 80% 48%); }
 .dark .tr-tag-violet  { color: hsl(262 70% 72%); }
 .dark .tr-tag-emerald { color: hsl(142 60% 58%); }
 .dark .tr-tag-blue    { color: hsl(217 80% 70%); }
@@ -105,41 +112,41 @@
 
 .tr-title {
   font-size: 0.875rem; font-weight: 700;
-  color: hsl(var(--foreground));
-  line-height: 1.4;
+  color: hsl(var(--foreground)); line-height: 1.4;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  transition: color .15s;
-  margin-bottom: 2px;
+  transition: color .15s; margin: 0;
 }
-.tr-card:hover .tr-title { color: hsl(var(--primary)); }
 .tr-excerpt {
   font-size: 0.72rem; color: hsl(var(--muted-foreground)/0.8);
   display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
-  margin-bottom: 6px;
 }
 .tr-meta {
   display: flex; align-items: center; gap: 10px;
   font-size: 0.68rem; color: hsl(var(--muted-foreground)); flex-wrap: wrap;
+  margin-top: auto;
 }
 .tr-author { font-weight: 700; color: hsl(var(--foreground)); }
 .tr-stat { display: inline-flex; align-items: center; gap: 3px; }
 
 /* ── Empty state ── */
 .tr-empty {
-  text-align: center; padding: 56px 24px;
+  text-align: center; padding: 56px 24px; grid-column: 1 / -1;
   border: 1.5px dashed hsl(var(--border)/0.7);
-  border-radius: 1.25rem;
-  background: hsl(var(--muted)/0.2);
+  border-radius: 1.25rem; background: hsl(var(--muted)/0.2);
 }
 .tr-empty-icon { font-size: 2.5rem; margin-bottom: 12px; display: block; opacity: 0.5; }
 </style>
 
 <div class="tr-page">
 
-  <!-- Header -->
-  <div class="tr-header">
-    <h1>🔥 Trending</h1>
-    <span class="tr-period">Last 7 days</span>
+  <!-- Hero header -->
+  <div class="tr-hero">
+    <div>
+      <div class="tr-hero-label">What's Hot Right Now</div>
+      <h1>🔥 Trending</h1>
+      <div class="tr-hero-sub">Top posts ranked by engagement over the last 7 days.</div>
+    </div>
+    <span class="tr-period">Last 7 Days</span>
   </div>
 
   <!-- Tabs -->
@@ -153,8 +160,8 @@
   </div>
 
   <!-- Items -->
+  <div class="tr-grid">
   {% if items %}
-  <div>
     {% for item in items %}
 
     {% if item.kind == 'post' %}{% with p=item.obj %}
@@ -210,6 +217,30 @@
     </a>
     {% endwith %}
 
+    {% elif item.kind == 'stock' %}{% with s=item.obj %}
+    <a href="{% url 'stock_prediction' s.id %}" class="tr-card">
+      <div class="tr-rank">
+        {% if item.rank == 1 %}<span class="tr-rank-medal">🥇</span>
+        {% elif item.rank == 2 %}<span class="tr-rank-medal">🥈</span>
+        {% elif item.rank == 3 %}<span class="tr-rank-medal">🥉</span>
+        {% else %}<span class="tr-rank-num">#{{ item.rank }}</span>{% endif %}
+      </div>
+      <div class="tr-body">
+        <div class="tr-tags">
+          <span class="tr-tag tr-tag-emerald">📈 Stock</span>
+          {% if s.category %}<span class="tr-tag tr-tag-primary">{{ s.category }}</span>{% endif %}
+        </div>
+        <p class="tr-title">{{ s.title }}</p>
+        <div class="tr-meta">
+          <span class="tr-author">@{{ s.user.username }}</span>
+          {% if s.bull_count %}<span class="tr-stat">👍 {{ s.bull_count }}</span>{% endif %}
+          {% if s.bear_count %}<span class="tr-stat">👎 {{ s.bear_count }}</span>{% endif %}
+          <span class="ml-auto">{{ s.created_at|timesince }} ago</span>
+        </div>
+      </div>
+    </a>
+    {% endwith %}
+
     {% elif item.kind == 'question' %}{% with q=item.obj %}
     <a href="{% url 'question_detail' q.id %}" class="tr-card">
       <div class="tr-rank">
@@ -234,7 +265,6 @@
     {% endwith %}{% endif %}
 
     {% endfor %}
-  </div>
 
   {% else %}
   <div class="tr-empty">
@@ -243,6 +273,7 @@
     <p class="text-xs text-muted-foreground">Check back later or try another tab.</p>
   </div>
   {% endif %}
+  </div>
 
 </div>
 {% endblock %}
