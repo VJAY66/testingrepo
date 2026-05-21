@@ -35,20 +35,30 @@
       <span id="dc-{{ cw.comment.id }}">{{ cw.comment.dislikes }}</span>
     </button>
 
-    {% comment %}Debate button — only shown if commenter is on opposite side from logged-in user{% endcomment %}
+    {% comment %}Debate button — same state logic as discussion and stock predictions{% endcomment %}
     {% if user_reaction and user_reaction != side and cw.comment.user != user %}
     {% if cw.active_debate %}
-    <button type="button"
-      onclick="openReviewDebateModal('{{ cw.comment.id }}', '{{ cw.comment.user.username|escapejs }}', true, '/debates/{{ cw.active_debate.id }}/chat/')"
-      class="debate-btn active ml-auto">
-      ⚔️ View Debate
-    </button>
+      {% comment %}User is already in this debate — view it{% endcomment %}
+      <button type="button"
+        onclick="openReviewDebateModal('{{ cw.comment.id }}', '{{ cw.comment.user.username|escapejs }}', true, '/debates/{{ cw.active_debate.id }}/chat/')"
+        class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600 ml-auto">
+        ⚔️ View Debate
+      </button>
+    {% elif cw.comment.debate_start_blocked %}
+      {% comment %}Blocked from debating this commenter{% endcomment %}
+      <button type="button"
+        onclick="showInlineActionPopup(this, 'You were removed from this comment debate and cannot start it again.', 'error')"
+        class="rounded-full bg-slate-400 px-1.5 py-0.5 text-[9px] text-white cursor-not-allowed opacity-80 ml-auto"
+        aria-disabled="true" title="You were removed from this comment debate and cannot start it again.">
+        Debate Blocked
+      </button>
     {% else %}
-    <button type="button"
-      onclick="openReviewDebateModal('{{ cw.comment.id }}', '{{ cw.comment.user.username|escapejs }}', false, '')"
-      class="debate-btn ml-auto">
-      ⚔️ Debate
-    </button>
+      {% comment %}No active debate — offer to start one{% endcomment %}
+      <button type="button"
+        onclick="openReviewDebateModal('{{ cw.comment.id }}', '{{ cw.comment.user.username|escapejs }}', false, '')"
+        class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600 ml-auto">
+        ⚔️ Start Debate
+      </button>
     {% endif %}
     {% endif %}
 

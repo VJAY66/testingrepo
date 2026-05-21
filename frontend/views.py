@@ -6546,11 +6546,23 @@ def review_detail(request, review_id):
             participants__is_active=True,
         ).first()
 
+    # Build set of comment IDs where user was banned/removed from a debate
+    blocked_review_comment_ids = set()
+    if request.user.is_authenticated:
+        blocked_review_comment_ids = set(
+            DebateParticipant.objects.filter(
+                user=request.user, is_banned=True,
+                debate__review_comment__review=review,
+            ).values_list('debate__review_comment_id', flat=True)
+        )
+
     def enrich(c):
+        active_debate = c.debates.filter(status='accepted').first()
         return {
             'comment': c,
             'user_reaction': user_comment_reactions.get(c.id),
-            'active_debate': c.debates.filter(status='accepted').first(),
+            'active_debate': active_debate,
+            'debate_start_blocked': c.id in blocked_review_comment_ids,
         }
 
     agree_comments = [enrich(c) for c in comments if c.side == 'agree']

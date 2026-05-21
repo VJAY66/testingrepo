@@ -568,10 +568,18 @@
                         <span class="inline-flex items-center rounded-full border border-border/50 bg-background/50 text-[9px] px-1.5 py-0.5 text-muted-foreground/50">👎 <span>{{ cmt.dislikes|default:0 }}</span></span>
                         {% endif %}
                         {% if cmt.show_debate_action %}
-                            {% if cmt.debate_action_mode == 'view' and cmt.debate_chat_url %}<a href="{{ cmt.debate_chat_url }}" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</a>
-                            {% elif cmt.debate_action_mode == 'blocked' %}<button type="button" class="rounded-full bg-slate-400 px-1.5 py-0.5 text-[9px] text-white cursor-not-allowed opacity-80">{{ cmt.debate_action_label }}</button>
-                            {% elif cmt.debate_action_mode == 'waiting' %}<button type="button" class="inline-flex items-center gap-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] text-white cursor-default">⏳ Waiting</button>
-                            {% else %}<button onclick="startDebate('{{ cmt.id }}', this)" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</button>{% endif %}
+                        {% if cmt.show_debate_view_link and cmt.debate_view_url and cmt.debate_action_mode == 'start' %}
+                        <a href="{{ cmt.debate_view_url }}" class="inline-flex items-center rounded-full bg-slate-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-slate-600">View Debate</a>
+                        {% endif %}
+                        {% if cmt.debate_action_mode == 'view' and cmt.debate_chat_url %}
+                        <a href="{{ cmt.debate_chat_url }}" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</a>
+                        {% elif cmt.debate_action_mode == 'blocked' %}
+                        <button type="button" onclick="showInlineActionPopup(this, 'You were removed from this comment debate and cannot start it again.', 'error')" class="rounded-full bg-slate-400 px-1.5 py-0.5 text-[9px] text-white cursor-not-allowed opacity-80" aria-disabled="true" title="You were removed from this comment debate and cannot start it again.">{{ cmt.debate_action_label }}</button>
+                        {% elif cmt.debate_action_mode == 'waiting' %}
+                        <button type="button" class="inline-flex items-center gap-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] text-white cursor-default opacity-90" title="Waiting for opponent to accept">⏳ Waiting</button>
+                        {% else %}
+                        <button onclick="startDebate('{{ cmt.id }}', this)" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</button>
+                        {% endif %}
                         {% endif %}
                     </div>
                     {% endif %}
@@ -626,10 +634,18 @@
                         <span class="inline-flex items-center rounded-full border border-border/50 bg-background/50 text-[9px] px-1.5 py-0.5 text-muted-foreground/50">👎 <span>{{ cmt.dislikes|default:0 }}</span></span>
                         {% endif %}
                         {% if cmt.show_debate_action %}
-                            {% if cmt.debate_action_mode == 'view' and cmt.debate_chat_url %}<a href="{{ cmt.debate_chat_url }}" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</a>
-                            {% elif cmt.debate_action_mode == 'blocked' %}<button type="button" class="rounded-full bg-slate-400 px-1.5 py-0.5 text-[9px] text-white cursor-not-allowed opacity-80">{{ cmt.debate_action_label }}</button>
-                            {% elif cmt.debate_action_mode == 'waiting' %}<button type="button" class="inline-flex items-center gap-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] text-white cursor-default">⏳ Waiting</button>
-                            {% else %}<button onclick="startDebate('{{ cmt.id }}', this)" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</button>{% endif %}
+                        {% if cmt.show_debate_view_link and cmt.debate_view_url and cmt.debate_action_mode == 'start' %}
+                        <a href="{{ cmt.debate_view_url }}" class="inline-flex items-center rounded-full bg-slate-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-slate-600">View Debate</a>
+                        {% endif %}
+                        {% if cmt.debate_action_mode == 'view' and cmt.debate_chat_url %}
+                        <a href="{{ cmt.debate_chat_url }}" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</a>
+                        {% elif cmt.debate_action_mode == 'blocked' %}
+                        <button type="button" onclick="showInlineActionPopup(this, 'You were removed from this comment debate and cannot start it again.', 'error')" class="rounded-full bg-slate-400 px-1.5 py-0.5 text-[9px] text-white cursor-not-allowed opacity-80" aria-disabled="true" title="You were removed from this comment debate and cannot start it again.">{{ cmt.debate_action_label }}</button>
+                        {% elif cmt.debate_action_mode == 'waiting' %}
+                        <button type="button" class="inline-flex items-center gap-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] text-white cursor-default opacity-90" title="Waiting for opponent to accept">⏳ Waiting</button>
+                        {% else %}
+                        <button onclick="startDebate('{{ cmt.id }}', this)" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</button>
+                        {% endif %}
                         {% endif %}
                     </div>
                     {% endif %}
