@@ -63,23 +63,24 @@
 
 /* ── Comment cards ── */
 .cmt-card {
-    border-radius: 1rem; border: 1px solid hsl(var(--border)/0.7);
+    border-radius: .75rem;
+    border: 1px solid hsl(var(--border)/0.8);
     background: hsl(var(--card));
-    padding: 0.9rem 1rem;
     overflow: hidden;
+    box-shadow: 0 1px 3px hsl(0 0% 0%/0.06);
     transition: border-color 160ms, box-shadow 160ms, transform 140ms;
 }
+.cmt-card .cmt-inner { padding: 10px 10px; }
 .cmt-card.bull-card {
-    border-left: 3px solid hsl(142 71% 45%/.6);
-    background: linear-gradient(135deg, hsl(142 71% 45%/.05) 0%, hsl(var(--card)) 60%);
+    border-left: 3px solid hsl(142 71% 45%/.55);
+    background: linear-gradient(135deg, hsl(142 71% 45%/.04) 0%, hsl(var(--card)) 60%);
 }
 .cmt-card.bear-card {
-    border-left: 3px solid hsl(346 77% 50%/.6);
-    background: linear-gradient(135deg, hsl(346 77% 50%/.05) 0%, hsl(var(--card)) 60%);
+    border-left: 3px solid hsl(346 77% 50%/.55);
+    background: linear-gradient(135deg, hsl(346 77% 50%/.04) 0%, hsl(var(--card)) 60%);
 }
-.cmt-card:hover { transform: translateY(-1px); }
-.cmt-card.bull-card:hover { box-shadow: 0 6px 20px -10px hsl(142 71% 45%/.3); border-color: hsl(142 71% 45%/.4); }
-.cmt-card.bear-card:hover { box-shadow: 0 6px 20px -10px hsl(346 77% 50%/.3); border-color: hsl(346 77% 50%/.4); }
+.cmt-card.bull-card:hover { box-shadow: 0 4px 14px -8px hsl(142 71% 45%/.35); border-color: hsl(142 71% 45%/.4); transform: translateY(-1px); }
+.cmt-card.bear-card:hover { box-shadow: 0 4px 14px -8px hsl(346 77% 50%/.35); border-color: hsl(346 77% 50%/.4); transform: translateY(-1px); }
 
 /* ── Confidence badge ── */
 .conf-badge {
@@ -539,61 +540,37 @@
             <div class="space-y-2.5" id="bullish-list">
                 {% for cmt in bullish_comments %}
                 <div class="cmt-card bull-card {% if cmt.id == top_bull_id %}ring-1 ring-emerald-400/35{% endif %}" id="spcmt-{{ cmt.id }}">
-                    {% if cmt.content %}
-                    <p class="text-sm leading-relaxed text-foreground break-words mb-2.5">{{ cmt.content }}</p>
-                    {% endif %}
-                    <div class="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  <div class="cmt-inner">
+                    {% if cmt.content %}<p class="text-xs leading-relaxed font-medium text-foreground break-words {% if user.is_authenticated %}mb-1.5{% endif %}">{{ cmt.content }}</p>{% endif %}
+                    <div class="flex flex-wrap items-center gap-1 text-muted-foreground mt-1">
                         {% if cmt.is_anonymous %}
-                        <span class="italic text-[11px]">Anonymous</span>
+                        <div class="flex h-5 w-5 flex-none items-center justify-center rounded-full border border-dashed border-border bg-muted text-[9px]">?</div>
+                        <p class="font-medium text-[11px] leading-4 italic">Anonymous</p>
                         {% else %}
                         {% with pic=cmt.user.profile.get_picture_url %}{% if pic %}
-                        <img src="{{ pic }}" alt="{{ cmt.user.username }}" class="w-5 h-5 rounded-full object-cover border border-border">
+                        <img src="{{ pic }}" alt="{{ cmt.user.username }}" class="h-5 w-5 rounded-full object-cover border border-border flex-shrink-0">
                         {% else %}
-                        <div class="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 flex items-center justify-center text-[9px] font-black flex-shrink-0">{{ cmt.user.username|first|upper }}</div>
+                        <div class="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-secondary text-secondary-foreground text-[9px] font-semibold">{{ cmt.user.username|first|upper }}</div>
                         {% endif %}{% endwith %}
-                        <a href="{% url 'user_profile' cmt.user.username %}" class="font-semibold text-foreground hover:text-primary transition text-[11px]">{{ cmt.user.username }}</a>
+                        <a href="{% url 'user_profile' cmt.user.username %}" class="font-medium text-[11px] leading-4 truncate hover:text-primary transition">{{ cmt.user.username }}</a>
                         {% endif %}
-                        {% if cmt.confidence_score %}
-                        <span class="conf-badge {% if cmt.confidence_score <= 3 %}cbadge-low{% elif cmt.confidence_score <= 6 %}cbadge-mid{% elif cmt.confidence_score <= 9 %}cbadge-high{% else %}cbadge-max{% endif %}">{{ cmt.confidence_score }}/10</span>
-                        {% endif %}
-                        {% if cmt.id == top_bull_id %}
-                        <span class="px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[9px] font-bold">🔥 Top</span>
-                        {% endif %}
-                        <!-- Live pts badge if resolved -->
-                        {% if sp.status == 'resolved' %}
-                        <span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold
-                            {% if sp.outcome == 'bullish_wins' or sp.outcome == 'bullish_correct' %}bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400{% else %}bg-rose-100 dark:bg-rose-900/25 text-rose-700 dark:text-rose-400{% endif %}">
-                            {% if sp.outcome == 'bullish_wins' or sp.outcome == 'bullish_correct' %}★ Correct{% else %}★ Wrong{% endif %}
-                        </span>
-                        {% endif %}
-                        <span class="ml-auto text-[10px]">{{ cmt.created_at|date:"M j" }}</span>
+                        {% if cmt.confidence_score %}<span class="conf-badge {% if cmt.confidence_score <= 3 %}cbadge-low{% elif cmt.confidence_score <= 6 %}cbadge-mid{% elif cmt.confidence_score <= 9 %}cbadge-high{% else %}cbadge-max{% endif %}">{{ cmt.confidence_score }}/10</span>{% endif %}
+                        {% if cmt.id == top_bull_id %}<span class="inline-flex items-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 text-[9px] font-semibold">⭐ Top</span>{% endif %}
+                        {% if sp.status == 'resolved' %}<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold {% if sp.outcome == 'bullish_wins' or sp.outcome == 'bullish_correct' %}bg-emerald-500/15 text-emerald-700 dark:text-emerald-300{% else %}bg-rose-500/15 text-rose-700 dark:text-rose-300{% endif %}">{% if sp.outcome == 'bullish_wins' or sp.outcome == 'bullish_correct' %}★ Correct{% else %}★ Wrong{% endif %}</span>{% endif %}
                     </div>
                     {% if user.is_authenticated %}
-                    <div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/45 flex-wrap">
-                        <button type="button" onclick="reactCmt('{{ cmt.id }}','like')"
-                                class="react-btn {% if cmt.user_reaction == 'like' %}liked{% endif %}" id="like-btn-{{ cmt.id }}">
-                            👍 <span id="like-cnt-{{ cmt.id }}">{{ cmt.likes|default:0 }}</span>
-                        </button>
-                        <button type="button" onclick="reactCmt('{{ cmt.id }}','dislike')"
-                                class="react-btn {% if cmt.user_reaction == 'dislike' %}disliked{% endif %}" id="dislike-btn-{{ cmt.id }}">
-                            👎 <span id="dislike-cnt-{{ cmt.id }}">{{ cmt.dislikes|default:0 }}</span>
-                        </button>
+                    <div class="flex flex-wrap items-center gap-1 mt-1.5 pt-1.5 border-t border-border/60">
+                        <button onclick="reactCmt('{{ cmt.id }}','like')" id="like-btn-{{ cmt.id }}" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 {% if cmt.user_reaction == 'like' %}text-primary border-primary/40{% else %}text-muted-foreground hover:border-primary/40 hover:text-foreground{% endif %}">👍 <span id="like-cnt-{{ cmt.id }}">{{ cmt.likes|default:0 }}</span></button>
+                        <button onclick="reactCmt('{{ cmt.id }}','dislike')" id="dislike-btn-{{ cmt.id }}" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 {% if cmt.user_reaction == 'dislike' %}text-destructive border-destructive/40{% else %}text-muted-foreground hover:border-primary/40 hover:text-foreground{% endif %}">👎 <span id="dislike-cnt-{{ cmt.id }}">{{ cmt.dislikes|default:0 }}</span></button>
                         {% if cmt.show_debate_action %}
-                        {% if cmt.show_debate_view_link and cmt.debate_view_url and cmt.debate_action_mode == 'start' %}
-                        <a href="{{ cmt.debate_view_url }}" class="inline-flex items-center rounded-full bg-slate-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-slate-600">View Debate</a>
-                        {% endif %}
-                        {% if cmt.debate_action_mode == 'view' and cmt.debate_chat_url %}
-                        <a href="{{ cmt.debate_chat_url }}" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</a>
-                        {% elif cmt.debate_action_mode == 'blocked' %}
-                        <button type="button" class="rounded-full bg-slate-400 px-1.5 py-0.5 text-[9px] text-white cursor-not-allowed opacity-80" title="Debate blocked">{{ cmt.debate_action_label }}</button>
-                        {% elif cmt.debate_action_mode == 'waiting' %}
-                        <button type="button" class="inline-flex items-center gap-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] text-white cursor-default opacity-90">⏳ Waiting</button>
-                        {% else %}
-                        <button onclick="startDebate('{{ cmt.id }}', this)" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</button>
-                        {% endif %}
+                            {% if cmt.debate_action_mode == 'view' and cmt.debate_chat_url %}<a href="{{ cmt.debate_chat_url }}" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</a>
+                            {% elif cmt.debate_action_mode == 'blocked' %}<button type="button" class="rounded-full bg-slate-400 px-1.5 py-0.5 text-[9px] text-white cursor-not-allowed opacity-80">{{ cmt.debate_action_label }}</button>
+                            {% elif cmt.debate_action_mode == 'waiting' %}<button type="button" class="inline-flex items-center gap-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] text-white cursor-default">⏳ Waiting</button>
+                            {% else %}<button onclick="startDebate('{{ cmt.id }}', this)" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</button>{% endif %}
                         {% endif %}
                     </div>
                     {% endif %}
+                  </div>
                 </div>
                 {% empty %}
                 <div class="text-center py-10 text-sm text-muted-foreground" id="bull-empty">
@@ -616,60 +593,37 @@
             <div class="space-y-2.5" id="bearish-list">
                 {% for cmt in bearish_comments %}
                 <div class="cmt-card bear-card {% if cmt.id == top_bear_id %}ring-1 ring-rose-400/35{% endif %}" id="spcmt-{{ cmt.id }}">
-                    {% if cmt.content %}
-                    <p class="text-sm leading-relaxed text-foreground break-words mb-2.5">{{ cmt.content }}</p>
-                    {% endif %}
-                    <div class="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                  <div class="cmt-inner">
+                    {% if cmt.content %}<p class="text-xs leading-relaxed font-medium text-foreground break-words {% if user.is_authenticated %}mb-1.5{% endif %}">{{ cmt.content }}</p>{% endif %}
+                    <div class="flex flex-wrap items-center gap-1 text-muted-foreground mt-1">
                         {% if cmt.is_anonymous %}
-                        <span class="italic text-[11px]">Anonymous</span>
+                        <div class="flex h-5 w-5 flex-none items-center justify-center rounded-full border border-dashed border-border bg-muted text-[9px]">?</div>
+                        <p class="font-medium text-[11px] leading-4 italic">Anonymous</p>
                         {% else %}
                         {% with pic=cmt.user.profile.get_picture_url %}{% if pic %}
-                        <img src="{{ pic }}" alt="{{ cmt.user.username }}" class="w-5 h-5 rounded-full object-cover border border-border">
+                        <img src="{{ pic }}" alt="{{ cmt.user.username }}" class="h-5 w-5 rounded-full object-cover border border-border flex-shrink-0">
                         {% else %}
-                        <div class="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-400 flex items-center justify-center text-[9px] font-black flex-shrink-0">{{ cmt.user.username|first|upper }}</div>
+                        <div class="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-secondary text-secondary-foreground text-[9px] font-semibold">{{ cmt.user.username|first|upper }}</div>
                         {% endif %}{% endwith %}
-                        <a href="{% url 'user_profile' cmt.user.username %}" class="font-semibold text-foreground hover:text-primary transition text-[11px]">{{ cmt.user.username }}</a>
+                        <a href="{% url 'user_profile' cmt.user.username %}" class="font-medium text-[11px] leading-4 truncate hover:text-primary transition">{{ cmt.user.username }}</a>
                         {% endif %}
-                        {% if cmt.confidence_score %}
-                        <span class="conf-badge {% if cmt.confidence_score <= 3 %}cbadge-low{% elif cmt.confidence_score <= 6 %}cbadge-mid{% elif cmt.confidence_score <= 9 %}cbadge-high{% else %}cbadge-max{% endif %}">{{ cmt.confidence_score }}/10</span>
-                        {% endif %}
-                        {% if cmt.id == top_bear_id %}
-                        <span class="px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[9px] font-bold">🔥 Top</span>
-                        {% endif %}
-                        {% if sp.status == 'resolved' %}
-                        <span class="px-1.5 py-0.5 rounded-full text-[9px] font-bold
-                            {% if sp.outcome == 'bearish_wins' or sp.outcome == 'bearish_correct' %}bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400{% else %}bg-rose-100 dark:bg-rose-900/25 text-rose-700 dark:text-rose-400{% endif %}">
-                            {% if sp.outcome == 'bearish_wins' or sp.outcome == 'bearish_correct' %}★ Correct{% else %}★ Wrong{% endif %}
-                        </span>
-                        {% endif %}
-                        <span class="ml-auto text-[10px]">{{ cmt.created_at|date:"M j" }}</span>
+                        {% if cmt.confidence_score %}<span class="conf-badge {% if cmt.confidence_score <= 3 %}cbadge-low{% elif cmt.confidence_score <= 6 %}cbadge-mid{% elif cmt.confidence_score <= 9 %}cbadge-high{% else %}cbadge-max{% endif %}">{{ cmt.confidence_score }}/10</span>{% endif %}
+                        {% if cmt.id == top_bear_id %}<span class="inline-flex items-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 text-[9px] font-semibold">⭐ Top</span>{% endif %}
+                        {% if sp.status == 'resolved' %}<span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold {% if sp.outcome == 'bearish_wins' or sp.outcome == 'bearish_correct' %}bg-emerald-500/15 text-emerald-700 dark:text-emerald-300{% else %}bg-rose-500/15 text-rose-700 dark:text-rose-300{% endif %}">{% if sp.outcome == 'bearish_wins' or sp.outcome == 'bearish_correct' %}★ Correct{% else %}★ Wrong{% endif %}</span>{% endif %}
                     </div>
                     {% if user.is_authenticated %}
-                    <div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/45 flex-wrap">
-                        <button type="button" onclick="reactCmt('{{ cmt.id }}','like')"
-                                class="react-btn {% if cmt.user_reaction == 'like' %}liked{% endif %}" id="like-btn-{{ cmt.id }}">
-                            👍 <span id="like-cnt-{{ cmt.id }}">{{ cmt.likes|default:0 }}</span>
-                        </button>
-                        <button type="button" onclick="reactCmt('{{ cmt.id }}','dislike')"
-                                class="react-btn {% if cmt.user_reaction == 'dislike' %}disliked{% endif %}" id="dislike-btn-{{ cmt.id }}">
-                            👎 <span id="dislike-cnt-{{ cmt.id }}">{{ cmt.dislikes|default:0 }}</span>
-                        </button>
+                    <div class="flex flex-wrap items-center gap-1 mt-1.5 pt-1.5 border-t border-border/60">
+                        <button onclick="reactCmt('{{ cmt.id }}','like')" id="like-btn-{{ cmt.id }}" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 {% if cmt.user_reaction == 'like' %}text-primary border-primary/40{% else %}text-muted-foreground hover:border-primary/40 hover:text-foreground{% endif %}">👍 <span id="like-cnt-{{ cmt.id }}">{{ cmt.likes|default:0 }}</span></button>
+                        <button onclick="reactCmt('{{ cmt.id }}','dislike')" id="dislike-btn-{{ cmt.id }}" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 {% if cmt.user_reaction == 'dislike' %}text-destructive border-destructive/40{% else %}text-muted-foreground hover:border-primary/40 hover:text-foreground{% endif %}">👎 <span id="dislike-cnt-{{ cmt.id }}">{{ cmt.dislikes|default:0 }}</span></button>
                         {% if cmt.show_debate_action %}
-                        {% if cmt.show_debate_view_link and cmt.debate_view_url and cmt.debate_action_mode == 'start' %}
-                        <a href="{{ cmt.debate_view_url }}" class="inline-flex items-center rounded-full bg-slate-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-slate-600">View Debate</a>
-                        {% endif %}
-                        {% if cmt.debate_action_mode == 'view' and cmt.debate_chat_url %}
-                        <a href="{{ cmt.debate_chat_url }}" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</a>
-                        {% elif cmt.debate_action_mode == 'blocked' %}
-                        <button type="button" class="rounded-full bg-slate-400 px-1.5 py-0.5 text-[9px] text-white cursor-not-allowed opacity-80" title="Debate blocked">{{ cmt.debate_action_label }}</button>
-                        {% elif cmt.debate_action_mode == 'waiting' %}
-                        <button type="button" class="inline-flex items-center gap-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] text-white cursor-default opacity-90">⏳ Waiting</button>
-                        {% else %}
-                        <button onclick="startDebate('{{ cmt.id }}', this)" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</button>
-                        {% endif %}
+                            {% if cmt.debate_action_mode == 'view' and cmt.debate_chat_url %}<a href="{{ cmt.debate_chat_url }}" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</a>
+                            {% elif cmt.debate_action_mode == 'blocked' %}<button type="button" class="rounded-full bg-slate-400 px-1.5 py-0.5 text-[9px] text-white cursor-not-allowed opacity-80">{{ cmt.debate_action_label }}</button>
+                            {% elif cmt.debate_action_mode == 'waiting' %}<button type="button" class="inline-flex items-center gap-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] text-white cursor-default">⏳ Waiting</button>
+                            {% else %}<button onclick="startDebate('{{ cmt.id }}', this)" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</button>{% endif %}
                         {% endif %}
                     </div>
                     {% endif %}
+                  </div>
                 </div>
                 {% empty %}
                 <div class="text-center py-10 text-sm text-muted-foreground" id="bear-empty">
