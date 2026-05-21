@@ -6438,10 +6438,16 @@ def reviews_list(request):
             'is_following': review.id in user_rev_follows,
         })
 
+    _REVIEW_ICONS = {
+        'Movie': '🎬', 'TV Show': '📺', 'Book': '📖', 'Music / Album': '🎵',
+        'Product': '📦', 'Restaurant': '🍽️', 'Place': '📍',
+        'App / Game': '🎮', 'Person': '👤', 'Other': '🗂️',
+    }
+    review_types_3 = [(k, v, _REVIEW_ICONS.get(k, '🗂️')) for k, v in REVIEW_TYPE_CHOICES]
     return render(request, 'frontend/reviews_list.html', {
         'reviews_data': reviews_data,
         'page_obj': page_obj,
-        'review_types': REVIEW_TYPE_CHOICES,
+        'review_types': review_types_3,
         'active_type': type_filter,
         'search_query': search_query,
     })
@@ -11711,12 +11717,22 @@ def discussions_list(request):
     paginator = Paginator(qs, 15)
     page_obj = paginator.get_page(request.GET.get('page', 1))
 
+    _DISC_ICONS = {
+        'Astrology': '🔮', 'Beauty': '💅', 'Business': '💼', 'Education': '📚',
+        'Entertainment': '🎬', 'Fashion': '👗', 'Food': '🍔', 'Gadgets': '📱',
+        'Health': '❤️', 'History': '📜', 'Investment': '📈', 'Music': '🎵',
+        'Painting': '🎨', 'Photography': '📷', 'Politics': '🏛️',
+        'Relationships': '💞', 'Science': '🔬', 'Spirituality': '🕊️',
+        'Sports': '⚽', 'Technology': '💻', 'Travel': '✈️',
+        'Vehicles': '🚗', 'Others': '🗂️',
+    }
+    categories_3 = [(k, v, _DISC_ICONS.get(k, '🗂️')) for k, v in _CAT_CHOICES]
     return render(request, 'frontend/discussions_list.html', {
         'page_obj': page_obj,
         'sort': sort,
         'category_filter': category_filter,
         'search_query': search_query,
-        'categories': _CAT_CHOICES,
+        'categories': categories_3,
     })
 
 
@@ -11756,13 +11772,21 @@ def stocks_list(request):
         cache.set(leaderboard_cache_key, leaderboard_data, 300)
     leaderboard, total_resolved = leaderboard_data
 
+    _STOCK_ICONS = {
+        'Technology': '💻', 'Energy': '⚡', 'Healthcare': '🏥',
+        'Finance & Banking': '🏦', 'Consumer Goods': '🛒', 'Automotive': '🚗',
+        'Real Estate': '🏠', 'Cryptocurrency': '₿', 'Commodities': '🪙',
+        'Market Indices': '📊', 'Pharmaceuticals': '💊', 'Retail & E-Commerce': '🛍️',
+        'Telecom': '📡', 'Infrastructure': '🏗️', 'Other': '🗂️',
+    }
+    stock_categories_3 = [(k, v, _STOCK_ICONS.get(k, '🗂️')) for k, v in STOCK_CATEGORY_CHOICES]
     return render(request, 'frontend/stocks_list.html', {
         'page_obj': page_obj,
         'status_filter': status_filter,
         'symbol_filter': symbol_filter,
         'category_filter': category_filter,
         'search_query': search_query,
-        'stock_categories': STOCK_CATEGORY_CHOICES,
+        'stock_categories': stock_categories_3,
         'leaderboard': leaderboard,
         'total_resolved': total_resolved,
     })
