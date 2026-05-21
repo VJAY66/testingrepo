@@ -353,66 +353,111 @@
         </details>
         {% endif %}
 
-        {% if user.is_authenticated %}
-        <div class="mb-1 flex items-center sm:gap-6 gap-3">
-            <button type="button" data-action="like" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-like {% if post.is_liked %}active text-amber-500 shadow-md shadow-amber-500/20 bg-amber-50/60 dark:bg-amber-950/30{% else %}text-muted-foreground hover:text-amber-500{% endif %} hover:bg-amber-50/70 dark:hover:bg-amber-950/20 hover:shadow-md overflow-hidden">
-                <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_liked %}scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="{% if post.is_liked %}url(#dh-like-gradient){% else %}none{% endif %}" stroke="currentColor" stroke-width="2">
-                    <defs>
-                        <linearGradient id="dh-like-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="hsl(var(--primary))"/>
-                            <stop offset="100%" stop-color="hsl(var(--accent))"/>
-                        </linearGradient>
-                    </defs>
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                </svg>
-                <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.like_count|default:0 }}</span>
-            </button>
-            <button type="button" data-action="repost" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-repost {% if post.is_reposted %}text-green-500 shadow-md shadow-green-500/20 bg-green-50/50 dark:bg-green-950/30{% else %}text-muted-foreground hover:text-green-500{% endif %} hover:bg-green-50 dark:hover:bg-green-950/20 hover:shadow-md overflow-hidden">
-                <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M17 1l4 4-4 4"/>
-                    <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-                    <path d="M7 23l-4-4 4-4"/>
-                    <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-                </svg>
-                <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.repost_count|default:0 }}</span>
-            </button>
-            <button type="button" data-action="save" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced action-btn-save {% if post.is_saved %}active text-primary shadow-md shadow-primary/20 bg-primary/5{% else %}text-muted-foreground hover:text-primary{% endif %} hover:bg-primary/10 hover:shadow-md overflow-hidden">
-                <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 {% if post.is_saved %}fill-current scale-110{% else %}group-hover:scale-110{% endif %} relative z-10" viewBox="0 0 24 24" fill="{% if post.is_saved %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2">
-                    <path d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/>
-                </svg>
-                <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.save_count|default:0 }}</span>
-            </button>
-            <button type="button" onclick="openSharePanel(this)" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced text-muted-foreground hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/20 hover:shadow-md overflow-hidden">
-                <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="18" cy="5" r="3"></circle>
-                    <circle cx="6" cy="12" r="3"></circle>
-                    <circle cx="18" cy="19" r="3"></circle>
-                    <path d="M8.59 13.51L15.42 17.49"></path>
-                    <path d="M15.41 6.51L8.59 10.49"></path>
-                </svg>
-                <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Share</span>
-            </button>
+        {# ── Action bar ── #}
+        <div class="mt-2 -mx-1 flex items-center gap-0.5 overflow-x-auto" style="scrollbar-width:none;">
+            <svg class="absolute" width="0" height="0"><defs><linearGradient id="dh-like-gradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="hsl(var(--primary))"/><stop offset="100%" stop-color="hsl(var(--accent))"/></linearGradient></defs></svg>
+
+            {# Like #}
             {% if user.is_authenticated %}
-            <button type="button" onclick="openQuoteFromDiscussion('{{ post.id|escapejs }}','{{ post.title|escapejs }}','{{ post.user.username|escapejs }}')"
-              class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced text-muted-foreground hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 hover:shadow-md overflow-hidden">
-              <span class="sm:w-5 sm:h-5 w-4 h-4 relative z-10 text-base leading-none">💬</span>
-              <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Quote</span>
+            <button type="button" data-action="like" title="Like"
+              class="group action-btn-enhanced action-btn-like inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold transition-all duration-200
+                     {% if post.is_liked %}text-amber-500 bg-amber-50 dark:bg-amber-950/40{% else %}text-muted-foreground hover:text-amber-500 hover:bg-amber-50/70 dark:hover:bg-amber-950/20{% endif %}">
+              <svg class="w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110" viewBox="0 0 24 24"
+                   fill="{% if post.is_liked %}url(#dh-like-gradient){% else %}none{% endif %}" stroke="currentColor" stroke-width="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+              </svg>
+              <span class="action-count">{{ post.like_count|default:0 }}</span>
+            </button>
+            {% else %}
+            <button type="button" onclick="location.href='{% url 'login' %}'" title="Like"
+              class="group inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-muted-foreground hover:text-amber-500 hover:bg-amber-50/70 transition-all duration-200">
+              <svg class="w-3.5 h-3.5 flex-shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              <span class="action-count">{{ post.like_count|default:0 }}</span>
             </button>
             {% endif %}
+
+            {# Repost #}
             {% if user.is_authenticated %}
-            <button type="button" onclick="toggleReadLaterDiscussion('{{ post.id|escapejs }}', this)"
-              title="Read Later"
-              class="flex items-center gap-1 h-8 px-2 rounded-full border text-xs font-medium transition-all pointer-events-auto border-border text-muted-foreground hover:text-teal-600 hover:bg-teal-50 hover:border-teal-300">
-              🕐 <span class="hidden sm:inline">Later</span>
+            <button type="button" data-action="repost" title="Repost"
+              class="group action-btn-enhanced action-btn-repost inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold transition-all duration-200
+                     {% if post.is_reposted %}text-emerald-500 bg-emerald-50 dark:bg-emerald-950/40{% else %}text-muted-foreground hover:text-emerald-500 hover:bg-emerald-50/70 dark:hover:bg-emerald-950/20{% endif %}">
+              <svg class="w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                <path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+              </svg>
+              <span class="action-count">{{ post.repost_count|default:0 }}</span>
+            </button>
+            {% else %}
+            <button type="button" onclick="location.href='{% url 'login' %}'" title="Repost"
+              class="group inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-muted-foreground hover:text-emerald-500 hover:bg-emerald-50/70 transition-all duration-200">
+              <svg class="w-3.5 h-3.5 flex-shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                <path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+              </svg>
+              <span class="action-count">{{ post.repost_count|default:0 }}</span>
             </button>
             {% endif %}
+
+            {# Save #}
             {% if user.is_authenticated %}
+            <button type="button" data-action="save" title="Save"
+              class="group action-btn-enhanced action-btn-save inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold transition-all duration-200
+                     {% if post.is_saved %}text-primary bg-primary/8{% else %}text-muted-foreground hover:text-primary hover:bg-primary/8{% endif %}">
+              <svg class="w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110" viewBox="0 0 24 24"
+                   fill="{% if post.is_saved %}currentColor{% else %}none{% endif %}" stroke="currentColor" stroke-width="2">
+                <path d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/>
+              </svg>
+              <span class="action-count">{{ post.save_count|default:0 }}</span>
+            </button>
+            {% else %}
+            <button type="button" onclick="location.href='{% url 'login' %}'" title="Save"
+              class="group inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-muted-foreground hover:text-primary hover:bg-primary/8 transition-all duration-200">
+              <svg class="w-3.5 h-3.5 flex-shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/></svg>
+              <span class="action-count">{{ post.save_count|default:0 }}</span>
+            </button>
+            {% endif %}
+
+            {# Divider #}
+            <span class="w-px h-5 bg-border/60 mx-1 flex-shrink-0"></span>
+
+            {# Share #}
+            <button type="button" onclick="openSharePanel(this)" title="Share"
+              class="group inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-muted-foreground hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950/20 transition-all duration-200">
+              <svg class="w-3.5 h-3.5 flex-shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                <path d="M8.59 13.51L15.42 17.49"/><path d="M15.41 6.51L8.59 10.49"/>
+              </svg>
+              <span class="hidden sm:inline">Share</span>
+            </button>
+
+            {% if user.is_authenticated %}
+            {# Quote #}
+            <button type="button" onclick="openQuoteFromDiscussion('{{ post.id|escapejs }}','{{ post.title|escapejs }}','{{ post.user.username|escapejs }}')" title="Quote"
+              class="group inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-muted-foreground hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/20 transition-all duration-200">
+              <svg class="w-3.5 h-3.5 flex-shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span class="hidden sm:inline">Quote</span>
+            </button>
+
+            {# Later #}
+            <button type="button" onclick="toggleReadLaterDiscussion('{{ post.id|escapejs }}', this)" title="Read Later"
+              class="group inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-muted-foreground hover:text-teal-500 hover:bg-teal-50 dark:hover:bg-teal-950/20 transition-all duration-200">
+              <svg class="w-3.5 h-3.5 flex-shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+              </svg>
+              <span class="hidden sm:inline">Later</span>
+            </button>
+
+            {# Remind #}
             <div class="relative inline-block" id="reminder-wrap-{{ post.id }}">
-              <button type="button" onclick="toggleReminderMenu('{{ post.id|escapejs }}')"
-                title="Set reminder"
-                class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 pointer-events-auto action-btn-enhanced {% if post.has_reminder %}text-amber-500 bg-amber-50/60{% else %}text-muted-foreground hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/20{% endif %} hover:shadow-md overflow-hidden">
-                <span class="sm:w-5 sm:h-5 w-4 h-4 relative z-10 text-base leading-none">⏰</span>
-                <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Remind</span>
+              <button type="button" onclick="toggleReminderMenu('{{ post.id|escapejs }}')" title="Remind me"
+                class="group inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold transition-all duration-200
+                       {% if post.has_reminder %}text-amber-500 bg-amber-50 dark:bg-amber-950/40{% else %}text-muted-foreground hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/20{% endif %}">
+                <svg class="w-3.5 h-3.5 flex-shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                <span class="hidden sm:inline">Remind</span>
               </button>
               <div id="reminder-menu-{{ post.id }}" class="hidden absolute left-0 top-full mt-1 z-50 w-48 rounded-xl border border-border bg-card shadow-lg p-1">
                 <button onclick="setReminder('{{ post.id|escapejs }}','1h')" class="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-muted transition">⏱ In 1 hour</button>
@@ -422,46 +467,32 @@
               </div>
             </div>
             {% endif %}
-            <button type="button" data-action="hot" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_hot %}active text-orange-500 bg-orange-50/60 border-orange-300/60{% else %}text-muted-foreground hover:text-orange-500 hover:bg-orange-50/60{% endif %}">🔥 <span class="action-count text-xs" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','hot')">{{ post.hot_count|default:0 }}</span></button>
-            <button type="button" data-action="debatable" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_debatable %}active text-purple-500 bg-purple-50/60 border-purple-300/60{% else %}text-muted-foreground hover:text-purple-500 hover:bg-purple-50/60{% endif %}">🤔 <span class="action-count text-xs" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','debatable')">{{ post.debatable_count|default:0 }}</span></button>
-            <button type="button" data-action="agree" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_agree %}active text-green-600 bg-green-50/60 border-green-300/60{% else %}text-muted-foreground hover:text-green-600 hover:bg-green-50/60{% endif %}">👏 <span class="action-count text-xs" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','agree')">{{ post.agree_count|default:0 }}</span></button>
-            <button type="button" data-action="surprising" class="inline-flex items-center gap-1 h-8 px-2 rounded-full border border-border/60 text-xs font-medium transition-all duration-200 pointer-events-auto {% if post.is_surprising %}active text-blue-500 bg-blue-50/60 border-blue-300/60{% else %}text-muted-foreground hover:text-blue-500 hover:bg-blue-50/60{% endif %}">😮 <span class="action-count text-xs" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','surprising')">{{ post.surprising_count|default:0 }}</span></button>
-        </div>
-        {% else %}
-        <div class="mb-1 flex items-center sm:gap-6 gap-3">
-            <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 action-btn-enhanced action-btn-like text-muted-foreground hover:text-amber-500 hover:bg-amber-50/70 dark:hover:bg-amber-950/20 hover:shadow-md overflow-hidden cursor-pointer">
-                <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                </svg>
-                <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.like_count|default:0 }}</span>
+
+            {# Divider #}
+            <span class="w-px h-5 bg-border/60 mx-1 flex-shrink-0"></span>
+
+            {# Emoji reactions #}
+            <button type="button" data-action="hot" title="Hot"
+              class="action-btn-enhanced group inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-semibold transition-all duration-200
+                     {% if post.is_hot %}text-orange-500 bg-orange-50 dark:bg-orange-950/30{% else %}text-muted-foreground hover:text-orange-500 hover:bg-orange-50/60{% endif %}">
+              🔥 <span class="action-count" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','hot')">{{ post.hot_count|default:0 }}</span>
             </button>
-            <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 action-btn-enhanced action-btn-repost text-muted-foreground hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-950/20 hover:shadow-md overflow-hidden cursor-pointer">
-                <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M17 1l4 4-4 4"/>
-                    <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-                    <path d="M7 23l-4-4 4-4"/>
-                    <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-                </svg>
-                <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.repost_count|default:0 }}</span>
+            <button type="button" data-action="debatable" title="Debatable"
+              class="action-btn-enhanced group inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-semibold transition-all duration-200
+                     {% if post.is_debatable %}text-violet-500 bg-violet-50 dark:bg-violet-950/30{% else %}text-muted-foreground hover:text-violet-500 hover:bg-violet-50/60{% endif %}">
+              🤔 <span class="action-count" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','debatable')">{{ post.debatable_count|default:0 }}</span>
             </button>
-            <button type="button" onclick="window.location.href='{% url 'login' %}'" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 action-btn-enhanced action-btn-save text-muted-foreground hover:text-primary hover:bg-primary/10 hover:shadow-md overflow-hidden cursor-pointer">
-                <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17 3H7C5.89543 3 5 3.89543 5 5V21L12 15L19 21V5C19 3.89543 18.1046 3 17 3Z"/>
-                </svg>
-                <span class="action-count sm:text-sm text-xs font-medium relative z-10">{{ post.save_count|default:0 }}</span>
+            <button type="button" data-action="agree" title="Agree"
+              class="action-btn-enhanced group inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-semibold transition-all duration-200
+                     {% if post.is_agree %}text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30{% else %}text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50/60{% endif %}">
+              👏 <span class="action-count" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','agree')">{{ post.agree_count|default:0 }}</span>
             </button>
-            <button type="button" onclick="openSharePanel(this)" class="group relative flex items-center justify-center gap-1.5 w-auto sm:h-10 h-8 sm:px-3 px-2 rounded-full transition-all duration-300 action-btn-enhanced text-muted-foreground hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/20 hover:shadow-md overflow-hidden cursor-pointer">
-                <svg class="sm:w-5 sm:h-5 w-4 h-4 transition-all duration-300 group-hover:scale-110 relative z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="18" cy="5" r="3"></circle>
-                    <circle cx="6" cy="12" r="3"></circle>
-                    <circle cx="18" cy="19" r="3"></circle>
-                    <path d="M8.59 13.51L15.42 17.49"></path>
-                    <path d="M15.41 6.51L8.59 10.49"></path>
-                </svg>
-                <span class="hidden sm:inline sm:text-sm font-medium relative z-10">Share</span>
+            <button type="button" data-action="surprising" title="Surprising"
+              class="action-btn-enhanced group inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-semibold transition-all duration-200
+                     {% if post.is_surprising %}text-sky-500 bg-sky-50 dark:bg-sky-950/30{% else %}text-muted-foreground hover:text-sky-500 hover:bg-sky-50/60{% endif %}">
+              😮 <span class="action-count" onclick="event.stopPropagation();showDiscussionReactions('{{ post.id }}','surprising')">{{ post.surprising_count|default:0 }}</span>
             </button>
         </div>
-        {% endif %}
 
         {% if show_post_submitted %}
         <div id="post-submitted-banner" class="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl transition-opacity duration-500">
