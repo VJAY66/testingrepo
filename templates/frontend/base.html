@@ -2,7 +2,7 @@
 <html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}PickASide{% endblock %}</title>
     <!-- ── Page load progress bar ── -->
     <style>
@@ -213,11 +213,6 @@
             --float-gradient: linear-gradient(120deg, hsl(var(--primary)), #14b8a6 58%, hsl(var(--accent)));
             background-image: radial-gradient(circle at top right, rgba(34, 211, 238, 0.14), transparent 34%), radial-gradient(circle at bottom left, rgba(245, 158, 11, 0.12), transparent 30%);
         }
-        html {
-            overflow-x: hidden;
-            overscroll-behavior-x: none;
-        }
-
         body {
             background-image: inherit;
             background-repeat: no-repeat;
@@ -226,7 +221,6 @@
             font-weight: 300;
             letter-spacing: 0.01em;
             overflow-x: hidden;
-            overscroll-behavior-x: none;
             -webkit-overflow-scrolling: touch;
         }
         *, *::before, *::after { overflow-wrap: break-word; }
