@@ -3,11 +3,6 @@
 
 {% block title %}Debate Chat - Discussion Hub{% endblock %}
 
-{% block og_meta %}{{ block.super }}
-<style id="mc-embed-guard">.nav-shell,footer,aside,#flash-messages,#mobile-menu-drawer{display:none!important}</style>
-<script>if(window.self===window.top){var _g=document.getElementById('mc-embed-guard');if(_g)_g.remove();}</script>
-{% endblock %}
-
 {% block content %}
 {{ active_participants|json_script:"dh-debate-active-participants" }}
 <link rel="stylesheet" href="{% static 'css/chatbox_modern.css' %}">
