@@ -496,12 +496,13 @@ function confirmReviewDebate() {
     closeReviewDebateModal();
     if (d.redirect_url) { window.location.href = d.redirect_url; return; }
     if (d.success) {
-      alert(d.message || 'Debate request sent!');
+      showToast(d.message || 'Debate request sent!', 'success', 4500);
     } else {
-      alert(d.error || 'Could not send debate request.');
+      btn.disabled = false; btn.textContent = 'Challenge';
+      showToast(d.error || 'Could not send debate request.', 'error');
     }
   })
-  .catch(() => { btn.disabled = false; btn.textContent = 'Challenge'; alert('Network error.'); });
+  .catch(() => { btn.disabled = false; btn.textContent = 'Challenge'; showToast('Network error. Please try again.', 'error'); });
 }
 
 function escH(s) {
