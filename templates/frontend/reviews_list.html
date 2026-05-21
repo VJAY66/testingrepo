@@ -290,12 +290,16 @@
   {% endif %}
 
   {% else %}
-  <div class="rl-empty">
-    <div class="text-4xl mb-3">⭐</div>
-    <p class="font-semibold text-foreground mb-1">No reviews yet{% if active_category %} in {{ active_category }}{% endif %}</p>
-    <p class="text-xs text-muted-foreground mb-4">Be the first to share your verdict on something!</p>
+  <div style="margin:2rem 0;border-radius:20px;overflow:hidden;background:linear-gradient(135deg,hsl(var(--primary)/0.07) 0%,hsl(var(--card)) 60%);border:1.5px solid hsl(var(--primary)/0.15);padding:52px 32px;text-align:center;position:relative;">
+    <div style="position:absolute;inset:0;pointer-events:none;opacity:0.04;font-size:120px;line-height:1;display:flex;align-items:center;justify-content:center;">⭐</div>
+    <div style="font-size:3rem;margin-bottom:12px;">⭐</div>
+    <h2 style="font-family:'Playfair Display',Georgia,serif;font-size:1.35rem;font-weight:800;color:hsl(var(--foreground));margin:0 0 8px;">No reviews yet{% if active_category %} in <em>{{ active_category }}</em>{% endif %}</h2>
+    <p style="font-size:13px;color:hsl(var(--muted-foreground));max-width:320px;margin:0 auto 20px;line-height:1.6;">Be the first to share your verdict — your opinion helps the community.</p>
     {% if user.is_authenticated %}
-    <a href="{% url 'create_review' %}" class="rl-write-btn" style="display:inline-flex;">Write a Review</a>
+    <a href="{% url 'create_review' %}" style="display:inline-flex;align-items:center;gap:7px;padding:11px 28px;border-radius:999px;background:linear-gradient(135deg,hsl(var(--primary)),hsl(var(--primary)/0.82));color:hsl(var(--primary-foreground));font-size:14px;font-weight:700;text-decoration:none;box-shadow:0 4px 16px hsl(var(--primary)/0.35);transition:opacity .15s,transform .15s;" onmouseover="this.style.opacity='.88';this.style.transform='translateY(-1px)'" onmouseout="this.style.opacity='1';this.style.transform='translateY(0)'">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
+      Write a Review
+    </a>
     {% endif %}
   </div>
   {% endif %}

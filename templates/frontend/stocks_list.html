@@ -299,21 +299,18 @@ html.dark .chip-down { color: hsl(346 70% 62%); }
             {% endif %}
 
             {% else %}
-            <!-- Empty state -->
-            <div class="rounded-2xl border border-dashed border-border bg-card p-14 text-center">
-                <p class="text-5xl mb-4">📈</p>
-                <p class="text-lg font-bold text-foreground mb-2">
-                    No predictions yet{% if symbol_filter %} for "{{ symbol_filter }}"{% endif %}
-                </p>
-                <p class="text-sm text-muted-foreground mb-6">Be the first to make a stock prediction and spark the debate!</p>
+            <div style="margin:2rem 0;border-radius:20px;overflow:hidden;background:linear-gradient(135deg,hsl(var(--primary)/0.07) 0%,hsl(var(--card)) 60%);border:1.5px solid hsl(var(--primary)/0.15);padding:52px 32px;text-align:center;position:relative;">
+                <div style="position:absolute;inset:0;pointer-events:none;opacity:0.04;font-size:120px;line-height:1;display:flex;align-items:center;justify-content:center;">📈</div>
+                <div style="font-size:3rem;margin-bottom:12px;">📈</div>
+                <h2 style="font-family:'Playfair Display',Georgia,serif;font-size:1.35rem;font-weight:800;color:hsl(var(--foreground));margin:0 0 8px;">No predictions yet{% if symbol_filter %} for <em>"{{ symbol_filter }}"</em>{% endif %}</h2>
+                <p style="font-size:13px;color:hsl(var(--muted-foreground));max-width:320px;margin:0 auto 20px;line-height:1.6;">Be the first to call it — make a prediction and spark the debate.</p>
                 {% if user.is_authenticated %}
-                <a href="{% url 'create_stock_prediction' %}" class="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground hover:opacity-90 transition shadow-lg shadow-primary/25">
-                    🚀 Make a Prediction
+                <a href="{% url 'create_stock_prediction' %}" style="display:inline-flex;align-items:center;gap:7px;padding:11px 28px;border-radius:999px;background:linear-gradient(135deg,hsl(var(--primary)),hsl(var(--primary)/0.82));color:hsl(var(--primary-foreground));font-size:14px;font-weight:700;text-decoration:none;box-shadow:0 4px 16px hsl(var(--primary)/0.35);transition:opacity .15s,transform .15s;" onmouseover="this.style.opacity='.88';this.style.transform='translateY(-1px)'" onmouseout="this.style.opacity='1';this.style.transform='translateY(0)'">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg>
+                    Make a Prediction
                 </a>
                 {% else %}
-                <a href="{% url 'login' %}" class="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground hover:opacity-90 transition shadow-lg shadow-primary/25">
-                    Sign In to Predict
-                </a>
+                <a href="{% url 'login' %}" style="display:inline-flex;align-items:center;gap:7px;padding:11px 28px;border-radius:999px;background:linear-gradient(135deg,hsl(var(--primary)),hsl(var(--primary)/0.82));color:hsl(var(--primary-foreground));font-size:14px;font-weight:700;text-decoration:none;box-shadow:0 4px 16px hsl(var(--primary)/0.35);">Sign In to Predict</a>
                 {% endif %}
             </div>
             {% endif %}
