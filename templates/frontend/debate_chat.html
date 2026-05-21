@@ -3,18 +3,9 @@
 
 {% block title %}Debate Chat - Discussion Hub{% endblock %}
 
-{% block jsonld %}
-{# Hide nav/footer immediately when loaded inside the chats sidebar iframe.
-   The style is removed by JS if this page is opened directly (not embedded). #}
-<style id="mc-embed-guard">
-    .nav-shell, footer, aside, #flash-messages, #mobile-menu-drawer { display: none !important; }
-</style>
-<script>
-    if (window.self === window.top) {
-        var g = document.getElementById('mc-embed-guard');
-        if (g) g.remove();
-    }
-</script>
+{% block og_meta %}{{ block.super }}
+<style id="mc-embed-guard">.nav-shell,footer,aside,#flash-messages,#mobile-menu-drawer{display:none!important}</style>
+<script>if(window.self===window.top){var _g=document.getElementById('mc-embed-guard');if(_g)_g.remove();}</script>
 {% endblock %}
 
 {% block content %}
