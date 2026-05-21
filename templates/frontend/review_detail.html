@@ -62,11 +62,22 @@
 }
 .debate-col-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 14px; border-radius: .9rem;
-  font-weight: 700; font-size: 13px; margin-bottom: 2px;
+  padding: 10px 16px; border-radius: 1rem;
+  font-weight: 700; font-size: 13px; margin-bottom: 4px;
+  border: 1px solid transparent;
 }
-.agree-col-hdr    { background: hsl(142 71% 45%/.1); color: hsl(142 71% 35%); }
-.disagree-col-hdr { background: hsl(346 77% 50%/.1); color: hsl(346 77% 44%); }
+.agree-col-hdr {
+  background: linear-gradient(135deg, hsl(142 71% 45%/.12) 0%, hsl(142 71% 45%/.05) 100%);
+  border-color: hsl(142 71% 45%/.25);
+  color: hsl(142 71% 35%);
+  box-shadow: 0 2px 8px -4px hsl(142 71% 45%/.2);
+}
+.disagree-col-hdr {
+  background: linear-gradient(135deg, hsl(346 77% 50%/.12) 0%, hsl(346 77% 50%/.05) 100%);
+  border-color: hsl(346 77% 50%/.25);
+  color: hsl(346 77% 44%);
+  box-shadow: 0 2px 8px -4px hsl(346 77% 50%/.2);
+}
 .dark .agree-col-hdr    { color: hsl(142 60% 55%); }
 .dark .disagree-col-hdr { color: hsl(346 60% 65%); }
 
@@ -76,12 +87,21 @@
   background: hsl(var(--card));
   padding: 12px 14px;
   position: relative;
-  transition: box-shadow .15s;
+  overflow: hidden;
+  transition: box-shadow .18s, border-color .18s, transform .15s;
 }
-.rc-card:hover { box-shadow: 0 4px 16px -8px hsl(var(--primary)/.15); }
-.rc-card.agree-card-border    { border-left: 3px solid hsl(142 71% 45%/.5); }
-.rc-card.disagree-card-border { border-left: 3px solid hsl(346 77% 50%/.5); }
-.rc-card.pinned { border-color: hsl(38 92% 50%/.5); background: hsl(38 92% 50%/.04); }
+.rc-card:hover { box-shadow: 0 6px 20px -10px hsl(var(--primary)/.2); transform: translateY(-1px); }
+.rc-card.agree-card-border {
+  border-left: 3px solid hsl(142 71% 45%/.6);
+  background: linear-gradient(135deg, hsl(142 71% 45%/.04) 0%, hsl(var(--card)) 60%);
+}
+.rc-card.agree-card-border:hover { box-shadow: 0 6px 20px -10px hsl(142 71% 45%/.3); }
+.rc-card.disagree-card-border {
+  border-left: 3px solid hsl(346 77% 50%/.6);
+  background: linear-gradient(135deg, hsl(346 77% 50%/.04) 0%, hsl(var(--card)) 60%);
+}
+.rc-card.disagree-card-border:hover { box-shadow: 0 6px 20px -10px hsl(346 77% 50%/.3); }
+.rc-card.pinned { border-color: hsl(38 92% 50%/.5); background: linear-gradient(135deg, hsl(38 92% 50%/.06) 0%, hsl(var(--card)) 60%); }
 .pin-badge {
   display: inline-flex; align-items: center; gap: 3px;
   font-size: 10px; font-weight: 700; color: hsl(38 72% 45%);
