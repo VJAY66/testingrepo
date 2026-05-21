@@ -267,13 +267,13 @@
 @keyframes chSpin {
     to { transform: rotate(360deg); }
 }
-/* Kill the entrance animation when chat is loaded inside the container */
-#ch-conv-container #mc-shell {
+/* Kill ALL animations when chat is loaded inside the container */
+#ch-conv-container #mc-shell,
+#ch-conv-container .mc-msg,
+#ch-conv-container .mc-bubble,
+#ch-conv-container * {
     animation: none !important;
     transition: none !important;
-}
-#ch-conv-container {
-    transition: opacity 0.15s ease;
 }
 .ch-item.active [data-unread-badge] {
     display: none !important;
@@ -597,14 +597,14 @@ function _activateScripts(container) {
 var _currentChatUrl = null;
 
 function _loadChat(url, container) {
-    if (_currentChatUrl === url) return; // already showing this chat
+    if (_currentChatUrl === url) return;
     _currentChatUrl = url;
 
     var loader = document.getElementById('ch-frame-loader');
-
-    // Fade out existing content instantly, show loader
-    container.style.opacity = '0';
-    if (loader) loader.classList.remove('hidden');
+    // Only show loader if fetch takes longer than 400ms
+    var loaderTimer = loader ? setTimeout(function() {
+        loader.classList.remove('hidden');
+    }, 400) : null;
 
     return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function(r) {
@@ -612,18 +612,15 @@ function _loadChat(url, container) {
             return r.text();
         })
         .then(function(html) {
+            clearTimeout(loaderTimer);
             container.innerHTML = html;
             _activateScripts(container);
             if (loader) loader.classList.add('hidden');
-            // Fade in smoothly
-            requestAnimationFrame(function() {
-                container.style.opacity = '1';
-            });
         })
-        .catch(function(err) {
+        .catch(function() {
+            clearTimeout(loaderTimer);
             _currentChatUrl = null;
             if (loader) loader.classList.add('hidden');
-            container.style.opacity = '1';
             container.innerHTML = '<p style="padding:2rem;color:hsl(var(--muted-foreground));text-align:center;">Failed to load conversation. Please try again.</p>';
         });
 }
