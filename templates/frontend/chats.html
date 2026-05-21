@@ -267,6 +267,14 @@
 @keyframes chSpin {
     to { transform: rotate(360deg); }
 }
+/* Kill the entrance animation when chat is loaded inside the container */
+#ch-conv-container #mc-shell {
+    animation: none !important;
+    transition: none !important;
+}
+#ch-conv-container {
+    transition: opacity 0.15s ease;
+}
 .ch-item.active [data-unread-badge] {
     display: none !important;
 }
@@ -586,8 +594,16 @@ function _activateScripts(container) {
     });
 }
 
+var _currentChatUrl = null;
+
 function _loadChat(url, container) {
+    if (_currentChatUrl === url) return; // already showing this chat
+    _currentChatUrl = url;
+
     var loader = document.getElementById('ch-frame-loader');
+
+    // Fade out existing content instantly, show loader
+    container.style.opacity = '0';
     if (loader) loader.classList.remove('hidden');
 
     return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
@@ -599,9 +615,15 @@ function _loadChat(url, container) {
             container.innerHTML = html;
             _activateScripts(container);
             if (loader) loader.classList.add('hidden');
+            // Fade in smoothly
+            requestAnimationFrame(function() {
+                container.style.opacity = '1';
+            });
         })
         .catch(function(err) {
+            _currentChatUrl = null;
             if (loader) loader.classList.add('hidden');
+            container.style.opacity = '1';
             container.innerHTML = '<p style="padding:2rem;color:hsl(var(--muted-foreground));text-align:center;">Failed to load conversation. Please try again.</p>';
         });
 }
@@ -675,6 +697,7 @@ function openDesktopChat(chatId, btn) {
 
     var container = document.getElementById('ch-conv-container');
     if (container) {
+        _currentChatUrl = null; // reset so switching always loads
         _loadChat(btn.getAttribute('data-chat-url'), container);
     }
 
