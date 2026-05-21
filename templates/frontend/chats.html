@@ -601,10 +601,7 @@ function _loadChat(url, container) {
     _currentChatUrl = url;
 
     var loader = document.getElementById('ch-frame-loader');
-    // Only show loader if fetch takes longer than 400ms
-    var loaderTimer = loader ? setTimeout(function() {
-        loader.classList.remove('hidden');
-    }, 400) : null;
+    if (loader) loader.classList.add('hidden');
 
     return fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function(r) {
@@ -612,15 +609,11 @@ function _loadChat(url, container) {
             return r.text();
         })
         .then(function(html) {
-            clearTimeout(loaderTimer);
             container.innerHTML = html;
             _activateScripts(container);
-            if (loader) loader.classList.add('hidden');
         })
         .catch(function() {
-            clearTimeout(loaderTimer);
             _currentChatUrl = null;
-            if (loader) loader.classList.add('hidden');
             container.innerHTML = '<p style="padding:2rem;color:hsl(var(--muted-foreground));text-align:center;">Failed to load conversation. Please try again.</p>';
         });
 }
