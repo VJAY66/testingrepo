@@ -46,7 +46,7 @@
             <h1 class="flex items-center gap-2" style="font-family:'Playfair Display',serif; font-style:italic; font-weight:600; font-size:1.35rem; letter-spacing:0.01em; color:hsl(var(--foreground));">
                 <span style="font-style:normal;">💬</span> Questions{% if active_category %} · {{ active_category }}{% endif %}
             </h1>
-            <p class="text-xs text-muted-foreground" style="font-style:italic; letter-spacing:0.015em;">Ask anything — get community answers.</p>
+            <p class="text-xs text-muted-foreground" style="font-style:italic; letter-spacing:0.02em;">Seek wisdom &middot; Spark conversation &middot; Share knowledge</p>
         </div>
         {% if user.is_authenticated %}
         <a href="{% url 'ask_general_question' %}" class="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-sm shadow-primary/25">
@@ -56,7 +56,7 @@
     </div>
 
     <!-- Search bar -->
-    <form method="get" action="" class="relative group mb-2.5 max-w-xl">
+    <form method="get" action="" class="relative group mb-2.5 max-w-xl mx-auto">
         {% if active_category %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}
         <div class="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-1.5 shadow-sm transition-all focus-within:border-primary/60 focus-within:shadow-primary/10">
             <svg class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 group-focus-within:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35"/></svg>
