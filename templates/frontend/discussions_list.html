@@ -84,7 +84,7 @@
     </div>
 
     <!-- ── Search bar ── -->
-    <form method="get" class="relative group mb-2.5">
+    <form method="get" class="relative group mb-2.5 max-w-xl">
         {% if sort != 'trending' %}<input type="hidden" name="sort" value="{{ sort }}">{% endif %}
         {% if category_filter %}<input type="hidden" name="category" value="{{ category_filter }}">{% endif %}
         <div class="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-1.5 shadow-sm transition-all focus-within:border-primary/60 focus-within:shadow-primary/10">
