@@ -54,8 +54,8 @@
 {% block content %}
 <div class="max-w-4xl mx-auto space-y-8">
     <!-- Post Content -->
-    <div class="bg-card border border-border rounded-2xl px-4 sm:px-6 pt-6 pb-3" data-post-id="{{ post.id }}" data-share-url="{% url 'discussion' post.id %}">
-        <div class="flex items-start justify-between mb-4 gap-2">
+    <div class="bg-card border border-border rounded-2xl px-4 sm:px-5 pt-4 pb-2" data-post-id="{{ post.id }}" data-share-url="{% url 'discussion' post.id %}">
+        <div class="flex items-start justify-between mb-2.5 gap-2">
             <div class="flex items-center space-x-2 min-w-0">
                 {% if post.is_anonymous and not reveal_identity %}
                 <div class="w-8 h-8 bg-muted rounded-full flex items-center justify-center border border-border flex-shrink-0">
@@ -112,7 +112,7 @@
         </div>
 
         <div class="mb-1 flex items-start justify-between gap-3">
-            <h1 id="post-title-display" class="text-2xl font-bold text-foreground">{{ post.title }}</h1>
+            <h1 id="post-title-display" class="text-xl font-bold text-foreground leading-snug">{{ post.title }}</h1>
             {% if is_post_creator %}
             <div class="flex items-center gap-2">
                 <button type="button" id="open-post-editor-btn" onclick="openPostEditor()" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border text-muted-foreground hover:border-primary hover:text-primary transition" aria-label="Edit post" title="Edit post">
@@ -211,42 +211,37 @@
         }
         </script>
 
-        <!-- Hashtags Section -->
-        {% if post.hashtags %}
-        <div class="mb-6 flex flex-wrap gap-2">
+        <!-- Hashtags + Share + Follow — single compact row -->
+        <div class="mb-2 flex flex-wrap items-center gap-1.5">
+            {% if post.hashtags %}
             {% for hashtag in post.get_hashtags_list %}
-            <a href="{% url 'hashtag_search' %}?tag={{ hashtag }}" 
-               class="inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-cyan-500/20 via-teal-500/20 to-amber-500/20 border border-cyan-500/30 hover:border-cyan-500/60 text-cyan-600 dark:text-cyan-400 text-xs font-medium hover:bg-gradient-to-r hover:from-cyan-500/30 hover:via-teal-500/30 hover:to-amber-500/30 transition">
-                <span class="mr-1">#</span>{{ hashtag }}
+            <a href="{% url 'hashtag_search' %}?tag={{ hashtag }}"
+               class="inline-flex items-center px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-600 dark:text-cyan-400 text-[11px] font-medium hover:bg-cyan-500/20 transition">
+                #{{ hashtag }}
             </a>
             {% endfor %}
-        </div>
-        {% endif %}
-
-        <!-- Social Sharing — compact -->
-        <div class="mb-3 flex items-center gap-1.5 flex-wrap">
-          <span class="text-[11px] font-semibold text-muted-foreground mr-0.5">Share:</span>
-          <a href="https://twitter.com/intent/tweet?text={{ post.title|urlencode }}&url={{ request.build_absolute_uri|urlencode }}" target="_blank" rel="noopener" title="Share on 𝕏 Twitter"
-             class="inline-flex items-center px-2.5 py-1 rounded-full border border-border text-[11px] font-medium text-muted-foreground hover:text-blue-500 hover:border-blue-400 transition-colors">𝕏</a>
-          <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.build_absolute_uri|urlencode }}" target="_blank" rel="noopener" title="Share on Facebook"
-             class="inline-flex items-center px-2.5 py-1 rounded-full border border-border text-[11px] font-medium text-muted-foreground hover:text-blue-600 hover:border-blue-500 transition-colors">fb</a>
-          <a href="https://wa.me/?text={{ post.title|urlencode }}%20{{ request.build_absolute_uri|urlencode }}" target="_blank" rel="noopener" title="Share on WhatsApp"
-             class="inline-flex items-center px-2.5 py-1 rounded-full border border-border text-[11px] font-medium text-muted-foreground hover:text-green-600 hover:border-green-400 transition-colors">wa</a>
-          <a href="https://www.linkedin.com/sharing/share-offsite/?url={{ request.build_absolute_uri|urlencode }}" target="_blank" rel="noopener" title="Share on LinkedIn"
-             class="inline-flex items-center px-2.5 py-1 rounded-full border border-border text-[11px] font-medium text-muted-foreground hover:text-blue-700 hover:border-blue-600 transition-colors">in</a>
-          <button onclick="navigator.clipboard.writeText(window.location.href).then(function(){this.textContent='✓';var b=this;setTimeout(function(){b.textContent='🔗';},1500);}.bind(this))"
-             title="Copy link" class="inline-flex items-center px-2.5 py-1 rounded-full border border-border text-[11px] font-medium text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors">🔗</button>
-        </div>
-
-        {% if user.is_authenticated and not is_post_creator %}
-        <div class="mb-4">
+            {% endif %}
+            <span class="text-border/70 text-[11px] mx-0.5">·</span>
+            <span class="text-[11px] font-semibold text-muted-foreground">Share:</span>
+            <a href="https://twitter.com/intent/tweet?text={{ post.title|urlencode }}&url={{ request.build_absolute_uri|urlencode }}" target="_blank" rel="noopener" title="𝕏 Twitter"
+               class="inline-flex items-center px-2 py-0.5 rounded-full border border-border text-[11px] text-muted-foreground hover:text-blue-500 hover:border-blue-400 transition-colors">𝕏</a>
+            <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.build_absolute_uri|urlencode }}" target="_blank" rel="noopener" title="Facebook"
+               class="inline-flex items-center px-2 py-0.5 rounded-full border border-border text-[11px] text-muted-foreground hover:text-blue-600 hover:border-blue-500 transition-colors">fb</a>
+            <a href="https://wa.me/?text={{ post.title|urlencode }}%20{{ request.build_absolute_uri|urlencode }}" target="_blank" rel="noopener" title="WhatsApp"
+               class="inline-flex items-center px-2 py-0.5 rounded-full border border-border text-[11px] text-muted-foreground hover:text-green-600 hover:border-green-400 transition-colors">wa</a>
+            <a href="https://www.linkedin.com/sharing/share-offsite/?url={{ request.build_absolute_uri|urlencode }}" target="_blank" rel="noopener" title="LinkedIn"
+               class="inline-flex items-center px-2 py-0.5 rounded-full border border-border text-[11px] text-muted-foreground hover:text-blue-700 hover:border-blue-600 transition-colors">in</a>
+            <button onclick="navigator.clipboard.writeText(window.location.href).then(function(){this.textContent='✓';var b=this;setTimeout(function(){b.textContent='🔗';},1200);}.bind(this))"
+               title="Copy link" class="inline-flex items-center px-2 py-0.5 rounded-full border border-border text-[11px] text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors">🔗</button>
+            {% if user.is_authenticated and not is_post_creator %}
+            <span class="text-border/70 text-[11px] mx-0.5">·</span>
             <button id="follow-post-btn" type="button" onclick="togglePostFollow('{{ post.id }}')"
-                    class="inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold transition
-                    {% if is_following_post %}bg-gray-500 text-white hover:bg-gray-600{% else %}bg-primary text-primary-foreground hover:bg-primary/90{% endif %}">
-                {% if is_following_post %}Unfollow Post{% else %}Follow Post{% endif %}
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition border
+                    {% if is_following_post %}border-border text-muted-foreground hover:text-destructive hover:border-destructive/40{% else %}border-primary/50 text-primary hover:bg-primary/8{% endif %}">
+                {% if is_following_post %}✓ Following{% else %}+ Follow{% endif %}
             </button>
+            {% endif %}
         </div>
-        {% endif %}
 
         {% if is_post_creator %}
         {% if can_edit_post %}
@@ -291,7 +286,7 @@
         </a>
         {% endif %}
 
-        <div class="mb-4 flex items-center gap-4 text-sm text-muted-foreground">
+        <div class="mb-2 flex items-center gap-4 text-xs text-muted-foreground">
             <div class="flex-1">
                 <div class="flex justify-between mb-1">
                     <span id="discussion-yes-percentage-label">{{ post.yes_label }}: {{ yes_percentage|floatformat:1 }}%</span>
