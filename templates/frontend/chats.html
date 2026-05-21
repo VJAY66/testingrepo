@@ -233,6 +233,11 @@
     border: none;
     background: hsl(var(--background));
     color-scheme: dark light;
+    opacity: 0;
+    transition: opacity .12s ease;
+}
+.ch-conv-frame.loaded {
+    opacity: 1;
 }
 .ch-item.active [data-unread-badge] {
     display: none !important;
@@ -396,8 +401,7 @@ body.ch-fullscreen {
     </div>
 </aside>
 <section class="ch-conv-col" style="position:relative;">
-    <div id="ch-frame-overlay" style="position:absolute;inset:0;background:hsl(var(--background));z-index:10;pointer-events:none;{% if not selected_chat_id %}display:none;{% endif %}"></div>
-    <iframe id="ch-conv-frame" class="ch-conv-frame" src="{% if selected_chat_id %}{% url 'debate_chat' selected_chat_id %}?return_to={% url 'chats' %}{% if selected_chat_id %}%3Fchat%3D{{ selected_chat_id }}{% endif %}{% endif %}"></iframe>
+    <iframe id="ch-conv-frame" class="ch-conv-frame" src="about:blank" loading="eager"></iframe>
     <div id="ch-conv-placeholder" class="ch-placeholder{% if selected_chat_id %} hidden{% endif %}">
         <div class="ch-placeholder-card">
             <span class="ch-placeholder-icon" aria-hidden="true">
@@ -552,36 +556,41 @@ document.body.classList.add('ch-fullscreen');
 window.addEventListener('pagehide', function() { document.documentElement.style.overflow = ''; });
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Hide overlay once the initial iframe finishes loading
-    var initFrame = document.getElementById('ch-conv-frame');
-    var initOverlay = document.getElementById('ch-frame-overlay');
-    if (initFrame && initOverlay && initFrame.src) {
-        initFrame.addEventListener('load', function() {
-            setTimeout(function() { initOverlay.style.display = 'none'; }, 80);
-        }, { once: true });
-    }
-
     var nav = document.querySelector('.nav-shell');
     var main = document.getElementById('ch-main');
 
     function applyNavHeight() {
-    if (nav && main) {
-        const navHeight = nav.offsetHeight || 64;
-        main.style.top = navHeight + 'px';
+        if (nav && main) {
+            var navHeight = nav.offsetHeight || 64;
+            main.style.top = navHeight + 'px';
+        }
     }
-}
     applyNavHeight();
 
-    // Keep nav height in sync without forcing synchronous layouts.
     if (typeof ResizeObserver !== 'undefined' && nav && main) {
         new ResizeObserver(applyNavHeight).observe(nav);
     }
 
     bindChatSearch('ch-desktop-search', '#ch-desktop-list');
+
+    // Add fade-in handler — fires for initial load and every subsequent switch
+    var frame = document.getElementById('ch-conv-frame');
+    if (frame) {
+        frame.addEventListener('load', function() {
+            frame.classList.add('loaded');
+        });
+    }
+
     if (activeChatId) {
         var autoBtn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
-        if (autoBtn) autoBtn.classList.add('active');
+        if (autoBtn) {
+            autoBtn.classList.add('active');
+            if (frame && autoBtn.dataset.chatUrl) {
+                frame.src = autoBtn.dataset.chatUrl;
+            }
+        }
     }
+
     refreshUnreadBadges();
     markActiveChatRead();
     window.addEventListener('storage', function(e) {
@@ -615,12 +624,8 @@ function openDesktopChat(chatId, btn) {
 
 
     var frame = document.getElementById('ch-conv-frame');
-    var overlay = document.getElementById('ch-frame-overlay');
     if (frame) {
-        if (overlay) overlay.style.display = 'block';
-        frame.onload = function() {
-            setTimeout(function() { if (overlay) overlay.style.display = 'none'; }, 80);
-        };
+        frame.classList.remove('loaded');
         frame.src = btn.getAttribute('data-chat-url');
     }
     var placeholder = document.getElementById('ch-conv-placeholder');
