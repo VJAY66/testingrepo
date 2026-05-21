@@ -239,6 +239,38 @@
 .ch-conv-frame.loaded {
     opacity: 1;
 }
+.ch-frame-loader {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background:
+        radial-gradient(640px 270px at 12% -4%, hsl(var(--primary) / 0.12), transparent 65%),
+        radial-gradient(520px 240px at 95% 110%, hsl(var(--accent) / 0.12), transparent 70%),
+        linear-gradient(180deg, hsl(var(--background) / 0.92), hsl(var(--card) / 0.98));
+    color: hsl(var(--muted-foreground));
+    font-size: 0.82rem;
+    z-index: 5;
+    transition: opacity .18s ease;
+}
+.ch-frame-loader.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+.ch-loader-spinner {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 3px solid hsl(var(--border));
+    border-top-color: hsl(var(--primary));
+    animation: chSpin .8s linear infinite;
+}
+@keyframes chSpin {
+    to { transform: rotate(360deg); }
+}
 .ch-item.active [data-unread-badge] {
     display: none !important;
 }
@@ -401,6 +433,10 @@ body.ch-fullscreen {
     </div>
 </aside>
 <section class="ch-conv-col" style="position:relative;">
+    <div id="ch-frame-loader" class="ch-frame-loader{% if not selected_chat_id %} hidden{% endif %}">
+        <div class="ch-loader-spinner"></div>
+        <p>Loading conversation...</p>
+    </div>
     <iframe id="ch-conv-frame" class="ch-conv-frame" src="about:blank" loading="eager"></iframe>
     <div id="ch-conv-placeholder" class="ch-placeholder{% if selected_chat_id %} hidden{% endif %}">
         <div class="ch-placeholder-card">
@@ -560,11 +596,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     bindChatSearch('ch-desktop-search', '#ch-desktop-list');
 
-    // Add fade-in handler — fires for initial load and every subsequent switch
     var frame = document.getElementById('ch-conv-frame');
     if (frame) {
         frame.addEventListener('load', function() {
             frame.classList.add('loaded');
+            var loader = document.getElementById('ch-frame-loader');
+            if (loader) loader.classList.add('hidden');
         });
     }
 
@@ -573,6 +610,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (autoBtn) {
             autoBtn.classList.add('active');
             if (frame && autoBtn.dataset.chatUrl) {
+                var loader = document.getElementById('ch-frame-loader');
+                if (loader) loader.classList.remove('hidden');
                 frame.src = autoBtn.dataset.chatUrl;
             }
         }
@@ -613,6 +652,8 @@ function openDesktopChat(chatId, btn) {
     var frame = document.getElementById('ch-conv-frame');
     if (frame) {
         frame.classList.remove('loaded');
+        var loader = document.getElementById('ch-frame-loader');
+        if (loader) loader.classList.remove('hidden');
         frame.src = btn.getAttribute('data-chat-url');
     }
     var placeholder = document.getElementById('ch-conv-placeholder');
