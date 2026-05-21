@@ -485,9 +485,7 @@ function setBadge(item, show) {
 function refreshUnreadBadges() {
     var lr = getLastRead();
     document.querySelectorAll('.ch-item[data-chat-id]').forEach(function(item) {
-        // Force-remove badge on active item before any calculations
         if (item.classList.contains('active')) {
-            console.log('FORCING ACTIVE CHAT BADGE REMOVAL', item.getAttribute('data-chat-id'));
             var activeBadge = item.querySelector('.ch-unread-badge');
             if (activeBadge) activeBadge.remove();
             return;
@@ -501,17 +499,6 @@ function refreshUnreadBadges() {
         var isActive     = activeChatId && chatId === String(activeChatId);
         var isMine       = item.getAttribute('data-last-sender') === currentUsername;
         var isUnread     = !isActive && !isMine && lastId > readFloor;
-
-        console.log('UNREAD DEBUG', {
-            chatId: item.getAttribute('data-chat-id'),
-            lastId: item.getAttribute('data-last-id'),
-            serverReadId: item.getAttribute('data-server-read-id'),
-            active: item.classList.contains('active'),
-            activeChatId: activeChatId,
-            isMine: isMine,
-            isUnread: isUnread
-        });
-        console.log(item.outerHTML);
 
         setBadge(item, isUnread);
     });

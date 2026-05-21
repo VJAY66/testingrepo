@@ -3270,15 +3270,17 @@ def logout_view(request):
     return redirect('index')
 
 
-@login_required
 @require_POST
 def mark_offline(request):
-    """Handle unload pings without forcing last_seen backwards.
+    """Handle unload pings — always returns JSON/204, never HTML.
 
-    Presence should stay online while any tab is open. We rely on the normal
-    heartbeat timeout window for offline transitions rather than hard-setting an
-    old timestamp on unload, which can race with active page requests.
+    @login_required is intentionally omitted: keepalive fetch calls from
+    pagehide/beforeunload fire after session cookies may have changed, and
+    a login-redirect HTML response could leak into the iframe context.
+    Unauthenticated pings are silently discarded.
     """
+    if not request.user.is_authenticated:
+        return HttpResponse(status=204)
     request.session.pop('dh_last_seen_epoch', None)
     return JsonResponse({'success': True})
 
