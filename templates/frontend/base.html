@@ -6121,17 +6121,34 @@ function acceptCookies() {
         @media (max-width: 639px) {
             #create-content-modal .cm-card {
                 bottom: 0; left: 0; right: 0;
-                border-radius: 24px 24px 0 0;
-                padding: 0 0 env(safe-area-inset-bottom, 16px);
+                border-radius: 20px 20px 0 0;
+                padding: 0 0 env(safe-area-inset-bottom, 20px);
                 border-bottom: none;
                 animation: cmSlideUp .28s cubic-bezier(.32,1.1,.6,1) both;
-                max-height: 90vh;
+                max-height: 85vh;
                 overflow-y: auto;
+                overscroll-behavior: contain;
+                -webkit-overflow-scrolling: touch;
             }
             #create-content-modal .cm-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 10px;
-                padding: 0 16px 16px;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+                padding: 0 16px 8px;
+            }
+            .cm-item {
+                padding: 18px 10px 16px;
+                border-radius: 18px;
+            }
+            .cm-item-icon {
+                width: 52px; height: 52px;
+                border-radius: 16px;
+                font-size: 26px;
+            }
+            .cm-item-label {
+                font-size: 13px;
+            }
+            .cm-item-desc {
+                font-size: 11px;
             }
         }
         /* Desktop: centered card (display controlled by JS only) */
@@ -6266,6 +6283,7 @@ function acceptCookies() {
         const m = document.getElementById('create-content-modal');
         if (!m) return;
         m.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
         if (window.innerWidth >= 640) {
             m.classList.add('cm-open-desktop');
             m.classList.remove('cm-open-mobile');
@@ -6279,6 +6297,7 @@ function acceptCookies() {
         if (!m) return;
         m.classList.add('hidden');
         m.classList.remove('cm-open-desktop', 'cm-open-mobile');
+        document.body.style.overflow = '';
     }
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') closeCreateModal();
