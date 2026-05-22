@@ -559,7 +559,8 @@
                 {% for cmt in bullish_comments %}
                 <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm {% if cmt.id == top_bull_id %}ring-1 ring-emerald-400/35{% endif %}" id="spcmt-{{ cmt.id }}">
                   <div class="px-2.5 py-2">
-                    {% if cmt.content %}<p class="text-xs leading-relaxed font-medium text-foreground break-words {% if user.is_authenticated %}mb-1.5{% endif %}">{{ cmt.content }}</p>{% endif %}
+                    <p id="comment-content-{{ cmt.id }}" class="text-xs leading-relaxed font-medium text-foreground break-words {% if user.is_authenticated %}mb-1.5{% endif %} {% if not cmt.content %}hidden{% endif %}">{{ cmt.content }}</p>
+                    {% if cmt.is_edited %}<button type="button" id="comment-edited-badge-{{ cmt.id }}" onclick="openEditHistory('comment','{{ cmt.id }}')" class="text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% else %}<button type="button" id="comment-edited-badge-{{ cmt.id }}" class="hidden text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% endif %}
                     <div class="flex items-center gap-1.5 mt-1">
                         {% if cmt.is_anonymous %}
                         <div class="flex h-5 w-5 flex-none items-center justify-center rounded-full border border-dashed border-border bg-muted text-[9px]">?</div>
@@ -605,6 +606,16 @@
                         <button onclick="startDebate('{{ cmt.id }}', this)" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</button>
                         {% endif %}
                         {% endif %}
+                        {% if cmt.user == user %}
+                        <button onclick="openCommentEditor('{{ cmt.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Edit</button>
+                        {% endif %}
+                    </div>
+                    <div id="comment-editor-{{ cmt.id }}" class="hidden mt-2 space-y-1.5 rounded-lg border border-border bg-background/70 p-2">
+                        <textarea id="comment-editor-input-{{ cmt.id }}" rows="3" class="w-full rounded-lg border border-border bg-card px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">{{ cmt.content|default:'' }}</textarea>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" id="comment-save-btn-{{ cmt.id }}" onclick="saveCommentEdit('{{ cmt.id }}')" class="rounded-full bg-primary px-2.5 py-1 text-[9px] font-semibold text-primary-foreground hover:bg-primary/90">Save</button>
+                            <button type="button" onclick="closeCommentEditor('{{ cmt.id }}')" class="rounded-full border border-border px-2.5 py-1 text-[9px] font-semibold text-foreground hover:border-primary hover:text-primary">Cancel</button>
+                        </div>
                     </div>
                     {% endif %}
                   </div>
@@ -627,7 +638,8 @@
                 {% for cmt in bearish_comments %}
                 <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm {% if cmt.id == top_bear_id %}ring-1 ring-rose-400/35{% endif %}" id="spcmt-{{ cmt.id }}">
                   <div class="px-2.5 py-2">
-                    {% if cmt.content %}<p class="text-xs leading-relaxed font-medium text-foreground break-words {% if user.is_authenticated %}mb-1.5{% endif %}">{{ cmt.content }}</p>{% endif %}
+                    <p id="comment-content-{{ cmt.id }}" class="text-xs leading-relaxed font-medium text-foreground break-words {% if user.is_authenticated %}mb-1.5{% endif %} {% if not cmt.content %}hidden{% endif %}">{{ cmt.content }}</p>
+                    {% if cmt.is_edited %}<button type="button" id="comment-edited-badge-{{ cmt.id }}" onclick="openEditHistory('comment','{{ cmt.id }}')" class="text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% else %}<button type="button" id="comment-edited-badge-{{ cmt.id }}" class="hidden text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% endif %}
                     <div class="flex items-center gap-1.5 mt-1">
                         {% if cmt.is_anonymous %}
                         <div class="flex h-5 w-5 flex-none items-center justify-center rounded-full border border-dashed border-border bg-muted text-[9px]">?</div>
@@ -673,6 +685,16 @@
                         <button onclick="startDebate('{{ cmt.id }}', this)" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</button>
                         {% endif %}
                         {% endif %}
+                        {% if cmt.user == user %}
+                        <button onclick="openCommentEditor('{{ cmt.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Edit</button>
+                        {% endif %}
+                    </div>
+                    <div id="comment-editor-{{ cmt.id }}" class="hidden mt-2 space-y-1.5 rounded-lg border border-border bg-background/70 p-2">
+                        <textarea id="comment-editor-input-{{ cmt.id }}" rows="3" class="w-full rounded-lg border border-border bg-card px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">{{ cmt.content|default:'' }}</textarea>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" id="comment-save-btn-{{ cmt.id }}" onclick="saveCommentEdit('{{ cmt.id }}')" class="rounded-full bg-primary px-2.5 py-1 text-[9px] font-semibold text-primary-foreground hover:bg-primary/90">Save</button>
+                            <button type="button" onclick="closeCommentEditor('{{ cmt.id }}')" class="rounded-full border border-border px-2.5 py-1 text-[9px] font-semibold text-foreground hover:border-primary hover:text-primary">Cancel</button>
+                        </div>
                     </div>
                     {% endif %}
                   </div>
@@ -733,6 +755,46 @@ function expandVoteBox(btn) {
     var ta = wrap.querySelector('.vote-textarea');
     ta.classList.remove('hidden');
     ta.focus();
+}
+
+// ── Comment edit ─────────────────────────────────────────────
+function openCommentEditor(commentId) {
+    var panel = document.getElementById('comment-editor-' + commentId);
+    if (panel) panel.classList.remove('hidden');
+}
+function closeCommentEditor(commentId) {
+    var panel = document.getElementById('comment-editor-' + commentId);
+    if (panel) panel.classList.add('hidden');
+}
+function saveCommentEdit(commentId) {
+    var input   = document.getElementById('comment-editor-input-' + commentId);
+    var saveBtn = document.getElementById('comment-save-btn-' + commentId);
+    if (!input) return;
+    var trimmed = input.value.trim();
+    if (!trimmed) { window.showToast && window.showToast('Comment cannot be empty.', 'error'); return; }
+    if (saveBtn) saveBtn.disabled = true;
+    fetch('{% url "update_comment" %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': CSRF_TOKEN },
+        body: 'comment_id=' + encodeURIComponent(commentId) + '&content=' + encodeURIComponent(trimmed)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            window.showToast && window.showToast(data.message, 'success');
+            var contentEl = document.getElementById('comment-content-' + commentId);
+            if (contentEl) { contentEl.textContent = trimmed; contentEl.classList.remove('hidden'); }
+            if (data.is_edited) {
+                var badge = document.getElementById('comment-edited-badge-' + commentId);
+                if (badge) badge.classList.remove('hidden');
+            }
+            closeCommentEditor(commentId);
+        } else {
+            window.showToast && window.showToast(data.error || 'Failed to update comment.', 'error');
+        }
+    })
+    .catch(function() { window.showToast && window.showToast('Failed to update comment.', 'error'); })
+    .finally(function() { if (saveBtn) saveBtn.disabled = false; });
 }
 
 // ── Confidence slider ────────────────────────────────────────

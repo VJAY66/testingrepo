@@ -528,5 +528,44 @@ function confirmReviewDebate() {
 function escH(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+function openRcEditor(commentId) {
+  var panel = document.getElementById('rc-editor-' + commentId);
+  if (panel) panel.classList.remove('hidden');
+}
+function closeRcEditor(commentId) {
+  var panel = document.getElementById('rc-editor-' + commentId);
+  if (panel) panel.classList.add('hidden');
+}
+function saveRcEdit(commentId) {
+  var input   = document.getElementById('rc-editor-input-' + commentId);
+  var saveBtn = document.getElementById('rc-save-btn-' + commentId);
+  if (!input) return;
+  var trimmed = input.value.trim();
+  if (!trimmed) { showToast('Comment cannot be empty.', 'error'); return; }
+  if (saveBtn) saveBtn.disabled = true;
+  var fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF_TOKEN);
+  fd.append('comment_id', commentId);
+  fd.append('content', trimmed);
+  fetch('{% url "update_comment" %}', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        showToast(data.message, 'success');
+        var contentEl = document.getElementById('rc-content-' + commentId);
+        if (contentEl) contentEl.textContent = trimmed;
+        if (data.is_edited) {
+          var badge = document.getElementById('rc-edited-badge-' + commentId);
+          if (badge) badge.classList.remove('hidden');
+        }
+        closeRcEditor(commentId);
+      } else {
+        showToast(data.error || 'Failed to update comment.', 'error');
+      }
+    })
+    .catch(function() { showToast('Failed to update comment.', 'error'); })
+    .finally(function() { if (saveBtn) saveBtn.disabled = false; });
+}
 </script>
 {% endblock %}

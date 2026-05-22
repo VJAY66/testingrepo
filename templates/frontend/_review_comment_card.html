@@ -18,7 +18,8 @@
     <span class="ml-auto text-[10px] text-muted-foreground">{{ cw.comment.created_at|date:"M j" }}</span>
   </div>
 
-  <p class="text-sm text-foreground leading-relaxed mb-2">{{ cw.comment.content }}</p>
+  <p id="rc-content-{{ cw.comment.id }}" class="text-sm text-foreground leading-relaxed mb-2">{{ cw.comment.content }}</p>
+  {% if cw.comment.is_edited %}<button type="button" id="rc-edited-badge-{{ cw.comment.id }}" onclick="openEditHistory('comment','{{ cw.comment.id }}')" class="text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors mb-1">edited ↗</button>{% else %}<button type="button" id="rc-edited-badge-{{ cw.comment.id }}" class="hidden text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors mb-1">edited ↗</button>{% endif %}
 
   <div class="flex items-center gap-2 flex-wrap">
     {% if user.is_authenticated and cw.comment.user != user %}
@@ -75,5 +76,17 @@
       {% if cw.comment.is_pinned %}Unpin{% else %}📌 Pin{% endif %}
     </button>
     {% endif %}
+    {% if user.is_authenticated and user == cw.comment.user %}
+    <button type="button" onclick="openRcEditor('{{ cw.comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Edit</button>
+    {% endif %}
   </div>
+  {% if user.is_authenticated and user == cw.comment.user %}
+  <div id="rc-editor-{{ cw.comment.id }}" class="hidden mt-2 space-y-1.5 rounded-lg border border-border bg-background/70 p-2">
+    <textarea id="rc-editor-input-{{ cw.comment.id }}" rows="3" class="w-full rounded-lg border border-border bg-card px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">{{ cw.comment.content|default:'' }}</textarea>
+    <div class="flex items-center gap-1.5">
+      <button type="button" id="rc-save-btn-{{ cw.comment.id }}" onclick="saveRcEdit('{{ cw.comment.id }}')" class="rounded-full bg-primary px-2.5 py-1 text-[9px] font-semibold text-primary-foreground hover:bg-primary/90">Save</button>
+      <button type="button" onclick="closeRcEditor('{{ cw.comment.id }}')" class="rounded-full border border-border px-2.5 py-1 text-[9px] font-semibold text-foreground hover:border-primary hover:text-primary">Cancel</button>
+    </div>
+  </div>
+  {% endif %}
 </div>
