@@ -2154,7 +2154,7 @@ function sendShareDM(postId) {
     <div class="flex items-center gap-2 mb-4">
         <span class="text-base font-bold text-foreground">More in {{ post.category }}</span>
         <span class="text-xs text-muted-foreground">· You may also like</span>
-        <a href="?category={{ post.category|urlencode }}" class="ml-auto text-xs text-primary hover:underline font-semibold">See all →</a>
+        <a href="{% url 'discussions_list' %}?category={{ post.category|urlencode }}" class="ml-auto text-xs text-primary hover:underline font-semibold">See all →</a>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {% for related in related_posts %}
