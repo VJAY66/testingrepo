@@ -6122,16 +6122,19 @@ function acceptCookies() {
             #create-content-modal .cm-card {
                 bottom: 0; left: 0; right: 0;
                 border-radius: 24px 24px 0 0;
-                padding: 0 0 env(safe-area-inset-bottom, 16px);
+                padding: 0 0 env(safe-area-inset-bottom, 20px);
                 border-bottom: none;
                 animation: cmSlideUp .28s cubic-bezier(.32,1.1,.6,1) both;
-                max-height: 90vh;
+                max-height: 85vh;
                 overflow-y: auto;
+                overscroll-behavior: contain;
+                -webkit-overflow-scrolling: touch;
+                will-change: transform;
             }
             #create-content-modal .cm-grid {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 10px;
-                padding: 0 16px 16px;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+                padding: 0 16px 8px;
             }
         }
         /* Desktop: centered card (display controlled by JS only) */
@@ -6262,9 +6265,17 @@ function acceptCookies() {
         </div>
     </div>
     <script>
+    var _cmScrollY = 0;
     function openCreateModal() {
         const m = document.getElementById('create-content-modal');
         if (!m) return;
+        // Lock body scroll
+        _cmScrollY = window.scrollY;
+        document.body.style.position = 'fixed';
+        document.body.style.top = '-' + _cmScrollY + 'px';
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+        document.body.style.overflow = 'hidden';
         m.classList.remove('hidden');
         if (window.innerWidth >= 640) {
             m.classList.add('cm-open-desktop');
@@ -6272,13 +6283,53 @@ function acceptCookies() {
         } else {
             m.classList.add('cm-open-mobile');
             m.classList.remove('cm-open-desktop');
+            _cmAttachDrag(m.querySelector('.cm-card'));
         }
     }
     function closeCreateModal() {
         const m = document.getElementById('create-content-modal');
         if (!m) return;
+        // Restore body scroll
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.overflow = '';
+        window.scrollTo(0, _cmScrollY);
         m.classList.add('hidden');
         m.classList.remove('cm-open-desktop', 'cm-open-mobile');
+    }
+    function _cmAttachDrag(card) {
+        if (!card || card._cmDrag) return;
+        card._cmDrag = true;
+        var startY = 0, curY = 0, dragging = false;
+        var handle = card.querySelector('.cm-handle');
+        var target = handle || card;
+        target.addEventListener('touchstart', function(e) {
+            startY = e.touches[0].clientY;
+            curY = 0;
+            dragging = true;
+            card.style.transition = 'none';
+        }, { passive: true });
+        target.addEventListener('touchmove', function(e) {
+            if (!dragging) return;
+            curY = e.touches[0].clientY - startY;
+            if (curY < 0) curY = 0;
+            card.style.transform = 'translateY(' + curY + 'px)';
+        }, { passive: true });
+        target.addEventListener('touchend', function() {
+            dragging = false;
+            card.style.transition = '';
+            if (curY > 120) {
+                card.style.transform = 'translateY(100%)';
+                setTimeout(function() {
+                    card.style.transform = '';
+                    closeCreateModal();
+                }, 200);
+            } else {
+                card.style.transform = '';
+            }
+        });
     }
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') closeCreateModal();
