@@ -2287,6 +2287,11 @@ function toggleReadLaterDiscussion(postId, btn) {
       btn.classList.toggle('bg-teal-50', d.saved);
       btn.classList.toggle('border-teal-300', d.saved);
       btn.title = d.saved ? 'Remove from Read Later' : 'Read Later';
+      if (d.saved) {
+        showToast('Added to bookmarks — you can read it later!', 'success', 3500);
+      } else {
+        showToast('Removed from bookmarks.', 'info', 2500);
+      }
     }
   });
 }
