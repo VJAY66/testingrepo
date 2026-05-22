@@ -428,22 +428,30 @@
             </button>
 
             {# Remind #}
-            <div class="relative inline-block" id="reminder-wrap-{{ post.id }}">
-              <button type="button" onclick="toggleReminderMenu('{{ post.id|escapejs }}')" title="Remind me"
+            <div class="inline-block" id="reminder-wrap-{{ post.id }}">
+              <button type="button" id="reminder-btn-{{ post.id }}" onclick="toggleReminderMenu('{{ post.id|escapejs }}', this)" title="Remind me"
                 class="group inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold transition-all duration-200
-                       {% if post.has_reminder %}text-amber-500 bg-amber-50 dark:bg-amber-950/40{% else %}text-muted-foreground hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/20{% endif %}">
+                       {% if post.has_reminder %}text-amber-500 bg-amber-50 dark:bg-amber-950/40{% else %}text-muted-foreground hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/20{% endif %}"
+                data-has-reminder="{{ post.has_reminder|yesno:'true,false' }}">
                 <svg class="w-3.5 h-3.5 flex-shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
                 <span class="hidden sm:inline">Remind</span>
               </button>
-              <div id="reminder-menu-{{ post.id }}" class="hidden absolute left-0 top-full mt-1 z-50 w-48 rounded-xl border border-border bg-card shadow-lg p-1">
-                <button onclick="setReminder('{{ post.id|escapejs }}','1h')" class="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-muted transition">⏱ In 1 hour</button>
-                <button onclick="setReminder('{{ post.id|escapejs }}','tomorrow')" class="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-muted transition">🌅 Tomorrow morning</button>
-                <button onclick="setReminder('{{ post.id|escapejs }}','next_week')" class="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-muted transition">📅 Next week</button>
-                {% if post.has_reminder %}<button onclick="setReminder('{{ post.id|escapejs }}','clear')" class="w-full text-left px-3 py-2 text-xs rounded-lg hover:bg-destructive/10 text-destructive transition">✕ Clear reminder</button>{% endif %}
-              </div>
             </div>
+            <!-- Reminder dropdown portal (fixed position, appended to body by JS) -->
+            <template id="reminder-tpl-{{ post.id }}">
+              <div id="reminder-menu-{{ post.id }}" class="fixed z-[9999] w-52 rounded-2xl border border-border bg-card shadow-xl p-1.5 text-sm" style="display:none">
+                <p class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Remind me in…</p>
+                <button onclick="setReminder('{{ post.id|escapejs }}','1h')" class="w-full text-left px-3 py-2 rounded-xl hover:bg-muted transition flex items-center gap-2">⏱ <span>In 1 hour</span></button>
+                <button onclick="setReminder('{{ post.id|escapejs }}','tomorrow')" class="w-full text-left px-3 py-2 rounded-xl hover:bg-muted transition flex items-center gap-2">🌅 <span>Tomorrow morning</span></button>
+                <button onclick="setReminder('{{ post.id|escapejs }}','next_week')" class="w-full text-left px-3 py-2 rounded-xl hover:bg-muted transition flex items-center gap-2">📅 <span>Next week</span></button>
+                <div id="reminder-clear-{{ post.id }}" class="{{ post.has_reminder|yesno:',' }}hidden">
+                  <div class="my-1 border-t border-border/60"></div>
+                  <button onclick="setReminder('{{ post.id|escapejs }}','clear')" class="w-full text-left px-3 py-2 rounded-xl hover:bg-destructive/10 text-destructive transition flex items-center gap-2">✕ <span>Clear reminder</span></button>
+                </div>
+              </div>
+            </template>
             {% endif %}
 
             {# Divider #}
@@ -2283,37 +2291,93 @@ function toggleReadLaterDiscussion(postId, btn) {
   });
 }
 
-function toggleReminderMenu(postId) {
-  var menu = document.getElementById('reminder-menu-' + postId);
-  if (!menu) return;
-  menu.classList.toggle('hidden');
-  if (!menu.classList.contains('hidden')) {
-    var close = function(e) {
-      if (!menu.contains(e.target)) { menu.classList.add('hidden'); document.removeEventListener('click', close); }
-    };
-    setTimeout(function() { document.addEventListener('click', close); }, 0);
+var _reminderMenuOpen = null;
+function _closeReminderMenu() {
+  if (_reminderMenuOpen) {
+    _reminderMenuOpen.style.display = 'none';
+    _reminderMenuOpen = null;
   }
+}
+function toggleReminderMenu(postId, btn) {
+  // If same menu already open, close it
+  var existing = document.getElementById('reminder-menu-' + postId);
+  if (existing && existing.style.display !== 'none') { _closeReminderMenu(); return; }
+  _closeReminderMenu();
+
+  // Portal: move template content into body once
+  var tpl = document.getElementById('reminder-tpl-' + postId);
+  var menu;
+  if (tpl) {
+    var frag = tpl.content.cloneNode(true);
+    document.body.appendChild(frag);
+    tpl.remove();
+    menu = document.getElementById('reminder-menu-' + postId);
+  } else {
+    menu = document.getElementById('reminder-menu-' + postId);
+  }
+  if (!menu) return;
+
+  // Position below the button
+  var rect = btn.getBoundingClientRect();
+  var menuW = 208;
+  var left = Math.min(rect.left, window.innerWidth - menuW - 8);
+  menu.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+  menu.style.left = Math.max(8, left) + 'px';
+  menu.style.display = 'block';
+  _reminderMenuOpen = menu;
+
+  setTimeout(function() {
+    document.addEventListener('click', function _closeHandler(e) {
+      if (!menu.contains(e.target) && e.target !== btn) {
+        _closeReminderMenu();
+        document.removeEventListener('click', _closeHandler);
+      }
+    });
+  }, 0);
 }
 
 function setReminder(postId, preset) {
-  var menu = document.getElementById('reminder-menu-' + postId);
-  if (menu) menu.classList.add('hidden');
-  var body = new URLSearchParams({ preset: preset });
+  _closeReminderMenu();
+  var btn = document.getElementById('reminder-btn-' + postId);
+
+  // Request push permission if not already granted
+  if (preset !== 'clear' && typeof window.registerPushNotifications === 'function') {
+    if (window.Notification && Notification.permission === 'default') {
+      window.registerPushNotifications();
+    }
+  }
+
+  var labels = { '1h': 'in 1 hour', 'tomorrow': 'tomorrow morning', 'next_week': 'next week' };
+
   fetch('/posts/' + postId + '/reminder/', {
     method: 'POST',
     headers: { 'X-CSRFToken': getCookie('csrftoken') || '', 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString()
+    body: new URLSearchParams({ preset: preset }).toString()
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
-      var btn = document.querySelector('#reminder-wrap-' + postId + ' button');
+      var clearDiv = document.getElementById('reminder-clear-' + postId);
       if (d.cleared) {
-        if (btn) { btn.classList.remove('text-amber-500', 'bg-amber-50/60'); btn.classList.add('text-muted-foreground'); }
+        if (btn) {
+          btn.classList.remove('text-amber-500', 'bg-amber-50', 'dark:bg-amber-950/40');
+          btn.classList.add('text-muted-foreground');
+          btn.dataset.hasReminder = 'false';
+        }
+        if (clearDiv) clearDiv.classList.add('hidden');
+        showToast('Reminder cleared.', 'info', 2500);
       } else {
-        if (btn) { btn.classList.add('text-amber-500', 'bg-amber-50/60'); btn.classList.remove('text-muted-foreground'); }
+        if (btn) {
+          btn.classList.add('text-amber-500', 'bg-amber-50', 'dark:bg-amber-950/40');
+          btn.classList.remove('text-muted-foreground');
+          btn.dataset.hasReminder = 'true';
+        }
+        if (clearDiv) clearDiv.classList.remove('hidden');
+        showToast('🔔 Reminder set ' + (labels[preset] || '') + '! We\'ll notify you then.', 'success', 4000);
       }
     } else {
-      alert(d.error || 'Could not set reminder.');
+      showToast(d.error || 'Could not set reminder.', 'error', 4000);
     }
+  }).catch(function() {
+    showToast('Network error. Please try again.', 'error', 3500);
   });
 }
 
