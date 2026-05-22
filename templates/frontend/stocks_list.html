@@ -127,31 +127,40 @@ html.dark .chip-down { color: hsl(346 70% 62%); }
 <div class="max-w-6xl mx-auto py-3 px-4">
 
     <!-- ── Header bar ─────────────────────────────────────── -->
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:hsl(var(--card));border-radius:999px;border:1px solid hsl(var(--border)/.6);margin-bottom:12px;">
-        <h1 style="font-size:0.95rem;font-weight:800;letter-spacing:-0.01em;color:hsl(var(--foreground));font-family:'Playfair Display',Georgia,serif;font-style:italic;margin:0;white-space:nowrap;display:flex;align-items:center;gap:6px;">📈 Stock Predictions</h1>
-        <!-- Inline search -->
-        <form method="get" style="flex:1;position:relative;min-width:0;max-width:576px;">
+    <div class="mb-3 space-y-2">
+        <!-- Row 1: Title + actions -->
+        <div class="flex items-center gap-2">
+            <h1 class="flex items-center gap-2 text-base font-extrabold tracking-tight text-foreground" style="font-family:'Playfair Display',Georgia,serif;font-style:italic;">
+                📈 Stock Predictions
+            </h1>
+            <div class="ml-auto flex items-center gap-2 flex-shrink-0">
+                <a href="{% url 'stock_leaderboard' %}"
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-card text-xs font-bold text-foreground hover:border-primary/50 hover:text-primary transition-all whitespace-nowrap">
+                    🏆 <span class="hidden sm:inline">Leaderboard</span><span class="sm:hidden">Board</span>
+                </a>
+                {% if user.is_authenticated %}
+                <a href="{% url 'create_stock_prediction' %}"
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-bold whitespace-nowrap shadow-sm hover:brightness-110 transition-all">
+                    + <span class="hidden sm:inline">New Prediction</span><span class="sm:hidden">New</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        <!-- Row 2: Search -->
+        <form method="get" class="relative">
             {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
             {% if category_filter %}<input type="hidden" name="category" value="{{ category_filter }}">{% endif %}
-            <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:hsl(var(--muted-foreground));pointer-events:none;" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35"/></svg>
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35"/></svg>
             <input type="text" name="q" value="{{ search_query }}"
                    placeholder="Search ticker or prediction…"
-                   style="width:100%;padding:7px 32px 7px 30px;border-radius:999px;border:1.5px solid hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground));font-size:0.78rem;font-family:inherit;outline:none;transition:border-color .18s,box-shadow .18s;box-sizing:border-box;"
-                   onfocus="this.style.borderColor='hsl(var(--primary)/.6)';this.style.boxShadow='0 0 0 3px hsl(var(--primary)/.1)'"
-                   onblur="this.style.borderColor='';this.style.boxShadow=''">
+                   class="w-full pl-9 pr-8 py-2 rounded-full border border-border bg-background text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all">
             {% if search_query or symbol_filter %}
-            <a href="?{% if status_filter %}status={{ status_filter }}&{% endif %}{% if category_filter %}category={{ category_filter }}&{% endif %}" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:hsl(var(--muted-foreground));border-radius:50%;padding:2px;text-decoration:none;" onmouseover="this.style.color='hsl(var(--foreground))'" onmouseout="this.style.color='hsl(var(--muted-foreground))'">
-                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            <a href="?{% if status_filter %}status={{ status_filter }}&{% endif %}{% if category_filter %}category={{ category_filter }}&{% endif %}"
+               class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </a>
             {% endif %}
         </form>
-        <!-- Actions -->
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-            <a href="{% url 'stock_leaderboard' %}" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:999px;border:1.5px solid hsl(var(--border));background:transparent;font-size:0.72rem;font-weight:700;color:hsl(var(--foreground));text-decoration:none;white-space:nowrap;transition:border-color .15s,color .15s;" onmouseover="this.style.borderColor='hsl(var(--primary)/.5)';this.style.color='hsl(var(--primary))'" onmouseout="this.style.borderColor='';this.style.color='hsl(var(--foreground))'">🏆 Leaderboard</a>
-            {% if user.is_authenticated %}
-            <a href="{% url 'create_stock_prediction' %}" style="display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:999px;background:hsl(var(--primary));color:hsl(var(--primary-foreground));font-size:0.72rem;font-weight:700;text-decoration:none;white-space:nowrap;box-shadow:0 2px 8px -2px hsl(var(--primary)/.4);transition:filter .15s;" onmouseover="this.style.filter='brightness(1.08)'" onmouseout="this.style.filter=''">+ New Prediction</a>
-            {% endif %}
-        </div>
     </div>
 
     <!-- ── Category filter ─────────────────────────────────── -->
