@@ -557,8 +557,38 @@
             </div>
             <div class="space-y-2" id="bullish-list">
                 {% for cmt in bullish_comments %}
-                <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm {% if cmt.id == top_bull_id %}ring-1 ring-emerald-400/35{% endif %}" id="spcmt-{{ cmt.id }}">
-                  <div class="px-2.5 py-2">
+                <div class="border border-border rounded-xl bg-card shadow-sm {% if cmt.id == top_bull_id %}ring-1 ring-emerald-400/35{% endif %}" id="spcmt-{{ cmt.id }}">
+                  <div class="px-2.5 py-2 relative">
+                    {% if user.is_authenticated %}
+                    <div class="absolute top-1.5 right-1.5 z-10" id="cmt-menu-wrap-{{ cmt.id }}">
+                      <button type="button" onclick="toggleCmtMenu('{{ cmt.id }}')"
+                        class="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                      </button>
+                      <div id="cmt-dots-{{ cmt.id }}" class="hidden absolute right-0 top-7 z-50 w-32 rounded-xl border border-border bg-popover shadow-2xl py-1">
+                        {% if cmt.user == user %}
+                        <button type="button" onclick="openCommentEditor('{{ cmt.id }}'); closeCmtMenu('{{ cmt.id }}')"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors">
+                          <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                          Edit
+                        </button>
+                        {% if not cmt.has_active_debate %}
+                        <button type="button" onclick="deleteComment('{{ cmt.id }}'); closeCmtMenu('{{ cmt.id }}')"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors">
+                          <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                          Delete
+                        </button>
+                        {% endif %}
+                        {% else %}
+                        <button type="button" onclick="reportComment('{{ cmt.id }}'); closeCmtMenu('{{ cmt.id }}')"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors">
+                          <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6H14.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
+                          Report
+                        </button>
+                        {% endif %}
+                      </div>
+                    </div>
+                    {% endif %}
                     <p id="comment-content-{{ cmt.id }}" class="text-xs leading-relaxed font-medium text-foreground break-words {% if user.is_authenticated %}mb-1.5{% endif %} {% if not cmt.content %}hidden{% endif %}">{{ cmt.content }}</p>
                     {% if cmt.is_edited %}<button type="button" id="comment-edited-badge-{{ cmt.id }}" onclick="openEditHistory('comment','{{ cmt.id }}')" class="text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% else %}<button type="button" id="comment-edited-badge-{{ cmt.id }}" class="hidden text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% endif %}
                     <div class="flex items-center gap-1.5 mt-1">
@@ -606,12 +636,6 @@
                         <button onclick="startDebate('{{ cmt.id }}', this)" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</button>
                         {% endif %}
                         {% endif %}
-                        {% if cmt.user == user %}
-                        <button onclick="openCommentEditor('{{ cmt.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Edit</button>
-                        {% if not cmt.has_active_debate %}<button onclick="deleteComment('{{ cmt.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-destructive/40 hover:text-destructive">Delete</button>{% endif %}
-                        {% else %}
-                        <button onclick="reportComment('{{ cmt.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Report</button>
-                        {% endif %}
                     </div>
                     <div id="comment-editor-{{ cmt.id }}" class="hidden mt-2 space-y-1.5 rounded-lg border border-border bg-background/70 p-2">
                         <textarea id="comment-editor-input-{{ cmt.id }}" rows="3" class="w-full rounded-lg border border-border bg-card px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">{{ cmt.content|default:'' }}</textarea>
@@ -639,8 +663,38 @@
             </div>
             <div class="space-y-2" id="bearish-list">
                 {% for cmt in bearish_comments %}
-                <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm {% if cmt.id == top_bear_id %}ring-1 ring-rose-400/35{% endif %}" id="spcmt-{{ cmt.id }}">
-                  <div class="px-2.5 py-2">
+                <div class="border border-border rounded-xl bg-card shadow-sm {% if cmt.id == top_bear_id %}ring-1 ring-rose-400/35{% endif %}" id="spcmt-{{ cmt.id }}">
+                  <div class="px-2.5 py-2 relative">
+                    {% if user.is_authenticated %}
+                    <div class="absolute top-1.5 right-1.5 z-10" id="cmt-menu-wrap-{{ cmt.id }}">
+                      <button type="button" onclick="toggleCmtMenu('{{ cmt.id }}')"
+                        class="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                      </button>
+                      <div id="cmt-dots-{{ cmt.id }}" class="hidden absolute right-0 top-7 z-50 w-32 rounded-xl border border-border bg-popover shadow-2xl py-1">
+                        {% if cmt.user == user %}
+                        <button type="button" onclick="openCommentEditor('{{ cmt.id }}'); closeCmtMenu('{{ cmt.id }}')"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors">
+                          <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                          Edit
+                        </button>
+                        {% if not cmt.has_active_debate %}
+                        <button type="button" onclick="deleteComment('{{ cmt.id }}'); closeCmtMenu('{{ cmt.id }}')"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors">
+                          <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                          Delete
+                        </button>
+                        {% endif %}
+                        {% else %}
+                        <button type="button" onclick="reportComment('{{ cmt.id }}'); closeCmtMenu('{{ cmt.id }}')"
+                          class="flex w-full items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors">
+                          <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6H14.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
+                          Report
+                        </button>
+                        {% endif %}
+                      </div>
+                    </div>
+                    {% endif %}
                     <p id="comment-content-{{ cmt.id }}" class="text-xs leading-relaxed font-medium text-foreground break-words {% if user.is_authenticated %}mb-1.5{% endif %} {% if not cmt.content %}hidden{% endif %}">{{ cmt.content }}</p>
                     {% if cmt.is_edited %}<button type="button" id="comment-edited-badge-{{ cmt.id }}" onclick="openEditHistory('comment','{{ cmt.id }}')" class="text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% else %}<button type="button" id="comment-edited-badge-{{ cmt.id }}" class="hidden text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% endif %}
                     <div class="flex items-center gap-1.5 mt-1">
@@ -687,12 +741,6 @@
                         {% else %}
                         <button onclick="startDebate('{{ cmt.id }}', this)" class="inline-flex items-center rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] text-white hover:bg-blue-600">{{ cmt.debate_action_label }}</button>
                         {% endif %}
-                        {% endif %}
-                        {% if cmt.user == user %}
-                        <button onclick="openCommentEditor('{{ cmt.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Edit</button>
-                        {% if not cmt.has_active_debate %}<button onclick="deleteComment('{{ cmt.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-destructive/40 hover:text-destructive">Delete</button>{% endif %}
-                        {% else %}
-                        <button onclick="reportComment('{{ cmt.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Report</button>
                         {% endif %}
                     </div>
                     <div id="comment-editor-{{ cmt.id }}" class="hidden mt-2 space-y-1.5 rounded-lg border border-border bg-background/70 p-2">
@@ -897,6 +945,23 @@ function reactCmt(commentId, reaction) {
     })
     .catch(function() {});
 }
+
+function toggleCmtMenu(id) {
+    var menu = document.getElementById('cmt-dots-' + id);
+    if (!menu) return;
+    var isHidden = menu.classList.contains('hidden');
+    document.querySelectorAll('[id^="cmt-dots-"]').forEach(function(m) { m.classList.add('hidden'); });
+    if (isHidden) menu.classList.remove('hidden');
+}
+function closeCmtMenu(id) {
+    var menu = document.getElementById('cmt-dots-' + id);
+    if (menu) menu.classList.add('hidden');
+}
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('[id^="cmt-menu-wrap-"]')) {
+        document.querySelectorAll('[id^="cmt-dots-"]').forEach(function(m) { m.classList.add('hidden'); });
+    }
+});
 
 function reportComment(commentId) {
     if (!confirm('Are you sure you want to report this comment?')) return;

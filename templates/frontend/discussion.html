@@ -742,8 +742,38 @@
                 {% if yes_comments %}
                 <div class="space-y-2">
                     {% for comment in yes_comments %}
-                    <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm">
-                        <div class="px-2.5 py-2">
+                    <div class="border border-border rounded-xl bg-card shadow-sm">
+                        <div class="px-2.5 py-2 relative">
+                            {% if user.is_authenticated %}
+                            <div class="absolute top-1.5 right-1.5 z-10" id="cmt-menu-wrap-{{ comment.id }}">
+                              <button type="button" onclick="toggleCmtMenu('{{ comment.id }}')"
+                                class="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                              </button>
+                              <div id="cmt-dots-{{ comment.id }}" class="hidden absolute right-0 top-7 z-50 w-32 rounded-xl border border-border bg-popover shadow-2xl py-1">
+                                {% if user == comment.user %}
+                                <button type="button" onclick="openCommentEditor('{{ comment.id }}'); closeCmtMenu('{{ comment.id }}')"
+                                  class="flex w-full items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors">
+                                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                  Edit
+                                </button>
+                                {% if not comment.has_active_debate %}
+                                <button type="button" onclick="deleteComment('{{ comment.id }}'); closeCmtMenu('{{ comment.id }}')"
+                                  class="flex w-full items-center gap-2 px-3 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors">
+                                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                  Delete
+                                </button>
+                                {% endif %}
+                                {% else %}
+                                <button type="button" onclick="reportComment('{{ comment.id }}'); closeCmtMenu('{{ comment.id }}')"
+                                  class="flex w-full items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors">
+                                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6H14.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
+                                  Report
+                                </button>
+                                {% endif %}
+                              </div>
+                            </div>
+                            {% endif %}
                             <p id="comment-content-{{ comment.id }}" class="text-xs leading-relaxed font-medium text-foreground break-words {% if not comment.content %}hidden{% endif %}">{{ comment.content }}</p>
                             {% if comment.is_edited %}<button type="button" id="comment-edited-badge-{{ comment.id }}" onclick="openEditHistory('comment','{{ comment.id }}')" class="text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% else %}<button type="button" id="comment-edited-badge-{{ comment.id }}" class="hidden text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% endif %}
                             <div class="mt-1.5 flex items-center gap-1.5 text-muted-foreground">
@@ -796,10 +826,6 @@
                                 {% endif %}
                                 {% endif %}
                                 {% endif %}
-                                {% if user == comment.user %}
-                                <button onclick="openCommentEditor('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Edit</button>
-                                {% if not comment.has_active_debate %}<button onclick="deleteComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-destructive/40 hover:text-destructive">Delete</button>{% endif %}
-                                {% endif %}
                                 {% if is_post_creator %}
                                 {% if comment.is_pinned %}
                                 <button onclick="unpinComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-yellow-400/60 bg-yellow-50 dark:bg-yellow-900/20 text-[9px] px-1.5 py-0.5 text-yellow-700 dark:text-yellow-400 hover:border-yellow-500">📌 Unpin</button>
@@ -807,7 +833,6 @@
                                 <button onclick="pinComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-yellow-400/60 hover:text-yellow-600 transition">📌 Pin</button>
                                 {% endif %}
                                 {% endif %}
-                                {% if user != comment.user %}<button onclick="reportComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Report</button>{% endif %}
                             </div>
                             {% if user == comment.user %}
                             <div id="comment-editor-{{ comment.id }}" class="hidden mt-2 space-y-1.5 rounded-lg border border-border bg-background/70 p-2">
@@ -841,8 +866,38 @@
                 {% if no_comments %}
                 <div class="space-y-2">
                     {% for comment in no_comments %}
-                    <div class="border border-border rounded-xl bg-card overflow-hidden shadow-sm">
-                        <div class="px-2.5 py-2">
+                    <div class="border border-border rounded-xl bg-card shadow-sm">
+                        <div class="px-2.5 py-2 relative">
+                            {% if user.is_authenticated %}
+                            <div class="absolute top-1.5 right-1.5 z-10" id="cmt-menu-wrap-{{ comment.id }}">
+                              <button type="button" onclick="toggleCmtMenu('{{ comment.id }}')"
+                                class="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground/50 hover:bg-muted hover:text-foreground transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                              </button>
+                              <div id="cmt-dots-{{ comment.id }}" class="hidden absolute right-0 top-7 z-50 w-32 rounded-xl border border-border bg-popover shadow-2xl py-1">
+                                {% if user == comment.user %}
+                                <button type="button" onclick="openCommentEditor('{{ comment.id }}'); closeCmtMenu('{{ comment.id }}')"
+                                  class="flex w-full items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors">
+                                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                  Edit
+                                </button>
+                                {% if not comment.has_active_debate %}
+                                <button type="button" onclick="deleteComment('{{ comment.id }}'); closeCmtMenu('{{ comment.id }}')"
+                                  class="flex w-full items-center gap-2 px-3 py-2 text-xs text-destructive hover:bg-destructive/10 transition-colors">
+                                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                  Delete
+                                </button>
+                                {% endif %}
+                                {% else %}
+                                <button type="button" onclick="reportComment('{{ comment.id }}'); closeCmtMenu('{{ comment.id }}')"
+                                  class="flex w-full items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted transition-colors">
+                                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6H14.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
+                                  Report
+                                </button>
+                                {% endif %}
+                              </div>
+                            </div>
+                            {% endif %}
                             <p id="comment-content-{{ comment.id }}" class="text-xs leading-relaxed font-medium text-foreground break-words {% if not comment.content %}hidden{% endif %}">{{ comment.content }}</p>
                             {% if comment.is_edited %}<button type="button" id="comment-edited-badge-{{ comment.id }}" onclick="openEditHistory('comment','{{ comment.id }}')" class="text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% else %}<button type="button" id="comment-edited-badge-{{ comment.id }}" class="hidden text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% endif %}
                             <div class="mt-1.5 flex items-center gap-1.5 text-muted-foreground">
@@ -895,10 +950,6 @@
                                 {% endif %}
                                 {% endif %}
                                 {% endif %}
-                                {% if user == comment.user %}
-                                <button onclick="openCommentEditor('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Edit</button>
-                                {% if not comment.has_active_debate %}<button onclick="deleteComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-destructive/40 hover:text-destructive">Delete</button>{% endif %}
-                                {% endif %}
                                 {% if is_post_creator %}
                                 {% if comment.is_pinned %}
                                 <button onclick="unpinComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-yellow-400/60 bg-yellow-50 dark:bg-yellow-900/20 text-[9px] px-1.5 py-0.5 text-yellow-700 dark:text-yellow-400 hover:border-yellow-500">📌 Unpin</button>
@@ -906,7 +957,6 @@
                                 <button onclick="pinComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-yellow-400/60 hover:text-yellow-600 transition">📌 Pin</button>
                                 {% endif %}
                                 {% endif %}
-                                {% if user != comment.user %}<button onclick="reportComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Report</button>{% endif %}
                             </div>
                             {% if user == comment.user %}
                             <div id="comment-editor-{{ comment.id }}" class="hidden mt-2 space-y-1.5 rounded-lg border border-border bg-background/70 p-2">
@@ -1424,6 +1474,23 @@ function _startDebateStatusPolling(debateId, triggerEl, initYes, initNo) {
         .catch(function() {});
     }, 4000);
 }
+
+function toggleCmtMenu(id) {
+    var menu = document.getElementById('cmt-dots-' + id);
+    if (!menu) return;
+    var isHidden = menu.classList.contains('hidden');
+    document.querySelectorAll('[id^="cmt-dots-"]').forEach(function(m) { m.classList.add('hidden'); });
+    if (isHidden) menu.classList.remove('hidden');
+}
+function closeCmtMenu(id) {
+    var menu = document.getElementById('cmt-dots-' + id);
+    if (menu) menu.classList.add('hidden');
+}
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('[id^="cmt-menu-wrap-"]')) {
+        document.querySelectorAll('[id^="cmt-dots-"]').forEach(function(m) { m.classList.add('hidden'); });
+    }
+});
 
 function reportComment(commentId) {
     if (confirm('Are you sure you want to report this comment?')) {
