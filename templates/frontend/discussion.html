@@ -55,59 +55,45 @@
 <div class="max-w-4xl mx-auto space-y-8">
     <!-- Post Content -->
     <div class="bg-card border border-border rounded-2xl px-4 sm:px-5 pt-4 pb-2" data-post-id="{{ post.id }}" data-share-url="{% url 'discussion' post.id %}">
-        <div class="flex items-start justify-between mb-2.5 gap-2">
-            <div class="flex items-center space-x-2 min-w-0">
-                {% if post.is_anonymous and not reveal_identity %}
-                <div class="w-8 h-8 bg-muted rounded-full flex items-center justify-center border border-border flex-shrink-0">
-                    <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                </div>
-                <div>
-                    <p class="font-medium text-foreground flex items-center gap-1.5">
-                        Anonymous
-                        <span class="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full font-semibold">anon</span>
-                    </p>
-                    <p class="text-sm text-muted-foreground">{{ post.created_at|date:"M j, Y g:i A" }}</p>
-                </div>
-                {% else %}
-                <a href="{% url 'user_profile' post.user.username %}" class="flex-shrink-0">
+        <!-- Author row -->
+        <div class="flex items-center gap-2 mb-2">
+            {% if post.is_anonymous and not reveal_identity %}
+            <div class="w-8 h-8 bg-muted rounded-full flex items-center justify-center border border-border flex-shrink-0">
+                <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            </div>
+            <div class="min-w-0 flex-1">
+                <p class="font-semibold text-sm text-foreground leading-tight">Anonymous <span class="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full font-semibold">anon</span></p>
+                <p class="text-xs text-muted-foreground">{{ post.created_at|date:"M j, Y · g:i A" }}</p>
+            </div>
+            {% else %}
+            <a href="{% url 'user_profile' post.user.username %}" class="flex-shrink-0">
                 {% if post.author_avatar %}
-                <img src="{{ post.author_avatar }}" alt="{{ post.user.username }}" class="w-8 h-8 rounded-full object-cover border border-border" loading="lazy">
+                <img src="{{ post.author_avatar }}" alt="{{ post.user.username }}" class="w-9 h-9 rounded-full object-cover border border-border" loading="lazy">
                 {% else %}
-                <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-medium">
-                    {{ post.user.username|first|upper }}
-                </div>
+                <div class="w-9 h-9 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-semibold text-sm">{{ post.user.username|first|upper }}</div>
                 {% endif %}
-                </a>
-                <div>
-                    <p class="font-medium text-foreground flex items-center gap-1.5">
-                        {{ post.user.username }}
-                        {% if post.is_anonymous %}<span class="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full font-semibold">posted anonymously</span>{% endif %}
-                    </p>
-                    <p class="text-sm text-muted-foreground">{{ post.created_at|date:"M j, Y g:i A" }}</p>
+            </a>
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    <p class="font-semibold text-sm text-foreground leading-tight">{{ post.user.username }}</p>
+                    {% if post.is_anonymous %}<span class="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full font-semibold">anon</span>{% endif %}
+                </div>
+                <div class="flex items-center gap-1.5 flex-wrap mt-0.5">
+                    <p class="text-xs text-muted-foreground">{{ post.created_at|date:"M j, Y · g:i A" }}</p>
                     {% if accepted_coauthors %}
-                    <p class="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 flex-wrap">
-                        <span>with</span>
-                        {% for ca in accepted_coauthors %}
-                        <a href="{% url 'user_profile' ca.user.username %}" class="text-primary font-medium hover:underline">@{{ ca.user.username }}</a>{% if not forloop.last %},{% endif %}
-                        {% endfor %}
-                    </p>
+                    <span class="text-xs text-muted-foreground">· with {% for ca in accepted_coauthors %}<a href="{% url 'user_profile' ca.user.username %}" class="text-primary font-medium hover:underline">@{{ ca.user.username }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</span>
                     {% endif %}
                 </div>
-                {% endif %}
             </div>
-            <div class="flex items-center gap-2 flex-wrap">
-                <span class="px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-sm">
-                    {{ post.category }}
-                </span>
-                {% if post.mood %}
-                <span class="px-2.5 py-1 border border-border rounded-full text-xs font-semibold bg-secondary/60 text-secondary-foreground">{{ post.get_mood_display }}</span>
-                {% endif %}
-                {% if post.reading_time_minutes %}
-                <span class="px-2.5 py-1 border border-border rounded-full text-xs text-muted-foreground font-medium">📖 {{ post.reading_time_minutes }} min read</span>
-                {% endif %}
-                {% if is_post_creator %}
-                <a href="{% url 'creator_analytics' post.id %}" class="px-2.5 py-1 border border-border rounded-full text-xs text-muted-foreground font-medium hover:text-primary hover:border-primary/40 transition-colors ml-auto">📊 Analytics</a>
-                {% endif %}
+            {% endif %}
+            <!-- Category + meta badges aligned right -->
+            <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                <span class="px-2.5 py-0.5 bg-secondary text-secondary-foreground rounded-full text-xs font-medium">{{ post.category }}</span>
+                <div class="flex items-center gap-1">
+                    {% if post.mood %}<span class="px-2 py-0.5 border border-border rounded-full text-[10px] font-semibold bg-secondary/60 text-secondary-foreground">{{ post.get_mood_display }}</span>{% endif %}
+                    {% if post.reading_time_minutes %}<span class="px-2 py-0.5 border border-border rounded-full text-[10px] text-muted-foreground font-medium">📖 {{ post.reading_time_minutes }}m</span>{% endif %}
+                    {% if is_post_creator %}<a href="{% url 'creator_analytics' post.id %}" class="px-2 py-0.5 border border-border rounded-full text-[10px] text-muted-foreground font-medium hover:text-primary hover:border-primary/40 transition-colors">📊</a>{% endif %}
+                </div>
             </div>
         </div>
 
@@ -211,17 +197,19 @@
         }
         </script>
 
-        <!-- Hashtags + Share + Follow — single compact row -->
-        <div class="mb-2 flex flex-wrap items-center gap-1.5">
-            {% if post.hashtags %}
+        <!-- Hashtags row -->
+        {% if post.hashtags %}
+        <div class="mb-1.5 flex flex-wrap gap-1">
             {% for hashtag in post.get_hashtags_list %}
             <a href="{% url 'hashtag_search' %}?tag={{ hashtag }}"
                class="inline-flex items-center px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-600 dark:text-cyan-400 text-[11px] font-medium hover:bg-cyan-500/20 transition">
                 #{{ hashtag }}
             </a>
             {% endfor %}
-            {% endif %}
-            <span class="text-border/70 text-[11px] mx-0.5">·</span>
+        </div>
+        {% endif %}
+        <!-- Share + Follow row -->
+        <div class="mb-2 flex items-center gap-1.5 flex-wrap">
             <span class="text-[11px] font-semibold text-muted-foreground">Share:</span>
             <a href="https://twitter.com/intent/tweet?text={{ post.title|urlencode }}&url={{ request.build_absolute_uri|urlencode }}" target="_blank" rel="noopener" title="𝕏 Twitter"
                class="inline-flex items-center px-2 py-0.5 rounded-full border border-border text-[11px] text-muted-foreground hover:text-blue-500 hover:border-blue-400 transition-colors">𝕏</a>
@@ -234,9 +222,8 @@
             <button onclick="navigator.clipboard.writeText(window.location.href).then(function(){this.textContent='✓';var b=this;setTimeout(function(){b.textContent='🔗';},1200);}.bind(this))"
                title="Copy link" class="inline-flex items-center px-2 py-0.5 rounded-full border border-border text-[11px] text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors">🔗</button>
             {% if user.is_authenticated and not is_post_creator %}
-            <span class="text-border/70 text-[11px] mx-0.5">·</span>
             <button id="follow-post-btn" type="button" onclick="togglePostFollow('{{ post.id }}')"
-                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition border
+                    class="ml-auto inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition border
                     {% if is_following_post %}border-border text-muted-foreground hover:text-destructive hover:border-destructive/40{% else %}border-primary/50 text-primary hover:bg-primary/8{% endif %}">
                 {% if is_following_post %}✓ Following{% else %}+ Follow{% endif %}
             </button>
