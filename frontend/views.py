@@ -1485,6 +1485,10 @@ def discussion(request, post_id):
                 if already_in:
                     mode  = 'waiting'
                     label = 'Waiting…'
+                elif user_vote_type in ('yes', 'no') and not _can_pre_join(yes_pre, no_pre, user_vote_type):
+                    # User's side is full or imbalanced — show View Debate upfront
+                    mode  = 'view'
+                    label = 'View Debate'
                 else:
                     mode  = 'join'
                     label = 'Join Debate'
@@ -3832,6 +3836,55 @@ def _handle_start_review_debate(request, review_comment_id):
                 DebateParticipant.objects.create(debate=accepted_debate, user=request.user, side=chosen_side, is_active=False)
             return JsonResponse({'success': True, 'queued': True, 'message': 'Debate is full. You can view it.', 'redirect_url': f'/debates/{accepted_debate.id}/chat/'})
 
+        # Single-side full check (missing from original review path)
+        active_side_count = active_counts.get(chosen_side, 0)
+        side_limit = accepted_debate.yes_supporters if chosen_side == 'yes' else accepted_debate.no_supporters
+        if side_limit and active_side_count >= side_limit:
+            if not participant:
+                DebateParticipant.objects.create(debate=accepted_debate, user=request.user, side=chosen_side, is_active=False)
+            return JsonResponse({
+                'success': True, 'queued': True,
+                'message': f'{chosen_side.upper()} side is full. You can view the debate.',
+                'redirect_url': f'/debates/{accepted_debate.id}/chat/'
+            })
+
+        # Controller imbalance: block the over-represented side when controller's side is far behind
+        if (accepted_debate.end_controller_id
+                and accepted_debate.end_controller_side
+                and chosen_side != accepted_debate.end_controller_side):
+            ctrl_side   = accepted_debate.end_controller_side
+            ctrl_active = active_counts.get(ctrl_side, 0)
+            ctrl_limit  = accepted_debate.yes_supporters if ctrl_side == 'yes' else accepted_debate.no_supporters
+            if (ctrl_limit > 0
+                    and ctrl_active < ctrl_limit * 0.5
+                    and active_side_count >= max(ctrl_active * 2, 1)):
+                if not participant:
+                    DebateParticipant.objects.create(debate=accepted_debate, user=request.user, side=chosen_side, is_active=False)
+                Notification.objects.get_or_create(
+                    user=accepted_debate.end_controller,
+                    notification_type='author_debate',
+                    defaults={
+                        'post': None,
+                        'message': (
+                            f"⚠️ The {chosen_side.upper()} side now has {active_side_count + 1} participants "
+                            f"but only {ctrl_active} from the {ctrl_side.upper()} side have joined. "
+                            f"Consider inviting more {ctrl_side.upper()} participants to balance the debate."
+                        ),
+                    }
+                )
+                ctrl_label = ctrl_side.upper()
+                return JsonResponse({
+                    'success': False,
+                    'can_view': True,
+                    'debate_id': accepted_debate.id,
+                    'error': (
+                        f"The {ctrl_label} side only has {ctrl_active} participant"
+                        f"{'s' if ctrl_active != 1 else ''} so far — please wait for more "
+                        f"{ctrl_label} participants before the debate can be balanced. "
+                        f"You can view the debate in the meantime."
+                    ),
+                })
+
         if participant:
             participant.is_active = True
             participant.left_at = None
@@ -3860,12 +3913,27 @@ def _handle_start_review_debate(request, review_comment_id):
         # Try to pre-join
         yes_pre, no_pre = _pending_side_counts(pending)
         if not _can_pre_join(yes_pre, no_pre, desired_side):
-            my_count = yes_pre if desired_side == 'yes' else no_pre
+            my_count    = yes_pre if desired_side == 'yes' else no_pre
+            other_count = no_pre  if desired_side == 'yes' else yes_pre
+            my_label    = desired_side.upper()
+            other_label = 'NO' if desired_side == 'yes' else 'YES'
             if my_count >= PRE_JOIN_LIMIT:
-                return JsonResponse({'success': False,
-                                     'error': f'Your side is already full ({PRE_JOIN_LIMIT}/{PRE_JOIN_LIMIT} pre-joined).'})
-            return JsonResponse({'success': False,
-                                 'error': 'The other side needs to catch up first. Try again shortly.'})
+                return JsonResponse({
+                    'success': False, 'can_view': True, 'debate_id': pending.id,
+                    'error': (
+                        f'The {my_label} side is already full ({PRE_JOIN_LIMIT}/{PRE_JOIN_LIMIT}). '
+                        f'You can view the debate while you wait for a spot.'
+                    ),
+                })
+            return JsonResponse({
+                'success': False, 'can_view': True, 'debate_id': pending.id,
+                'error': (
+                    f"You can't join the {my_label} side yet — there "
+                    f"{'is only' if other_count == 1 else 'are only'} {other_count} "
+                    f"{other_label} user{'s' if other_count != 1 else ''} so far. "
+                    f"You can view the debate until a {other_label} user joins to keep it balanced."
+                ),
+            })
         DebateParticipant.objects.create(debate=pending, user=request.user, side=desired_side, is_active=True)
         yes_pre2, no_pre2 = _pending_side_counts(pending)
         return JsonResponse({'success': True, 'pre_joined': True,
@@ -4234,6 +4302,46 @@ def start_debate(request):
                     'message': f'{side_label} side is full right now. You can view the conversation.',
                     'redirect_url': f'/debates/{accepted_debate.id}/chat/'
                 })
+
+            # Controller imbalance: block the over-represented side when controller's side is far behind
+            if (accepted_debate.end_controller_id
+                    and accepted_debate.end_controller_side
+                    and side != accepted_debate.end_controller_side):
+                ctrl_side   = accepted_debate.end_controller_side
+                ctrl_active = active_counts.get(ctrl_side, 0)
+                ctrl_limit  = accepted_debate.yes_supporters if ctrl_side == 'yes' else accepted_debate.no_supporters
+                # Trigger when: limits are set, controller's side is < 50% full, joining side >= 2× controller side
+                if (ctrl_limit > 0
+                        and ctrl_active < ctrl_limit * 0.5
+                        and active_side_count >= max(ctrl_active * 2, 1)):
+                    if not participant:
+                        DebateParticipant.objects.create(
+                            debate=accepted_debate, user=request.user, side=side, is_active=False)
+                    # Notify the controller once per joiner (don't spam)
+                    Notification.objects.get_or_create(
+                        user=accepted_debate.end_controller,
+                        notification_type='author_debate',
+                        defaults={
+                            'post': accepted_debate.post if accepted_debate.post_id else None,
+                            'message': (
+                                f"⚠️ The {side.upper()} side now has {active_side_count + 1} participants "
+                                f"but only {ctrl_active} from the {ctrl_side.upper()} side have joined. "
+                                f"Consider inviting more {ctrl_side.upper()} participants to balance the debate."
+                            ),
+                        }
+                    )
+                    ctrl_label = ctrl_side.upper()
+                    return JsonResponse({
+                        'success': False,
+                        'can_view': True,
+                        'debate_id': accepted_debate.id,
+                        'error': (
+                            f"The {ctrl_label} side only has {ctrl_active} participant"
+                            f"{'s' if ctrl_active != 1 else ''} so far — please wait for more "
+                            f"{ctrl_label} participants to join before the debate can be balanced. "
+                            f"You can view the debate in the meantime."
+                        ),
+                    })
 
             if participant:
                 participant.is_active = True
@@ -6556,12 +6664,51 @@ def review_detail(request, review_id):
             ).values_list('debate__review_comment_id', flat=True)
         )
 
+    # Precompute pending debate state for all comments in one pass
+    pending_debate_by_comment = {}
+    pending_pre_join_counts = {}
+    user_prejoined_review_ids = set()
+    side_map_review = {'agree': 'yes', 'disagree': 'no'}
+    user_review_side = side_map_review.get(user_reaction.reaction) if user_reaction else None
+    all_comment_ids = [c.id for c in comments]
+    if request.user.is_authenticated and all_comment_ids:
+        for d in Debate.objects.filter(review_comment_id__in=all_comment_ids, status='pending'):
+            if d.review_comment_id not in pending_debate_by_comment:
+                pending_debate_by_comment[d.review_comment_id] = d
+        if pending_debate_by_comment:
+            p_ids = list({d.id for d in pending_debate_by_comment.values()})
+            for row in DebateParticipant.objects.filter(
+                debate_id__in=p_ids, is_active=True
+            ).values('debate_id', 'side').annotate(n=Count('id')):
+                pending_pre_join_counts[(row['debate_id'], row['side'])] = row['n']
+            user_prejoined_review_ids = set(
+                DebateParticipant.objects.filter(
+                    debate_id__in=p_ids, user=request.user
+                ).values_list('debate_id', flat=True)
+            )
+
     def enrich(c):
         active_debate = c.debates.filter(status='accepted').first()
+        pending_debate = pending_debate_by_comment.get(c.id) if not active_debate else None
+        pending_view_only = False
+        pending_user_in   = False
+        if pending_debate and user_review_side:
+            already_in = (pending_debate.id in user_prejoined_review_ids
+                          or pending_debate.initiator_id == request.user.id)
+            if already_in:
+                pending_user_in = True
+            else:
+                p_yes = pending_pre_join_counts.get((pending_debate.id, 'yes'), 0)
+                p_no  = pending_pre_join_counts.get((pending_debate.id, 'no'),  0)
+                if not _can_pre_join(p_yes, p_no, user_review_side):
+                    pending_view_only = True
         return {
             'comment': c,
             'user_reaction': user_comment_reactions.get(c.id),
             'active_debate': active_debate,
+            'pending_debate': pending_debate,
+            'pending_view_only': pending_view_only,
+            'pending_user_in': pending_user_in,
             'debate_start_blocked': c.id in blocked_review_comment_ids,
         }
 
@@ -11364,6 +11511,12 @@ def stock_prediction_detail(request, post_id):
         if pending_debates_qs:
             pending_ids = [d.id for d in pending_debates_qs]
             user_prejoined_set = set(DebateParticipant.objects.filter(debate_id__in=pending_ids, user=request.user).values_list('debate_id', flat=True))
+            disc_pending_counts = {
+                (row['debate_id'], row['side']): row['total']
+                for row in DebateParticipant.objects.filter(
+                    debate_id__in=pending_ids, is_active=True,
+                ).values('debate_id', 'side').annotate(total=Count('id'))
+            }
             pending_by_target = {}
             for d in pending_debates_qs:
                 if d.target_id not in pending_by_target:
@@ -11372,8 +11525,17 @@ def stock_prediction_detail(request, post_id):
                 if target_id in debate_lookup:
                     continue
                 already_in = debate.id in user_prejoined_set or debate.initiator_id == request.user.id
-                mode = 'waiting' if already_in else 'join'
-                label = 'Waiting…' if already_in else 'Join Debate'
+                if already_in:
+                    mode, label = 'waiting', 'Waiting…'
+                elif user_vote_type in ('yes', 'no'):
+                    yes_pre = disc_pending_counts.get((debate.id, 'yes'), 0)
+                    no_pre  = disc_pending_counts.get((debate.id, 'no'),  0)
+                    if not _can_pre_join(yes_pre, no_pre, user_vote_type):
+                        mode, label = 'view', 'View Debate'
+                    else:
+                        mode, label = 'join', 'Join Debate'
+                else:
+                    mode, label = 'join', 'Join Debate'
                 debate_lookup[target_id] = {'id': debate.id, 'mode': mode, 'label': label, 'chat_url': f'/debates/{debate.id}/chat/'}
 
         all_visible_ids = [c.id for c in [*agree_comments, *disagree_comments]]

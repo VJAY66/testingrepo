@@ -1026,6 +1026,8 @@ function spToggleFollow() {
 }
 
 // ── Start Debate (reuse platform logic) ─────────────────────
+var _spDebatePollInterval = null;
+
 function startDebate(commentId, triggerEl) {
     fetch('{% url "start_debate" %}', {
         method: 'POST',
@@ -1036,12 +1038,80 @@ function startDebate(commentId, triggerEl) {
     .then(function(data) {
         if (data.success) {
             if (data.redirect_url) { window.location.href = data.redirect_url; return; }
-            if (triggerEl) { triggerEl.textContent = 'Challenge sent!'; triggerEl.disabled = true; }
+            showInlineActionPopup(triggerEl, data.message || 'Challenge sent!', 'success');
+            if (data.debate_id) {
+                _spStartDebateStatusPolling(data.debate_id, triggerEl,
+                    data.pre_join_yes || null, data.pre_join_no || null);
+            }
+        } else if (data.can_view && data.debate_id) {
+            _spShowCanViewPopup(triggerEl, data.error, data.debate_id);
         } else {
-            alert(data.error || 'Failed to start debate.');
+            showInlineActionPopup(triggerEl, data.error || 'Failed to start debate.', 'error');
         }
     })
-    .catch(function() { alert('Network error.'); });
+    .catch(function() { window.showToast && window.showToast('Failed to start debate.', 'error'); });
+}
+
+function _spShowCanViewPopup(triggerEl, message, debateId) {
+    var old = document.getElementById('sp-canview-popup');
+    if (old) old.remove();
+    var box = document.createElement('div');
+    box.id = 'sp-canview-popup';
+    box.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;background:hsl(var(--card));color:hsl(var(--foreground));border:1px solid hsl(var(--border));border-radius:14px;padding:14px 16px;font-size:13px;font-weight:500;box-shadow:0 4px 24px rgba(0,0,0,.18);max-width:320px;display:flex;flex-direction:column;gap:10px';
+    var msg = document.createElement('p');
+    msg.style.cssText = 'margin:0;line-height:1.5';
+    msg.textContent = message;
+    var actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:8px;align-items:center';
+    var viewBtn = document.createElement('a');
+    viewBtn.href = '/debates/' + debateId + '/chat/';
+    viewBtn.textContent = 'View Debate';
+    viewBtn.style.cssText = 'display:inline-flex;align-items:center;padding:6px 14px;border-radius:999px;background:hsl(var(--primary));color:hsl(var(--primary-foreground));font-size:12px;font-weight:700;text-decoration:none';
+    var closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Dismiss';
+    closeBtn.style.cssText = 'padding:6px 12px;border-radius:999px;border:1px solid hsl(var(--border));background:transparent;color:hsl(var(--muted-foreground));font-size:12px;font-weight:600;cursor:pointer';
+    closeBtn.onclick = function() { box.remove(); };
+    actions.appendChild(viewBtn);
+    actions.appendChild(closeBtn);
+    box.appendChild(msg);
+    box.appendChild(actions);
+    document.body.appendChild(box);
+    setTimeout(function() { if (box.parentNode) box.remove(); }, 10000);
+}
+
+function _spStartDebateStatusPolling(debateId, triggerEl, initYes, initNo) {
+    if (_spDebatePollInterval) clearInterval(_spDebatePollInterval);
+    var dots = 0;
+    var indicator = document.createElement('div');
+    indicator.id = 'sp-debate-waiting';
+    indicator.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;background:hsl(var(--primary));color:hsl(var(--primary-foreground));padding:12px 18px;border-radius:12px;font-size:13px;font-weight:700;box-shadow:0 4px 20px rgba(0,0,0,.25);display:flex;flex-direction:column;gap:6px';
+    var oldInd = document.getElementById('sp-debate-waiting');
+    if (oldInd) oldInd.remove();
+    var statusLine = document.createElement('span');
+    var countsLine = document.createElement('span');
+    countsLine.style.cssText = 'font-size:11px;font-weight:500;opacity:.85';
+    function updateCounts(y, n) {
+        if (y !== null && n !== null) countsLine.textContent = '✅ ' + y + ' YES  ❌ ' + n + ' NO waiting';
+    }
+    updateCounts(initYes, initNo);
+    indicator.appendChild(statusLine);
+    indicator.appendChild(countsLine);
+    document.body.appendChild(indicator);
+    _spDebatePollInterval = setInterval(function() {
+        dots = (dots + 1) % 4;
+        statusLine.textContent = 'Waiting for opponent' + '.'.repeat(dots);
+        fetch('/debates/' + debateId + '/status/')
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.status === 'accepted' && d.redirect_url) {
+                    clearInterval(_spDebatePollInterval);
+                    indicator.remove();
+                    window.location.href = d.redirect_url;
+                } else if (d.pre_join_yes !== undefined) {
+                    updateCounts(d.pre_join_yes, d.pre_join_no);
+                }
+            }).catch(function() {});
+    }, 4000);
 }
 </script>
 {% endblock %}
