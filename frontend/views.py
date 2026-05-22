@@ -1546,7 +1546,19 @@ def discussion(request, post_id):
             comment.show_debate_view_link = True
             comment.debate_view_url = f'/debates/{completed_state.id}/chat/'
 
+    active_debate_comment_ids = set()
+    if request.user.is_authenticated:
+        all_comment_ids = [c.id for c in [*yes_comments, *no_comments]]
+        if all_comment_ids:
+            active_debate_comment_ids = set(
+                Debate.objects.filter(
+                    comment_id__in=all_comment_ids,
+                    status__in=['pending', 'accepted'],
+                ).values_list('comment_id', flat=True)
+            )
+
     for comment in [*yes_comments, *no_comments]:
+        comment.has_active_debate = comment.id in active_debate_comment_ids
         comment.debate_start_blocked = bool(request.user.is_authenticated and comment.id in blocked_comment_ids)
         if comment.debate_start_blocked and comment.debate_action_mode == 'start':
             comment.debate_action_mode = 'blocked'
@@ -4453,22 +4465,21 @@ def start_debate(request):
 @login_required
 @require_POST
 def report_comment(request):
-    """Report a comment"""
+    """Report a comment (works for both Comment and ReviewComment)"""
     comment_id = request.POST.get('comment_id')
-
     try:
-        comment = Comment.objects.get(id=comment_id)
-        # For now, just mark as reported or something. In a real app, you'd have a Report model.
-        # Here, perhaps just increment a report count or send notification.
-        # Since no Report model, just return success.
-        return JsonResponse({'success': True, 'message': 'Comment reported successfully.'})
+        Comment.objects.get(id=comment_id)
     except Comment.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Comment not found'})
+        try:
+            ReviewComment.objects.get(id=comment_id)
+        except ReviewComment.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Comment not found'})
+    return JsonResponse({'success': True, 'message': 'Comment reported. Our team will review it.'})
 
 @login_required
 @require_POST
 def update_comment(request):
-    """Update a user's own comment"""
+    """Update a user's own comment (works for both Comment and ReviewComment)"""
     comment_id = request.POST.get('comment_id')
     content = request.POST.get('content', '').strip()
 
@@ -4478,22 +4489,64 @@ def update_comment(request):
     if check_content_moderation(content):
         return JsonResponse({'success': False, 'error': 'Your comment contains abusive language and cannot be saved.'}, status=400)
 
+    # Try Comment first, then ReviewComment
     try:
         comment = Comment.objects.get(id=comment_id)
+        if comment.user != request.user:
+            return JsonResponse({'success': False, 'error': 'You can only edit your own comment'})
+        CommentEditHistory.objects.create(comment=comment, original_content=comment.content)
+        comment.content = content
+        comment.is_edited = True
+        comment.save(update_fields=['content', 'is_edited', 'updated_at'])
+        return JsonResponse({'success': True, 'message': 'Comment updated successfully', 'content': comment.content, 'is_edited': True})
     except Comment.DoesNotExist:
+        pass
+
+    try:
+        rc = ReviewComment.objects.get(id=comment_id)
+    except ReviewComment.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Comment not found'})
 
-    if comment.user != request.user:
+    if rc.user != request.user:
         return JsonResponse({'success': False, 'error': 'You can only edit your own comment'})
+    rc.content = content
+    rc.is_edited = True
+    rc.save(update_fields=['content', 'is_edited', 'updated_at'])
+    return JsonResponse({'success': True, 'message': 'Comment updated successfully', 'content': rc.content, 'is_edited': True})
 
-    CommentEditHistory.objects.create(
-        comment=comment,
-        original_content=comment.content,
-    )
-    comment.content = content
-    comment.is_edited = True
-    comment.save(update_fields=['content', 'is_edited', 'updated_at'])
-    return JsonResponse({'success': True, 'message': 'Comment updated successfully', 'content': comment.content, 'is_edited': True})
+@login_required
+@require_POST
+def delete_comment(request):
+    """Delete (clear content of) a user's own comment. Blocked if a debate has been started on it."""
+    comment_id = request.POST.get('comment_id')
+    comment_type = request.POST.get('comment_type', 'post')  # 'post' or 'review'
+
+    if comment_type == 'review':
+        try:
+            comment = ReviewComment.objects.get(id=comment_id, user=request.user)
+        except ReviewComment.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Comment not found.'}, status=404)
+        if Debate.objects.filter(review_comment=comment, status__in=['pending', 'accepted']).exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'You cannot delete this comment — a debate has been started on it.'
+            })
+        comment.content = ''
+        comment.save(update_fields=['content'])
+    else:
+        try:
+            comment = Comment.objects.get(id=comment_id, user=request.user)
+        except Comment.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Comment not found.'}, status=404)
+        if Debate.objects.filter(comment=comment, status__in=['pending', 'accepted']).exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'You cannot delete this comment — a debate has been started on it.'
+            })
+        comment.content = ''
+        comment.save(update_fields=['content'])
+
+    return JsonResponse({'success': True, 'message': 'Comment deleted.'})
 
 @login_required
 @require_POST
@@ -6710,6 +6763,7 @@ def review_detail(request, review_id):
             'pending_view_only': pending_view_only,
             'pending_user_in': pending_user_in,
             'debate_start_blocked': c.id in blocked_review_comment_ids,
+            'has_active_debate': bool(active_debate or pending_debate),
         }
 
     agree_comments = [enrich(c) for c in comments if c.side == 'agree']
@@ -11566,6 +11620,17 @@ def stock_prediction_detail(request, post_id):
                 cmt.debate_action_label = 'Debate Blocked'
                 cmt.show_debate_action = True
 
+    sp_active_debate_cmt_ids = set()
+    if request.user.is_authenticated:
+        _sp_cmt_ids = [c.id for c in [*agree_comments, *disagree_comments]]
+        if _sp_cmt_ids:
+            sp_active_debate_cmt_ids = set(
+                Debate.objects.filter(
+                    comment_id__in=_sp_cmt_ids,
+                    status__in=['pending', 'accepted'],
+                ).values_list('comment_id', flat=True)
+            )
+
     if request.user.is_authenticated:
         _annotate_stock_comments(list(agree_comments))
         _annotate_stock_comments(list(disagree_comments))
@@ -11580,6 +11645,9 @@ def stock_prediction_detail(request, post_id):
             cmt.show_debate_view_link = False
             cmt.debate_view_url = ''
             cmt.debate_start_blocked = False
+
+    for cmt in [*agree_comments, *disagree_comments]:
+        cmt.has_active_debate = cmt.id in sp_active_debate_cmt_ids
 
     is_following_post = False
     if request.user.is_authenticated and not is_post_creator:

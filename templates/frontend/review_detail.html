@@ -596,5 +596,40 @@ function saveRcEdit(commentId) {
     .catch(function() { showToast('Failed to update comment.', 'error'); })
     .finally(function() { if (saveBtn) saveBtn.disabled = false; });
 }
+
+function reportRcComment(commentId) {
+  if (!confirm('Are you sure you want to report this comment?')) return;
+  fetch('{% url "report_comment" %}', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': CSRF_TOKEN},
+    body: 'comment_id=' + encodeURIComponent(commentId)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.success) showToast(data.message, 'success');
+    else showToast('Failed to report comment.', 'error');
+  })
+  .catch(function() { showToast('Failed to report comment.', 'error'); });
+}
+
+function deleteRcComment(commentId) {
+  if (!confirm('Delete this comment? This cannot be undone.')) return;
+  fetch('{% url "delete_comment" %}', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': CSRF_TOKEN},
+    body: 'comment_id=' + encodeURIComponent(commentId) + '&comment_type=review'
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.success) {
+      var contentEl = document.getElementById('rc-content-' + commentId);
+      if (contentEl) { contentEl.textContent = ''; contentEl.classList.add('hidden'); }
+      showToast(data.message || 'Comment deleted.', 'success');
+    } else {
+      showToast(data.error || 'Could not delete comment.', 'error');
+    }
+  })
+  .catch(function() { showToast('Could not delete comment.', 'error'); });
+}
 </script>
 {% endblock %}

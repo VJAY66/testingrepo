@@ -91,6 +91,10 @@
     {% endif %}
     {% if user.is_authenticated and user == cw.comment.user %}
     <button type="button" onclick="openRcEditor('{{ cw.comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Edit</button>
+    {% if not cw.has_active_debate %}<button type="button" onclick="deleteRcComment('{{ cw.comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-destructive/40 hover:text-destructive">Delete</button>{% endif %}
+    {% endif %}
+    {% if user.is_authenticated and user != cw.comment.user %}
+    <button type="button" onclick="reportRcComment('{{ cw.comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Report</button>
     {% endif %}
   </div>
   {% if user.is_authenticated and user == cw.comment.user %}

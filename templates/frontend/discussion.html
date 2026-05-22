@@ -798,6 +798,7 @@
                                 {% endif %}
                                 {% if user == comment.user %}
                                 <button onclick="openCommentEditor('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Edit</button>
+                                {% if not comment.has_active_debate %}<button onclick="deleteComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-destructive/40 hover:text-destructive">Delete</button>{% endif %}
                                 {% endif %}
                                 {% if is_post_creator %}
                                 {% if comment.is_pinned %}
@@ -806,7 +807,7 @@
                                 <button onclick="pinComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-yellow-400/60 hover:text-yellow-600 transition">📌 Pin</button>
                                 {% endif %}
                                 {% endif %}
-                                <button onclick="reportComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Report</button>
+                                {% if user != comment.user %}<button onclick="reportComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Report</button>{% endif %}
                             </div>
                             {% if user == comment.user %}
                             <div id="comment-editor-{{ comment.id }}" class="hidden mt-2 space-y-1.5 rounded-lg border border-border bg-background/70 p-2">
@@ -896,6 +897,7 @@
                                 {% endif %}
                                 {% if user == comment.user %}
                                 <button onclick="openCommentEditor('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Edit</button>
+                                {% if not comment.has_active_debate %}<button onclick="deleteComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-destructive/40 hover:text-destructive">Delete</button>{% endif %}
                                 {% endif %}
                                 {% if is_post_creator %}
                                 {% if comment.is_pinned %}
@@ -904,7 +906,7 @@
                                 <button onclick="pinComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-yellow-400/60 hover:text-yellow-600 transition">📌 Pin</button>
                                 {% endif %}
                                 {% endif %}
-                                <button onclick="reportComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Report</button>
+                                {% if user != comment.user %}<button onclick="reportComment('{{ comment.id }}')" class="inline-flex items-center rounded-full border border-border/70 bg-background/70 text-[9px] px-1.5 py-0.5 text-muted-foreground hover:border-primary/40 hover:text-foreground">Report</button>{% endif %}
                             </div>
                             {% if user == comment.user %}
                             <div id="comment-editor-{{ comment.id }}" class="hidden mt-2 space-y-1.5 rounded-lg border border-border bg-background/70 p-2">
@@ -1443,6 +1445,26 @@ function reportComment(commentId) {
         })
         .catch(() => window.showToast('Failed to report comment.', 'error'));
     }
+}
+
+function deleteComment(commentId) {
+    if (!confirm('Delete this comment? This cannot be undone.')) return;
+    fetch('{% url "delete_comment" %}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': getCSRFToken()},
+        body: 'comment_id=' + encodeURIComponent(commentId) + '&comment_type=post'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const contentEl = document.getElementById('comment-content-' + commentId);
+            if (contentEl) { contentEl.textContent = ''; contentEl.classList.add('hidden'); }
+            window.showToast(data.message || 'Comment deleted.', 'success');
+        } else {
+            window.showToast(data.error || 'Could not delete comment.', 'error');
+        }
+    })
+    .catch(() => window.showToast('Could not delete comment.', 'error'));
 }
 
 function openCommentEditor(commentId) {
