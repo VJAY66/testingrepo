@@ -525,6 +525,7 @@ function setBadge(item, show) {
 function refreshUnreadBadges() {
     var lr = getLastRead();
     document.querySelectorAll('.ch-item[data-chat-id]').forEach(function(item) {
+        // Force-remove badge on active item before any calculations
         if (item.classList.contains('active')) {
             var activeBadge = item.querySelector('.ch-unread-badge');
             if (activeBadge) activeBadge.remove();
@@ -655,7 +656,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function openDesktopChat(chatId, btn) {
-    // Synchronously save previous chat as fully read (race condition fix)
+    // Synchronously save the PREVIOUS active chat as fully read before switching.
+    // This prevents the race condition where markActiveChatRead()'s async fetch
+    // hasn't returned yet when refreshUnreadBadges() runs for the old chat.
     if (activeChatId && activeChatId !== String(chatId)) {
         var prevBtn = document.querySelector('.ch-item[data-chat-id="' + activeChatId + '"]');
         if (prevBtn) {
@@ -671,6 +674,7 @@ function openDesktopChat(chatId, btn) {
         window._debateCleanup();
         window._debateCleanup = null;
     }
+
 
     activeChatId = String(chatId);
     document.querySelectorAll('.ch-item.active').forEach(function(item) { item.classList.remove('active'); });
