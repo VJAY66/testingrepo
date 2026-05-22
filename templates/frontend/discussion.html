@@ -769,28 +769,34 @@
                         <div class="px-2.5 py-2">
                             <p id="comment-content-{{ comment.id }}" class="text-xs leading-relaxed font-medium text-foreground break-words {% if not comment.content %}hidden{% endif %}">{{ comment.content }}</p>
                             {% if comment.is_edited %}<button type="button" id="comment-edited-badge-{{ comment.id }}" onclick="openEditHistory('comment','{{ comment.id }}')" class="text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% else %}<button type="button" id="comment-edited-badge-{{ comment.id }}" class="hidden text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% endif %}
-                            <div class="mt-1.5 flex flex-wrap items-center gap-1 text-muted-foreground">
+                            <div class="mt-1.5 flex items-center gap-1.5 text-muted-foreground">
                                 {% if comment.is_anonymous and comment.user != user %}
                                 <div class="flex h-5 w-5 flex-none items-center justify-center rounded-full border border-dashed border-border bg-muted text-[9px] text-muted-foreground">?</div>
-                                <p class="font-medium text-[11px] leading-4 truncate min-w-0 italic text-muted-foreground">Anonymous</p>
+                                <div class="flex flex-col min-w-0">
+                                    <p class="font-medium text-[11px] leading-4 truncate italic text-muted-foreground">Anonymous</p>
+                                </div>
                                 {% else %}
                                 {% with pic=comment.user.profile.get_picture_url %}
                                 {% if pic %}
-                                <img src="{{ pic }}" alt="{{ comment.user.username }}" class="h-5 w-5 rounded-full object-cover border border-border" loading="lazy">
+                                <img src="{{ pic }}" alt="{{ comment.user.username }}" class="h-5 w-5 flex-none rounded-full object-cover border border-border" loading="lazy">
                                 {% else %}
                                 <div class="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-secondary text-secondary-foreground text-[9px] font-semibold">
                                     {{ comment.user.username|first|upper }}
                                 </div>
                                 {% endif %}
                                 {% endwith %}
-                                <p class="font-medium text-[11px] leading-4 truncate min-w-0">{{ comment.user.username }}{% if comment.is_anonymous %} <span class="text-[9px] text-amber-500">(you, anon)</span>{% endif %}</p>
-                                <span title="{% if comment.is_online %}Active now{% else %}{{ comment.presence_label }}{% endif %}" class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold {% if comment.is_online %}bg-emerald-500/15 text-emerald-700 dark:text-emerald-300{% else %}bg-gray-500/15 text-gray-600 dark:text-gray-300{% endif %}">
-                                    <span class="h-1.5 w-1.5 rounded-full {% if comment.is_online %}bg-emerald-500{% else %}bg-gray-400{% endif %}"></span>
-                                    {% if comment.is_online %}Online{% else %}Offline{% endif %}
-                                </span>
-                                {% endif %}
-                                {% if top_yes_comment_id and comment.id == top_yes_comment_id %}
-                                <span class="inline-flex items-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 text-[9px] font-semibold">⭐ Top</span>
+                                <div class="flex flex-col min-w-0">
+                                    <p class="font-medium text-[11px] leading-4 truncate">{{ comment.user.username }}{% if comment.is_anonymous %} <span class="text-[9px] text-amber-500">(you, anon)</span>{% endif %}</p>
+                                    <div class="flex items-center gap-1 mt-0.5">
+                                        <span title="{% if comment.is_online %}Active now{% else %}{{ comment.presence_label }}{% endif %}" class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold {% if comment.is_online %}bg-emerald-500/15 text-emerald-700 dark:text-emerald-300{% else %}bg-gray-500/15 text-gray-600 dark:text-gray-300{% endif %}">
+                                            <span class="h-1.5 w-1.5 rounded-full {% if comment.is_online %}bg-emerald-500{% else %}bg-gray-400{% endif %}"></span>
+                                            {% if comment.is_online %}Online{% else %}Offline{% endif %}
+                                        </span>
+                                        {% if top_yes_comment_id and comment.id == top_yes_comment_id %}
+                                        <span class="inline-flex items-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 text-[9px] font-semibold">⭐ Top</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
                                 {% endif %}
                             </div>
                             {% if user.is_authenticated %}
@@ -861,28 +867,34 @@
                         <div class="px-2.5 py-2">
                             <p id="comment-content-{{ comment.id }}" class="text-xs leading-relaxed font-medium text-foreground break-words {% if not comment.content %}hidden{% endif %}">{{ comment.content }}</p>
                             {% if comment.is_edited %}<button type="button" id="comment-edited-badge-{{ comment.id }}" onclick="openEditHistory('comment','{{ comment.id }}')" class="text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% else %}<button type="button" id="comment-edited-badge-{{ comment.id }}" class="hidden text-[9px] text-muted-foreground hover:text-primary hover:underline transition-colors">edited ↗</button>{% endif %}
-                            <div class="mt-1.5 flex flex-wrap items-center gap-1 text-muted-foreground">
+                            <div class="mt-1.5 flex items-center gap-1.5 text-muted-foreground">
                                 {% if comment.is_anonymous and comment.user != user %}
                                 <div class="flex h-5 w-5 flex-none items-center justify-center rounded-full border border-dashed border-border bg-muted text-[9px] text-muted-foreground">?</div>
-                                <p class="font-medium text-[11px] leading-4 truncate min-w-0 italic text-muted-foreground">Anonymous</p>
+                                <div class="flex flex-col min-w-0">
+                                    <p class="font-medium text-[11px] leading-4 truncate italic text-muted-foreground">Anonymous</p>
+                                </div>
                                 {% else %}
                                 {% with pic=comment.user.profile.get_picture_url %}
                                 {% if pic %}
-                                <img src="{{ pic }}" alt="{{ comment.user.username }}" class="h-5 w-5 rounded-full object-cover border border-border" loading="lazy">
+                                <img src="{{ pic }}" alt="{{ comment.user.username }}" class="h-5 w-5 flex-none rounded-full object-cover border border-border" loading="lazy">
                                 {% else %}
                                 <div class="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-secondary text-secondary-foreground text-[9px] font-semibold">
                                     {{ comment.user.username|first|upper }}
                                 </div>
                                 {% endif %}
                                 {% endwith %}
-                                <p class="font-medium text-[11px] leading-4 truncate min-w-0">{{ comment.user.username }}{% if comment.is_anonymous %} <span class="text-[9px] text-amber-500">(you, anon)</span>{% endif %}</p>
-                                <span title="{% if comment.is_online %}Active now{% else %}{{ comment.presence_label }}{% endif %}" class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold {% if comment.is_online %}bg-emerald-500/15 text-emerald-700 dark:text-emerald-300{% else %}bg-gray-500/15 text-gray-600 dark:text-gray-300{% endif %}">
-                                    <span class="h-1.5 w-1.5 rounded-full {% if comment.is_online %}bg-emerald-500{% else %}bg-gray-400{% endif %}"></span>
-                                    {% if comment.is_online %}Online{% else %}Offline{% endif %}
-                                </span>
-                                {% endif %}
-                                {% if top_no_comment_id and comment.id == top_no_comment_id %}
-                                <span class="inline-flex items-center rounded-full bg-red-500/15 text-red-700 dark:text-red-300 px-1.5 py-0.5 text-[9px] font-semibold">⭐ Top</span>
+                                <div class="flex flex-col min-w-0">
+                                    <p class="font-medium text-[11px] leading-4 truncate">{{ comment.user.username }}{% if comment.is_anonymous %} <span class="text-[9px] text-amber-500">(you, anon)</span>{% endif %}</p>
+                                    <div class="flex items-center gap-1 mt-0.5">
+                                        <span title="{% if comment.is_online %}Active now{% else %}{{ comment.presence_label }}{% endif %}" class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold {% if comment.is_online %}bg-emerald-500/15 text-emerald-700 dark:text-emerald-300{% else %}bg-gray-500/15 text-gray-600 dark:text-gray-300{% endif %}">
+                                            <span class="h-1.5 w-1.5 rounded-full {% if comment.is_online %}bg-emerald-500{% else %}bg-gray-400{% endif %}"></span>
+                                            {% if comment.is_online %}Online{% else %}Offline{% endif %}
+                                        </span>
+                                        {% if top_no_comment_id and comment.id == top_no_comment_id %}
+                                        <span class="inline-flex items-center rounded-full bg-red-500/15 text-red-700 dark:text-red-300 px-1.5 py-0.5 text-[9px] font-semibold">⭐ Top</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
                                 {% endif %}
                             </div>
                             {% if user.is_authenticated %}
