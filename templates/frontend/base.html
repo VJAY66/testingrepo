@@ -6130,6 +6130,16 @@ function acceptCookies() {
                 overscroll-behavior: contain;
                 -webkit-overflow-scrolling: touch;
                 will-change: transform;
+                touch-action: pan-y;
+            }
+            #create-content-modal .cm-handle {
+                cursor: grab;
+                padding: 8px 0 4px;
+                touch-action: none;
+            }
+            #create-content-modal .cm-header {
+                touch-action: none;
+                cursor: grab;
             }
             #create-content-modal .cm-grid {
                 grid-template-columns: repeat(2, 1fr);
@@ -6171,10 +6181,10 @@ function acceptCookies() {
         }
         /* Drag handle (mobile only) */
         .cm-handle {
-            width: 36px; height: 4px;
+            width: 44px; height: 5px;
             border-radius: 99px;
             background: hsl(var(--border));
-            margin: 12px auto 0;
+            margin: 10px auto 4px;
         }
         .cm-header {
             display: flex;
@@ -6302,33 +6312,46 @@ function acceptCookies() {
     function _cmAttachDrag(card) {
         if (!card || card._cmDrag) return;
         card._cmDrag = true;
-        var startY = 0, curY = 0, dragging = false;
-        var handle = card.querySelector('.cm-handle');
-        var target = handle || card;
-        target.addEventListener('touchstart', function(e) {
+        var startY = 0, curY = 0, dragging = false, locked = false;
+        // Drag zone = handle bar + full header row
+        var dragZone = card; // whole card, but gated by scrollTop check below
+        dragZone.addEventListener('touchstart', function(e) {
             startY = e.touches[0].clientY;
             curY = 0;
-            dragging = true;
-            card.style.transition = 'none';
+            locked = false;
+            // Allow drag from anywhere when card is scrolled to top,
+            // or always allow from handle/header
+            var fromHeader = e.target.closest('.cm-handle, .cm-header');
+            dragging = fromHeader ? true : (card.scrollTop <= 0);
+            if (dragging) card.style.transition = 'none';
         }, { passive: true });
-        target.addEventListener('touchmove', function(e) {
+        dragZone.addEventListener('touchmove', function(e) {
             if (!dragging) return;
-            curY = e.touches[0].clientY - startY;
-            if (curY < 0) curY = 0;
+            var dy = e.touches[0].clientY - startY;
+            if (dy < 0) { dragging = false; card.style.transform = ''; return; }
+            curY = dy;
             card.style.transform = 'translateY(' + curY + 'px)';
+            card.style.opacity = String(Math.max(0.6, 1 - curY / 400));
         }, { passive: true });
-        target.addEventListener('touchend', function() {
+        dragZone.addEventListener('touchend', function() {
+            if (!dragging) return;
             dragging = false;
-            card.style.transition = '';
-            if (curY > 120) {
-                card.style.transform = 'translateY(100%)';
+            card.style.transition = 'transform 0.22s cubic-bezier(.4,0,.2,1), opacity 0.22s';
+            if (curY > 100) {
+                card.style.transform = 'translateY(110%)';
+                card.style.opacity = '0';
                 setTimeout(function() {
+                    card.style.transition = '';
                     card.style.transform = '';
+                    card.style.opacity = '';
                     closeCreateModal();
-                }, 200);
+                }, 230);
             } else {
                 card.style.transform = '';
+                card.style.opacity = '';
+                setTimeout(function() { card.style.transition = ''; }, 230);
             }
+            curY = 0;
         });
     }
     document.addEventListener('keydown', function(e) {
